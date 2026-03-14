@@ -1,0 +1,56 @@
+{
+  "app": {
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "C:\\Users\\lism\\.ohos\\config\\default_OpenClawNodeHarmonyOS_rwnyPsvoTBOHvjSnj5NveN5RcdWhMkMyxRsrQhDH1ho=.cer",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000001BD2F0D7EF0EA61C3AD180C934E8A7A4C52BA4D2255CBD5FF1D935DC99211D38F4D51EECAFDDCA4E",
+          "profile": "C:\\Users\\lism\\.ohos\\config\\default_OpenClawNodeHarmonyOS_rwnyPsvoTBOHvjSnj5NveN5RcdWhMkMyxRsrQhDH1ho=.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "C:\\Users\\lism\\.ohos\\config\\default_OpenClawNodeHarmonyOS_rwnyPsvoTBOHvjSnj5NveN5RcdWhMkMyxRsrQhDH1ho=.p12",
+          "storePassword": "0000001BC51EB6F8B61A395B2522028852470D88034D4E33F5FB321CEA129F5858779A635B58A364DDA4E9"
+        }
+      }
+    ],
+    "products": [
+      {
+        "name": "default",
+        "signingConfig": "default",
+        "targetSdkVersion": "6.0.2(22)",
+        "compatibleSdkVersion": "6.0.1(21)",
+        "runtimeOS": "HarmonyOS",
+        "buildOption": {
+          "strictMode": {
+            "caseSensitiveCheck": true,
+            "useNormalizedOHMUrl": true
+          }
+        }
+      }
+    ],
+    "buildModeSet": [
+      {
+        "name": "debug",
+      },
+      {
+        "name": "release"
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "entry",
+      "srcPath": "./entry",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
+    }
+  ]
+}
