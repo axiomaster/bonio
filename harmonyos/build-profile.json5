@@ -1,0 +1,46 @@
+{
+  "app": {
+    // NOTE: no signingConfigs committed on purpose — each machine adds its
+    // own signing config via DevEco Studio (File > Project Structure > Signing
+    // Configs) so private keys never end up in git. Builds are unsigned by
+    // default; sign with tools/hapsigner for system_core (see
+    // harmonyos/root_float_signing/README).
+    "products": [
+      {
+        "name": "default",
+        
+        "targetSdkVersion": "6.0.2(22)",
+        "compatibleSdkVersion": "6.0.1(21)",
+        "runtimeOS": "HarmonyOS",
+        "buildOption": {
+          "strictMode": {
+            "caseSensitiveCheck": true,
+            "useNormalizedOHMUrl": true
+          }
+        }
+      }
+    ],
+    "buildModeSet": [
+      {
+        "name": "debug",
+      },
+      {
+        "name": "release"
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "entry",
+      "srcPath": "./entry",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
+    }
+  ]
+}

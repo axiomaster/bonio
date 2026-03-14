@@ -1,0 +1,36 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "module description"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "description"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "OpenClaw Node"
+    },
+    {
+      "name": "reason_location",
+      "value": "Used to fulfill remote location requests"
+    },
+    {
+      "name": "reason_sms",
+      "value": "Used to send SMS messages on command"
+    },
+    {
+      "name": "reason_camera",
+      "value": "Used to capture photos and videos for remote monitoring"
+    },
+    {
+      "name": "reason_microphone",
+      "value": "Used to capture audio for videos and voice wake word listening"
+    },
+    {
+      "name": "reason_storage",
+      "value": "Used to save captured media files temporarily"
+    }
+  ]
+}
