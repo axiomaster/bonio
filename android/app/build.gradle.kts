@@ -1,24 +1,29 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
-    namespace = "ai.axiomaster.BoJi"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
-
+    namespace = "ai.axiomaster.boji"
+    compileSdk = 36
+    
     defaultConfig {
-        applicationId = "ai.axiomaster.BoJi"
-        minSdk = 24
+        applicationId = "ai.axiomaster.boji"
+        minSdk = 31
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    androidResources {
+        noCompress += listOf(".lottie")
+    }
+    @Suppress("DEPRECATION")
+    aaptOptions {
+        noCompress += listOf(".lottie", "lottie")
     }
 
     buildTypes {
@@ -31,11 +36,12 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -57,7 +63,34 @@ dependencies {
     // AppCompat for Lottie's AppCompatImageView requirement
     implementation("androidx.appcompat:appcompat:1.6.1")
     // Navigation Compose
-    implementation("androidx.navigation:navigation-compose:2.7.7")
+    implementation(libs.androidx.navigation.compose)
+
+    // OpenClaw Port Dependencies
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.okhttp)
+    implementation(libs.androidx.security.crypto)
+    implementation(libs.androidx.webkit)
+    implementation(libs.androidx.compose.material.icons.extended)
+    implementation(libs.bouncycastle)
+    implementation(libs.dnsjava)
+    implementation(libs.androidx.exifinterface)
+    
+    // CameraX
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.video)
+    implementation(libs.androidx.camera.view)
+
+    // Vosk offline speech recognition
+    implementation("com.alphacephei:vosk-android:0.3.75")
+
+    // Markdown
+    implementation(libs.commonmark)
+    implementation(libs.commonmark.ext.autolink)
+    implementation(libs.commonmark.ext.gfm.strikethrough)
+    implementation(libs.commonmark.ext.gfm.tables)
+    implementation(libs.commonmark.ext.task.listitems)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

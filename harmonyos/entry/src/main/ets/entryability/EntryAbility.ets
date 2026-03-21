@@ -5,6 +5,7 @@ import { NodeRuntime } from '../node/NodeRuntime';
 import { SecurePrefs } from '../common/SecurePrefs';
 import { DeviceIdentityStore } from '../common/DeviceIdentityStore';
 import { backgroundTaskManager } from '@kit.BackgroundTasksKit';
+import { FloatWindowManager } from '../common/FloatWindowManager';
 
 const DOMAIN = 0x3D00;
 
@@ -27,6 +28,9 @@ export default class EntryAbility extends UIAbility {
         const runtime = new NodeRuntime(this.context);
         AppStorage.setOrCreate<NodeRuntime>('nodeRuntime', runtime);
         hilog.info(DOMAIN, 'testTag', 'NodeRuntime initialized and stored in AppStorage');
+
+        FloatWindowManager.getInstance().init(this.context);
+        hilog.info(DOMAIN, 'testTag', 'FloatWindowManager initialized');
       } catch (e) {
         hilog.error(DOMAIN, 'testTag', 'Failed to initialize NodeRuntime: %{public}s', JSON.stringify(e));
         // Even if it fails, we should resolve so loadContent can proceed and show the error in UI
@@ -56,7 +60,7 @@ export default class EntryAbility extends UIAbility {
       hilog.info(DOMAIN, 'testTag', 'onWindowStageCreate: initPromise resolved.');
     }
 
-    windowStage.loadContent('pages/LoginPage', (err) => {
+    windowStage.loadContent('pages/MainPage', (err) => {
       if (err.code) {
         hilog.error(DOMAIN, 'testTag', 'Failed to load the content. Cause: %{public}s', JSON.stringify(err));
         return;

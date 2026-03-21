@@ -1,0 +1,502 @@
+--------- beginning of system
+03-15 23:07:00.065  1779  3582 D ActivityManager: beginTime 1229989 endTime 1951725 freezeTime 0
+03-15 23:07:00.065  1779  3582 D ActivityManager: beginTime 1229711 endTime 1951725 freezeTime 0
+03-15 23:07:00.065  1779  3582 D ActivityManager: beginTime 1229710 endTime 1951725 freezeTime 0
+03-15 23:07:00.065  1779  3582 D ActivityManager: beginTime 1229683 endTime 1951725 freezeTime 0
+03-15 23:07:00.065  1779  3582 D ActivityManager: beginTime 1223815 endTime 1951725 freezeTime 0
+03-15 23:07:00.065  1779  3582 D ActivityManager: beginTime 1200369 endTime 1951725 freezeTime 0
+03-15 23:07:00.065  1779  3582 D ActivityManager: beginTime 1200269 endTime 1951725 freezeTime 0
+03-15 23:07:00.065  1779  3582 D ActivityManager: beginTime 1198790 endTime 1951725 freezeTime 0
+03-15 23:07:00.065  1779  3582 D ActivityManager: beginTime 1160186 endTime 1951725 freezeTime 0
+03-15 23:07:00.065  1779  3582 D ActivityManager: beginTime 930202 endTime 1951725 freezeTime 0
+03-15 23:07:00.065  1779  3582 D ActivityManager: beginTime 930202 endTime 1951725 freezeTime 0
+03-15 23:07:00.065  1779  3582 D ActivityManager: beginTime 925480 endTime 1951725 freezeTime 0
+03-15 23:07:00.065  1779  3582 D ActivityManager: beginTime 651194 endTime 1951725 freezeTime 0
+03-15 23:07:00.065  1779  3582 D ActivityManager: beginTime 651207 endTime 1951725 freezeTime 0
+03-15 23:07:00.065  1779  3582 D ActivityManager: beginTime 644517 endTime 1951725 freezeTime 0
+03-15 23:07:00.065  1779  3582 D ActivityManager: beginTime 449063 endTime 1951725 freezeTime 0
+03-15 23:07:00.065  1779  3582 D ActivityManager: beginTime 449212 endTime 1951725 freezeTime 0
+03-15 23:07:00.065  1779  3582 D ActivityManager: beginTime 434691 endTime 1951725 freezeTime 0
+03-15 23:07:00.065  1779  3582 D ActivityManager: beginTime 327681 endTime 1951725 freezeTime 0
+03-15 23:07:00.065  1779  3582 D ActivityManager: beginTime 271966 endTime 1951725 freezeTime 0
+03-15 23:07:00.065  1779  3582 D ActivityManager: beginTime 150237 endTime 1951725 freezeTime 0
+03-15 23:07:00.065  1779  3582 D ActivityManager: beginTime 76581 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 69642 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 59670 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 59643 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 59610 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 59409 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 59016 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 58780 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 58454 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 58012 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 57941 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 56930 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 56857 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 56769 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 55566 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 54625 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 53177 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 52602 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 47447 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 42143 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 41368 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 37854 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 37614 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 37538 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 34865 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 33776 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 32950 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 59526 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 30608 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 31194 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 29617 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 27170 endTime 1951725 freezeTime 0
+03-15 23:07:00.066  1779  3582 D ActivityManager: beginTime 26230 endTime 1951725 freezeTime 0
+03-15 23:07:00.067  1779  3582 D ActivityManager: beginTime 23878 endTime 1951725 freezeTime 0
+03-15 23:07:00.067  1779  3582 D ActivityManager: beginTime 23415 endTime 1951725 freezeTime 0
+03-15 23:07:00.067  1779  3582 D ActivityManager: beginTime 22789 endTime 1951725 freezeTime 0
+03-15 23:07:00.067  1779  3582 D ActivityManager: beginTime 21267 endTime 1951725 freezeTime 0
+03-15 23:07:00.067  1779  3582 D ActivityManager: beginTime 18267 endTime 1951725 freezeTime 0
+03-15 23:07:00.067  1779  3582 D ActivityManager: beginTime 15946 endTime 1951725 freezeTime 0
+--------- beginning of main
+03-15 23:07:00.067 18879 18879 I HwAOD   : DateView:initAttrs() isShowLunar: true, isHomeDate: false
+03-15 23:07:00.067  1779  1779 D AlarmManager: mBroadcastRefCount -> 0
+03-15 23:07:00.067  1779  1779 I PowerMS : release:L=49744844,F=0x0,T=*alarm*,N=android,WS=WorkSource{10180},U=1000,P=1779
+03-15 23:07:00.069 18879 18879 I HwAOD   : BitmapTransManager:updateViews style name fullScreenPress start
+03-15 23:07:00.070 18879 18879 I HwAOD   : DigitClockView:setTime() time: 11:07, isDual: false, currentFlag: 0
+03-15 23:07:00.080 18879 18879 I Bitmap  : source bitmap colorspace: sRGB IEC61966-2.1
+03-15 23:07:00.085 18879 18879 I Bitmap  : source bitmap colorspace: sRGB IEC61966-2.1
+03-15 23:07:00.090 18879 18879 I Bitmap  : source bitmap colorspace: sRGB IEC61966-2.1
+03-15 23:07:00.095 18879 18879 I Bitmap  : source bitmap colorspace: sRGB IEC61966-2.1
+03-15 23:07:00.100 18879 18879 I Bitmap  : source bitmap colorspace: sRGB IEC61966-2.1
+03-15 23:07:00.101 18879 18879 I HwAOD   : DateView:use xml config text ttf
+03-15 23:07:00.101 18879 18879 I HwAOD   : LocalCalendar:CalendarId: 0001, LocalCalender On
+03-15 23:07:00.101 18879 18879 E com.huawei.aod: No package ID ff found for ID 0xffffffff.
+03-15 23:07:00.101 18879 18879 I HwAOD   : BatteryView:updateViews showBattery:true, isForPreViewfalse
+03-15 23:07:00.104 18879 18879 I HwAOD   : NotificationGroupView:updateNtfView isShowNtf:true, isForPreView:false, isForCrop: false
+03-15 23:07:00.104 18879 18879 I HwAOD   : NotificationGroupView:updateNtfView() notificationList.size 1
+03-15 23:07:00.104 18879 18879 I HwAOD   : ReflectUtil:updateIconCache, pkgName: android
+03-15 23:07:00.105 18879 18879 I HwAOD   : NotificationGroupView:icon:Icon(typ=RESOURCE pkg=android id=0x0108088d) flag:0 pkgName:android;
+03-15 23:07:00.105 18879 18879 I HwAOD   : NotificationView:is capsule: false
+03-15 23:07:00.109  1779  3582 I ContentProviderHelper: Successfully start provider ContentProviderRecord{5114033 u0 com.android.systemui/com.huawei.keyguard.doze.HwAodProvider} launchingApp=null caller pid= 18879
+03-15 23:07:00.110 18879 18879 I HwAOD   : BitmapTransManager:updateViews style name fullScreenPress finished
+03-15 23:07:00.110 18879 18879 I HwAOD   : BigBoldUtil:scaleFactor: 1.0
+03-15 23:07:00.110 18879 18879 I HwAOD   : CapsuleAdjustmentUtils:adjustForSingleNoDate isNeedAdjust: false
+03-15 23:07:00.110 18879 18879 I HwAOD   : DigitClockView:onAttachedToWindow() begin.
+03-15 23:07:00.116  2535  2710 E NumberUtils: Number Format err! str: 
+03-15 23:07:00.127 18879 18879 I ViewRootImpl[AodScreen_0]: ViewUI_insets controlInsetsForCompatibility, typesToShow:0 typesToHide:0
+03-15 23:07:00.129 18879 18879 I ViewRootImpl[AodScreen_0]: ViewUI relayoutWindow reason: params != null
+03-15 23:07:00.130 15850 15850 I HAF_MemoryUtils: 1600102310|R|I|total-pss=53611, java-heap=12556, native-heap=5936, code=11344, system=18723, threads=45, importance=(400, 0), dex-mmap=(22414, 10500, 0, 32), ver=16.1.2.310
+03-15 23:07:00.130  1779 10297 I WindowManager_visibility: start Relayout Window{bb4e51d u0 AodScreen_0} oldVis=0 newVis=0 attr.width1312 attr.height =1248 req.width=1312 req.height=1248 appearance=0 fl_fullscreen=false vsysui_fullscreen=false
+03-15 23:07:00.130  2268  2268 D StackScrollAlgorithm: liveRowList is empty
+03-15 23:07:00.132  1779 10297 I WindowManager_visibility: complete Relayout Window{bb4e51d u0 AodScreen_0}  size:ClientWindowFrames{frame=[2,0][1314,1248] display=[-10000,-10000][10000,10000] backdrop=[0,0][1312,1248]}
+03-15 23:07:00.133 18879 18879 I ViewRootImpl[AodScreen_0]: ViewUI relayoutWindow relayoutResult 1 isValid: true useBLAST: true
+03-15 23:07:00.133 18879 18879 I InsetsSourceConsumer: ViewUI_insets_ime removeImeSurface window: android.view.ViewRootImpl$W@25af3a0
+03-15 23:07:00.133 18879 18879 I InsetsController: ViewUI_insets onControlsChanged, showTypes:0 hideTypes:0
+03-15 23:07:00.134 18879 18879 I HwAOD   : DigitClockView:ViewLocationInWindow[1] Rect(656, 0 - 903, 357)
+03-15 23:07:00.134 18879 18879 I HwAOD   : DigitClockView:ViewLocationInWindow[0] Rect(409, 0 - 656, 357)
+03-15 23:07:00.134 18879 18879 I HwAOD   : DigitClockView:ViewLocationInWindow[2] Rect(409, 371 - 656, 728)
+03-15 23:07:00.134 18879 18879 I HwAOD   : DigitClockView:ViewLocationInWindow[3] Rect(656, 371 - 903, 728)
+03-15 23:07:00.134 18879 18879 I HwAOD   : DigitClockView:ViewLocationInWindow[4] Rect(409, 0 - 409, 0)
+03-15 23:07:00.134  1779  1779 I InputMethodManagerService: REMOVE_IME_SURFACE_FROM_WINDOW windowToken: android.os.BinderProxy@61dafc7 ,mCurFocusedWindow: android.os.BinderProxy@489a17d
+03-15 23:07:00.134 18879 18879 I HwAOD   : BitmapTransManager:onViewLayoutFinished() invoke.
+03-15 23:07:00.134 18879 18879 I HwAOD   : BigBoldUtil:scaleFactor 1.0f, no need to do scale action
+03-15 23:07:00.134 18879 18879 I HwAOD   : BitmapTransManager:snapActivity() begin.
+03-15 23:07:00.134 18879 18879 I HwAOD   : UiUtils:createBitmapFromView() viewWidth: 1312, viewHeight: 1248
+03-15 23:07:00.140 18879 18879 I HwAOD   : BitmapTransManager:snapActivity() gen base view consume 6 ms.
+03-15 23:07:00.141 18879 18879 I HwAOD   : BitmapTransManager:onPostSnapView begin, remove mContentView
+03-15 23:07:00.141 18879 18879 I HwAOD   : BitmapTransManager:onViewLayoutFinished() msg.what: 2
+03-15 23:07:00.143 18879 18879 I ViewRootImpl[AodScreen_0]: ViewUI_insets controlInsetsForCompatibility, typesToShow:0 typesToHide:0
+03-15 23:07:00.143 18879 18879 I ViewRootImpl[AodScreen_0]: ViewUI relayoutWindow reason: params != null
+03-15 23:07:00.144  1779 10297 I WindowManager_visibility: start Relayout Window{bb4e51d u0 AodScreen_0} oldVis=0 newVis=0 attr.width1312 attr.height =1248 req.width=1312 req.height=1248 appearance=0 fl_fullscreen=false vsysui_fullscreen=false
+03-15 23:07:00.147  1779 10297 I WindowManager_visibility: complete Relayout Window{bb4e51d u0 AodScreen_0}  size:ClientWindowFrames{frame=[2,0][1314,1248] display=[-10000,-10000][10000,10000] backdrop=[0,0][1312,1248]}
+03-15 23:07:00.149 18879 18879 I ViewRootImpl[AodScreen_0]: ViewUI relayoutWindow relayoutResult 1 isValid: true useBLAST: true
+03-15 23:07:00.149 18879 18879 I InsetsSourceConsumer: ViewUI_insets_ime removeImeSurface window: android.view.ViewRootImpl$W@25af3a0
+03-15 23:07:00.149 18879 18879 I InsetsController: ViewUI_insets onControlsChanged, showTypes:0 hideTypes:0
+03-15 23:07:00.150  1779  1779 I InputMethodManagerService: REMOVE_IME_SURFACE_FROM_WINDOW windowToken: android.os.BinderProxy@61dafc7 ,mCurFocusedWindow: android.os.BinderProxy@489a17d
+03-15 23:07:00.151  1779  3582 W ActivityManager: Receiver with filter android.content.IntentFilter@e6d28e5 already registered for pid 18879, callerPackage is com.huawei.aod
+03-15 23:07:00.152  1779  3582 W ActivityManager: Receiver with filter android.content.IntentFilter@d0e5fba already registered for pid 18879, callerPackage is com.huawei.aod
+03-15 23:07:00.153 18879 18879 I HwAOD   : AodStateManager:checkAodModeOfIntelligentShow: mAodMode = 2305
+03-15 23:07:00.153 18879 18879 I HwAOD   : AodStateManager:checkAodModeDimming isTimeEnable: true hasMotion: false isFullScreenAod: true mAodMode: 2305
+03-15 23:07:00.153 18879 18879 I HwAOD   : AodStateManager:aod mode:2305, timeEnable:true, fpEnable:false
+03-15 23:07:00.153 18879 18879 I HwAOD   : AodStateManager:updateBitmapForSensorhub start
+03-15 23:07:00.153 18879 18879 I HwAOD   : SensorHubAodControl:getRealByteCount bitmapWidth: 1312 bitmapHeight: 2088 size:5478912
+03-15 23:07:00.155 18879 18879 I HwAOD   : TimePainter:fillBitmapArray() , toFillArray.length:5478912
+03-15 23:07:00.155 18879 18879 I HwAOD   : TimeConfigManager:transBitmapToByteArray baseViewWidth: 1312, baseViewHeight: 1248, baseBitmapSize: 3274752, dest.length: 5478912
+03-15 23:07:00.163 18879 18894 I com.huawei.aod: NativeAlloc concurrent copying GC freed 13630(659KB) AllocSpace objects, 1(5352KB) LOS objects, 24% free, 14MB/18MB,  current_footprint is 18MB, capacity is 384MB, growth limit is 384MB, paused 422us,64us total 27.376ms cpu time 26.688ms DisableRefAccess:0.914ms(0.842ms), NotOnTop, cpufreq(0-7): 1550000 1550000 1550000 1550000 558000 558000 558000 558000, curUsage: 0.906250, Imperceptible, last gc 59632.731ms, last NativeAlloc 59632.731ms, last free 15499904, 0, process name: "com.huawei.aod"
+03-15 23:07:00.218 18879 18879 I HwAOD   : TimeConfigManager:genClockNumberBitmap start
+03-15 23:07:00.234 18879 18879 I Bitmap  : source bitmap colorspace: sRGB IEC61966-2.1
+03-15 23:07:00.235 18879 18879 I HwAOD   : TimeConfigManager:scale bitmap, originWidth: 247, originHeight: 357 dstWidth: 247, dstHeight: 357
+03-15 23:07:00.235 18879 18879 I Bitmap  : source bitmap colorspace: sRGB IEC61966-2.1
+03-15 23:07:00.249 18879 18879 I Bitmap  : source bitmap colorspace: sRGB IEC61966-2.1
+03-15 23:07:00.250 18879 18879 I HwAOD   : TimeConfigManager:scale bitmap, originWidth: 247, originHeight: 357 dstWidth: 247, dstHeight: 357
+03-15 23:07:00.251 18879 18879 I Bitmap  : source bitmap colorspace: sRGB IEC61966-2.1
+03-15 23:07:00.264 18879 18879 I Bitmap  : source bitmap colorspace: sRGB IEC61966-2.1
+03-15 23:07:00.265 18879 18879 I HwAOD   : TimeConfigManager:scale bitmap, originWidth: 247, originHeight: 357 dstWidth: 247, dstHeight: 357
+03-15 23:07:00.265 18879 18879 I Bitmap  : source bitmap colorspace: sRGB IEC61966-2.1
+03-15 23:07:00.279 18879 18879 I Bitmap  : source bitmap colorspace: sRGB IEC61966-2.1
+03-15 23:07:00.280 18879 18879 I HwAOD   : TimeConfigManager:scale bitmap, originWidth: 247, originHeight: 357 dstWidth: 247, dstHeight: 357
+03-15 23:07:00.280 18879 18879 I Bitmap  : source bitmap colorspace: sRGB IEC61966-2.1
+03-15 23:07:00.294 18879 18879 I Bitmap  : source bitmap colorspace: sRGB IEC61966-2.1
+03-15 23:07:00.295 18879 18879 I HwAOD   : TimeConfigManager:scale bitmap, originWidth: 247, originHeight: 357 dstWidth: 247, dstHeight: 357
+03-15 23:07:00.295 18879 18879 I Bitmap  : source bitmap colorspace: sRGB IEC61966-2.1
+03-15 23:07:00.309 18879 18879 I Bitmap  : source bitmap colorspace: sRGB IEC61966-2.1
+03-15 23:07:00.310 18879 18879 I HwAOD   : TimeConfigManager:scale bitmap, originWidth: 247, originHeight: 357 dstWidth: 247, dstHeight: 357
+03-15 23:07:00.310 18879 18879 I Bitmap  : source bitmap colorspace: sRGB IEC61966-2.1
+03-15 23:07:00.324 18879 18879 I Bitmap  : source bitmap colorspace: sRGB IEC61966-2.1
+03-15 23:07:00.325 18879 18879 I HwAOD   : TimeConfigManager:scale bitmap, originWidth: 247, originHeight: 357 dstWidth: 247, dstHeight: 357
+03-15 23:07:00.325 18879 18879 I Bitmap  : source bitmap colorspace: sRGB IEC61966-2.1
+03-15 23:07:00.338 18879 18879 I Bitmap  : source bitmap colorspace: sRGB IEC61966-2.1
+03-15 23:07:00.339 18879 18879 I HwAOD   : TimeConfigManager:scale bitmap, originWidth: 247, originHeight: 357 dstWidth: 247, dstHeight: 357
+03-15 23:07:00.339 18879 18879 I Bitmap  : source bitmap colorspace: sRGB IEC61966-2.1
+03-15 23:07:00.353 18879 18879 I Bitmap  : source bitmap colorspace: sRGB IEC61966-2.1
+03-15 23:07:00.354 18879 18879 I HwAOD   : TimeConfigManager:scale bitmap, originWidth: 247, originHeight: 357 dstWidth: 247, dstHeight: 357
+03-15 23:07:00.354 18879 18879 I Bitmap  : source bitmap colorspace: sRGB IEC61966-2.1
+03-15 23:07:00.360  1451  4245 I CPU_STATS: iawared: query next cpu load with 2!
+03-15 23:07:00.360  1451  4245 I CPU_STATS: total cost time 2010271406 ns
+03-15 23:07:00.361  1451  4245 I CPU_STATS: iawared: current total load is 0.017061, capacity : 5658, pre load:  483124231387, current load : 483313734589
+03-15 23:07:00.362  1451  4245 I CPU_STATS: read once cost time 1536 us
+03-15 23:07:00.369 18879 18879 I Bitmap  : source bitmap colorspace: sRGB IEC61966-2.1
+03-15 23:07:00.370 18879 18879 I HwAOD   : TimeConfigManager:scale bitmap, originWidth: 247, originHeight: 357 dstWidth: 247, dstHeight: 357
+03-15 23:07:00.370 18879 18879 I Bitmap  : source bitmap colorspace: sRGB IEC61966-2.1
+03-15 23:07:00.371 18879 18879 I HwAOD   : TimeConfigManager:layoutView screenWidth = 1316 screenHeight = 2832
+03-15 23:07:00.373 18879 18879 I HwAOD   : TimeConfigManager:updateNumSize: Point(247, 357)
+03-15 23:07:00.383 18879 18894 I com.huawei.aod: NativeAlloc concurrent copying GC freed 5345(257KB) AllocSpace objects, 2(9600KB) LOS objects, 24% free, 8158KB/10MB,  current_footprint is 10MB, capacity is 384MB, growth limit is 384MB, paused 289us,61us total 29.021ms cpu time 28.523ms DisableRefAccess:0.474ms(0.471ms), NotOnTop, cpufreq(0-7): 1550000 1550000 1550000 1550000 558000 558000 558000 558000, curUsage: 0.971429, Imperceptible, last gc 219.328ms, last NativeAlloc 219.328ms, last free 6155288, 0, process name: "com.huawei.aod"
+03-15 23:07:00.392 18879 18879 I HwAOD   : TimeConfigManager:genClockNumberBitmap finished, bgColor: 0
+03-15 23:07:00.393 18879 18879 I HwAOD   : TimeConfigManager:fillNumArea bytesAll: 3527160
+03-15 23:07:00.405 18879 18894 I com.huawei.aod: Background young concurrent copying GC freed 191(8848B) AllocSpace objects, 0(0B) LOS objects, 0% free, 13MB/13MB,  current_footprint is 13MB, capacity is 384MB, growth limit is 384MB, paused 277us,45us total 10.491ms cpu time 10.150ms DisableRefAccess:0.374ms(0.372ms), NotOnTop, cpufreq(0-7): 1550000 1550000 1550000 1550000 558000 558000 558000 558000, curUsage: 0.928571, Imperceptible, last gc 21.939ms, last Background young 120139.102ms, last free 10093576, 0, process name: "com.huawei.aod"
+03-15 23:07:00.432 18879 18879 I HwAOD   : SensorHubAodControl:getDrawAODBitmapArray result.length= 5478912
+03-15 23:07:00.434 18879 18879 I HwAOD   : TimePainter:fillClockTextSize width:247, height:357
+03-15 23:07:00.434 18879 18879 I HwAOD   : SensorHubAodControl:origClockStyle is 2001
+03-15 23:07:00.434 18879 18879 D FingerprintManagerEx: getSpotPosition sSpotPosition[0] -1
+03-15 23:07:00.435  1779  3582 D HwFingerprintService: onHwTransact Code = 1110
+03-15 23:07:00.435  1779  3582 D HwFingerprintService: CODE_GET_HARDWARE_POSITION
+03-15 23:07:00.436  1498  1498 I vendor.huawei.hardware.biometrics.fingerprint@2.2-service: BiometricsFingerprint::sendCmdToHal 59.
+03-15 23:07:00.436  1498  1498 I vendor.huawei.hardware.biometrics.fingerprint@2.2-service: SendCmdToHal cmdId is 59, result is -22.
+03-15 23:07:00.436  1498  1498 I vendor.huawei.hardware.biometrics.fingerprint@2.2-service: FingerprintDevice::SendCmdToHal 59.
+03-15 23:07:00.436  1498  1498 E vendor.huawei.hardware.biometrics.fingerprint@2.2-service: SendCmdToHal dev is invalid.
+03-15 23:07:00.436  1498  1498 I vendor.huawei.hardware.biometrics.fingerprint@2.2-service: BiometricsFingerprint::sendCmdToHal 60.
+03-15 23:07:00.436  1498  1498 I vendor.huawei.hardware.biometrics.fingerprint@2.2-service: SendCmdToHal cmdId is 60, result is -22.
+03-15 23:07:00.436  1498  1498 I vendor.huawei.hardware.biometrics.fingerprint@2.2-service: FingerprintDevice::SendCmdToHal 60.
+03-15 23:07:00.436  1498  1498 E vendor.huawei.hardware.biometrics.fingerprint@2.2-service: SendCmdToHal dev is invalid.
+03-15 23:07:00.437  1779  3582 D HwFingerprintService: hardwarePosition:-1,-1
+03-15 23:07:00.437  1779  3582 D FingerprintViewUtils: getHardwarePosition from SystemPropertiesEx: -1
+03-15 23:07:00.437 18879 18879 D FingerprintManagerEx: getSpotPosition from hal after covert: -1
+03-15 23:07:00.437 18879 18879 D FingerprintManagerEx: getSpotPosition from hal after covert: -1
+03-15 23:07:00.437 18879 18879 D FingerprintManagerEx: getSpotPosition from hal after covert: -1
+03-15 23:07:00.437 18879 18879 D FingerprintManagerEx: getSpotPosition from hal after covert: -1
+03-15 23:07:00.438 18879 18879 I HwAOD   : ThemeParserUtils:getStyleNameChosen from sp: fullScreenPress
+03-15 23:07:00.458 18879 18879 I HwAOD   : HorizontalStyle4Utils:getFullScreenBgPositionRect left:0 top:0 right:1316 bottom:2832
+03-15 23:07:00.458 18879 18879 I HwAOD   : SensorHubAodControl:lmtSwitch: 6, aodDisplayTime: 5, fpDisplayTime: 2, eyeGlanceTime:5
+03-15 23:07:00.458 18879 18879 I HwAOD   : SensorHubAodControl:fillOngoingNtfAreaRects start
+03-15 23:07:00.458 18879 18879 I HwAOD   : TriggerBuilder:com.huawei.aod.theme.triggers.forestclock.TimerTriggerBuilder
+03-15 23:07:00.459 18879 18879 W HwAOD   : TriggerBuilder:{trigger:5, layers:[{layer:2, pictureRgb:1, actions:[{action: 17, minRangeX: 0, maxRangeX: 0, minRangeY: 0, maxRangeY: 553, mMoveStepX: 0, mMoveStepY: 0}]}, {layer:4, pictureRgb:1, actions:[{action: 17, minRangeX: 0, maxRangeX: 0, minRangeY: 408, maxRangeY: 553, mMoveStepX: 0, mMoveStepY: 42}]}]}
+03-15 23:07:00.459 18879 18879 I HwAOD   : TriggerBuilder:com.huawei.aod.theme.triggers.forestclock.ShowTriggerBuilder
+03-15 23:07:00.459 18879 18879 W HwAOD   : TriggerBuilder:{trigger:2, layers:[{layer:2, pictureRgb:1, actions:[{action: 4, timeout: 5}]}, {layer:4, pictureRgb:1, actions:[{action: 4, timeout: 5}]}]}
+03-15 23:07:00.459 18879 18879 W HwAOD   : TriggerBuilder:{trigger:8, layers:[{layer:2, pictureRgb:1, actions:[{action: 4, timeout: 5}]}, {layer:4, pictureRgb:1, actions:[{action: 4, timeout: 5}]}]}
+03-15 23:07:00.459 18879 18879 W HwAOD   : TriggerBuilder:{trigger:6, layers:[{layer:2, pictureRgb:1, actions:[{action: 4, timeout: 5}]}, {layer:4, pictureRgb:1, actions:[{action: 4, timeout: 5}]}]}
+03-15 23:07:00.459 18879 18879 W HwAOD   : TriggerBuilder:{trigger:15, layers:[{layer:2, pictureRgb:1, actions:[{action: 4, timeout: 0}]}, {layer:4, pictureRgb:1, actions:[{action: 4, timeout: 0}]}]}
+03-15 23:07:00.459 18879 18879 W HwAOD   : TriggerBuilder:{trigger:16, layers:[{layer:2, pictureRgb:1, actions:[{action: 4, timeout: 5}]}, {layer:4, pictureRgb:1, actions:[{action: 4, timeout: 5}]}]}
+03-15 23:07:00.459 18879 18879 I HwAOD   : TriggerBuilder:com.huawei.aod.theme.triggers.forestclock.WorkTriggerBuilder
+03-15 23:07:00.459 18879 18879 W HwAOD   : TriggerBuilder:{trigger:4, layers:[{layer:4, pictureRgb:1, actions:[{action:0}]}]}
+03-15 23:07:00.459 18879 18879 I HwAOD   : AodLayerManager:getTriggerUtilFromXml extendClockType:  7 aodWorkMode: 2305 triggerUtilListSize: 7
+03-15 23:07:00.460 18879 18894 I com.huawei.aod: Background concurrent copying GC freed 1413(111KB) AllocSpace objects, 2(5172KB) LOS objects, 24% free, 8134KB/10MB,  current_footprint is 10MB, capacity is 384MB, growth limit is 384MB, paused 280us,35us total 26.354ms cpu time 26.096ms DisableRefAccess:0.415ms(0.372ms), NotOnTop, cpufreq(0-7): 1550000 1550000 1550000 1550000 558000 558000 558000 558000, curUsage: 0.968750, Imperceptible, last gc 54.873ms, last Background 120089.740ms, last free 8848, 0, process name: "com.huawei.aod"
+03-15 23:07:00.460 18879 18879 I HwAOD   : AodLayerManager:triggers dipatched to SensorHub: [{trigger:5, layers:[{layer:2, pictureRgb:1, actions:[{action: 17, minRangeX: 0, maxRangeX: 0, minRangeY: 0, maxRangeY: 553, mMoveStepX: 0, mMoveStepY: 0}]}, {layer:4, pictureRgb:1, actions:[{action: 17, minRangeX: 0, maxRangeX: 0, minRangeY: 408, maxRangeY: 553, mMoveStepX: 0, mMoveStepY: 42}]}]}, {trigger:2, layers:[{layer:2, pictureRgb:1, actions:[{action: 4, timeout: 5}]}, {layer:4, pictureRgb:1, actions:[{action: 4, timeout: 5}]}]}, {trigger:8, layers:[{layer:2, pictureRgb:1, actions:[{action: 4, timeout: 5}]}, {layer:4, pictureRgb:1, actions:[{action: 4, timeout: 5}]}]}, {trigger:6, layers:[{layer:2, pictureRgb:1, actions:[{action: 4, timeout: 5}]}, {layer:4, pictureRgb:1, actions:[{action: 4, timeout: 5}]}]}, {trigger:15, layers:[{layer:2, pictureRgb:1, actions:[{action: 4, timeout: 0}]}, {layer:4, pictureRgb:1, actions:[{action: 4, timeout: 0}]}]}, {trigger:16, layers:[{layer:2, pictureRgb:1, actions:[{action: 4, timeout: 5}]}, {layer:4, pictureRgb:1, actions:[{action: 4, timeout: 5}]}]}, {trigger:4, layers:[{layer:4, pictureRgb:1, actions:[{action:0}]}]}]
+03-15 23:07:00.460 18879 18879 I HwAOD   : SensorHubAodControl:configInfo.mNtfPackageName: 
+03-15 23:07:00.467 18879 18879 I HwAOD   : SensorHubAodControl:enable func: configAndUpdate
+03-15 23:07:00.470  1779 10297 I HwAodManagerService: setFullAodMsgToDE isFullAodStyle: true
+03-15 23:07:00.472  1779  2178 I DE J HwBrightnessInterfaceData: [effect] setFullAodBrightnessDataToSystem, ambientLux=-1
+03-15 23:07:00.472  1779  2178 I FullAodBrightnessData: setFullAodBrightnessData, ambientLux=-1
+03-15 23:07:00.472  1779  2178 I HwNormalizedAutomaticBrightnessController: setFullAodBrightnessData, lux=-1,mAmbientLux=441.6,mScreenAutoBrightness=0.23137255,mWakeupFromSleep=false
+03-15 23:07:00.472  1779  2178 I HwNormalizedAutomaticBrightnessController: updateNewAutoBrightness,newScreenAutoBrightness=0.23137255,ambientLux=441.6,mMaxT=255
+03-15 23:07:00.472  1779  2178 I HwNormalizedAutomaticBrightnessController: setFullAodBrightness, lux=-1,mAmbientLux=441.6,mScreenAutoBrightness=0.23137255,mIsUseFullAodBrightness=false
+03-15 23:07:00.473  1779  2178 I DE J HwBrightnessInterfaceData: [effect] setFullAodBrightnessDataToSystem ok, ambientLux=-1
+03-15 23:07:00.473  1779  1890 I DisplayPowerController[0]: mPowerState.mScreenChangedReason: 0 mPendingRequestLocked.mScreenChangeReason 0
+03-15 23:07:00.473  1779  1890 I DisplayPowerController[0]: Screen off set ColorFadeLevel 0 finished.
+03-15 23:07:00.473  1421  1522 I DE N SR-DATA: D SetAodDisplayFullscreen:346: get aod display fullscreen status:1
+03-15 23:07:00.473  1421  1522 I DE N HW : D SetEffectLogPrintNormal:1067: FEATURE_ALL(16) { MODE_SCREEN_TIME_CONTROL size:1 }
+03-15 23:07:00.473  1779  1890 I DisplayPowerController[0]: skip false
+03-15 23:07:00.473   946  2219 I DE H =DE: I SetAodFullScreenStatus:864: isAodFullScreen: 1, current refresh mode: 2
+03-15 23:07:00.474   946  2219 I DE H SH : I SetMutableParam:35: call for SetMutableParam, displaymode: 2, bt2020: 0
+03-15 23:07:00.474   946  2219 I DE H =XPMBase: I GetNormalizedOutputXccParam:194: maxSumRGB = 32768, alpha = 1.000000.
+03-15 23:07:00.474   946  2219 W DE H =XPMBase: GetNormalizedOutputXccParam:210: no need apply alpha 1.000000 , which >= 1.0 !
+03-15 23:07:00.474   946  2219 I DE H SH : I SetAodTypeToSensorhub:284: call for SetAodTypeToAod, aodType: 1
+03-15 23:07:00.474   946  2219 I DE H =DEEP_CALIB: I SetAodDdicDemuraStatus:241: ap demura is not initialized
+03-15 23:07:00.474   946  2219 E DE H =DE: SetAodFullScreenStatus:885: Failed to set aod ddic demura off
+03-15 23:07:00.474   946  2219 I DE H SH : I SetDcValue:86: call for SetDcValue, displaymode: 2, value:0
+03-15 23:07:00.475  1779  2159 I IAodManager-JNI: SetAodConfigInfo mFileDescriptor:465, mDualClock:0, mCurrentTime:1773587220433, mBufferWidth:1312, mBufferHeight:1088 len:29
+03-15 23:07:00.475  1779  2159 I IAodManager-JNI: SetAodConfigInfo mAodItemRect: 0, left: 2, right: 1314, top: 0, bottom: 1248
+03-15 23:07:00.475 18879 18879 I HwAOD   : SensorHubAodControl:configAndUpdate finished
+03-15 23:07:00.475  1779  2159 I IAodManager-JNI: SetAodConfigInfo mAodItemRect: 1, left: 409, right: 656, top: 0, bottom: 357
+03-15 23:07:00.475  1779  2159 I IAodManager-JNI: SetAodConfigInfo mAodItemRect: 2, left: 656, right: 903, top: 0, bottom: 357
+03-15 23:07:00.475  1779  2159 I IAodManager-JNI: SetAodConfigInfo mAodItemRect: 3, left: 409, right: 656, top: 371, bottom: 728
+03-15 23:07:00.475  1779  2159 I IAodManager-JNI: SetAodConfigInfo mAodItemRect: 4, left: 656, right: 903, top: 371, bottom: 728
+03-15 23:07:00.475 18879 18879 I HwAOD   : AodStateManager:updateBitmapForSensorhub finish
+03-15 23:07:00.475  1779  2159 I IAodManager-JNI: SetAodConfigInfo mAodItemRect: 5, left: 6, right: 8, top: 3, bottom: 5
+03-15 23:07:00.475 18879 18879 I HwAOD   : AodDisplayManager:aod status changed to:UPDATED
+03-15 23:07:00.475  1779  2159 I IAodManager-JNI: SetAodConfigInfo mAodItemRect: 6, left: 3, right: 5, top: 3, bottom: 5
+03-15 23:07:00.475  1779  2159 I IAodManager-JNI: SetAodConfigInfo mAodItemRect: 7, left: 3, right: 5, top: 600, bottom: 888
+03-15 23:07:00.475  1779  2159 I IAodManager-JNI: SetAodConfigInfo mAodItemRect: 8, left: 322, right: 994, top: 2694, bottom: 2736
+03-15 23:07:00.475  1779  2159 I IAodManager-JNI: SetAodConfigInfo mAodItemRect: 9, left: 322, right: 994, top: 2646, bottom: 2688
+03-15 23:07:00.476  1779  2159 I IAodManager-JNI: SetAodConfigInfo mAodItemRect: 10, left: 0, right: 0, top: 0, bottom: 0
+03-15 23:07:00.476  1779  2159 I IAodManager-JNI: SetAodConfigInfo mAodItemRect: 11, left: 0, right: 0, top: 0, bottom: 0
+03-15 23:07:00.476  1779  2159 I IAodManager-JNI: SetAodConfigInfo mAodItemRect: 12, left: 306, right: 1010, top: 0, bottom: 704
+03-15 23:07:00.476  1779  2159 I IAodManager-JNI: SetAodConfigInfo mAodItemRect: 13, left: 0, right: 96, top: 0, bottom: 420
+03-15 23:07:00.476  1779  2159 I IAodManager-JNI: SetAodConfigInfo mAodItemRect: 14, left: 0, right: 96, top: 0, bottom: 420
+03-15 23:07:00.476  1779  2159 I IAodManager-JNI: SetAodConfigInfo mAodItemRect: 15, left: 0, right: 48, top: 0, bottom: 339
+03-15 23:07:00.476  1779  2159 I IAodManager-JNI: SetAodConfigInfo mAodItemRect: 16, left: 0, right: 48, top: 0, bottom: 339
+03-15 23:07:00.476  1779  2159 I IAodManager-JNI: SetAodConfigInfo mAodItemRect: 17, left: 408, right: 553, top: 408, bottom: 42
+03-15 23:07:00.476  1779  2159 I IAodManager-JNI: SetAodConfigInfo mAodItemRect: 18, left: 0, right: 1316, top: 0, bottom: 2832
+03-15 23:07:00.476  1779  2159 I IAodManager-JNI: SetAodConfigInfo mAodItemRect: 19, left: 0, right: 0, top: 0, bottom: 0
+03-15 23:07:00.476  1779  2159 I IAodManager-JNI: SetAodConfigInfo mAodItemRect: 20, left: 0, right: 0, top: 0, bottom: 0
+03-15 23:07:00.476  1779  2159 I IAodManager-JNI: SetAodConfigInfo mAodItemRect: 21, left: 0, right: 0, top: 0, bottom: 0
+03-15 23:07:00.476  1779  2159 I IAodManager-JNI: SetAodConfigInfo mAodItemRect: 22, left: 0, right: 0, top: 0, bottom: 0
+03-15 23:07:00.476  1779  2159 I IAodManager-JNI: SetAodConfigInfo mAodItemRect: 23, left: 6, right: 2, top: 5, bottom: 5
+03-15 23:07:00.476  1779  2159 I IAodManager-JNI: SetAodConfigInfo mAodItemRect: 24, left: 0, right: 0, top: 0, bottom: 0
+03-15 23:07:00.476  1779  2159 I IAodManager-JNI: SetAodConfigInfo mAodItemRect: 25, left: 0, right: 0, top: 0, bottom: 0
+03-15 23:07:00.476  1779  2159 I IAodManager-JNI: SetAodConfigInfo mAodItemRect: 26, left: 0, right: 0, top: 0, bottom: 0
+03-15 23:07:00.476  1779  2159 I IAodManager-JNI: SetAodConfigInfo mAodItemRect: 27, left: 0, right: 0, top: 0, bottom: 0
+03-15 23:07:00.476  1779  2159 I IAodManager-JNI: SetAodConfigInfo mAodItemRect: 28, left: 0, right: 0, top: 0, bottom: 0
+03-15 23:07:00.476  1779  2159 I HwAodManagerService: AodManagerService setAodConfig, mState:4 mDualClock:0 mAODWorkMode:2305 mDisplayMode:7 mCurrentColorFlag:0 Radius:95 mPowerState:101 mIsTimeRefresh:1 mNotificationOffset:0 mClockType:2001
+03-15 23:07:00.476  1779  2159 I HwAodManagerService: logAodInfo TriggerSize: 7 mActionDataSize: 248
+03-15 23:07:00.477  1779  2159 I HwAodManagerService: setAodConfig enter mDisplayMode:7 mState:4
+03-15 23:07:00.477  1779  2159 I HwAodManagerService: mUpdateDynamicBitmapRunnable begin. mDisplayMode:7
+03-15 23:07:00.477  1779  2159 I HwAodManagerService: beginUpdate forceUpdate = true
+03-15 23:07:00.477  1779  2159 I HwAodManagerService: checkIfStatusChanged
+03-15 23:07:00.477  1779  2159 W HwAodManagerService: checkIfStatusChanged last status is 0:0:50:, current status is 0:0:50:, length = 3
+03-15 23:07:00.477  1779  2159 I HwAodManagerService: setBitmapByMemoryFileInner enter. fileSize = 5478912
+03-15 23:07:00.489  1779  2159 I HwAodManagerService: setBitmapByMemoryFileInner read succeed. length =  5478912
+03-15 23:07:00.489  1779  2159 I HwAodManagerService: handleBaseTimeCachedResources mBaseTimeAreaBufferSize: 3274752, mBaseTimeAreaBitmapNum: 1
+03-15 23:07:00.493  1779  2159 W HwAodManagerService: mBaseTimeAreaBitmapNum out of bounds 1
+03-15 23:07:00.493  1779  2159 W HwAodManagerService: handleNumberCachedResources, mBaseTimeAreaBufferSize: 3274752, mNumberAreaBufferSize: 1763580, mNumberAreaBitmapNum: 1, mBitmapBuffer.length: 5478912
+03-15 23:07:00.496  1779  2159 W HwAodManagerService: mNumberAreaBitmapNum out of bounds 1
+03-15 23:07:00.496  1779  2159 I HwAodManagerService: setBitmapByMemoryFileInner result:0
+03-15 23:07:00.496  1779  2159 I HwAodManagerService: updateResBuffer: res buffer does not need to be updated, return
+03-15 23:07:00.496  1779  2159 I IAodManager-JNI: DoIoctlAodBeginUpdate mFileDescriptor is 465
+03-15 23:07:00.497  1779  2159 I IAodManager-JNI: DoIoctlSetTimeDataSize fd is 465,  xres0 is 247, yres0 is 357, xres1 is 0, yres1 is 0
+03-15 23:07:00.497  1779  2159 I IAodManager-JNI: DoIoctlSetTimeRect fd is 465 mDualClock:0 dual_clocks:0 display_space_count:10
+03-15 23:07:00.497  1779  2159 I IAodManager-JNI: DoMmapFrameBuffer 465, 247, 357, 247, 357, 2, 2, mFrameBuffer:0x0, mBufferSize:0, allSize:5038368
+03-15 23:07:00.497  1779  2159 I IAodManager-JNI: DoIoctlAodUpdateNotificationBuffer frameBufferWidth:1312, mAodConfigInfo.mBufferWidth:1312, len:5478912
+03-15 23:07:00.498  1779  2159 I IAodManager-JNI: doIoctlAodUpdateClockBitmapBuffer ion_map index[0] mIonBufFD[751] mVirtualPointer[0x7870779000],memcpy_s size:3274752, notificationOffset:0
+03-15 23:07:00.498  1779  2159 I IAodManager-JNI: DoMmapFrameBuffer 465, 247, 357, 247, 357, 2, 2, mFrameBuffer:0x0, mBufferSize:0, allSize:5038368
+03-15 23:07:00.498  1779  2159 I IAodManager-JNI: DoIoctlAodUpdateNumberBuffer allSize = 5038368
+03-15 23:07:00.498  1779  2159 I IAodManager-JNI: DoIoctlAodUpdateNumberBuffer frameBufferWidth:1312, mAodConfigInfo.mBufferWidth:1312, len:1763580
+03-15 23:07:00.498  1779  2159 I IAodManager-JNI: DoIoctlAodUpdateNumberBuffer ion_map index[0] mIonBufFD[757] mVirtualPointer[0x7870d60000],memcpy_s size:1763584, notificationOffset:0
+03-15 23:07:00.498  1779  2159 E IAodManager-JNI: DoIoctlAodUpdateTimeRect ACTION_CLOCK_REFRESH begin.
+03-15 23:07:00.498  1779  2159 E IAodManager-JNI: DoIoctlAodUpdateTimeRect timeFreshRangeOffset=264.
+03-15 23:07:00.498  1779  2159 E IAodManager-JNI: DoIoctlAodUpdateTimeRect x_start:409, y_start:0, x_size:247, y_size:357.
+03-15 23:07:00.498  1779  2159 E IAodManager-JNI: DoIoctlAodUpdateTimeRect x_start:656, y_start:0, x_size:247, y_size:357.
+03-15 23:07:00.498  1779  2159 E IAodManager-JNI: DoIoctlAodUpdateTimeRect x_start:409, y_start:371, x_size:247, y_size:357.
+03-15 23:07:00.498  1779  2159 E IAodManager-JNI: DoIoctlAodUpdateTimeRect x_start:656, y_start:371, x_size:247, y_size:357.
+03-15 23:07:00.498  1779  2159 I IAodManager-JNI: DoIoctlAodEndUpdate mFileDescriptor is 465, aod_type is 2305
+03-15 23:07:00.499  1779  2159 W ContextImpl: Calling a method in the system process without a qualified user: android.app.ContextImpl.startService:1964 com.huawei.aod.HwAodManagerService.releaseAodWakeLock:7799 com.huawei.aod.HwAodManagerService.lambda$configAndUpdate$10$HwAodManagerService:2426 com.huawei.aod.HwAodManagerService$$ExternalSyntheticLambda17.run:8 android.os.Handler.handleCallback:966 
+03-15 23:07:00.499  1779  2159 I ActivityManager: startService: Intent { act=com.huawei.aod.action.RELEASE_WAKE_LOCK cmp=com.huawei.aod/.AODService } callingPid: 1779 callingPackage:android
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 1952163 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 1822769 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 1264548 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 28419 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 1358708 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 612408 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 926958 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 19647 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 31819 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 33844 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 441153 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 1825157 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 1263953 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 1235719 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 919364 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 40130 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 1822853 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 58736 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 32174 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 26454 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 1363400 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 983010 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 40924 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 1822153 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 1236017 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 397551 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 454109 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 1244943 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 1204803 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 1264429 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 23842 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 23847 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 1230078 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 16618 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 1229777 endTime 1952163 freezeTime 0
+03-15 23:07:00.500  1779  2159 D ActivityManager: beginTime 16001 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 23862 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 1880939 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 1273257 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 1822309 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 19647 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 919364 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 40130 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 1822853 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 32174 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 26454 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 1363400 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 1258162 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 1258082 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 1258075 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 1258073 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 1258024 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 1257978 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 1257846 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 1257667 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 1256019 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 1232725 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 1232725 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 1232682 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 1232713 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 1229989 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 1229711 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 1229710 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 1229683 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 1223815 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 1200369 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 1200269 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 1198790 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 1160186 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 930202 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 930202 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 925480 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 651194 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 651207 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 644517 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 449063 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 449212 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 434691 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 327681 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 271966 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 150237 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 76581 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 69642 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 59670 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 59643 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 59610 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 59409 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 59016 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 58780 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 58454 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 58012 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 57941 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 56930 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 56857 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 56769 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 55566 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 54625 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 53177 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 52602 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 47447 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 42143 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 41368 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 37854 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 37614 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 37538 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 34865 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 33776 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 32950 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 59526 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 30608 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 31194 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 29617 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 27170 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 26230 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 23878 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 23415 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 22789 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 21267 endTime 1952163 freezeTime 0
+03-15 23:07:00.501  1779  2159 D ActivityManager: beginTime 18267 endTime 1952163 freezeTime 0
+03-15 23:07:00.502  1779  2159 D ActivityManager: beginTime 15946 endTime 1952163 freezeTime 0
+03-15 23:07:00.503 18879 18879 I HwAOD   : AODSensorhubImpl:onStartCommand action = com.huawei.aod.action.RELEASE_WAKE_LOCK
+03-15 23:07:00.503 18879 18879 I HwAOD   : AODSensorhubImpl:mSensorhubHandler handleMessage:108
+03-15 23:07:00.503 18879 18879 I HwAOD   : AodWakeLock:releaseWakeLock
+03-15 23:07:00.505  1779  3582 I PowerMS : release:L=121849762,F=0x0,T=com.huawei.aod:AOD_Partial_WakeLock,N=com.huawei.aod,WS=null,U=10180,P=18879
+03-15 23:07:00.505  1779 10297 D ActivityManager: beginTime 1952163 endTime 1952168 freezeTime 0
+03-15 23:07:00.505  1779 10297 D ActivityManager: beginTime 1822769 endTime 1952168 freezeTime 0
+03-15 23:07:00.506   712   712 I android.system.suspend@1.0-service: decSuspendCounter kname=native_PowerManagerService.WakeLocks --mSuspendCounter= 0
+03-15 23:07:00.523  1779  1832 I system_server: Background young concurrent copying GC freed 30584(2944KB) AllocSpace objects, 8(5284KB) LOS objects, 8% free, 96MB/104MB,  current_footprint is 104MB, capacity is 800MB, growth limit is 800MB, paused 235us,110us total 20.753ms cpu time 20.627ms DisableRefAccess:2.705ms(2.686ms), NotOnTop, cpufreq(0-11): 692000 692000 692000 692000 1536000 1536000 1536000 1536000 1536000 1536000 1210000 1210000, curUsage: 0.913043, Perceptible, last gc 59972.983ms, last Background young 59972.983ms, last free 23267784, 0, process name: "system_server"
+03-15 23:07:00.523  1779  1834 W System  : A resource failed to call close. 
+03-15 23:07:00.770  1779  2050 V HwWifiServiceFactory: get AllImpl object = com.android.server.wifi.HwWifiServiceFactoryImpl@f8e66c3
+03-15 23:07:00.889  1779  2012 I InputReader: eventHub getEvents 0
+03-15 23:07:00.889  1779  1856 I EventHub: EventHub monitor: no key events in the past 398s, no motion events in the past 183s
+03-15 23:07:01.995  2565  2755 I Booster_BoosterdDelegate: [handleMessage]handleMessage, enter
+03-15 23:07:01.995  2565  2755 E Booster_BoosterdDelegate: [bindService]bindService start
+03-15 23:07:01.997  2565  2755 E Booster_BoosterdDelegate: [getBoosterdNativeService]Failed to get boosterd native service
+03-15 23:07:01.997  2565  2755 E Booster_BoosterdDelegate: [bindService]mService is null
+03-15 23:07:01.997  2565  2755 I Booster_BoosterdDelegate: [startRebindServieTimer] startRebindServieTimer
+03-15 23:07:01.998  2565  2755 I OllieMsgCenter: publishEvt=2135097353
+03-15 23:07:02.110 10228 10250 I ZrHung.AppEyeUiProbe: restart watching of heap dump.
+03-15 23:07:02.246  2535  3717 I PGServer: getThermalInfo. calling pkg: com.huawei.iaware
+03-15 23:07:02.368  1451  4245 I CPU_STATS: iawared: query next cpu load with 2!
+03-15 23:07:02.368  1451  4245 I CPU_STATS: total cost time 2008131719 ns
+03-15 23:07:02.370  1451  4245 I CPU_STATS: iawared: current total load is 0.009707, capacity : 5658, pre load:  483313734589, current load : 483421436112
+03-15 23:07:02.372  1451  4245 I CPU_STATS: read once cost time 3821 us
+03-15 23:07:02.581  1488  8713 I HwTrace : interrupt not parse line Err:          0
+03-15 23:07:02.584  1488  8713 I HwTrace : SysCpuLoad:0.004584,SysMemLevel:0
+03-15 23:07:02.590 19155 19155 I ScreemCommon: [HW] New process 19155, set the selinux context as dumpstate
+03-15 23:07:02.599  1779  2143 I WifiNl80211Manager: Noise: -92, Snr: 28, Chload: 214, rssi: -66, txBitrate: 39, rxBitrate: 96, frequency: 5180, UlDelay: 1, currentTxBytes: 71145807, currentTxPackets: 60451, currentTxFailed: 0, currentRxBytes: 30144133, currentRxPackets: 35622, chloadSelf: 0, c0RssiDbm: 0, c1RssiDbm: 0
+03-15 23:07:02.599  1779  2143 I HwDualBandLearningAlg: update5gBetaAttribute, m24gConnectionRateList is empty or not full, ignore
+03-15 23:07:02.691  1488  8710 I HwTrace : ReplaySystrace-WaitPid waitpid(19155) success.
+03-15 23:07:02.988  9213 18773 I axiomaster.BoJ: jit_compiled:[OK] java.lang.ThreadLocal$ThreadLocalMap java.lang.ThreadLocal.getMap(java.lang.Thread) @ /apex/com.android.art/javalib/core-oj.jar
+03-15 23:07:02.989  9213 18773 I axiomaster.BoJ: jit_compiled:[OK] int java.lang.ThreadLocal.access$400(java.lang.ThreadLocal) @ /apex/com.android.art/javalib/core-oj.jar
+03-15 23:07:03.120 10228 10250 I ZrHung.AppEyeUiProbe: stop UiProbe
+03-15 23:07:03.120 10228 10250 I ZrHung.AppEyeUiProbe: not watching, wait.
+03-15 23:07:03.774  1779  2050 V HwWifiServiceFactory: get AllImpl object = com.android.server.wifi.HwWifiServiceFactoryImpl@f8e66c3
+03-15 23:07:03.893  1779  2012 I InputReader: eventHub getEvents 0
+03-15 23:07:03.893  1779  1856 I EventHub: EventHub monitor: no key events in the past 401s, no motion events in the past 186s
+03-15 23:07:04.008  2565  2755 I Booster_BoosterdDelegate: [handleMessage]handleMessage, enter
+03-15 23:07:04.008  2565  2755 E Booster_BoosterdDelegate: [bindService]bindService start
+03-15 23:07:04.010  2565  2755 E Booster_BoosterdDelegate: [getBoosterdNativeService]Failed to get boosterd native service
+03-15 23:07:04.010  2565  2755 E Booster_BoosterdDelegate: [bindService]mService is null
+03-15 23:07:04.010  2565  2755 I Booster_BoosterdDelegate: [startRebindServieTimer] startRebindServieTimer
+03-15 23:07:04.011  2565  2755 I OllieMsgCenter: publishEvt=2135097353
+03-15 23:07:04.296  1390  1390 W hilogcat: type=1400 audit(0.0:2098): avc: denied { read } for name="brightness" dev="sysfs" ino=76242 scontext=u:r:glogcat:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=0
+03-15 23:07:04.301  1405  1405 E selinux_dmd: type=1400 audit(0.0:2098): avc: denied { read } for comm="hilogcat" name="brightness" dev="sysfs" ino=76242 scontext=u:r:glogcat:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=0 find  pid= failed
+03-15 23:07:04.301  1405  1405 E selinux_dmd: type=1400 audit(0.0:2098): avc: denied { read } for comm="hilogcat" name="brightness" dev="sysfs" ino=76242 scontext=u:r:glogcat:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=0 ExtractKeys failed
+03-15 23:07:04.390  1451  4245 I CPU_STATS: iawared: query next cpu load with 2!
+03-15 23:07:04.391  1451  4245 I CPU_STATS: total cost time 2022149687 ns
+03-15 23:07:04.392  1451  4245 I CPU_STATS: iawared: current total load is 0.002922, capacity : 5658, pre load:  483421436112, current load : 483454081001
+03-15 23:07:04.395  1451  4245 I CPU_STATS: read once cost time 3844 us
+03-15 23:07:04.801  1424  1940 E dubaid  : [UidTimeInStateReader.cpp] GetTime# Failed to open uid_time_in_state
+03-15 23:07:04.803  1424  1949 E dubaid  : [WakelockStats.cpp] SaveKernelWakelockData# Invalid wakelock tag:             
+03-15 23:07:04.803  1424  1949 E dubaid  : [WakelockStats.cpp] ReadKernelWakelock# Failed to parse kernel wakelock message:             	1494		1494		0		0		0		1024		17		1955557		0
+03-15 23:07:04.826  1424  1735 D dubaid  : [BufferedLogServer.cpp] ReceiveMessage# Received buffered log from dubai_driver-0
+03-15 23:07:04.827  1424  1735 D dubaid  : [BufferedLogServer.cpp] ReceiveMessage# Received buffered log from dubai_driver-0
+03-15 23:07:04.856  1424  2038 W dubaid  : [SocTempRainflow.cpp] FormatTempData# Matrix index: 0, Point 1: 33.000000, Point 2: 34.000000, Value: 1.000000, range:1.000000, means:33.500000
+03-15 23:07:04.856  5630  5638 I bms_behavior: [WaitConditionStatus]: runState = 1, cvStatus = 1 
+03-15 23:07:04.857  1424  2038 W dubaid  : [SocTempRainflow.cpp] FormatTempData# Matrix index: 1, Point 1: 34.000000, Point 2: 35.000000, Value: 1.000000, range:1.000000, means:34.500000
+03-15 23:07:04.857  1424  2038 W dubaid  : [SocTempRainflow.cpp] FormatTempData# Matrix index: 2, Point 1: 34.000000, Point 2: 35.000000, Value: 1.000000, range:1.000000, means:34.500000
+03-15 23:07:04.859  5630  5638 D bms_behavior: [GetChargeMaxPower]: mode:0, max_power:0
+03-15 23:07:04.859  5630  5638 D bms_behavior: [GetCableType]: cable type:0
+03-15 23:07:04.866  5630  5638 E bms_file: [BmsFileReadBuffer]: file /sys/class/hw_power/coul/coul_data/rbatt is invalid
+03-15 23:07:04.873  5630  5638 I bms_behavior: [Monitor]: monitor interval count 385, name: Battery
+03-15 23:07:05.624  1779  2143 I WifiNl80211Manager: Noise: -92, Snr: 28, Chload: 214, rssi: -66, txBitrate: 39, rxBitrate: 96, frequency: 5180, UlDelay: 1, currentTxBytes: 71145807, currentTxPackets: 60451, currentTxFailed: 0, currentRxBytes: 30144133, currentRxPackets: 35622, chloadSelf: 0, c0RssiDbm: 0, c1RssiDbm: 0
+03-15 23:07:05.624  1779  2143 I HwDualBandLearningAlg: update5gBetaAttribute, m24gConnectionRateList is empty or not full, ignore
+03-15 23:07:06.013  2565  2755 I Booster_BoosterdDelegate: [handleMessage]handleMessage, enter
+03-15 23:07:06.014  2565  2755 E Booster_BoosterdDelegate: [bindService]bindService start
+03-15 23:07:06.015  2565  2755 E Booster_BoosterdDelegate: [getBoosterdNativeService]Failed to get boosterd native service
+03-15 23:07:06.015  2565  2755 E Booster_BoosterdDelegate: [bindService]mService is null
+03-15 23:07:06.016  2565  2755 I Booster_BoosterdDelegate: [startRebindServieTimer] startRebindServieTimer
+03-15 23:07:06.016  2565  2755 I OllieMsgCenter: publishEvt=2135097353
+03-15 23:07:06.404  1451  4245 I CPU_STATS: iawared: query next cpu load with 2!
+03-15 23:07:06.404  1451  4245 I CPU_STATS: total cost time 2013259219 ns
+03-15 23:07:06.405  1451  4245 I CPU_STATS: iawared: current total load is 0.003345, capacity : 5658, pre load:  483454081001, current load : 483491288138
+03-15 23:07:06.408  1451  4245 I CPU_STATS: read once cost time 3819 us
+03-15 23:07:06.795  1779  2050 V HwWifiServiceFactory: get AllImpl object = com.android.server.wifi.HwWifiServiceFactoryImpl@f8e66c3
+03-15 23:07:06.900  1779  2012 I InputReader: eventHub getEvents 0
+03-15 23:07:06.900  1779  1856 I EventHub: EventHub monitor: no key events in the past 404s, no motion events in the past 189s
+03-15 23:07:07.131 10299 10321 I ZrHung.AppEyeUiProbe: restart watching of heap dump.
+03-15 23:07:07.249  2535  3717 I PGServer: getThermalInfo. calling pkg: com.huawei.iaware
+03-15 23:07:08.022  2565  2755 I Booster_BoosterdDelegate: [handleMessage]handleMessage, enter
+03-15 23:07:08.023  2565  2755 E Booster_BoosterdDelegate: [bindService]bindService start
+03-15 23:07:08.024  2565  2755 E Booster_BoosterdDelegate: [getBoosterdNativeService]Failed to get boosterd native service
+03-15 23:07:08.024  2565  2755 E Booster_BoosterdDelegate: [bindService]mService is null
+03-15 23:07:08.025  2565  2755 I Booster_BoosterdDelegate: [startRebindServieTimer] startRebindServieTimer
+03-15 23:07:08.025  2565  2755 I OllieMsgCenter: publishEvt=2135097353
+03-15 23:07:08.138 10299 10321 I ZrHung.AppEyeUiProbe: stop UiProbe
+03-15 23:07:08.138 10299 10321 I ZrHung.AppEyeUiProbe: not watching, wait.

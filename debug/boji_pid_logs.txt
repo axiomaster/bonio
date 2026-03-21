@@ -1,0 +1,38 @@
+--------- beginning of system
+03-15 23:14:07.577 10053 10053 I TopResumedActivityChangeItem: execute start, ActivityClientRecord = ActivityRecord{9788217 token=android.os.BinderProxy@433eeb9 {ai.axiomaster.BoJi/ai.axiomaster.BoJi.MainActivity}}
+03-15 23:14:07.578 10053 10053 D ActivityThread: Won't deliver top position change in state=5
+03-15 23:14:07.594 10053 10053 I ActivityThread: Resuming ActivityRecord{9788217 token=android.os.BinderProxy@433eeb9 {ai.axiomaster.BoJi/ai.axiomaster.BoJi.MainActivity}} with isForward=true visibleFromClient=true
+03-15 23:14:07.711 10053 10053 I ActivityManager_activity: Reporting idle of ActivityRecord{9788217 token=android.os.BinderProxy@433eeb9 {ai.axiomaster.BoJi/ai.axiomaster.BoJi.MainActivity}} finished=false
+--------- beginning of main
+03-15 23:14:09.205 10053 19339 D HwViewRootImpl: [DetectViewsLocationRunner] start to get views' rect, type = SCENE_WINDOW_FOCUS_CHANGE
+03-15 23:14:09.207 10053 19339 D HwViewRootImpl: [DetectViewsLocationRunner] windowModeType: 1
+03-15 23:14:09.207 10053 19339 D HwViewRootImpl: [DetectViewsLocationRunner] displayPoint: Point(1316, 2832)
+03-15 23:14:09.207 10053 19339 D HwViewRootImpl: [DetectViewsLocationRunner] windowModeType: 1
+03-15 23:14:09.210 10053 19339 D HwViewRootImpl: [DetectViewsLocationRunner] lazyMode:
+03-15 23:14:09.210 10053 19339 D HwViewRootImpl: [DetectViewsLocationRunner] current mode is full screen
+03-15 23:14:09.210 10053 10053 D HwViewRootImpl: [DetectViewsLocationRunner] start to getViewHierarchy
+03-15 23:14:09.212 10053 19339 D HwViewRootImpl: [DetectViewsLocationRunner] deviceOrientation: 0
+03-15 23:14:09.212 10053 19339 D HwViewRootImpl: [DetectViewsLocationRunner-ScreenDirection] ROTATION_0
+03-15 23:14:09.212 10053 19339 D HwViewRootImpl: [DetectViewsLocationRunner] get views' rect = 0, SCENE_WINDOW_FOCUS_CHANGE
+03-15 23:14:09.373 10053 19270 I axiomaster.BoJ: Background young concurrent copying GC freed 128932(6244KB) AllocSpace objects, 2(40KB) LOS objects, 41% free, 8794KB/14MB,  current_footprint is 14MB, capacity is 384MB, growth limit is 384MB, paused 1.113ms,198us total 67.235ms cpu time 57.278ms DisableRefAccess:5.473ms(4.844ms), OnTop, cpufreq(0-7): 980000 980000 980000 980000 884000 884000 884000 884000, Perceptible, last gc 102745.959ms, last Background young 102745.959ms, last free 6480824, 0, process name: "<pre-initialized>"
+03-15 23:14:09.580 10053 10053 I AwareLog: RtgSched: handleMessage msg:1
+03-15 23:14:10.566 10053 19269 I axiomaster.BoJ: jit_compiled:[OK] boolean java.util.Arrays.deepEquals(java.lang.Object[], java.lang.Object[]) @ /apex/com.android.art/javalib/core-oj.jar
+03-15 23:14:10.793 10053 10053 I HwViewRootImpl: removeInvalidNode all the node in jank list is out of time
+03-15 23:14:11.515 10053 19269 I axiomaster.BoJ: jit_compiled:[OK] java.lang.Object java.util.concurrent.CopyOnWriteArrayList.get(java.lang.Object[], int) @ /apex/com.android.art/javalib/core-oj.jar
+03-15 23:14:11.532 10053 19269 I axiomaster.BoJ: jit_compiled:[OK] void android.view.HwViewRootImpl$JankDetector.removeInvalidNode(long) @ /system/framework/hwPartBasicplatform.jar
+03-15 23:14:12.880 10053 19270 I axiomaster.BoJ: Background concurrent copying GC freed 181064(7369KB) AllocSpace objects, 2(40KB) LOS objects, 49% free, 7560KB/14MB,  current_footprint is 14MB, capacity is 384MB, growth limit is 384MB, paused 140us,22us total 60.882ms cpu time 58.201ms DisableRefAccess:1.372ms(1.372ms), OnTop, cpufreq(0-7): 980000 980000 980000 980000 1786000 1786000 1786000 1786000, Perceptible, last gc 3506.485ms, last Background 189614.538ms, last free 6435536, 0, process name: "<pre-initialized>"
+03-15 23:14:13.978 10053 19269 I axiomaster.BoJ: jit_compiled:[OK] int java.util.concurrent.CopyOnWriteArrayList.size() @ /apex/com.android.art/javalib/core-oj.jar
+03-15 23:14:14.295 10053 19269 I axiomaster.BoJ: jit_compiled:[OK] int java.lang.Long.compareTo(java.lang.Long) @ /apex/com.android.art/javalib/core-oj.jar
+03-15 23:14:15.521 10053 19269 I axiomaster.BoJ: jit_compiled:[OK] boolean java.util.concurrent.CopyOnWriteArrayList.removeAll(java.util.Collection) @ /apex/com.android.art/javalib/core-oj.jar
+03-15 23:14:15.636 10053 19269 I axiomaster.BoJ: jit_compiled:[OK] int java.util.Collections.indexedBinarySearch(java.util.List, java.lang.Object, java.util.Comparator) @ /apex/com.android.art/javalib/core-oj.jar
+03-15 23:14:15.669 10053 19269 I axiomaster.BoJ: jit_compiled:[OK] boolean java.util.Collections$SingletonSet.contains(java.lang.Object) @ /apex/com.android.art/javalib/core-oj.jar
+03-15 23:14:15.670 10053 19269 I axiomaster.BoJ: jit_compiled:[OK] boolean java.util.concurrent.CopyOnWriteArrayList.add(java.lang.Object) @ /apex/com.android.art/javalib/core-oj.jar
+03-15 23:14:15.736 10053 19269 I axiomaster.BoJ: jit_compiled:[OK] boolean java.util.Collections.eq(java.lang.Object, java.lang.Object) @ /apex/com.android.art/javalib/core-oj.jar
+03-15 23:14:17.093 10053 19269 I axiomaster.BoJ: jit_compiled:[OK] int android.view.HwViewRootImpl$JankDetector$1.compare(android.util.Pair, android.util.Pair) @ /system/framework/hwPartBasicplatform.jar
+03-15 23:14:17.931 10053 19269 I axiomaster.BoJ: jit_compiled:[OK] int android.view.HwViewRootImpl$JankDetector$1.compare(java.lang.Object, java.lang.Object) @ /system/framework/hwPartBasicplatform.jar
+03-15 23:14:17.945 10053 19270 I axiomaster.BoJ: Background young concurrent copying GC freed 183337(7463KB) AllocSpace objects, 0(0B) LOS objects, 49% free, 7569KB/14MB,  current_footprint is 14MB, capacity is 384MB, growth limit is 384MB, paused 496us,64us total 13.652ms cpu time 12.995ms DisableRefAccess:1.85ms(1.83ms), OnTop, cpufreq(0-7): 692000 692000 692000 692000 1536000 1536000 1536000 1536000, Perceptible, last gc 5064.818ms, last Background young 8571.303ms, last free 7587608, 0, process name: "<pre-initialized>"
+03-15 23:14:18.707 10053 19269 I axiomaster.BoJ: jit_compiled:[OK] void java.lang.System.arraycopy(char[], int, char[], int, int) @ /apex/com.android.art/javalib/core-oj.jar
+03-15 23:14:21.231 10053 19269 I axiomaster.BoJ: jit_compiled:[OK] void android.view.HwViewRootImpl$JankDetector$1.<init>(android.view.HwViewRootImpl$JankDetector) @ /system/framework/hwPartBasicplatform.jar
+03-15 23:14:21.512 10053 10053 I HwViewRootImpl: removeInvalidNode jank list is null
+03-15 23:14:23.002 10053 19270 I axiomaster.BoJ: Background young concurrent copying GC freed 182835(7449KB) AllocSpace objects, 0(0B) LOS objects, 49% free, 7591KB/14MB,  current_footprint is 14MB, capacity is 384MB, growth limit is 384MB, paused 780us,75us total 35.955ms cpu time 31.687ms DisableRefAccess:6.795ms(5.36ms), OnTop, cpufreq(0-7): 845000 845000 845000 845000 1536000 1536000 1536000 1536000, Perceptible, last gc 5057.103ms, last Background young 5057.103ms, last free 7642368, 0, process name: "<pre-initialized>"
+03-15 23:14:26.134 10053 19269 I axiomaster.BoJ: jit_compiled:[OK] int java.util.Collections.binarySearch(java.util.List, java.lang.Object, java.util.Comparator) @ /apex/com.android.art/javalib/core-oj.jar
