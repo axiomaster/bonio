@@ -6,39 +6,60 @@ import { fileIo as fs } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
+import lottie from '@ohos/lottie';
 
 const DOMAIN = 0x3D00;
 const TAG = 'ChatTab';
+
+// Agent states mirroring Android AgentState
+enum AgentState {
+  Idle,
+  Listening,
+  Thinking,
+  Speaking,
+  Working
+}
 
 @Component
 export struct ChatTab {
   runtime: NodeRuntime | undefined = undefined;
 
   @State messages: ChatMessage[] = [];
-  @State inputText: string = "";
+  @State inputText: string = '';
   @State isSending: boolean = false;
-  @State thinkingLevel: string = "off";
+  @State thinkingLevel: string = 'off';
   @State streamingText: string | undefined = undefined;
   @State errorText: string | undefined = undefined;
   @State healthOk: boolean = true;
-  @State sessionLabel: string = "HarmonyOS Node";
+  @State sessionLabel: string = 'main';
   @State showThinkingMenu: boolean = false;
+  @State showAttachmentMenu: boolean = false;
   @State pendingAttachments: OutgoingAttachment[] = [];
+  @State isSpeakerEnabled: boolean = true;
+  @State agentState: AgentState = AgentState.Idle;
+  @State pendingRunCount: number = 0;
 
   private scroller: Scroller = new Scroller();
+  private catCanvasSettings: RenderingContextSettings = new RenderingContextSettings(true);
+  private catCanvasContext: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.catCanvasSettings);
+  private currentLottieAnim: string = 'cat_anim';
+  private lastLoadedAsset: string = '';
 
   aboutToAppear() {
     const ctrl = this.runtime?.chatController;
     if (ctrl) {
       this.syncFromController(ctrl);
-
       ctrl.onChatUpdate = () => {
         this.syncFromController(ctrl);
       };
-
       ctrl.refresh();
     }
-    this.sessionLabel = "HarmonyOS Node";
+  }
+
+  aboutToDisappear() {
+    try {
+      lottie.destroy(this.currentLottieAnim);
+    } catch (_e) { /* ignore */ }
   }
 
   private syncFromController(ctrl: ChatController) {
@@ -46,9 +67,9 @@ export struct ChatTab {
     this.thinkingLevel = ctrl.thinkingLevel;
     this.streamingText = ctrl.streamingAssistantText;
     this.errorText = ctrl.errorText;
+    this.pendingRunCount = ctrl.pendingRunCount;
     this.isSending = ctrl.pendingRunCount > 0;
     this.healthOk = ctrl.healthOk;
-    // Auto-scroll to bottom
     setTimeout(() => {
       this.scroller.scrollEdge(Edge.Bottom);
     }, 50);
@@ -56,17 +77,39 @@ export struct ChatTab {
 
   private thinkingLabel(raw: string): string {
     switch (raw.trim().toLowerCase()) {
-      case "low": return "Low";
-      case "medium": return "Medium";
-      case "high": return "High";
-      default: return "Off";
+      case 'low': return 'Low';
+      case 'medium': return 'Medium';
+      case 'high': return 'High';
+      default: return 'Off';
     }
   }
 
-  private nextThinkingLevel(): string {
-    const levels: string[] = ["off", "low", "medium", "high"];
-    const idx = levels.indexOf(this.thinkingLevel.trim().toLowerCase());
-    return levels[(idx + 1) % levels.length];
+  private getLottieAsset(): string {
+    switch (this.agentState) {
+      case AgentState.Idle: return 'cat-idle.json';
+      case AgentState.Listening: return 'cat-listening.json';
+      case AgentState.Thinking: return 'cat-thinking.json';
+      case AgentState.Speaking: return 'cat-speaking.json';
+      case AgentState.Working: return 'cat-working.json';
+      default: return 'cat-idle.json';
+    }
+  }
+
+  private loadCatAnimation() {
+    const asset = this.getLottieAsset();
+    if (asset === this.lastLoadedAsset) return;
+    this.lastLoadedAsset = asset;
+    try {
+      lottie.destroy(this.currentLottieAnim);
+    } catch (_e) { /* ignore if not loaded yet */ }
+    lottie.loadAnimation({
+      container: this.catCanvasContext,
+      renderer: 'canvas',
+      loop: true,
+      autoplay: true,
+      name: this.currentLottieAnim,
+      path: asset,
+    });
   }
 
   private async selectImages() {
@@ -109,29 +152,22 @@ export struct ChatTab {
       const file = fs.openSync(uri, fs.OpenMode.READ_ONLY);
       const stat = fs.statSync(file.fd);
       const fileName = uri.split('/').pop() || (type === 'image' ? 'image.jpg' : 'file');
-      
-      // Limit size to 10MB for safety in base64
       if (stat.size > 10 * 1024 * 1024) {
-        this.errorText = "File too large (>10MB)";
+        this.errorText = 'File too large (>10MB)';
         fs.closeSync(file);
         return;
       }
-
       const buffer = new ArrayBuffer(stat.size);
       fs.readSync(file.fd, buffer);
-      
       const helper = new util.Base64Helper();
       const base64 = helper.encodeToStringSync(new Uint8Array(buffer));
-      
       const mimeType = type === 'image' ? 'image/jpeg' : 'application/octet-stream';
-      
       this.pendingAttachments.push({
         type: type,
         mimeType: mimeType,
         fileName: fileName,
         base64: base64
       });
-      
       fs.closeSync(file.fd);
     } catch (err) {
       const error = err as BusinessError;
@@ -143,184 +179,369 @@ export struct ChatTab {
     this.pendingAttachments.splice(index, 1);
   }
 
+  private canSend(): boolean {
+    return !this.isSending && (this.inputText.trim().length > 0 || this.pendingAttachments.length > 0) && this.healthOk;
+  }
+
+  private send() {
+    if (!this.canSend()) return;
+    const msg = this.inputText;
+    this.inputText = '';
+    const atts = [...this.pendingAttachments];
+    this.pendingAttachments = [];
+    this.runtime?.chatController?.sendMessage(msg, this.thinkingLevel, atts);
+  }
+
+  private onCatPress() {
+    if (this.pendingRunCount === 0) {
+      this.agentState = AgentState.Listening;
+      this.loadCatAnimation();
+    }
+  }
+
+  private onCatRelease() {
+    if (this.agentState === AgentState.Listening) {
+      this.agentState = AgentState.Thinking;
+      this.loadCatAnimation();
+      // Send voice message (simulated)
+      this.runtime?.chatController?.sendMessage('[Voice Message]', this.thinkingLevel, []);
+      // After a delay, return to Idle
+      setTimeout(() => {
+        this.agentState = AgentState.Idle;
+        this.loadCatAnimation();
+      }, 3000);
+    }
+  }
+
   build() {
     Column() {
-      // ── Message Area (Card) ──
-      Column() {
-        List({ scroller: this.scroller }) {
-          ForEach(this.messages, (msg: ChatMessage) => {
-            ListItem() { this.MessageBubble(msg) }
-          }, (msg: ChatMessage) => msg.id)
+      // ── Session Header Bar ──
+      Row() {
+        // Session button (left)
+        Button(this.sessionLabel)
+          .type(ButtonType.Normal)
+          .backgroundColor('#E8ECF0')
+          .fontColor('#333333')
+          .fontSize(13)
+          .height(28)
+          .borderRadius(8)
+          .padding({ left: 10, right: 10 })
 
-          // Streaming text
-          if (this.streamingText) {
-            ListItem() { this.StreamingBubble(this.streamingText!) }
-          }
+        // Connection status pill
+        Row() {
+          Text('●')
+            .fontSize(6)
+            .fontColor(this.healthOk ? '#2ECC71' : '#F39C12')
+            .margin({ right: 4 })
+          Text(this.healthOk ? 'Connected' : 'Offline')
+            .fontSize(11)
+            .fontColor('#999999')
+        }
+        .height(28)
+        .padding({ left: 8, right: 8 })
+        .borderRadius(8)
+        .backgroundColor('#E8ECF0')
+        .margin({ left: 6 })
 
-          // Typing indicator
-          if (this.isSending && !this.streamingText) {
-            ListItem() { this.TypingIndicator() }
+        Blank()
+
+        // SPK toggle (right)
+        Button() {
+          Row() {
+            Text(this.isSpeakerEnabled ? '🔊' : '🔇')
+              .fontSize(16)
           }
         }
-        .width('100%')
-        .layoutWeight(1)
-        .padding({ left: 12, right: 12, top: 8, bottom: 8 })
+        .type(ButtonType.Normal)
+        .width(36)
+        .height(28)
+        .borderRadius(8)
+        .backgroundColor(this.isSpeakerEnabled ? '#E3F2FD' : '#F0F0F0')
+        .onClick(() => {
+          this.isSpeakerEnabled = !this.isSpeakerEnabled;
+        })
       }
-      .layoutWeight(1)
       .width('100%')
-      .margin({ left: 12, right: 12, top: 12 })
-      .borderRadius(20)
-      .backgroundColor('#F0F4F8')
-      .clip(true)
+      .padding({ left: 12, right: 12, top: 6, bottom: 6 })
 
-      // ── Composer Panel ──
+      // ── Message Area ──
+      List({ scroller: this.scroller }) {
+        ForEach(this.messages, (msg: ChatMessage) => {
+          ListItem() { this.MessageBubble(msg) }
+        }, (msg: ChatMessage) => msg.id)
+
+        if (this.streamingText) {
+          ListItem() { this.StreamingBubble(this.streamingText!) }
+        }
+
+        if (this.isSending && !this.streamingText) {
+          ListItem() { this.TypingIndicator() }
+        }
+      }
+      .width('100%')
+      .layoutWeight(1)
+      .padding({ left: 12, right: 12, top: 8, bottom: 8 })
+
+      // ── Composer Area ──
       Column() {
-        // Top toolbar row: session + thinking + refresh + attach
-        Scroll(new Scroller()) {
-          Row() {
-            // Session selector button
-            Button(this.sessionLabel)
-              .type(ButtonType.Capsule)
-              .backgroundColor('#E8ECF0')
-              .fontColor('#333333')
-              .fontSize(14)
-              .height(36)
-              .fontWeight(FontWeight.Medium)
-
-            // Thinking level button
-            Button(`🧠 ${this.thinkingLabel(this.thinkingLevel)}`)
-              .type(ButtonType.Capsule)
-              .backgroundColor('#E8ECF0')
-              .fontColor('#333333')
-              .fontSize(14)
-              .height(36)
-              .margin({ left: 8 })
-              .onClick(() => {
-                const next = this.nextThinkingLevel();
-                this.thinkingLevel = next;
-                this.runtime?.chatController?.setThinkingLevel(next);
+        // Cat Voice Avatar (above controls, 192vp, left-aligned)
+        Row() {
+          Column() {
+            // Lottie animation via Canvas
+            Canvas(this.catCanvasContext)
+              .width(192)
+              .height(192)
+              .onReady(() => {
+                this.loadCatAnimation();
               })
 
-            // Refresh button
-            Button("↻")
-              .type(ButtonType.Circle)
-              .backgroundColor('#E8ECF0')
-              .fontColor('#333333')
-              .fontSize(18)
-              .width(36)
-              .height(36)
-              .margin({ left: 8 })
+            // Status overlay
+            if (this.agentState === AgentState.Listening) {
+              Text('Listening...')
+                .fontSize(11)
+                .fontColor('#0A59F7')
+                .margin({ top: -20 })
+            } else if (this.agentState === AgentState.Thinking) {
+              Text('Thinking...')
+                .fontSize(11)
+                .fontColor('#999999')
+                .margin({ top: -20 })
+            }
+          }
+          .gesture(
+            LongPressGesture({ repeat: false, duration: 300 })
+              .onAction(() => {
+                this.onCatPress();
+              })
+              .onActionEnd(() => {
+                this.onCatRelease();
+              })
+          )
+        }
+        .width('100%')
+        .padding({ left: 8 })
+        .justifyContent(FlexAlign.Start)
+
+        // Control Row: Continue/Stop (merged) + Thinking level
+        Row() {
+          // Dynamic Continue/Stop button
+          if (this.pendingRunCount > 0) {
+            Button('Stop')
+              .type(ButtonType.Normal)
+              .height(28)
+              .borderRadius(8)
+              .fontSize(12)
+              .fontWeight(FontWeight.Medium)
+              .backgroundColor(Color.White)
+              .fontColor('#666666')
+              .border({ width: 1, color: '#CCCCCC' })
+              .padding({ left: 8, right: 8 })
+              .onClick(() => {
+                // abort not yet implemented in ChatController, use refresh as fallback
+                this.runtime?.chatController?.refresh();
+              })
+          } else {
+            Button('Continue')
+              .type(ButtonType.Normal)
+              .height(28)
+              .borderRadius(8)
+              .fontSize(12)
+              .fontWeight(FontWeight.Medium)
+              .backgroundColor(Color.White)
+              .fontColor('#666666')
+              .border({ width: 1, color: '#CCCCCC' })
+              .padding({ left: 8, right: 8 })
               .onClick(() => {
                 this.runtime?.chatController?.refresh();
               })
-
-            // Attachment buttons
-            Button("🖼️")
-              .type(ButtonType.Circle)
-              .backgroundColor('#E8ECF0')
-              .fontColor('#333333')
-              .fontSize(16)
-              .width(36)
-              .height(36)
-              .margin({ left: 8 })
-              .onClick(() => this.selectImages())
-
-            Button("📎")
-              .type(ButtonType.Circle)
-              .backgroundColor('#E8ECF0')
-              .fontColor('#333333')
-              .fontSize(16)
-              .width(36)
-              .height(36)
-              .margin({ left: 8 })
-              .onClick(() => this.selectFiles())
           }
-          .padding({ left: 10, right: 10 })
+
+          Blank()
+
+          // Thinking level chip
+          Button(`Thinking: ${this.thinkingLabel(this.thinkingLevel)}`)
+            .type(ButtonType.Normal)
+            .height(28)
+            .borderRadius(8)
+            .fontSize(12)
+            .fontWeight(FontWeight.Medium)
+            .backgroundColor(Color.White)
+            .fontColor('#666666')
+            .border({ width: 1, color: '#CCCCCC' })
+            .padding({ left: 8, right: 8 })
+            .bindMenu([
+              { value: 'Off', action: () => { this.thinkingLevel = 'off'; this.runtime?.chatController?.setThinkingLevel('off'); } },
+              { value: 'Low', action: () => { this.thinkingLevel = 'low'; this.runtime?.chatController?.setThinkingLevel('low'); } },
+              { value: 'Medium', action: () => { this.thinkingLevel = 'medium'; this.runtime?.chatController?.setThinkingLevel('medium'); } },
+              { value: 'High', action: () => { this.thinkingLevel = 'high'; this.runtime?.chatController?.setThinkingLevel('high'); } },
+            ])
         }
         .width('100%')
-        .scrollable(ScrollDirection.Horizontal)
-        .scrollBar(BarState.Off)
-        .padding({ top: 10 })
+        .padding({ left: 8, right: 8, top: 4, bottom: 4 })
 
-        // Text input
-        TextInput({ text: this.inputText, placeholder: 'Message OpenClaw...' })
-          .width('100%')
-          .height(this.pendingAttachments.length > 0 ? 60 : 80)
-          .borderRadius(12)
-          .backgroundColor(Color.White)
-          .padding({ left: 12, right: 12 })
-          .margin({ left: 10, right: 10, top: 4 })
-          .onChange((val: string) => this.inputText = val)
-          .onSubmit(() => this.send())
-
-        // Attachment Preview Area
+        // Attachment chips strip
         if (this.pendingAttachments.length > 0) {
           Scroll(new Scroller()) {
             Row() {
               ForEach(this.pendingAttachments, (att: OutgoingAttachment, index: number) => {
-                this.AttachmentPreview(att, index)
+                this.AttachmentChip(att, index)
               })
             }
-            .padding({ left: 10, right: 10, bottom: 8 })
+            .padding({ left: 8, right: 8 })
           }
           .scrollable(ScrollDirection.Horizontal)
+          .scrollBar(BarState.Off)
           .width('100%')
         }
 
-        // Bottom row: connection pill + send/abort button
+        // Input row with waveform or text
         Row() {
-          // Connection pill
-          Row() {
-            Text("●")
-              .fontSize(8)
-              .fontColor(this.healthOk ? '#2ECC71' : '#F39C12')
-              .margin({ right: 6 })
-            Text(this.sessionLabel)
-              .fontSize(12)
-              .fontColor('#333333')
-              .fontWeight(FontWeight.Medium)
-            Text(this.healthOk ? "  Connected" : "  Connecting…")
-              .fontSize(12)
-              .fontColor('#999999')
-          }
-          .height(28)
-          .padding({ left: 10, right: 10 })
-          .borderRadius(14)
-          .backgroundColor('#E8ECF0')
-
-          Blank()
-
-          if (this.isSending) {
-            // Abort button
-            Button("■")
-              .type(ButtonType.Circle)
-              .width(40)
-              .height(40)
-              .fontSize(16)
-              .backgroundColor('#33E74C3C')
-              .fontColor('#E74C3C')
-              .onClick(() => {
-                // abort not yet ported
+          if (this.agentState === AgentState.Listening) {
+            // Waveform visualization during recording
+            Row() {
+              ForEach([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] as number[], (i: number) => {
+                Column()
+                  .width(4)
+                  .height(8 + (i % 3) * 8)
+                  .borderRadius(2)
+                  .backgroundColor('#0A59F7')
+                  .margin({ left: 2, right: 2 })
               })
+            }
+            .layoutWeight(1)
+            .height(36)
+            .justifyContent(FlexAlign.SpaceEvenly)
+            .alignItems(VerticalAlign.Center)
+            .padding({ left: 12, right: 12 })
+            .borderRadius(12)
+            .backgroundColor(Color.White)
+            .border({ width: 1, color: '#E0E0E0' })
           } else {
-            // Send button
-            Button("↑")
-              .type(ButtonType.Circle)
-              .width(40)
-              .height(40)
-              .fontSize(20)
-              .fontWeight(FontWeight.Bold)
-              .backgroundColor(this.canSend() ? '#0A59F7' : '#CCCCCC')
-              .fontColor(Color.White)
-              .enabled(this.canSend())
-              .onClick(() => {
-                this.send();
-              })
+            // Normal text input
+            TextInput({ text: this.inputText, placeholder: 'Ask anything...' })
+              .layoutWeight(1)
+              .height(36)
+              .borderRadius(12)
+              .backgroundColor(Color.White)
+              .border({ width: 1, color: '#E0E0E0' })
+              .fontSize(14)
+              .padding({ left: 12, right: 12 })
+              .onChange((val: string) => { this.inputText = val; })
+              .onSubmit(() => this.send())
           }
+
+          // Dynamic +/Send button
+          Button() {
+            if (this.isSending) {
+              LoadingProgress()
+                .width(16)
+                .height(16)
+                .color(Color.White)
+            } else {
+              Text(this.inputText.trim().length > 0 ? '↑' : '+')
+                .fontSize(18)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(this.inputText.trim().length > 0 && this.canSend() ? Color.White : '#0A59F7')
+            }
+          }
+          .type(ButtonType.Normal)
+          .width(36)
+          .height(36)
+          .borderRadius(8)
+          .backgroundColor(this.inputText.trim().length > 0 && this.canSend() ? '#0A59F7' : '#E3F2FD')
+          .margin({ left: 8 })
+          .onClick(() => {
+            if (this.inputText.trim().length > 0) {
+              this.send();
+            } else {
+              this.showAttachmentMenu = !this.showAttachmentMenu;
+            }
+          })
         }
         .width('100%')
-        .padding({ left: 10, right: 10, top: 6, bottom: 10 })
-        .alignItems(VerticalAlign.Center)
+        .padding({ left: 8, right: 8, top: 2, bottom: 2 })
+
+        // Attachment menu (slide-up drawer)
+        if (this.showAttachmentMenu) {
+          Row() {
+            // Camera
+            Column() {
+              Column() {
+                Text('📷')
+                  .fontSize(24)
+              }
+              .width(52)
+              .height(52)
+              .borderRadius(16)
+              .backgroundColor(Color.White)
+              .border({ width: 1, color: '#E0E0E0' })
+              .justifyContent(FlexAlign.Center)
+              .alignItems(HorizontalAlign.Center)
+              Text('Camera')
+                .fontSize(11)
+                .fontColor('#999999')
+                .margin({ top: 4 })
+            }
+            .alignItems(HorizontalAlign.Center)
+            .layoutWeight(1)
+            .onClick(() => {
+              this.showAttachmentMenu = false;
+              // TODO: camera logic
+            })
+
+            // Gallery
+            Column() {
+              Column() {
+                Text('🖼️')
+                  .fontSize(24)
+              }
+              .width(52)
+              .height(52)
+              .borderRadius(16)
+              .backgroundColor(Color.White)
+              .border({ width: 1, color: '#E0E0E0' })
+              .justifyContent(FlexAlign.Center)
+              .alignItems(HorizontalAlign.Center)
+              Text('Gallery')
+                .fontSize(11)
+                .fontColor('#999999')
+                .margin({ top: 4 })
+            }
+            .alignItems(HorizontalAlign.Center)
+            .layoutWeight(1)
+            .onClick(() => {
+              this.showAttachmentMenu = false;
+              this.selectImages();
+            })
+
+            // File
+            Column() {
+              Column() {
+                Text('📄')
+                  .fontSize(24)
+              }
+              .width(52)
+              .height(52)
+              .borderRadius(16)
+              .backgroundColor(Color.White)
+              .border({ width: 1, color: '#E0E0E0' })
+              .justifyContent(FlexAlign.Center)
+              .alignItems(HorizontalAlign.Center)
+              Text('File')
+                .fontSize(11)
+                .fontColor('#999999')
+                .margin({ top: 4 })
+            }
+            .alignItems(HorizontalAlign.Center)
+            .layoutWeight(1)
+            .onClick(() => {
+              this.showAttachmentMenu = false;
+              this.selectFiles();
+            })
+          }
+          .width('100%')
+          .padding({ left: 8, right: 8, top: 12, bottom: 12 })
+        }
 
         // Error text
         if (this.errorText) {
@@ -332,7 +553,8 @@ export struct ChatTab {
         }
       }
       .width('100%')
-      .backgroundColor('#E8ECF0')
+      .padding({ bottom: 20 })
+      .backgroundColor('#F0F4F8')
       .borderRadius({ topLeft: 16, topRight: 16 })
     }
     .width('100%')
@@ -340,54 +562,32 @@ export struct ChatTab {
     .backgroundColor('#FAFAFA')
   }
 
-  @Builder AttachmentPreview(att: OutgoingAttachment, index: number) {
-    Stack({ alignContent: Alignment.TopEnd }) {
-      if (att.type === 'image') {
-        Image(`data:${att.mimeType};base64,${att.base64}`)
-          .width(60)
-          .height(60)
-          .borderRadius(8)
-          .objectFit(ImageFit.Cover)
-      } else {
-        Column() {
-          Text("📄")
-            .fontSize(20)
-          Text(att.fileName)
-            .fontSize(8)
-            .maxLines(1)
-            .fontColor('#666666')
-        }
-        .width(60)
-        .height(60)
-        .borderRadius(8)
-        .backgroundColor('#FFFFFF')
-        .justifyContent(FlexAlign.Center)
-        .alignItems(HorizontalAlign.Center)
-        .padding(4)
-      }
-
-      // Close/Delete button
-      Circle({ width: 18, height: 18 })
-        .fill('#CC000000')
+  @Builder AttachmentChip(att: OutgoingAttachment, index: number) {
+    Row() {
+      Text(att.fileName)
+        .fontSize(11)
+        .fontColor('#333333')
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .constraintSize({ maxWidth: 100 })
+      Text('×')
+        .fontSize(12)
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#999999')
+        .margin({ left: 6 })
         .onClick(() => this.removeAttachment(index))
-        .offset({ x: 4, y: -4 })
-      
-      Text("✕")
-        .fontSize(10)
-        .fontColor(Color.White)
-        .hitTestBehavior(HitTestMode.None)
-        .offset({ x: 4, y: -4 })
     }
-    .width(64)
-    .height(64)
-    .margin({ right: 10 })
+    .height(28)
+    .padding({ left: 10, right: 10 })
+    .borderRadius(14)
+    .backgroundColor('#E3F2FD')
+    .border({ width: 1, color: '#CCCCCC' })
+    .margin({ right: 8 })
   }
 
   @Builder MessageBubble(msg: ChatMessage) {
-    // Filter displayable content
     Column() {
       if (this.isUserMessage(msg)) {
-        // User bubble — right-aligned, teal gradient
         Row() {
           Blank()
           Column() {
@@ -404,8 +604,7 @@ export struct ChatTab {
                   .margin({ top: 4, bottom: 4 })
               } else if (part.type !== 'text') {
                 Row() {
-                  Text("📄")
-                    .margin({ right: 6 })
+                  Text('📄').margin({ right: 6 })
                   Text(part.fileName || 'file')
                     .fontSize(14)
                     .fontColor(Color.White)
@@ -426,7 +625,6 @@ export struct ChatTab {
         .width('100%')
         .justifyContent(FlexAlign.End)
       } else {
-        // Assistant bubble — left-aligned, light surface
         Row() {
           Column() {
             ForEach(msg.content, (part: ChatMessageContent) => {
@@ -442,8 +640,7 @@ export struct ChatTab {
                   .margin({ top: 4, bottom: 4 })
               } else if (part.type !== 'text') {
                 Row() {
-                  Text("📄")
-                    .margin({ right: 6 })
+                  Text('📄').margin({ right: 6 })
                   Text(part.fileName || 'file')
                     .fontSize(14)
                     .fontColor('#333333')
@@ -491,24 +688,10 @@ export struct ChatTab {
   @Builder TypingIndicator() {
     Row() {
       Row() {
-        Text("●")
-          .fontSize(6)
-          .fontColor('#999999')
-          .opacity(0.4)
-          .margin({ right: 4 })
-        Text("●")
-          .fontSize(6)
-          .fontColor('#999999')
-          .opacity(0.65)
-          .margin({ right: 4 })
-        Text("●")
-          .fontSize(6)
-          .fontColor('#999999')
-          .opacity(0.9)
-          .margin({ right: 8 })
-        Text("Thinking…")
-          .fontSize(14)
-          .fontColor('#999999')
+        Text('●').fontSize(6).fontColor('#999999').opacity(0.4).margin({ right: 4 })
+        Text('●').fontSize(6).fontColor('#999999').opacity(0.65).margin({ right: 4 })
+        Text('●').fontSize(6).fontColor('#999999').opacity(0.9).margin({ right: 8 })
+        Text('Thinking…').fontSize(14).fontColor('#999999')
       }
       .padding({ left: 14, right: 14, top: 10, bottom: 10 })
       .borderRadius(16)
@@ -520,22 +703,7 @@ export struct ChatTab {
     .margin({ top: 4, bottom: 4 })
   }
 
-  // ── Helpers ──
-
   private isUserMessage(msg: ChatMessage): boolean {
     return msg.role.toLowerCase() === 'user';
-  }
-
-  private canSend(): boolean {
-    return !this.isSending && (this.inputText.trim().length > 0 || this.pendingAttachments.length > 0) && this.healthOk;
-  }
-
-  private send() {
-    if (!this.canSend()) return;
-    const msg = this.inputText;
-    this.inputText = "";
-    const atts = [...this.pendingAttachments];
-    this.pendingAttachments = [];
-    this.runtime?.chatController?.sendMessage(msg, this.thinkingLevel, atts);
   }
 }

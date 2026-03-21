@@ -1,0 +1,5 @@
+2026-03-15 23:07:54.178 ERROR connect open.bigmodel.cn:443 failed! [HttpClient.cpp:216:http_client_connect]
+2026-03-15 23:20:48.559 ERROR connect open.bigmodel.cn:443 failed! [HttpClient.cpp:216:http_client_connect]
+2026-03-15 23:29:03.863 ERROR connect open.bigmodel.cn:443 failed! [HttpClient.cpp:216:http_client_connect]
+2026-03-15 23:54:11.759 ERROR connect open.bigmodel.cn:443 failed! [HttpClient.cpp:216:http_client_connect]
+2026-03-15 23:56:39.074 ERROR connect open.bigmodel.cn:443 failed! [HttpClient.cpp:216:http_client_connect]

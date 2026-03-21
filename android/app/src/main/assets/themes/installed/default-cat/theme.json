@@ -1,0 +1,13 @@
+{
+  "id": "default-cat",
+  "name": "Default Cat",
+  "version": "1.0",
+  "description": "Default cat avatar theme with Lottie animations for different agent states",
+  "states": {
+    "idle": "cat-idle.lottie",
+    "listening": "cat-listening.lottie",
+    "thinking": "cat-thinking.lottie",
+    "speaking": "cat-speaking.lottie",
+    "working": "cat-working.lottie"
+  }
+}

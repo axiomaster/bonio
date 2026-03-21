@@ -1,0 +1,140 @@
+package ai.axiomaster.boji.remote.node
+
+import ai.axiomaster.boji.remote.LocationMode
+import ai.axiomaster.boji.remote.SecurePrefs
+import ai.axiomaster.boji.remote.VoiceWakeMode
+import ai.axiomaster.boji.remote.gateway.GatewayClientInfo
+import ai.axiomaster.boji.remote.gateway.GatewayConnectOptions
+import ai.axiomaster.boji.remote.gateway.GatewayEndpoint
+import ai.axiomaster.boji.remote.gateway.GatewayTlsParams
+import android.os.Build
+
+class ConnectionManager(
+  private val prefs: SecurePrefs,
+  private val cameraEnabled: () -> Boolean,
+  private val locationMode: () -> LocationMode,
+  private val voiceWakeMode: () -> VoiceWakeMode,
+  private val motionActivityAvailable: () -> Boolean,
+  private val motionPedometerAvailable: () -> Boolean,
+  private val smsAvailable: () -> Boolean,
+  private val hasRecordAudioPermission: () -> Boolean,
+  private val manualTls: () -> Boolean,
+) {
+  companion object {
+    internal fun resolveTlsParamsForEndpoint(
+      endpoint: GatewayEndpoint,
+      storedFingerprint: String?,
+      manualTlsEnabled: Boolean,
+    ): GatewayTlsParams? {
+      val stableId = endpoint.stableId
+      val stored = storedFingerprint?.trim().takeIf { !it.isNullOrEmpty() }
+      val isManual = stableId.startsWith("manual|")
+
+      if (isManual) {
+        if (!manualTlsEnabled) return null
+        return GatewayTlsParams(
+          required = true,
+          expectedFingerprint = stored?.takeIf { it.isNotBlank() },
+          allowTOFU = stored.isNullOrBlank(),
+          stableId = stableId,
+        )
+      }
+
+      if (!stored.isNullOrBlank()) {
+        return GatewayTlsParams(
+          required = true,
+          expectedFingerprint = stored,
+          allowTOFU = false,
+          stableId = stableId,
+        )
+      }
+
+      val hinted = endpoint.tlsEnabled || !endpoint.tlsFingerprintSha256.isNullOrBlank()
+      if (hinted) {
+        return GatewayTlsParams(
+          required = true,
+          expectedFingerprint = null,
+          allowTOFU = false,
+          stableId = stableId,
+        )
+      }
+
+      return null
+    }
+  }
+
+  private fun runtimeFlags(): NodeRuntimeFlags =
+    NodeRuntimeFlags(
+      cameraEnabled = cameraEnabled(),
+      locationEnabled = locationMode() != LocationMode.Off,
+      smsAvailable = smsAvailable(),
+      voiceWakeEnabled = voiceWakeMode() != VoiceWakeMode.Off && hasRecordAudioPermission(),
+      motionActivityAvailable = motionActivityAvailable(),
+      motionPedometerAvailable = motionPedometerAvailable(),
+      debugBuild = true, // Force debug for now or link to BuildConfig
+    )
+
+  fun buildInvokeCommands(): List<String> = InvokeCommandRegistry.advertisedCommands(runtimeFlags())
+
+  fun buildCapabilities(): List<String> = InvokeCommandRegistry.advertisedCapabilities(runtimeFlags())
+
+  fun resolvedVersionName(): String {
+    return "1.0.0-boji"
+  }
+
+  fun resolveModelIdentifier(): String? {
+    return listOfNotNull(Build.MANUFACTURER, Build.MODEL)
+      .joinToString(" ")
+      .trim()
+      .ifEmpty { null }
+  }
+
+  fun buildUserAgent(): String {
+    val version = resolvedVersionName()
+    val release = Build.VERSION.RELEASE?.trim().orEmpty()
+    val releaseLabel = if (release.isEmpty()) "unknown" else release
+    return "BoJiAndroid/$version (Android $releaseLabel; SDK ${Build.VERSION.SDK_INT})"
+  }
+
+  fun buildClientInfo(clientId: String, clientMode: String): GatewayClientInfo {
+    return GatewayClientInfo(
+      id = clientId,
+      displayName = prefs.displayName.value,
+      version = resolvedVersionName(),
+      platform = "android",
+      mode = clientMode,
+      instanceId = prefs.instanceId.value,
+      deviceFamily = "Android",
+      modelIdentifier = resolveModelIdentifier(),
+    )
+  }
+
+  fun buildNodeConnectOptions(): GatewayConnectOptions {
+    return GatewayConnectOptions(
+      role = "node",
+      scopes = emptyList(),
+      caps = buildCapabilities(),
+      commands = buildInvokeCommands(),
+      permissions = emptyMap(),
+      client = buildClientInfo(clientId = "openclaw-android", clientMode = "node"),
+      userAgent = buildUserAgent(),
+    )
+  }
+
+  fun buildOperatorConnectOptions(): GatewayConnectOptions {
+    return GatewayConnectOptions(
+      role = "operator",
+      scopes = listOf("operator.read", "operator.write", "operator.talk.secrets"),
+      caps = emptyList(),
+      commands = emptyList(),
+      permissions = emptyMap(),
+      client = buildClientInfo(clientId = "openclaw-android", clientMode = "ui"),
+      userAgent = buildUserAgent(),
+    )
+  }
+
+  fun resolveTlsParams(endpoint: GatewayEndpoint): GatewayTlsParams? {
+    val stored = prefs.loadGatewayTlsFingerprint(endpoint.stableId)
+    return resolveTlsParamsForEndpoint(endpoint, storedFingerprint = stored, manualTlsEnabled = manualTls())
+  }
+}

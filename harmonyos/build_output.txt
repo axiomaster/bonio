@@ -1,0 +1,190 @@
+> hvigor [32mFinished :entry:default@PreBuild... after 80 ms [39m
+> hvigor [32mFinished :entry:default@CreateModuleInfo... after 1 ms [39m
+> hvigor [32mUP-TO-DATE :entry:default@GenerateMetadata...  [39m
+> hvigor [32mFinished :entry:default@ConfigureCmake... after 1 ms [39m
+> hvigor [32mUP-TO-DATE :entry:default@MergeProfile...  [39m
+> hvigor [32mUP-TO-DATE :entry:default@CreateBuildProfile...  [39m
+> hvigor [32mFinished :entry:default@PreCheckSyscap... after 1 ms [39m
+> hvigor [32mUP-TO-DATE :entry:default@GeneratePkgContextInfo...  [39m
+> hvigor [32mFinished :entry:default@ProcessIntegratedHsp... after 1 ms [39m
+> hvigor [32mFinished :entry:default@BuildNativeWithCmake... after 1 ms [39m
+> hvigor [32mUP-TO-DATE :entry:default@MakePackInfo...  [39m
+> hvigor [32mFinished :entry:default@SyscapTransform... after 8 ms [39m
+> hvigor [32mUP-TO-DATE :entry:default@ProcessProfile...  [39m
+> hvigor [32mUP-TO-DATE :entry:default@ProcessRouterMap...  [39m
+> hvigor [32mUP-TO-DATE :entry:default@ProcessShareConfig...  [39m
+> hvigor [32mFinished :entry:default@ProcessStartupConfig... after 2 ms [39m
+> hvigor [32mFinished :entry:default@BuildNativeWithNinja... after 1 ms [39m
+> hvigor [32mUP-TO-DATE :entry:default@ProcessResource...  [39m
+> hvigor [32mUP-TO-DATE :entry:default@GenerateLoaderJson...  [39m
+> hvigor [32mUP-TO-DATE :entry:default@ProcessLibs...  [39m
+> hvigor [32mFinished :entry:default@CompileResource... after 294 ms [39m
+> hvigor [32mUP-TO-DATE :entry:default@DoNativeStrip...  [39m
+> hvigor [32mFinished :entry:default@BuildJS... after 2 ms [39m
+> hvigor [32mUP-TO-DATE :entry:default@CacheNativeLibs...  [39m
+> hvigor WARN: WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/common/DeviceIdentityStore.ets:54:40
+ 'encode' has been deprecated.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/common/DeviceIdentityStore.ets:188:9
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/common/DeviceIdentityStore.ets:190:20
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/common/DeviceIdentityStore.ets:193:5
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/gateway/GatewayTls.ets:62:14
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/gateway/GatewayTls.ets:64:3
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/gateway/GatewayTls.ets:65:18
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/gateway/RawWebSocket.ets:357:22
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/gateway/RawWebSocket.ets:358:24
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/node/CanvasController.ets:102:48
+ 'get' has been deprecated.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/node/CanvasController.ets:112:44
+ 'packing' has been deprecated.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/node/handlers/SmsHandlerImpl.ets:74:13
+ To use this API, you need to apply for the permissions: ohos.permission.SEND_MESSAGES
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/node/CameraCaptureManager.ets:71:22
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/node/CameraCaptureManager.ets:72:11
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/node/CameraCaptureManager.ets:81:25
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/node/CameraCaptureManager.ets:85:26
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/node/CameraCaptureManager.ets:86:5
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/node/CameraCaptureManager.ets:87:5
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/node/CameraCaptureManager.ets:88:5
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/node/CameraCaptureManager.ets:89:11
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/node/CameraCaptureManager.ets:90:11
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/node/CameraCaptureManager.ets:122:30
+ 'packing' has been deprecated.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/node/handlers/CameraHandlerImpl.ets:88:26
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/node/handlers/CameraHandlerImpl.ets:98:26
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/node/handlers/CameraHandlerImpl.ets:106:24
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/node/handlers/CameraHandlerImpl.ets:108:11
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/node/ScreenRecordManager.ets:40:13
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/node/ScreenRecordManager.ets:56:18
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/node/ScreenRecordManager.ets:93:7
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/node/handlers/ScreenHandlerImpl.ets:76:26
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/node/handlers/ScreenHandlerImpl.ets:84:24
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/node/handlers/ScreenHandlerImpl.ets:86:11
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/voice/TalkModeManager.ets:404:30
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/common/FloatWindowManager.ets:47:30
+ 'moveTo' has been deprecated.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/common/FloatWindowManager.ets:54:30
+ 'loadContent' has been deprecated.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/entryability/EntryAbility.ets:115:9
+ The system capacity of this api 'backgroundTaskManager' is not supported on all devices
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/entryability/EntryAbility.ets:116:11
+ The system capacity of this api 'backgroundTaskManager' is not supported on all devices
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/entryability/EntryAbility.ets:133:7
+ The system capacity of this api 'backgroundTaskManager' is not supported on all devices
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/pages/ChatTab.ets:117:45
+ 'PhotoSelectOptions' has been deprecated.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/pages/ChatTab.ets:118:26
+ 'MIMEType' has been deprecated.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/pages/ChatTab.ets:118:44
+ 'PhotoViewMIMETypes' has been deprecated.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/pages/ChatTab.ets:118:63
+ 'IMAGE_TYPE' has been deprecated.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/pages/ChatTab.ets:119:26
+ 'maxSelectNumber' has been deprecated.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/pages/ChatTab.ets:120:38
+ 'PhotoViewPicker' has been deprecated.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/pages/ChatTab.ets:121:37
+ 'select' has been deprecated.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/pages/ChatTab.ets:122:22
+ 'photoUris' has been deprecated.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/pages/ChatTab.ets:123:31
+ 'photoUris' has been deprecated.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/pages/SettingsTab.ets:49:22
+ 'getContext' has been deprecated.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/pages/SettingsTab.ets:91:21
+ 'getContext' has been deprecated.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/pages/SettingsTab.ets:297:21
+ 'getContext' has been deprecated.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/pages/LoginPage.ets:71:5
+ Function may throw exceptions. Special handling is required.
+
+WARN: ArkTS:WARN File: D:/projects/boji/harmonyos/entry/src/main/ets/pages/LoginPage.ets:71:12
+ 'replaceUrl' has been deprecated.
+
+
+> hvigor [32mFinished :entry:default@CompileArkTS... after 3 s 22 ms [39m
+> hvigor [32mFinished :entry:default@GeneratePkgModuleJson... after 2 ms [39m
+> hvigor [32mFinished :entry:default@ProcessCompiledResources... after 1 ms [39m
+> hvigor [32mFinished :entry:default@PackageHap... after 1 s 551 ms [39m
+> hvigor [32mFinished :entry:default@PackingCheck... after 5 ms [39m
+> hvigor [32mFinished :entry:default@SignHap... after 2 s 393 ms [39m
+> hvigor [32mFinished :entry:default@CollectDebugSymbol... after 1 ms [39m
+> hvigor [32mFinished :entry:assembleHap... after 1 ms [39m
+> hvigor [32mBUILD SUCCESSFUL in 9 s 729 ms [39m

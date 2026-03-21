@@ -4,11 +4,16 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 import { SecurePrefs } from '../common/SecurePrefs';
 import { LocationMode, VoiceWakeMode } from '../models/CommonModels';
 import { deviceInfo } from '@kit.BasicServicesKit';
+import { FloatWindowManager } from '../common/FloatWindowManager';
+
+const DOMAIN = 0x3D00;
 
 @Component
 export struct SettingsTab {
   runtime: NodeRuntime | undefined = undefined;
   onDisconnect: (() => void) | undefined = undefined;
+
+  @State isFloatingWindowEnabled: boolean = false;
 
   @State locationMode: LocationMode = LocationMode.Off;
   @State voiceWakeMode: VoiceWakeMode = VoiceWakeMode.Off;
@@ -97,17 +102,6 @@ export struct SettingsTab {
 
   build() {
     Column() {
-      // Header
-      Row() {
-        Text("Settings")
-          .fontSize(20)
-          .fontWeight(FontWeight.Bold)
-      }
-      .width('100%')
-      .height(52)
-      .padding({ left: 16 })
-      .backgroundColor('#F5F5F5')
-
       List({ space: 0 }) {
         // Node Info Section
         ListItem() { this.SectionHeader("Node Info") }
@@ -115,26 +109,37 @@ export struct SettingsTab {
         ListItem() { this.InfoRow("Version", "1.0.0-dev") }
         ListItem() { this.InfoRow("Instance ID", this.runtime?.prefs.getInstanceId() || 'Unknown') }
 
-        // Gateway Section
-        ListItem() { this.SectionHeader("Gateway") }
-        ListItem() { this.InfoRow("Status", this.statusText) }
-        if (this.serverName) {
-          ListItem() { this.InfoRow('Server', this.serverName) }
-        }
-        if (this.remoteAddress) {
-          ListItem() { this.InfoRow('Address', this.remoteAddress) }
+        // Floating Window Section
+        ListItem() { this.SectionHeader("Floating Window") }
+        ListItem() {
+          Row() {
+            Text("Floating Window Permission")
+              .fontSize(14)
+              .fontColor('#333333')
+            Blank()
+            Button("Grant")
+              .type(ButtonType.Capsule)
+              .backgroundColor('#0A59F7')
+              .fontColor(Color.White)
+              .fontSize(12)
+              .height(28)
+              .onClick(() => {
+                this.requestFloatWindowPermission();
+              })
+          }
+          .width('100%')
+          .padding({ left: 16, right: 16, top: 8, bottom: 8 })
         }
         ListItem() {
           Row() {
-            Button("Disconnect")
-              .type(ButtonType.Capsule)
-              .backgroundColor('#E53935')
-              .fontColor(Color.White)
+            Text("Enable Cat Overlay")
               .fontSize(14)
-              .height(36)
-              .onClick(() => {
-                const cb = this.onDisconnect;
-                if (cb) cb();
+              .fontColor('#333333')
+            Blank()
+            Toggle({ type: ToggleType.Switch, isOn: this.isFloatingWindowEnabled })
+              .selectedColor('#0A59F7')
+              .onChange((isOn: boolean) => {
+                this.toggleFloatingWindow(isOn);
               })
           }
           .width('100%')
@@ -277,5 +282,31 @@ export struct SettingsTab {
     .height(56)
     .padding({ left: 16, right: 16 })
     .backgroundColor(Color.White)
+  }
+
+  private async toggleFloatingWindow(isOn: boolean) {
+    this.isFloatingWindowEnabled = isOn;
+    if (isOn) {
+      await FloatWindowManager.getInstance().showFloatWindow();
+    } else {
+      await FloatWindowManager.getInstance().hideFloatWindow();
+    }
+  }
+
+  private requestFloatWindowPermission() {
+    const context = getContext(this) as common.UIAbilityContext;
+    try {
+      context.startAbility({
+        bundleName: 'com.huawei.hmos.settings',
+        abilityName: 'com.huawei.hmos.settings.MainAbility',
+        uri: 'application_info_entry',
+        parameters: {
+          pushParams: context.abilityInfo.bundleName
+        }
+      });
+      hilog.info(DOMAIN, 'SettingsTab', 'Navigating to system settings for float window permission');
+    } catch (err) {
+      hilog.error(DOMAIN, 'SettingsTab', 'Failed to jump to settings: %{public}s', JSON.stringify(err));
+    }
   }
 }

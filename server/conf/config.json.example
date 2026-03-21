@@ -1,0 +1,29 @@
+{
+  "default_model": "llama3.2",
+  "system_prompt": "",
+  "models": [
+    {
+      "id": "llama3.2",
+      "provider": "ollama",
+      "base_url": "http://localhost:11434"
+    },
+    {
+      "id": "gpt-4o",
+      "provider": "openai",
+      "base_url": "https://api.openai.com/v1",
+      "api_key_env": "OPENAI_API_KEY"
+    },
+    {
+      "id": "glm-4-flash",
+      "provider": "glm",
+      "base_url": "https://open.bigmodel.cn/api/paas/v4",
+      "api_key_env": "GLM_API_KEY"
+    }
+  ],
+  "gateway": {
+    "port": 8765,
+    "host": "0.0.0.0",
+    "enabled": true,
+    "pairing_code": ""
+  }
+}

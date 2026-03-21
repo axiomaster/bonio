@@ -1,0 +1,19 @@
+{
+  "default_model": "glm-4.7",
+  "gateway": {
+    "enabled": true,
+    "host": "0.0.0.0",
+    "port": 10724
+  },
+  "models": [
+    {
+      "id": "qwen3.5:4b",
+      "provider": "ollama"
+    },
+    {
+      "api_key": "41abc3aa823748fc81d18d95fa4a74f3.SJtsVTjEPFihsjEY",
+      "id": "glm-4.7",
+      "provider": "glm"
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 {
   "src": [
+    "pages/MainPage",
     "pages/LoginPage",
-    "pages/MainPage"
+    "pages/FloatWindowPage"
   ]
 }

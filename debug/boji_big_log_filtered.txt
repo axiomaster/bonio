@@ -1,0 +1,25 @@
+
+boji_big_log.txt:3:03-15 23:15:25.560 D/Hicom_XEngineProc( 2565): isSupportLocalSocketKit packageNam: ai.axiomaster.BoJi isSupported: false
+boji_big_log.txt:13:03-15 23:15:25.689 I/AGPService( 1419): FrameRateManager:[HandleFrameRateRefresh] currPkgName: ai.axiomaster.BoJi, strategyCode 1242: dynamicCode 1, isFactor 0, min 30, max 90, down 90, idle 60
+boji_big_log.txt:33:03-15 23:15:25.692 D/AGPService( 1419): FrameRateManager: NotifyPackageUpdatedToITouch: currPkgName - ai.axiomaster.BoJi, type - -1, lcdFps - 60
+boji_big_log.txt:111:03-15 23:15:25.723 D/Display (10053): getRotation rotation = 0, packageName = ai.axiomaster.BoJi
+boji_big_log.txt:267:03-15 23:15:26.583 D/Hicom_XEngineProc( 2565): isSupportLocalSocketKit packageNam: ai.axiomaster.BoJi isSupported: false
+boji_big_log.txt:340:03-15 23:15:27.611 D/Hicom_XEngineProc( 2565): isSupportLocalSocketKit packageNam: ai.axiomaster.BoJi isSupported: false
+boji_big_log.txt:438:03-15 23:15:28.629 D/Hicom_XEngineProc( 2565): isSupportLocalSocketKit packageNam: ai.axiomaster.BoJi isSupported: false
+boji_big_log.txt:530:03-15 23:15:29.659 D/Hicom_XEngineProc( 2565): isSupportLocalSocketKit packageNam: ai.axiomaster.BoJi isSupported: false
+boji_big_log.txt:611:03-15 23:15:30.680 D/Hicom_XEngineProc( 2565): isSupportLocalSocketKit packageNam: ai.axiomaster.BoJi isSupported: false
+boji_big_log.txt:690:03-15 23:15:31.703 D/Hicom_XEngineProc( 2565): isSupportLocalSocketKit packageNam: ai.axiomaster.BoJi isSupported: false
+boji_big_log.txt:792:03-15 23:15:32.725 D/Hicom_XEngineProc( 2565): isSupportLocalSocketKit packageNam: ai.axiomaster.BoJi isSupported: false
+boji_big_log.txt:861:03-15 23:15:33.749 D/Hicom_XEngineProc( 2565): isSupportLocalSocketKit packageNam: ai.axiomaster.BoJi isSupported: false
+boji_big_log.txt:932:03-15 23:15:34.773 D/Hicom_XEngineProc( 2565): isSupportLocalSocketKit packageNam: ai.axiomaster.BoJi isSupported: false
+boji_big_log.txt:1046:03-15 23:15:35.804 D/Hicom_XEngineProc( 2565): isSupportLocalSocketKit packageNam: ai.axiomaster.BoJi isSupported: false
+boji_big_log.txt:1276:03-15 23:15:36.826 D/Hicom_XEngineProc( 2565): isSupportLocalSocketKit packageNam: ai.axiomaster.BoJi isSupported: false
+boji_big_log.txt:1378:03-15 23:15:37.849 D/Hicom_XEngineProc( 2565): isSupportLocalSocketKit packageNam: ai.axiomaster.BoJi isSupported: false
+boji_big_log.txt:1451:03-15 23:15:38.871 D/Hicom_XEngineProc( 2565): isSupportLocalSocketKit packageNam: ai.axiomaster.BoJi isSupported: false
+boji_big_log.txt:1558:03-15 23:15:39.894 D/Hicom_XEngineProc( 2565): isSupportLocalSocketKit packageNam: ai.axiomaster.BoJi isSupported: false
+boji_big_log.txt:1628:03-15 23:15:40.918 D/Hicom_XEngineProc( 2565): isSupportLocalSocketKit packageNam: ai.axiomaster.BoJi isSupported: false
+boji_big_log.txt:1715:03-15 23:15:41.944 D/Hicom_XEngineProc( 2565): isSupportLocalSocketKit packageNam: ai.axiomaster.BoJi isSupported: false
+boji_big_log.txt:1788:03-15 23:15:42.967 D/Hicom_XEngineProc( 2565): isSupportLocalSocketKit packageNam: ai.axiomaster.BoJi isSupported: false
+boji_big_log.txt:1874:03-15 23:15:43.995 D/Hicom_XEngineProc( 2565): isSupportLocalSocketKit packageNam: ai.axiomaster.BoJi isSupported: false
+boji_big_log.txt:1960:03-15 23:15:45.021 D/Hicom_XEngineProc( 2565): isSupportLocalSocketKit packageNam: ai.axiomaster.BoJi isSupported: false
+

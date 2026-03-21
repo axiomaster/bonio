@@ -1,0 +1,32 @@
+
+full_raw_log.txt:110:03-15 23:14:08.647  1779  1854 I DisplayDevice: isNeedRefreshOrientaion orientation 0
+full_raw_log.txt:189:03-15 23:14:10.567  1779  1854 I DisplayDevice: isNeedRefreshOrientaion orientation 0
+full_raw_log.txt:618:03-15 23:14:21.379  1779  1850 I HwSwingEyeGazeHub: refreshAwarenessConnection, registerEyeGazeFence, eyeGazeAction=1
+full_raw_log.txt:813:03-15 23:14:28.285  1779  2391 I HwSwingEyeGazeHub: Successfully refresh screen sleep time !
+full_raw_log.txt:1603:03-15 23:14:40.754  1438  1962 I storaged: storaged_t::event: storage_info refreshed.
+full_raw_log.txt:1633:03-15 23:14:42.289  1779  1850 I HwSwingEyeGazeHub: refreshAwarenessConnection, registerEyeGazeFence, eyeGazeAction=1
+full_raw_log.txt:1663:03-15 23:14:42.892  1779  2859 I HwSwingEyeGazeHub: Successfully refresh screen sleep time !
+full_raw_log.txt:2166:03-15 23:14:52.306  1779  1854 I DisplayDevice: isNeedRefreshOrientaion orientation 0
+full_raw_log.txt:2734:03-15 23:14:57.793  1779  1854 I DisplayDevice: isNeedRefreshOrientaion orientation 0
+full_raw_log.txt:2747:03-15 23:14:57.809  1779  1854 I DisplayDevice: isNeedRefreshOrientaion orientation 0
+full_raw_log.txt:4312:03-15 23:15:03.188  1419  1454 I AGPService: FrameRateManager:[HandleFrameRateRefresh] currPkgName: ai.axiomaster.BoJi, strategyCode 1242: dynamicCode 1, isFactor 0, min 30, max 90, down 90, idle 60
+full_raw_log.txt:4322:03-15 23:15:03.191  1419  1454 D AGPService: FrameRefreshThread: set refreshrate - 60
+full_raw_log.txt:4324:03-15 23:15:03.191   984  1895 D surfaceflinger: getRefreshRateFromFps: get target refresh rate fps 60
+full_raw_log.txt:4328:03-15 23:15:03.192  1419  1458 I AGPService: ScheduleProxy:[SendSlideRefreshRate] refreshrate - 60
+full_raw_log.txt:4338:03-15 23:15:03.193  1419  1458 D ITouchService: itouch OneFrameInfo check OneFrameSence in RefreshRateConfig 1
+full_raw_log.txt:4348:03-15 23:15:03.199   984   984 D SurfaceFlinger: getRefreshRateFromFps: get target refresh rate fps 60
+full_raw_log.txt:4349:03-15 23:15:03.199   984   984 I SurfaceFlinger: changeRefreshRate: new mode 3, fps 60, active display 0
+full_raw_log.txt:4350:03-15 23:15:03.199   984   984 D DisplayDevice: setDesiredActiveMode({id=3, hwcId=768, width=1316, height=2832, refreshRate=60.00fps, dpiX=451.71, dpiY=455.27, group=0}) on display 0
+full_raw_log.txt:4362:03-15 23:15:03.216   984   984 D SurfaceFlinger: getRefreshRateFromFps: get target refresh rate fps 60
+full_raw_log.txt:4403:03-15 23:15:03.227  1779  1854 I DisplayDevice: isNeedRefreshOrientaion orientation 0
+full_raw_log.txt:4793:03-15 23:15:04.934  1419  1454 I AGPService: FrameRateManager:[HandleFrameRateRefresh] currPkgName: ai.axiomaster.BoJi, strategyCode 1242: dynamicCode 1, isFactor 0, min 30, max 90, down 90, idle 60
+full_raw_log.txt:4807:03-15 23:15:04.936  1419  1454 D AGPService: FrameRefreshThread: set refreshrate - 90
+full_raw_log.txt:4809:03-15 23:15:04.937   984  1895 D surfaceflinger: getRefreshRateFromFps: get target refresh rate fps 90
+full_raw_log.txt:4815:03-15 23:15:04.937  1419  1458 I AGPService: ScheduleProxy:[SendSlideRefreshRate] refreshrate - 90
+full_raw_log.txt:4832:03-15 23:15:04.938  1419  1458 D ITouchService: itouch OneFrameInfo check OneFrameSence in RefreshRateConfig 1
+full_raw_log.txt:4852:03-15 23:15:04.941   984   984 D SurfaceFlinger: getRefreshRateFromFps: get target refresh rate fps 90
+full_raw_log.txt:4853:03-15 23:15:04.942   984   984 I SurfaceFlinger: changeRefreshRate: new mode 1, fps 90, active display 0
+full_raw_log.txt:4854:03-15 23:15:04.942   984   984 D DisplayDevice: setDesiredActiveMode({id=1, hwcId=256, width=1316, height=2832, refreshRate=90.00fps, dpiX=451.71, dpiY=455.27, group=0}) on display 0
+full_raw_log.txt:4864:03-15 23:15:04.952   984   984 D SurfaceFlinger: getRefreshRateFromFps: get target refresh rate fps 90
+full_raw_log.txt:4898:03-15 23:15:04.958  1779  1854 I DisplayDevice: isNeedRefreshOrientaion orientation 0
+
