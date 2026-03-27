@@ -2,8 +2,12 @@ package ai.axiomaster.boji
 
 import ai.axiomaster.boji.ai.AgentManager
 import ai.axiomaster.boji.ai.AgentState
+import ai.axiomaster.boji.avatar.AvatarController
+import ai.axiomaster.boji.avatar.AvatarState
+import ai.axiomaster.boji.avatar.MotionState
+import ai.axiomaster.boji.avatar.ThemeManager
+import ai.axiomaster.boji.avatar.ActionEventWatcher
 import ai.axiomaster.boji.remote.chat.SpeechToTextManager
-import ai.axiomaster.boji.remote.theme.ThemeRepository
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -40,12 +44,21 @@ class FloatingWindowService : Service() {
     private lateinit var bubbleLabel: TextView
     private lateinit var textBubble: TextView
 
-    private val stateManager = AgentManager.stateManager
+    private val avatarController: AvatarController get() = AgentManager.avatarController
+    private val stateManager get() = AgentManager.stateManager
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    private lateinit var themeManager: ThemeManager
+    private var actionEventWatcher: ActionEventWatcher? = null
+    private var idleBehaviorScheduler: ai.axiomaster.boji.avatar.IdleBehaviorScheduler? = null
+
     private var sttManager: SpeechToTextManager? = null
     private var isVoiceActive = false
+    private var voiceSessionId = 0
+
+    private var currentAssetPath: String? = null
+    private var isPlayingTransition = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -58,6 +71,8 @@ class FloatingWindowService : Service() {
     override fun onCreate() {
         Log.d(TAG, "FloatingWindowService onCreate")
         super.onCreate()
+
+        themeManager = ThemeManager(applicationContext)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channelId = "boji_agent_channel"
@@ -89,6 +104,8 @@ class FloatingWindowService : Service() {
         sttManager = SpeechToTextManager(applicationContext)
         sttManager?.warmUpVosk()
 
+        avatarController.updateScreenMetrics(resources.displayMetrics)
+
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         floatingView = LayoutInflater.from(this).inflate(R.layout.floating_agent_layout, null)
 
@@ -102,6 +119,7 @@ class FloatingWindowService : Service() {
 
         val savedX = prefs.getInt(KEY_POS_X, 0)
         val savedY = prefs.getInt(KEY_POS_Y, 100)
+        avatarController.setPosition(savedX.toFloat(), savedY.toFloat())
 
         val layoutFlag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -124,7 +142,46 @@ class FloatingWindowService : Service() {
         }
 
         setupTouchListener()
-        observeAgentState()
+        observeAvatarState()
+
+        avatarController.onTransition = { transition ->
+            mainHandler.post { playTransitionThenLoop(transition) }
+        }
+
+        // Start watching for on-device phone-use-agent action events
+        actionEventWatcher = ActionEventWatcher(avatarController, serviceScope)
+        actionEventWatcher?.start()
+
+        // Start idle wandering behavior (reads enabled state from BoJiApp)
+        val bojiApp = application as BoJiApp
+        val wanderingEnabled = kotlinx.coroutines.flow.MutableStateFlow(false)
+        serviceScope.launch {
+            // Poll the preference periodically since we don't have direct ViewModel access
+            val prefs = applicationContext.getSharedPreferences("boji_avatar", Context.MODE_PRIVATE)
+            while (true) {
+                wanderingEnabled.value = prefs.getBoolean("cat_wandering", false)
+                kotlinx.coroutines.delay(2000)
+            }
+        }
+        idleBehaviorScheduler = ai.axiomaster.boji.avatar.IdleBehaviorScheduler(
+            controller = avatarController,
+            enabled = wanderingEnabled,
+            scope = serviceScope,
+        )
+        idleBehaviorScheduler?.start()
+
+        // Observe overlay visibility preference
+        serviceScope.launch {
+            val prefs = applicationContext.getSharedPreferences("boji_avatar", Context.MODE_PRIVATE)
+            while (true) {
+                val shouldShow = prefs.getBoolean("show_overlay", true)
+                val targetVisibility = if (shouldShow) View.VISIBLE else View.GONE
+                if (floatingView.visibility != targetVisibility) {
+                    floatingView.visibility = targetVisibility
+                }
+                kotlinx.coroutines.delay(1000)
+            }
+        }
 
         try {
             Log.d(TAG, "FloatingWindowService - adding view to WindowManager")
@@ -156,58 +213,22 @@ class FloatingWindowService : Service() {
         return START_NOT_STICKY
     }
 
-    private fun observeAgentState() {
+    private fun observeAvatarState() {
+        // Load themes once at startup
         serviceScope.launch {
-            val themes = ThemeRepository(applicationContext).listInstalledThemes()
-            stateManager.currentState.collect { state: AgentState ->
-                val stateKey = when (state) {
-                    AgentState.Idle -> "idle"
-                    AgentState.Listening -> "listening"
-                    AgentState.Thinking -> "thinking"
-                    AgentState.Speaking -> "speaking"
-                    AgentState.Working -> "working"
-                }
-                val assetName = themes.firstOrNull()?.assetPathForState(stateKey)
-                    ?: when (state) {
-                        AgentState.Idle -> "cat-idle.lottie"
-                        AgentState.Listening -> "cat-listening.lottie"
-                        AgentState.Thinking -> "cat-thinking.lottie"
-                        AgentState.Speaking -> "cat-speaking.lottie"
-                        AgentState.Working -> "cat-working.lottie"
-                    }
-                try {
-                    lottieAnimationView.setAnimation(assetName)
-                    lottieAnimationView.playAnimation()
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to set Lottie animation: $assetName", e)
-                }
+            themeManager.refreshThemes()
+        }
 
-                when (state) {
-                    AgentState.Listening -> {
-                        bubbleLabel.text = "Listening..."
-                        bubbleLabel.visibility = View.VISIBLE
-                        bubbleContainer.visibility = View.VISIBLE
-                    }
-                    AgentState.Thinking -> {
-                        bubbleLabel.text = "Thinking..."
-                        bubbleLabel.visibility = View.VISIBLE
-                        bubbleContainer.visibility = View.VISIBLE
-                    }
-                    AgentState.Speaking -> {
-                        bubbleLabel.text = "Speaking..."
-                        bubbleLabel.visibility = View.VISIBLE
-                        bubbleContainer.visibility = View.VISIBLE
-                    }
-                    else -> {
-                        bubbleLabel.visibility = View.GONE
-                        if (textBubble.visibility != View.VISIBLE) {
-                            bubbleContainer.visibility = View.GONE
-                        }
-                    }
-                }
+        // Observe composite avatar state for animation + position
+        serviceScope.launch {
+            avatarController.avatarState.collect { state: AvatarState ->
+                updateAnimation(state)
+                updatePosition(state)
+                updateBubbleForActivity(state)
             }
         }
 
+        // Observe text bubble
         serviceScope.launch {
             stateManager.currentTextBubble.collect { text: String? ->
                 if (text.isNullOrEmpty()) {
@@ -223,6 +244,7 @@ class FloatingWindowService : Service() {
             }
         }
 
+        // Observe streaming assistant text
         val chatController = (application as BoJiApp).runtime.chat
         serviceScope.launch {
             chatController.streamingAssistantText.collect { text: String? ->
@@ -234,6 +256,105 @@ class FloatingWindowService : Service() {
                 } else if (state != AgentState.Listening && state != AgentState.Speaking) {
                     stateManager.clearBubble()
                 }
+            }
+        }
+    }
+
+    private fun updateAnimation(state: AvatarState) {
+        if (isPlayingTransition) {
+            updateFlip(state)
+            return
+        }
+
+        val assetPath = themeManager.resolveAssetPath(state)
+        if (assetPath == currentAssetPath) return
+        currentAssetPath = assetPath
+
+        try {
+            lottieAnimationView.repeatCount = com.airbnb.lottie.LottieDrawable.INFINITE
+            lottieAnimationView.setAnimation(assetPath)
+            lottieAnimationView.playAnimation()
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to set Lottie animation: $assetPath", e)
+        }
+
+        updateFlip(state)
+    }
+
+    private fun updateFlip(state: AvatarState) {
+        val target = state.targetPosition
+        if (target != null && (state.motion == MotionState.Walking || state.motion == MotionState.Running)) {
+            val movingLeft = target.x < state.position.x
+            lottieAnimationView.scaleX = if (movingLeft) -1f else 1f
+        } else {
+            lottieAnimationView.scaleX = 1f
+        }
+    }
+
+    private fun playTransitionThenLoop(transition: ai.axiomaster.boji.avatar.AvatarTransition) {
+        val transitionPath = themeManager.resolveTransitionPath(transition) ?: return
+        isPlayingTransition = true
+        currentAssetPath = null
+
+        try {
+            lottieAnimationView.repeatCount = 0
+            lottieAnimationView.setAnimation(transitionPath)
+            lottieAnimationView.removeAllAnimatorListeners()
+            lottieAnimationView.addAnimatorListener(object : android.animation.AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: android.animation.Animator) {
+                    lottieAnimationView.removeAllAnimatorListeners()
+                    isPlayingTransition = false
+                    avatarController.clearTransition()
+                    val stableState = avatarController.avatarState.value
+                    updateAnimation(stableState)
+                }
+            })
+            lottieAnimationView.playAnimation()
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to play transition animation: $transitionPath", e)
+            isPlayingTransition = false
+            avatarController.clearTransition()
+        }
+    }
+
+    private fun updatePosition(state: AvatarState) {
+        val newX = state.position.x.toInt()
+        val newY = state.position.y.toInt()
+        if (layoutParams.x != newX || layoutParams.y != newY) {
+            layoutParams.x = newX
+            layoutParams.y = newY
+            if (isViewAttached) {
+                try {
+                    windowManager.updateViewLayout(floatingView, layoutParams)
+                } catch (e: Exception) {
+                    Log.w(TAG, "updateViewLayout failed", e)
+                }
+            }
+        }
+    }
+
+    private fun updateBubbleForActivity(state: AvatarState) {
+        val labelText = when (state.activity) {
+            AgentState.Listening -> "Listening..."
+            AgentState.Thinking -> "Thinking..."
+            AgentState.Speaking -> "Speaking..."
+            AgentState.Working -> "Working..."
+            AgentState.Happy -> null
+            AgentState.Confused -> "Hmm?"
+            AgentState.Angry -> "Grr!"
+            AgentState.Watching -> null
+            AgentState.Bored -> null
+            AgentState.Sleeping -> "Zzz..."
+            AgentState.Idle -> null
+        }
+        if (labelText != null) {
+            bubbleLabel.text = labelText
+            bubbleLabel.visibility = View.VISIBLE
+            bubbleContainer.visibility = View.VISIBLE
+        } else {
+            bubbleLabel.visibility = View.GONE
+            if (textBubble.visibility != View.VISIBLE) {
+                bubbleContainer.visibility = View.GONE
             }
         }
     }
@@ -274,19 +395,20 @@ class FloatingWindowService : Service() {
                         return true
                     }
                     MotionEvent.ACTION_MOVE -> {
-                        if (longPressTriggered) {
-                            return true
-                        }
                         val dx = event.rawX - initialTouchX
                         val dy = event.rawY - initialTouchY
                         if (!isDragging && (Math.abs(dx) > dragThresholdPx || Math.abs(dy) > dragThresholdPx)) {
                             isDragging = true
                             mainHandler.removeCallbacks(longPressRunnable)
+                            if (longPressTriggered) {
+                                cancelVoiceInputFromFloating()
+                                longPressTriggered = false
+                            }
                         }
                         if (isDragging) {
-                            layoutParams.x = initialX + dx.toInt()
-                            layoutParams.y = initialY + dy.toInt()
-                            windowManager.updateViewLayout(floatingView, layoutParams)
+                            val newX = initialX + dx
+                            val newY = initialY + dy
+                            avatarController.dragTo(newX, newY)
                         }
                         return true
                     }
@@ -297,6 +419,7 @@ class FloatingWindowService : Service() {
                             stopVoiceInputFromFloating()
                             longPressTriggered = false
                         } else if (isDragging) {
+                            avatarController.endDrag()
                             savePosition()
                         } else {
                             v?.performClick()
@@ -309,6 +432,8 @@ class FloatingWindowService : Service() {
                         if (longPressTriggered) {
                             cancelVoiceInputFromFloating()
                             longPressTriggered = false
+                        } else if (isDragging) {
+                            avatarController.endDrag()
                         }
                         return true
                     }
@@ -320,7 +445,9 @@ class FloatingWindowService : Service() {
 
     private fun startVoiceInputFromFloating() {
         val currentState = stateManager.currentState.value
-        if (currentState != AgentState.Idle) {
+        if (currentState == AgentState.Bored || currentState == AgentState.Sleeping) {
+            avatarController.setActivity(AgentState.Idle)
+        } else if (currentState != AgentState.Idle) {
             Log.d(TAG, "Cannot start voice input, agent state is $currentState")
             return
         }
@@ -335,19 +462,25 @@ class FloatingWindowService : Service() {
         }
 
         Log.d(TAG, "Starting voice input from floating window")
+        val mySession = ++voiceSessionId
         isVoiceActive = true
-        stateManager.transitionTo(AgentState.Listening)
+        avatarController.setActivity(AgentState.Listening)
 
         sttManager?.startListening(object : SpeechToTextManager.Listener {
             override fun onPartialResult(text: String) {
-                stateManager.setBubble(text)
+                if (voiceSessionId != mySession) return
+                avatarController.setBubble(text)
             }
 
             override fun onFinalResult(text: String) {
+                if (voiceSessionId != mySession) {
+                    Log.d(TAG, "STT onFinalResult ignored (session $mySession stale, current $voiceSessionId)")
+                    return
+                }
                 Log.d(TAG, "STT final result from floating: $text")
                 isVoiceActive = false
-                stateManager.clearBubble()
-                stateManager.transitionTo(AgentState.Thinking)
+                avatarController.clearBubble()
+                avatarController.setActivity(AgentState.Thinking)
                 val runtime = (application as BoJiApp).runtime
                 runtime.chat.sendMessage(
                     message = text,
@@ -357,22 +490,25 @@ class FloatingWindowService : Service() {
             }
 
             override fun onError(errorCode: Int) {
+                if (voiceSessionId != mySession) return
                 Log.w(TAG, "STT error from floating: $errorCode")
                 isVoiceActive = false
-                stateManager.clearBubble()
-                stateManager.transitionTo(AgentState.Idle)
+                avatarController.clearBubble()
+                avatarController.setActivity(AgentState.Idle)
             }
 
             override fun onReadyForSpeech() {
+                if (voiceSessionId != mySession) return
                 Log.d(TAG, "STT ready for speech from floating")
             }
 
             override fun onEndOfSpeech() {
+                if (voiceSessionId != mySession) return
                 Log.d(TAG, "STT end of speech from floating")
                 if (isVoiceActive) {
                     isVoiceActive = false
-                    stateManager.clearBubble()
-                    stateManager.transitionTo(AgentState.Idle)
+                    avatarController.clearBubble()
+                    avatarController.setActivity(AgentState.Idle)
                 }
             }
         })
@@ -381,13 +517,14 @@ class FloatingWindowService : Service() {
     private fun stopVoiceInputFromFloating() {
         if (isVoiceActive) {
             Log.d(TAG, "Stopping voice input from floating window")
+            val mySession = voiceSessionId
             sttManager?.stopListening()
             mainHandler.postDelayed({
-                if (isVoiceActive) {
+                if (isVoiceActive && voiceSessionId == mySession) {
                     Log.w(TAG, "STT stop safety timeout — forcing state reset")
                     isVoiceActive = false
-                    stateManager.clearBubble()
-                    stateManager.transitionTo(AgentState.Idle)
+                    avatarController.clearBubble()
+                    avatarController.setActivity(AgentState.Idle)
                 }
             }, 1500L)
         }
@@ -396,9 +533,10 @@ class FloatingWindowService : Service() {
     private fun cancelVoiceInputFromFloating() {
         if (isVoiceActive) {
             Log.d(TAG, "Cancelling voice input from floating window")
+            voiceSessionId++
             sttManager?.cancelListening()
             isVoiceActive = false
-            AgentManager.stateManager.transitionTo(AgentState.Idle)
+            avatarController.setActivity(AgentState.Idle)
         }
     }
 
@@ -415,6 +553,11 @@ class FloatingWindowService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        avatarController.onTransition = null
+        idleBehaviorScheduler?.stop()
+        idleBehaviorScheduler = null
+        actionEventWatcher?.stop()
+        actionEventWatcher = null
         if (isVoiceActive) {
             sttManager?.cancelListening()
             isVoiceActive = false
@@ -434,8 +577,8 @@ class FloatingWindowService : Service() {
 
     companion object {
         private const val TAG = "BoJiApp"
-        private const val LONG_PRESS_THRESHOLD_MS = 300L
-        private const val DRAG_THRESHOLD_DP = 15f
+        private const val LONG_PRESS_THRESHOLD_MS = 600L
+        private const val DRAG_THRESHOLD_DP = 10f
         private const val PREFS_NAME = "boji_floating_window"
         private const val KEY_POS_X = "pos_x"
         private const val KEY_POS_Y = "pos_y"

@@ -1,13 +1,57 @@
 {
   "id": "default-cat",
   "name": "Default Cat",
-  "version": "1.0",
+  "version": "2.1",
   "description": "Default cat avatar theme with Lottie animations for different agent states",
+
   "states": {
-    "idle": "cat-idle.lottie",
+    "idle":      "cat-idle.lottie",
+    "bored":     "cat-bored.lottie",
+    "sleeping":  "cat-sleeping.lottie",
     "listening": "cat-listening.lottie",
-    "thinking": "cat-thinking.lottie",
-    "speaking": "cat-speaking.lottie",
-    "working": "cat-working.lottie"
+    "thinking":  "cat-thinking.lottie",
+    "speaking":  "cat-speaking.lottie",
+    "working":   "cat-working.lottie",
+    "happy":     "cat-happy.lottie",
+    "confused":  "cat-confused.lottie",
+    "angry":     "cat-angry.lottie",
+    "watching":  "cat-watching.lottie"
+  },
+
+  "motionStates": {
+    "walking":  "cat-walking.lottie",
+    "running":  "cat-running.lottie",
+    "dragging": "cat-dragging.lottie"
+  },
+
+  "actionStates": {
+    "tapping":       "cat-tapping.lottie",
+    "swiping":       "cat-swiping.lottie",
+    "longpressing":  "cat-longpressing.lottie",
+    "doubletapping": "cat-doubletapping.lottie",
+    "typing":        "cat-typing.lottie",
+    "waiting":       "cat-waiting.lottie",
+    "finishing":     "cat-finishing.lottie",
+    "launching":     "cat-launching.lottie",
+    "goback":        "cat-goback.lottie",
+    "takingphoto":   "cat-take-photo.lottie"
+  },
+
+  "transitionStates": {
+    "appear":                "cat-appear.lottie",
+    "disappear":             "cat-disappear.lottie",
+    "idle_to_listening":     "cat-idle-to-listening.lottie",
+    "listening_to_thinking": "cat-thinking.lottie",
+    "thinking_to_speaking":  "cat-speaking.lottie",
+    "speaking_to_idle":      "cat-idle.lottie",
+    "idle_to_working":       "cat-working.lottie",
+    "working_to_idle":       "cat-idle.lottie",
+    "idle_to_bored":         "cat-bored.lottie",
+    "bored_to_idle":         "cat-idle.lottie",
+    "idle_to_sleeping":      "cat-sleeping.lottie",
+    "sleeping_to_idle":      "cat-idle.lottie",
+    "startdrag":             "cat-startdrag.lottie",
+    "enddrag":               "cat-enddrag.lottie",
+    "error_shake":           "cat-error-shake.lottie"
   }
 }

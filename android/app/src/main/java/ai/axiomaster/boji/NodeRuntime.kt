@@ -185,7 +185,12 @@ class NodeRuntime(context: Context) {
         chat.onDisconnected(message)
         updateStatus()
       },
-      onEvent = { event, payloadJson -> chat.handleGatewayEvent(event, payloadJson) },
+      onEvent = { event, payloadJson ->
+        if (event == "agent.action.step" && payloadJson != null) {
+          handleAgentActionStep(payloadJson)
+        }
+        chat.handleGatewayEvent(event, payloadJson)
+      },
     )
 
   private val nodeSession =
@@ -371,5 +376,21 @@ class NodeRuntime(context: Context) {
 
   fun handleCanvasA2UIActionFromWebView(payload: String) {
       // Basic implementation for now
+  }
+
+  private fun handleAgentActionStep(payloadJson: String) {
+    try {
+      val obj = json.parseToJsonElement(payloadJson).asObjectOrNull() ?: return
+      val action = parseJsonString(obj, "action") ?: return
+      val x = parseJsonDouble(obj, "x")?.toFloat()
+      val y = parseJsonDouble(obj, "y")?.toFloat()
+
+      Log.d("BoJi", "agent.action.step: $action at ($x, $y)")
+      scope.launch(Dispatchers.Main) {
+        ai.axiomaster.boji.ai.AgentManager.avatarController.performAction(action, x, y)
+      }
+    } catch (e: Exception) {
+      Log.w("BoJi", "Failed to handle agent.action.step: ${e.message}")
+    }
   }
 }

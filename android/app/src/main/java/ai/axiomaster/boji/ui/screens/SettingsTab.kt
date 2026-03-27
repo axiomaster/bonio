@@ -274,6 +274,29 @@ fun SettingsTab(
         )
       }
 
+      // AVATAR BEHAVIOR
+      item { CategoryHeader("AVATAR BEHAVIOR") }
+      item {
+        val showOverlay by viewModel.showAvatarOverlay.collectAsState()
+        SwitchRow(
+          title = "Show Cat Avatar",
+          description = "Display the cat avatar overlay on screen.",
+          checked = showOverlay,
+          onCheckedChange = viewModel::setShowAvatarOverlay,
+          colors = listItemColors
+        )
+      }
+      item {
+        val wanderingEnabled by viewModel.catWanderingEnabled.collectAsState()
+        SwitchRow(
+          title = "Enable Cat Wandering",
+          description = "Cat will randomly walk around the screen when idle.",
+          checked = wanderingEnabled,
+          onCheckedChange = viewModel::setCatWanderingEnabled,
+          colors = listItemColors
+        )
+      }
+
       item { HorizontalDivider(color = mobileBorder) }
 
       // NODE

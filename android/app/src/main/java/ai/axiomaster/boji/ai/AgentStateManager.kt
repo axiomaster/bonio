@@ -15,9 +15,13 @@ class AgentStateManager {
         _currentState.value = newState
         when (newState) {
             AgentState.Idle -> clearBubble()
+            AgentState.Bored -> clearBubble()
+            AgentState.Sleeping -> clearBubble()
             AgentState.Listening -> setBubble("...")
             AgentState.Thinking -> setBubble("Hmm...")
-            else -> {} // Kept as is or replaced by specific events
+            AgentState.Happy -> clearBubble()
+            AgentState.Confused -> clearBubble()
+            else -> {}
         }
     }
 

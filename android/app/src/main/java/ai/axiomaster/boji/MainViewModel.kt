@@ -74,9 +74,27 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
   private val _isSpeakerEnabled = MutableStateFlow(true)
   val isSpeakerEnabled: StateFlow<Boolean> = _isSpeakerEnabled
 
-  private val themeRepository = ai.axiomaster.boji.remote.theme.ThemeRepository(app)
-  private val _installedThemes = MutableStateFlow<List<ai.axiomaster.boji.remote.theme.ThemeInfo>>(emptyList())
-  val installedThemes: StateFlow<List<ai.axiomaster.boji.remote.theme.ThemeInfo>> = _installedThemes
+  private val avatarPrefs = app.getSharedPreferences("boji_avatar", android.content.Context.MODE_PRIVATE)
+
+  private val _catWanderingEnabled = MutableStateFlow(avatarPrefs.getBoolean("cat_wandering", false))
+  val catWanderingEnabled: StateFlow<Boolean> = _catWanderingEnabled
+
+  private val _showAvatarOverlay = MutableStateFlow(avatarPrefs.getBoolean("show_overlay", true))
+  val showAvatarOverlay: StateFlow<Boolean> = _showAvatarOverlay
+
+  fun setCatWanderingEnabled(enabled: Boolean) {
+    _catWanderingEnabled.value = enabled
+    avatarPrefs.edit().putBoolean("cat_wandering", enabled).apply()
+  }
+
+  fun setShowAvatarOverlay(enabled: Boolean) {
+    _showAvatarOverlay.value = enabled
+    avatarPrefs.edit().putBoolean("show_overlay", enabled).apply()
+  }
+
+  val themeManager = ai.axiomaster.boji.avatar.ThemeManager(app)
+  val installedThemes: StateFlow<List<ai.axiomaster.boji.remote.theme.ThemeInfo>> = themeManager.installedThemes
+  val activeThemeId: StateFlow<String> = themeManager.activeThemeId
 
   private val sttManager = SpeechToTextManager(app)
   private val _partialSttText = MutableStateFlow<String?>(null)
@@ -414,27 +432,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
   fun refreshInstalledThemes() {
     viewModelScope.launch {
-      themeRepository.listInstalledThemes().also { _installedThemes.value = it }
+      themeManager.refreshThemes()
     }
+  }
+
+  fun setActiveTheme(themeId: String) {
+    themeManager.setActiveTheme(themeId)
   }
 
   fun getThemeAssetPath(state: AgentState): String {
-    val theme = _installedThemes.value.firstOrNull()
-    val stateKey = when (state) {
-      AgentState.Idle -> "idle"
-      AgentState.Listening -> "listening"
-      AgentState.Thinking -> "thinking"
-      AgentState.Speaking -> "speaking"
-      AgentState.Working -> "working"
-    }
-    return theme?.assetPathForState(stateKey) ?: fallbackAssetPath(state)
-  }
-
-  private fun fallbackAssetPath(state: AgentState) = when (state) {
-    AgentState.Idle -> "cat-idle.lottie"
-    AgentState.Listening -> "cat-listening.lottie"
-    AgentState.Thinking -> "cat-thinking.lottie"
-    AgentState.Speaking -> "cat-speaking.lottie"
-    AgentState.Working -> "cat-working.lottie"
+    val avatarState = ai.axiomaster.boji.avatar.AvatarState(activity = state)
+    return themeManager.resolveAssetPath(avatarState)
   }
 }

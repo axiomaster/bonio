@@ -25,6 +25,7 @@ fun ThemeSectionCard(
     modifier: Modifier = Modifier,
 ) {
     val themes by viewModel.installedThemes.collectAsState()
+    val activeThemeId by viewModel.activeThemeId.collectAsState()
 
     var expanded by rememberSaveable { mutableStateOf(false) }
 
@@ -72,7 +73,11 @@ fun ThemeSectionCard(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         items(themes, key = { it.id }) { theme ->
-                            ThemeCard(theme = theme)
+                            ThemeCard(
+                                theme = theme,
+                                isActive = theme.id == activeThemeId,
+                                onSetActive = { viewModel.setActiveTheme(theme.id) },
+                            )
                         }
                     }
                 }
@@ -84,29 +89,48 @@ fun ThemeSectionCard(
 @Composable
 private fun ThemeCard(
     theme: ThemeInfo,
+    isActive: Boolean,
+    onSetActive: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, mobileBorder),
+        color = if (isActive) mobileAccent.copy(alpha = 0.06f) else Color.White,
+        border = BorderStroke(1.dp, if (isActive) mobileAccent.copy(alpha = 0.4f) else mobileBorder),
         shadowElevation = 0.dp,
     ) {
         Row(
             modifier = Modifier.padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Default.Palette, contentDescription = null, tint = mobileAccent, modifier = Modifier.size(22.dp))
+            Icon(
+                Icons.Default.Palette,
+                contentDescription = null,
+                tint = if (isActive) mobileAccent else mobileTextSecondary,
+                modifier = Modifier.size(22.dp),
+            )
             Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    theme.name.ifBlank { theme.id },
-                    style = mobileCallout.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
-                    color = mobileText,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        theme.name.ifBlank { theme.id },
+                        style = mobileCallout.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
+                        color = mobileText,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (isActive) {
+                        Spacer(Modifier.width(6.dp))
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            contentDescription = "Active",
+                            tint = mobileAccent,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
                 if (theme.description.isNotBlank()) {
                     Text(
                         theme.description,
@@ -118,6 +142,12 @@ private fun ThemeCard(
                 }
                 if (theme.version.isNotBlank()) {
                     Text("v${theme.version}", style = mobileCaption2, color = mobileTextTertiary)
+                }
+            }
+            if (!isActive) {
+                Spacer(Modifier.width(8.dp))
+                TextButton(onClick = onSetActive) {
+                    Text("Activate", style = mobileCaption1)
                 }
             }
         }
