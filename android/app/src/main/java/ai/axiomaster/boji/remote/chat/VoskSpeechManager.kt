@@ -20,6 +20,7 @@ class VoskSpeechManager(private val context: Context) {
     private val mainHandler = Handler(Looper.getMainLooper())
     @Volatile private var model: Model? = null
     @Volatile private var running = false
+    @Volatile private var cancelled = false
     @Volatile private var recordThread: Thread? = null
     private var currentListener: SpeechToTextManager.Listener? = null
 
@@ -65,6 +66,7 @@ class VoskSpeechManager(private val context: Context) {
         }
 
         running = true
+        cancelled = false
         recordThread = Thread({
             runRecognitionLoop(m, listener)
         }, "VoskRecordThread").apply { start() }
@@ -77,6 +79,7 @@ class VoskSpeechManager(private val context: Context) {
     }
 
     fun cancelListening() {
+        cancelled = true
         running = false
         recordThread?.join(2000)
         recordThread = null
@@ -148,14 +151,15 @@ class VoskSpeechManager(private val context: Context) {
                 }
             }
 
-            // User stopped manually (finger lifted) — flush remaining audio
-            if (!deliveredFinal) {
-                val finalText = parseText(recognizer.finalResult)
-                if (finalText.isNotBlank()) {
-                    mainHandler.post { listener.onFinalResult(finalText) }
+            if (!cancelled) {
+                if (!deliveredFinal) {
+                    val finalText = parseText(recognizer.finalResult)
+                    if (finalText.isNotBlank()) {
+                        mainHandler.post { listener.onFinalResult(finalText) }
+                    }
                 }
+                mainHandler.post { listener.onEndOfSpeech() }
             }
-            mainHandler.post { listener.onEndOfSpeech() }
         } catch (e: Exception) {
             Log.e(TAG, "Recognition loop error", e)
             mainHandler.post { listener.onError(android.speech.SpeechRecognizer.ERROR_CLIENT) }

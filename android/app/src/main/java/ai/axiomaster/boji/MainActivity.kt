@@ -44,28 +44,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        android.util.Log.d("BoJiApp", "MainActivity onResume - App in foreground")
-        stopFloatingWindowService()
+        android.util.Log.d("BoJiApp", "MainActivity onResume")
+        ensureFloatingWindowRunning()
     }
 
-    override fun onPause() {
-        super.onPause()
-        android.util.Log.d("BoJiApp", "MainActivity onPause - starting floating window while still foreground")
-        checkPermissionAndStartService()
-    }
-
-    private fun checkPermissionAndStartService() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
-            // Need to guide user to settings if permission not granted
-            // Usually we wouldn't auto-launch this onStop as it's disruptive,
-            // but for MVP Phase 1 & 2.5 we leave it simple.
-            val intent = Intent(
-                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                Uri.parse("package:$packageName")
-            )
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            startActivityForResult(intent, OVERLAY_PERMISSION_REQ_CODE)
-        } else {
+    private fun ensureFloatingWindowRunning() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && Settings.canDrawOverlays(this)) {
             startFloatingWindowService()
         }
     }
@@ -78,11 +62,6 @@ class MainActivity : ComponentActivity() {
         } else {
             startService(serviceIntent)
         }
-    }
-
-    private fun stopFloatingWindowService() {
-        val serviceIntent = Intent(this, FloatingWindowService::class.java)
-        stopService(serviceIntent)
     }
 
     private fun checkOverlayPermission() {

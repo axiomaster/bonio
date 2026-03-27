@@ -27,24 +27,6 @@ import ai.axiomaster.boji.MainViewModel
 import ai.axiomaster.boji.remote.chat.ChatSessionEntry
 import ai.axiomaster.boji.remote.chat.OutgoingAttachment
 import ai.axiomaster.boji.ui.screens.chat.*
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.changedToUp
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChange
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.withTimeoutOrNull
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.IntOffset
-import kotlin.math.roundToInt
-import com.airbnb.lottie.compose.LottieAnimation
-import com.airbnb.lottie.compose.LottieCompositionSpec
-import com.airbnb.lottie.compose.LottieConstants
-import com.airbnb.lottie.compose.animateLottieCompositionAsState
-import com.airbnb.lottie.compose.rememberLottieComposition
-import ai.axiomaster.boji.ai.AgentManager
-import ai.axiomaster.boji.ai.AgentState
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -79,10 +61,6 @@ fun ChatTab(
         viewModel.loadChat(mainSessionKey)
         viewModel.refreshChatSessions(limit = 200)
     }
-    LaunchedEffect(Unit) {
-        viewModel.refreshInstalledThemes()
-    }
-
     val resolver = context.contentResolver
     val scope = rememberCoroutineScope()
 
@@ -193,21 +171,6 @@ fun ChatTab(
         }
     }
     
-    val agentState by AgentManager.stateManager.currentState.collectAsState()
-    val installedThemes by viewModel.installedThemes.collectAsState()
-    val assetPath = remember(installedThemes, agentState) {
-        viewModel.getThemeAssetPath(agentState)
-    }
-    FloatingDraggableAvatar(
-        agentState = agentState,
-        assetPath = assetPath,
-        isSpeakerEnabled = isSpeakerEnabled,
-        pendingRunCount = pendingRunCount,
-        partialSttText = partialSttText,
-        onStartVoice = { startVoiceWithPermission() },
-        onStopVoice = { viewModel.stopVoiceInput() },
-        onCancelVoice = { viewModel.cancelVoiceInput() },
-    )
 }
 }
 
@@ -338,182 +301,3 @@ private suspend fun loadImageAttachment(resolver: ContentResolver, uri: Uri): Pe
     )
 }
 
-@Composable
-fun FloatingDraggableAvatar(
-    agentState: AgentState,
-    assetPath: String,
-    isSpeakerEnabled: Boolean,
-    pendingRunCount: Int,
-    partialSttText: String?,
-    onStartVoice: () -> Unit,
-    onStopVoice: () -> Unit,
-    onCancelVoice: () -> Unit,
-) {
-    val density = LocalDensity.current
-
-    var offsetX by remember { mutableFloatStateOf(0f) }
-    var offsetY by remember { mutableFloatStateOf(0f) }
-
-    val maxOffsetX = with(density) { 150.dp.toPx() }
-
-    fun snapToEdge() {
-        val targetX = if (offsetX > 0) maxOffsetX else -maxOffsetX
-        offsetX = targetX
-    }
-
-    val composition by rememberLottieComposition(LottieCompositionSpec.Asset(assetPath))
-    val progress by animateLottieCompositionAsState(
-        composition,
-        iterations = LottieConstants.IterateForever,
-        isPlaying = true
-    )
-
-    val effectiveProgress = if (agentState == AgentState.Speaking && !isSpeakerEnabled) {
-        0f
-    } else {
-        progress
-    }
-
-    val currentAgentState by rememberUpdatedState(agentState)
-    val currentPendingRunCount by rememberUpdatedState(pendingRunCount)
-    val currentOnStartVoice by rememberUpdatedState(onStartVoice)
-    val currentOnStopVoice by rememberUpdatedState(onStopVoice)
-    val currentOnCancelVoice by rememberUpdatedState(onCancelVoice)
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(bottom = 120.dp),
-        contentAlignment = Alignment.BottomEnd
-    ) {
-        Box(
-            modifier = Modifier
-                .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
-                .size(192.dp)
-                .pointerInput(Unit) {
-                    val dragThreshold = 10.dp.toPx()
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false)
-                        android.util.Log.d("CatGesture", "DOWN state=${currentAgentState} pending=${currentPendingRunCount}")
-                        var isDragging = false
-                        var sttStarted = false
-                        var totalDragX = 0f
-                        var totalDragY = 0f
-
-                        val canStartVoice = currentPendingRunCount == 0 && currentAgentState == AgentState.Idle
-                        android.util.Log.d("CatGesture", "canStartVoice=$canStartVoice")
-
-                        if (canStartVoice) {
-                            val movedDuringWait = withTimeoutOrNull(300L) {
-                                while (true) {
-                                    val event = awaitPointerEvent(PointerEventPass.Main)
-                                    val pointer = event.changes.firstOrNull() ?: return@withTimeoutOrNull false
-                                    if (pointer.changedToUp()) return@withTimeoutOrNull false
-                                    val change = pointer.positionChange()
-                                    totalDragX += change.x
-                                    totalDragY += change.y
-                                    if (kotlin.math.abs(totalDragX) > dragThreshold || kotlin.math.abs(totalDragY) > dragThreshold) {
-                                        return@withTimeoutOrNull true
-                                    }
-                                }
-                                @Suppress("UNREACHABLE_CODE")
-                                false
-                            }
-                            android.util.Log.d("CatGesture", "movedDuringWait=$movedDuringWait")
-                            when (movedDuringWait) {
-                                null -> {
-                                    sttStarted = true
-                                    android.util.Log.d("CatGesture", "LONG_PRESS -> calling onStartVoice")
-                                    currentOnStartVoice()
-                                }
-                                true -> {
-                                    isDragging = true
-                                    offsetX += totalDragX
-                                    offsetY += totalDragY
-                                }
-                                false -> {
-                                    android.util.Log.d("CatGesture", "TAP (lifted within 300ms)")
-                                    return@awaitEachGesture
-                                }
-                            }
-                        }
-
-                        // Main event loop for drag or waiting for voice release
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val pointer = event.changes.firstOrNull() ?: break
-
-                            if (pointer.changedToUp()) {
-                                pointer.consume()
-                                if (isDragging) {
-                                    snapToEdge()
-                                } else if (sttStarted) {
-                                    currentOnStopVoice()
-                                }
-                                break
-                            }
-
-                            if (!pointer.pressed) break
-
-                            val change = pointer.positionChange()
-                            totalDragX += change.x
-                            totalDragY += change.y
-
-                            if (!isDragging && (kotlin.math.abs(totalDragX) > dragThreshold || kotlin.math.abs(totalDragY) > dragThreshold)) {
-                                isDragging = true
-                                if (sttStarted) {
-                                    currentOnCancelVoice()
-                                    sttStarted = false
-                                }
-                            }
-
-                            if (isDragging) {
-                                pointer.consume()
-                                offsetX += change.x
-                                offsetY += change.y
-                            }
-                        }
-                    }
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            LottieAnimation(
-                composition = composition,
-                progress = { effectiveProgress },
-                modifier = Modifier.fillMaxSize()
-            )
-
-            if (agentState == AgentState.Listening || agentState == AgentState.Thinking) {
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .offset(y = (-20).dp)
-                        .widthIn(max = 200.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color.White,
-                    shadowElevation = 4.dp,
-                ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = if (agentState == AgentState.Listening) "Listening..." else "Thinking...",
-                            style = mobileCaption2,
-                            color = if (agentState == AgentState.Listening) mobileAccent else mobileTextSecondary,
-                        )
-                        if (agentState == AgentState.Listening && !partialSttText.isNullOrBlank()) {
-                            Text(
-                                text = partialSttText,
-                                style = mobileCaption2,
-                                color = mobileText,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
