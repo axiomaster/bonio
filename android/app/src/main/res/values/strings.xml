@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">BoJi</string>
+    <string name="accessibility_service_description">BoJi uses accessibility to help type text in apps and interact with on-screen elements.</string>
 </resources>

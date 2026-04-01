@@ -83,7 +83,8 @@ RunResult run_streaming_with_history(
     ToolCallCallback tool_callback = nullptr,
     const std::atomic<bool>* aborted = nullptr,
     int max_tool_rounds = 3,
-    RemoteToolExecutor remote_executor = nullptr);
+    RemoteToolExecutor remote_executor = nullptr,
+    const std::string* user_message_json_override = nullptr);
 
 }  // namespace agent
 }  // namespace hiclaw

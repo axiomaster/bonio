@@ -1,6 +1,7 @@
 package ai.axiomaster.boji.avatar
 
 import android.animation.ValueAnimator
+import android.graphics.Color
 import android.util.DisplayMetrics
 import android.util.Log
 import android.view.animation.AccelerateDecelerateInterpolator
@@ -115,9 +116,20 @@ class AvatarController(
         }
     }
 
+    private var density = 3f
+
     fun updateScreenMetrics(metrics: DisplayMetrics) {
         screenWidth = metrics.widthPixels
         screenHeight = metrics.heightPixels
+        density = metrics.density
+    }
+
+    fun getScreenWidth(): Int = screenWidth
+    fun getScreenHeight(): Int = screenHeight
+    fun getDensity(): Float = density
+
+    fun cancelMovement() {
+        moveAnimator?.cancel()
     }
 
     // ── Activity state ──
@@ -147,6 +159,12 @@ class AvatarController(
     }
 
     fun setBubble(text: String?) = stateManager.setBubble(text)
+
+    fun setBubble(text: String, bgColor: Int, textColor: Int = Color.WHITE) =
+        stateManager.setBubble(text, bgColor, textColor)
+
+    fun setBubbleCountdown(text: String?) = stateManager.setBubbleCountdown(text)
+
     fun clearBubble() = stateManager.clearBubble()
 
     // ── Motion ──
@@ -219,23 +237,20 @@ class AvatarController(
         }
     }
 
-    // ── Drag ──
+    // ── Drag (position only, keeps current animation) ──
 
     fun dragTo(x: Float, y: Float) {
         wakeIfDormant()
         moveAnimator?.cancel()
         val clamped = clampPosition(x, y)
         _avatarState.value = _avatarState.value.copy(
-            motion = MotionState.Dragging,
             position = clamped,
             targetPosition = null,
         )
     }
 
     fun endDrag() {
-        _avatarState.value = _avatarState.value.copy(
-            motion = MotionState.Stationary,
-        )
+        // no-op: drag doesn't change motion state, nothing to reset
     }
 
     // ── GUI agent actions ──
@@ -296,8 +311,8 @@ class AvatarController(
 
     private fun clampPosition(x: Float, y: Float): AvatarPosition {
         return AvatarPosition(
-            x.coerceIn(0f, screenWidth.toFloat()),
-            y.coerceIn(0f, screenHeight.toFloat()),
+            x.coerceIn(-300f, screenWidth.toFloat() + 300f),
+            y.coerceIn(-100f, screenHeight.toFloat()),
         )
     }
 

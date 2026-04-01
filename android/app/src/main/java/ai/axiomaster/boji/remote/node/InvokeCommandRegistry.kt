@@ -14,6 +14,8 @@ import ai.axiomaster.boji.remote.protocol.OpenClawPhotosCommand
 import ai.axiomaster.boji.remote.protocol.OpenClawScreenCommand
 import ai.axiomaster.boji.remote.protocol.OpenClawSmsCommand
 import ai.axiomaster.boji.remote.protocol.OpenClawSystemCommand
+import ai.axiomaster.boji.remote.protocol.OpenClawInputCommand
+import ai.axiomaster.boji.remote.protocol.OpenClawTelephonyCommand
 
 data class NodeRuntimeFlags(
   val cameraEnabled: Boolean,
@@ -22,6 +24,7 @@ data class NodeRuntimeFlags(
   val voiceWakeEnabled: Boolean,
   val motionActivityAvailable: Boolean,
   val motionPedometerAvailable: Boolean,
+  val telephonyAvailable: Boolean,
   val debugBuild: Boolean,
 )
 
@@ -32,6 +35,7 @@ enum class InvokeCommandAvailability {
   SmsAvailable,
   MotionActivityAvailable,
   MotionPedometerAvailable,
+  TelephonyAvailable,
   DebugBuild,
 }
 
@@ -42,6 +46,7 @@ enum class NodeCapabilityAvailability {
   SmsAvailable,
   VoiceWakeEnabled,
   MotionAvailable,
+  TelephonyAvailable,
 }
 
 data class NodeCapabilitySpec(
@@ -87,6 +92,11 @@ object InvokeCommandRegistry {
         name = OpenClawCapability.Motion.rawValue,
         availability = NodeCapabilityAvailability.MotionAvailable,
       ),
+      NodeCapabilitySpec(
+        name = OpenClawCapability.Telephony.rawValue,
+        availability = NodeCapabilityAvailability.TelephonyAvailable,
+      ),
+      NodeCapabilitySpec(name = OpenClawCapability.Input.rawValue),
     )
 
   val all: List<InvokeCommandSpec> =
@@ -125,6 +135,10 @@ object InvokeCommandRegistry {
       ),
       InvokeCommandSpec(
         name = OpenClawScreenCommand.Record.rawValue,
+        requiresForeground = true,
+      ),
+      InvokeCommandSpec(
+        name = OpenClawScreenCommand.Capture.rawValue,
         requiresForeground = true,
       ),
       InvokeCommandSpec(
@@ -195,6 +209,18 @@ object InvokeCommandRegistry {
         availability = InvokeCommandAvailability.SmsAvailable,
       ),
       InvokeCommandSpec(
+        name = OpenClawTelephonyCommand.Answer.rawValue,
+        availability = InvokeCommandAvailability.TelephonyAvailable,
+      ),
+      InvokeCommandSpec(
+        name = OpenClawTelephonyCommand.Reject.rawValue,
+        availability = InvokeCommandAvailability.TelephonyAvailable,
+      ),
+      InvokeCommandSpec(
+        name = OpenClawTelephonyCommand.State.rawValue,
+        availability = InvokeCommandAvailability.TelephonyAvailable,
+      ),
+      InvokeCommandSpec(
         name = "debug.logs",
         availability = InvokeCommandAvailability.DebugBuild,
       ),
@@ -203,6 +229,8 @@ object InvokeCommandRegistry {
         availability = InvokeCommandAvailability.DebugBuild,
       ),
       InvokeCommandSpec(name = "app.update"),
+      InvokeCommandSpec(name = OpenClawInputCommand.Type.rawValue),
+      InvokeCommandSpec(name = OpenClawInputCommand.Find.rawValue),
     )
 
   private val byNameInternal: Map<String, InvokeCommandSpec> = all.associateBy { it.name }
@@ -219,6 +247,7 @@ object InvokeCommandRegistry {
           NodeCapabilityAvailability.SmsAvailable -> flags.smsAvailable
           NodeCapabilityAvailability.VoiceWakeEnabled -> flags.voiceWakeEnabled
           NodeCapabilityAvailability.MotionAvailable -> flags.motionActivityAvailable || flags.motionPedometerAvailable
+          NodeCapabilityAvailability.TelephonyAvailable -> flags.telephonyAvailable
         }
       }
       .map { it.name }
@@ -234,6 +263,7 @@ object InvokeCommandRegistry {
           InvokeCommandAvailability.SmsAvailable -> flags.smsAvailable
           InvokeCommandAvailability.MotionActivityAvailable -> flags.motionActivityAvailable
           InvokeCommandAvailability.MotionPedometerAvailable -> flags.motionPedometerAvailable
+          InvokeCommandAvailability.TelephonyAvailable -> flags.telephonyAvailable
           InvokeCommandAvailability.DebugBuild -> flags.debugBuild
         }
       }

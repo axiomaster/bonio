@@ -28,15 +28,15 @@ class SpeechToTextManager(private val context: Context) {
     @Volatile
     private var listening = false
 
-    private val voskManager = VoskSpeechManager(context)
+    private val sherpaManager = SherpaOnnxSpeechManager(context)
     @Volatile
-    private var usingVosk = false
+    private var usingSherpa = false
 
     fun startListening(listener: Listener) {
         mainHandler.post {
             if (systemSttAvailable == false) {
-                Log.d(TAG, "System STT known unavailable, using Vosk directly")
-                startVoskListening(listener)
+                Log.d(TAG, "System STT known unavailable, using Sherpa-ONNX directly")
+                startSherpaListening(listener)
             } else {
                 startListeningOnMain(listener)
             }
@@ -45,30 +45,30 @@ class SpeechToTextManager(private val context: Context) {
 
     private var startTimeoutRunnable: Runnable? = null
 
-    private fun startVoskListening(listener: Listener) {
+    private fun startSherpaListening(listener: Listener) {
         currentListener = listener
-        usingVosk = true
+        usingSherpa = true
         listening = true
         val wrappedListener = object : Listener {
             override fun onPartialResult(text: String) { listener.onPartialResult(text) }
             override fun onFinalResult(text: String) {
                 listening = false
-                usingVosk = false
+                usingSherpa = false
                 listener.onFinalResult(text)
             }
             override fun onError(errorCode: Int) {
                 listening = false
-                usingVosk = false
+                usingSherpa = false
                 listener.onError(errorCode)
             }
             override fun onReadyForSpeech() { listener.onReadyForSpeech() }
             override fun onEndOfSpeech() {
                 listening = false
-                usingVosk = false
+                usingSherpa = false
                 listener.onEndOfSpeech()
             }
         }
-        voskManager.startListening(wrappedListener)
+        sherpaManager.startListening(wrappedListener)
     }
 
     private fun startListeningOnMain(listener: Listener) {
@@ -77,13 +77,13 @@ class SpeechToTextManager(private val context: Context) {
         }
         destroyRecognizer()
         currentListener = listener
-        usingVosk = false
+        usingSherpa = false
 
         recognizer = createRecognizer()
         if (recognizer == null) {
-            Log.e(TAG, "SpeechRecognizer unavailable on this device, switching to Vosk")
+            Log.e(TAG, "SpeechRecognizer unavailable on this device, switching to Sherpa-ONNX")
             systemSttAvailable = false
-            startVoskListening(listener)
+            startSherpaListening(listener)
             return
         }
 
@@ -121,11 +121,11 @@ class SpeechToTextManager(private val context: Context) {
                 listening = false
                 destroyRecognizer()
 
-                // System STT failed — fall back to Vosk for this and all future calls
+                // System STT failed — fall back to Sherpa-ONNX for this and all future calls
                 if (systemSttAvailable != true) {
-                    Log.w(TAG, "System STT probe failed (error=$error), switching to Vosk fallback")
+                    Log.w(TAG, "System STT probe failed (error=$error), switching to Sherpa-ONNX fallback")
                     systemSttAvailable = false
-                    startVoskListening(listener)
+                    startSherpaListening(listener)
                 } else {
                     currentListener?.onError(error)
                 }
@@ -167,11 +167,11 @@ class SpeechToTextManager(private val context: Context) {
 
         startTimeoutRunnable = Runnable {
             if (!gotCallback) {
-                Log.w(TAG, "SpeechRecognizer start timeout — no callback received, falling back to Vosk")
+                Log.w(TAG, "SpeechRecognizer start timeout — no callback received, falling back to Sherpa-ONNX")
                 listening = false
                 destroyRecognizer()
                 systemSttAvailable = false
-                startVoskListening(listener)
+                startSherpaListening(listener)
             }
         }
         mainHandler.postDelayed(startTimeoutRunnable!!, 1000L)
@@ -188,8 +188,8 @@ class SpeechToTextManager(private val context: Context) {
 
     private fun stopListeningOnMain() {
         cancelStartTimeout()
-        if (usingVosk) {
-            voskManager.stopListening()
+        if (usingSherpa) {
+            sherpaManager.stopListening()
         } else {
             listening = false
             try {
@@ -208,8 +208,8 @@ class SpeechToTextManager(private val context: Context) {
     private fun cancelListeningOnMain() {
         cancelStartTimeout()
         listening = false
-        if (usingVosk) {
-            voskManager.cancelListening()
+        if (usingSherpa) {
+            sherpaManager.cancelListening()
         } else {
             try {
                 recognizer?.cancel()
@@ -218,7 +218,7 @@ class SpeechToTextManager(private val context: Context) {
             }
             destroyRecognizer()
         }
-        usingVosk = false
+        usingSherpa = false
         currentListener = null
     }
 
@@ -227,17 +227,17 @@ class SpeechToTextManager(private val context: Context) {
     fun destroy() {
         mainHandler.post {
             cancelListeningOnMain()
-            voskManager.destroy()
+            sherpaManager.destroy()
         }
     }
 
     /**
-     * Pre-initialize the Vosk model in background so first voice input is fast.
+     * Pre-initialize the Sherpa-ONNX model in background so first voice input is fast.
      */
-    fun warmUpVosk() {
-        voskManager.prepareModelAsync(
-            onReady = { Log.d(TAG, "Vosk model warmed up successfully") },
-            onError = { Log.w(TAG, "Vosk model warm-up failed", it) }
+    fun warmUp() {
+        sherpaManager.prepareModelAsync(
+            onReady = { Log.d(TAG, "Sherpa-ONNX model warmed up successfully") },
+            onError = { Log.w(TAG, "Sherpa-ONNX model warm-up failed", it) }
         )
     }
 

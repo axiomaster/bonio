@@ -9,6 +9,7 @@ import ai.axiomaster.boji.remote.gateway.GatewayEndpoint
 import ai.axiomaster.boji.remote.chat.OutgoingAttachment
 import ai.axiomaster.boji.remote.chat.SpeechToTextManager
 import ai.axiomaster.boji.remote.node.CanvasController
+import ai.axiomaster.boji.remote.node.ScreenCaptureManager
 import ai.axiomaster.boji.remote.node.ScreenRecordManager
 import ai.axiomaster.boji.remote.LocationMode
 import androidx.lifecycle.viewModelScope
@@ -25,6 +26,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
   val canvasA2uiHydrated: StateFlow<Boolean> = runtime.canvasA2uiHydrated
   val canvasRehydratePending: StateFlow<Boolean> = runtime.canvasRehydratePending
   val canvasRehydrateErrorText: StateFlow<String?> = runtime.canvasRehydrateErrorText
+  val screenCaptureManager: ScreenCaptureManager = runtime.screenCaptureManager
   val screenRecorder: ScreenRecordManager = runtime.screenRecorder
 
   val gateways: StateFlow<List<GatewayEndpoint>> = runtime.gateways
@@ -117,7 +119,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
           }
       }
 
-      sttManager.warmUpVosk()
+      sttManager.warmUp()
 
       viewModelScope.launch {
           isConnected.collect { connected ->

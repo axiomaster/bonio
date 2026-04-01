@@ -7,12 +7,14 @@ import ai.axiomaster.boji.remote.protocol.OpenClawCanvasCommand
 import ai.axiomaster.boji.remote.protocol.OpenClawCameraCommand
 import ai.axiomaster.boji.remote.protocol.OpenClawContactsCommand
 import ai.axiomaster.boji.remote.protocol.OpenClawDeviceCommand
+import ai.axiomaster.boji.remote.protocol.OpenClawInputCommand
 import ai.axiomaster.boji.remote.protocol.OpenClawLocationCommand
 import ai.axiomaster.boji.remote.protocol.OpenClawMotionCommand
 import ai.axiomaster.boji.remote.protocol.OpenClawNotificationsCommand
 import ai.axiomaster.boji.remote.protocol.OpenClawScreenCommand
 import ai.axiomaster.boji.remote.protocol.OpenClawSmsCommand
 import ai.axiomaster.boji.remote.protocol.OpenClawSystemCommand
+import ai.axiomaster.boji.remote.protocol.OpenClawTelephonyCommand
 
 class InvokeDispatcher(
   private val canvas: CanvasController,
@@ -27,6 +29,8 @@ class InvokeDispatcher(
   private val motionHandler: MotionHandler,
   private val screenHandler: ScreenHandler,
   private val smsHandler: SmsHandler,
+  private val telephonyHandler: TelephonyHandler,
+  private val inputHandler: InputHandler,
   private val a2uiHandler: A2UIHandler,
   private val debugHandler: DebugHandler,
   private val appUpdateHandler: AppUpdateHandler,
@@ -40,6 +44,7 @@ class InvokeDispatcher(
   private val onCanvasA2uiReset: () -> Unit,
   private val motionActivityAvailable: () -> Boolean,
   private val motionPedometerAvailable: () -> Boolean,
+  private val telephonyAvailable: () -> Boolean,
 ) {
   suspend fun handleInvoke(command: String, paramsJson: String?): GatewaySession.InvokeResult {
     val spec =
@@ -161,9 +166,18 @@ class InvokeDispatcher(
 
       // Screen command
       OpenClawScreenCommand.Record.rawValue -> screenHandler.handleScreenRecord(paramsJson)
+      OpenClawScreenCommand.Capture.rawValue -> screenHandler.handleScreenCapture(paramsJson)
 
       // SMS command
       OpenClawSmsCommand.Send.rawValue -> smsHandler.handleSmsSend(paramsJson)
+
+      // Telephony commands
+      OpenClawTelephonyCommand.Answer.rawValue -> telephonyHandler.handleAnswer(paramsJson)
+      OpenClawTelephonyCommand.Reject.rawValue -> telephonyHandler.handleReject(paramsJson)
+      OpenClawTelephonyCommand.State.rawValue -> telephonyHandler.handleState(paramsJson)
+
+      OpenClawInputCommand.Type.rawValue -> inputHandler.handleInputType(paramsJson)
+      OpenClawInputCommand.Find.rawValue -> inputHandler.handleInputFind(paramsJson)
 
       // Debug commands
       "debug.ed25519" -> debugHandler.handleEd25519()
@@ -266,6 +280,15 @@ class InvokeDispatcher(
           GatewaySession.InvokeResult.error(
             code = "SMS_UNAVAILABLE",
             message = "SMS_UNAVAILABLE: SMS not available on this device",
+          )
+        }
+      InvokeCommandAvailability.TelephonyAvailable ->
+        if (telephonyAvailable()) {
+          null
+        } else {
+          GatewaySession.InvokeResult.error(
+            code = "TELEPHONY_UNAVAILABLE",
+            message = "TELEPHONY_UNAVAILABLE: telephony not available on this device",
           )
         }
       InvokeCommandAvailability.DebugBuild ->

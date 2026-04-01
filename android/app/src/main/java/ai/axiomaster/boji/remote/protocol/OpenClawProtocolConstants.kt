@@ -15,6 +15,8 @@ enum class OpenClawCapability(val rawValue: String) {
   Contacts("contacts"),
   Calendar("calendar"),
   Motion("motion"),
+  Telephony("telephony"),
+  Input("input"),
 }
 
 enum class OpenClawCanvasCommand(val rawValue: String) {
@@ -54,6 +56,7 @@ enum class OpenClawCameraCommand(val rawValue: String) {
 
 enum class OpenClawScreenCommand(val rawValue: String) {
   Record("screen.record"),
+  Capture("screen.capture"),
   ;
 
   companion object {
@@ -146,5 +149,26 @@ enum class OpenClawMotionCommand(val rawValue: String) {
 
   companion object {
     const val NamespacePrefix: String = "motion."
+  }
+}
+
+enum class OpenClawTelephonyCommand(val rawValue: String) {
+  Answer("telephony.answer"),
+  Reject("telephony.reject"),
+  State("telephony.state"),
+  ;
+
+  companion object {
+    const val NamespacePrefix: String = "telephony."
+  }
+}
+
+enum class OpenClawInputCommand(val rawValue: String) {
+  Type("input.type"),
+  Find("input.find"),
+  ;
+
+  companion object {
+    const val NamespacePrefix: String = "input."
   }
 }

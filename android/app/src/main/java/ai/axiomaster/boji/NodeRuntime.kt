@@ -3,8 +3,11 @@ package ai.axiomaster.boji
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+
 import android.util.Log
 import androidx.core.content.ContextCompat
+import ai.axiomaster.boji.ai.AgentState
+import ai.axiomaster.boji.avatar.AvatarCommandExecutor
 import ai.axiomaster.boji.remote.chat.ChatController
 import ai.axiomaster.boji.remote.gateway.DeviceAuthStore
 import ai.axiomaster.boji.remote.gateway.DeviceIdentityStore
@@ -16,9 +19,12 @@ import ai.axiomaster.boji.remote.node.*
 import ai.axiomaster.boji.remote.LocationMode
 import ai.axiomaster.boji.remote.VoiceWakeMode
 import ai.axiomaster.boji.remote.SecurePrefs
+import android.os.PowerManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,7 +43,9 @@ class NodeRuntime(context: Context) {
   private val deviceAuthStore = DeviceAuthStore(prefs)
   val canvas = CanvasController()
   val screenRecorder = ScreenRecordManager(appContext)
+  val screenCaptureManager = ScreenCaptureManager(appContext)
   private val json = Json { ignoreUnknownKeys = true }
+  private var deviceStatusJob: Job? = null
 
   private val discovery = GatewayDiscovery(appContext, scope = scope)
   val gateways: StateFlow<List<GatewayEndpoint>> = discovery.gateways
@@ -56,11 +64,22 @@ class NodeRuntime(context: Context) {
   private val calendarHandler = CalendarHandler()
   private val motionHandler = MotionHandler()
   private val smsHandler = SmsHandler()
+  private val telephonyHandler = TelephonyHandler(appContext)
+  private val inputHandler = InputHandler()
   private val debugHandler = DebugHandler()
   private val appUpdateHandler = AppUpdateHandler()
+  val avatarCommandExecutor = AvatarCommandExecutor(appContext, scope)
+  var floatingWindowIntentHandler: ((String?) -> Unit)? = null
+
+  fun sendEventToServer(event: String, payloadJson: String) {
+    scope.launch {
+      operatorSession.sendNodeEvent(event, payloadJson)
+    }
+  }
 
   private val screenHandler: ScreenHandler = ScreenHandler(
     screenRecorder = screenRecorder,
+    screenCapturer = screenCaptureManager,
     setScreenRecordActive = { _screenRecordActive.value = it },
     invokeErrorFromThrowable = { invokeErrorFromThrowable(it) },
   )
@@ -80,6 +99,7 @@ class NodeRuntime(context: Context) {
     motionActivityAvailable = { false },
     motionPedometerAvailable = { false },
     smsAvailable = { false },
+    telephonyAvailable = { hasTelephony() },
     hasRecordAudioPermission = { hasRecordAudioPermission() },
     manualTls = { manualTls.value },
   )
@@ -97,6 +117,8 @@ class NodeRuntime(context: Context) {
     motionHandler = motionHandler,
     screenHandler = screenHandler,
     smsHandler = smsHandler,
+    telephonyHandler = telephonyHandler,
+    inputHandler = inputHandler,
     a2uiHandler = a2uiHandler,
     debugHandler = debugHandler,
     appUpdateHandler = appUpdateHandler,
@@ -104,6 +126,7 @@ class NodeRuntime(context: Context) {
     cameraEnabled = { cameraEnabled.value },
     locationEnabled = { locationMode.value != LocationMode.Off },
     smsAvailable = { false },
+    telephonyAvailable = { hasTelephony() },
     debugBuild = { true },
     refreshNodeCanvasCapability = { nodeSession.refreshNodeCanvasCapability() },
     onCanvasA2uiPush = {
@@ -189,7 +212,15 @@ class NodeRuntime(context: Context) {
         if (event == "agent.action.step" && payloadJson != null) {
           handleAgentActionStep(payloadJson)
         }
-        chat.handleGatewayEvent(event, payloadJson)
+        if (event == "avatar.command") {
+          avatarCommandExecutor.execute(payloadJson)
+        }
+        if (event == "intent.execute") {
+          floatingWindowIntentHandler?.invoke(payloadJson)
+        }
+        if (!callEventHandler.handleEvent(event, payloadJson)) {
+          chat.handleGatewayEvent(event, payloadJson)
+        }
       },
     )
 
@@ -266,6 +297,11 @@ class NodeRuntime(context: Context) {
 
   fun setForeground(v: Boolean) { _isForeground.value = v }
   fun connect(endpoint: GatewayEndpoint) {
+    DeviceNotificationListenerService.setNodeEventSink { event, payload ->
+      scope.launch {
+        operatorSession.sendNodeEvent(event, payload)
+      }
+    }
     val tls = connectionManager.resolveTlsParams(endpoint)
     if (tls?.required == true && tls.expectedFingerprint.isNullOrBlank()) {
       _statusText.value = "Verify gateway TLS fingerprint…"
@@ -283,12 +319,54 @@ class NodeRuntime(context: Context) {
     val pwd = prefs.loadGatewayPassword()
     operatorSession.connect(endpoint, token, pwd, connectionManager.buildOperatorConnectOptions(), tls)
     nodeSession.connect(endpoint, token, pwd, connectionManager.buildNodeConnectOptions(), tls)
+    startDeviceStatusReporting()
   }
 
   fun disconnect() {
+    stopDeviceStatusReporting()
+    DeviceNotificationListenerService.setNodeEventSink(null)
     connectedEndpoint = null
     operatorSession.disconnect()
     nodeSession.disconnect()
+  }
+
+  private fun startDeviceStatusReporting() {
+    stopDeviceStatusReporting()
+    deviceStatusJob = scope.launch {
+      while (true) {
+        delay(60_000L)
+        try {
+          val powerManager = appContext.getSystemService(Context.POWER_SERVICE) as? PowerManager
+          val screenOn = powerManager?.isInteractive ?: true
+          val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+          val avatarPrefs = appContext.getSharedPreferences("boji_avatar", Context.MODE_PRIVATE)
+          val healthNagEnabled = avatarPrefs.getBoolean("health_nag_enabled", false)
+          val idleWanderEnabled = avatarPrefs.getBoolean("idle_wander_enabled", true)
+          val ctrl = ai.axiomaster.boji.ai.AgentManager.avatarController
+          val state = ctrl.avatarState.value
+          val payload = buildJsonObject {
+            put("screenOn", JsonPrimitive(screenOn))
+            put("hour", JsonPrimitive(hour))
+            put("healthNagEnabled", JsonPrimitive(healthNagEnabled))
+            put("idleWanderEnabled", JsonPrimitive(idleWanderEnabled))
+            put("avatarX", JsonPrimitive(state.position.x))
+            put("avatarY", JsonPrimitive(state.position.y))
+            put("avatarActivity", JsonPrimitive(state.activity.name.lowercase()))
+            put("avatarMotion", JsonPrimitive(if (state.motion == ai.axiomaster.boji.avatar.MotionState.Stationary) "stationary" else "moving"))
+            put("screenWidth", JsonPrimitive(ctrl.getScreenWidth()))
+            put("screenHeight", JsonPrimitive(ctrl.getScreenHeight()))
+          }
+          operatorSession.sendNodeEvent("device.status", payload.toString())
+        } catch (e: Exception) {
+          Log.w("BoJi", "Failed to send device.status", e)
+        }
+      }
+    }
+  }
+
+  private fun stopDeviceStatusReporting() {
+    deviceStatusJob?.cancel()
+    deviceStatusJob = null
   }
 
   fun acceptGatewayTrustPrompt() {
@@ -303,7 +381,41 @@ class NodeRuntime(context: Context) {
     _statusText.value = "Offline"
   }
 
+  val callEventHandler: CallEventHandler by lazy {
+    CallEventHandler(
+      scope = scope,
+      sendEvent = { event, payload ->
+        Log.d("BoJi", "CallEventHandler sending event: $event")
+        val ok = operatorSession.sendNodeEvent(event, payload)
+        if (!ok) Log.w("BoJi", "CallEventHandler sendNodeEvent returned false (not connected?)")
+      },
+    ).also {
+      it.chatController = chat
+      it.telephonyHandler = telephonyHandler
+    }
+  }
+
   private fun hasRecordAudioPermission(): Boolean = ContextCompat.checkSelfPermission(appContext, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+
+  private fun hasTelephony(): Boolean = appContext.packageManager.hasSystemFeature(PackageManager.FEATURE_TELEPHONY)
+
+  val callStateMonitor: CallStateMonitor by lazy {
+    CallStateMonitor(
+      context = appContext,
+      scope = scope,
+      sendEvent = { event, payload ->
+        Log.i("BoJi", "CallStateMonitor sending event: $event, connected=${_isConnected.value}")
+        val ok = operatorSession.sendNodeEvent(event, payload)
+        if (ok) {
+          Log.i("BoJi", "CallStateMonitor event sent successfully: $event")
+        } else {
+          Log.w("BoJi", "CallStateMonitor failed to send event (not connected): $event")
+        }
+      },
+    ).also {
+      it.onCallEnded = { callEventHandler.onLocalCallEnded() }
+    }
+  }
 
   private suspend fun refreshBrandingFromGateway() {
     try {
@@ -386,11 +498,40 @@ class NodeRuntime(context: Context) {
       val y = parseJsonDouble(obj, "y")?.toFloat()
 
       Log.d("BoJi", "agent.action.step: $action at ($x, $y)")
-      scope.launch(Dispatchers.Main) {
-        ai.axiomaster.boji.ai.AgentManager.avatarController.performAction(action, x, y)
+
+      val agentState = agentStateFromAction(action)
+      if (agentState != null) {
+        scope.launch(Dispatchers.Main) {
+          val ctrl = ai.axiomaster.boji.ai.AgentManager.avatarController
+          ctrl.setActivity(agentState)
+          if (x != null && y != null) {
+            ctrl.runTo(x, y)
+          }
+        }
+      } else {
+        scope.launch(Dispatchers.Main) {
+          ai.axiomaster.boji.ai.AgentManager.avatarController.performAction(action, x, y)
+        }
       }
     } catch (e: Exception) {
       Log.w("BoJi", "Failed to handle agent.action.step: ${e.message}")
+    }
+  }
+
+  private fun agentStateFromAction(action: String): ai.axiomaster.boji.ai.AgentState? {
+    return when (action.lowercase()) {
+      "idle" -> ai.axiomaster.boji.ai.AgentState.Idle
+      "bored" -> ai.axiomaster.boji.ai.AgentState.Bored
+      "sleeping", "sleep" -> ai.axiomaster.boji.ai.AgentState.Sleeping
+      "listening", "listen" -> ai.axiomaster.boji.ai.AgentState.Listening
+      "thinking", "think" -> ai.axiomaster.boji.ai.AgentState.Thinking
+      "speaking", "speak" -> ai.axiomaster.boji.ai.AgentState.Speaking
+      "working", "work" -> ai.axiomaster.boji.ai.AgentState.Working
+      "happy" -> ai.axiomaster.boji.ai.AgentState.Happy
+      "confused" -> ai.axiomaster.boji.ai.AgentState.Confused
+      "angry" -> ai.axiomaster.boji.ai.AgentState.Angry
+      "watching", "watch" -> ai.axiomaster.boji.ai.AgentState.Watching
+      else -> null
     }
   }
 }

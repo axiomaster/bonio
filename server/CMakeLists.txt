@@ -152,7 +152,12 @@ set(HICLAW_SOURCES
   src/cron/store.cpp
   src/memory/file_memory.cpp
   src/net/async_agent.cpp
+  src/net/call_handler.cpp
   src/net/gateway.cpp
+  src/net/health_monitor.cpp
+  src/net/idle_manager.cpp
+  src/net/intent_router.cpp
+  src/net/notification_handler.cpp
   src/net/http_client.cpp
   src/net/serve.cpp
   src/net/tool_router.cpp
@@ -162,6 +167,7 @@ set(HICLAW_SOURCES
   src/security/path_guard.cpp
   src/session/store.cpp
   src/skills/skill_manager.cpp
+  src/tools/memo_tool.cpp
   src/tools/tool.cpp
 )
 
@@ -213,6 +219,11 @@ endif()
 
 if(NOT HICLAW_USE_WEBSOCKETPP AND NOT HICLAW_USE_LIBWEBSOCKETS)
   message(STATUS "HiClaw gateway: no backend available (stub only)")
+endif()
+
+# MSVC: treat source and output as UTF-8
+if(MSVC)
+  target_compile_options(hiclaw PRIVATE /utf-8)
 endif()
 
 # Optional: OHOS toolchain

@@ -1,7 +1,13 @@
 #include "hiclaw/agent/agent.hpp"
 #include "hiclaw/config/config.hpp"
 #include "hiclaw/net/async_agent.hpp"
+#include "hiclaw/net/avatar_command.hpp"
+#include "hiclaw/net/call_handler.hpp"
 #include "hiclaw/net/gateway.hpp"
+#include "hiclaw/net/health_monitor.hpp"
+#include "hiclaw/net/idle_manager.hpp"
+#include "hiclaw/net/intent_router.hpp"
+#include "hiclaw/net/notification_handler.hpp"
 #include "hiclaw/net/tool_router.hpp"
 #include "hiclaw/observability/log.hpp"
 #include "hiclaw/session/store.hpp"
@@ -40,6 +46,38 @@ using json = nlohmann::json;
 static std::string get_string(const json& j, const char* key) {
   if (!j.contains(key) || !j[key].is_string()) return "";
   return j[key].get<std::string>();
+}
+
+static std::string sanitize_utf8(const std::string& input) {
+  std::string out;
+  out.reserve(input.size());
+  size_t i = 0;
+  while (i < input.size()) {
+    unsigned char c = static_cast<unsigned char>(input[i]);
+    int expected = 0;
+    if (c <= 0x7F) { expected = 1; }
+    else if ((c & 0xE0) == 0xC0) { expected = 2; }
+    else if ((c & 0xF0) == 0xE0) { expected = 3; }
+    else if ((c & 0xF8) == 0xF0) { expected = 4; }
+    else { out += "\xEF\xBF\xBD"; ++i; continue; }
+
+    if (i + expected > input.size()) {
+      out += "\xEF\xBF\xBD"; ++i; continue;
+    }
+    bool valid = true;
+    for (int j = 1; j < expected; ++j) {
+      if ((static_cast<unsigned char>(input[i + j]) & 0xC0) != 0x80) {
+        valid = false; break;
+      }
+    }
+    if (valid) {
+      out.append(input, i, expected);
+      i += expected;
+    } else {
+      out += "\xEF\xBF\xBD"; ++i;
+    }
+  }
+  return out;
 }
 
 /// Shared protocol: handle one client frame, return response and update connected.
@@ -220,9 +258,10 @@ std::string gateway_handle_frame(const std::string& frame,
     res["id"] = id;
     res["ok"] = result.ok;
     if (result.ok) {
-      res["payload"] = {{"content", result.content}, {"full_response", result.content}};
+      std::string safe = sanitize_utf8(result.content);
+      res["payload"] = {{"content", safe}, {"full_response", safe}};
     } else {
-      res["error"] = {{"code", "AGENT_ERROR"}, {"message", result.error}};
+      res["error"] = {{"code", "AGENT_ERROR"}, {"message", sanitize_utf8(result.error)}};
     }
     return res.dump();
   }
@@ -316,11 +355,45 @@ std::string gateway_generate_pairing_code() {
 
 namespace {
 
+using wspp_json = nlohmann::json;
+
+static std::string wspp_get_string(const wspp_json& j, const char* key) {
+  if (!j.contains(key) || !j[key].is_string()) return "";
+  return j[key].get<std::string>();
+}
+
+/// Build OpenAI-style user message with text + image_url parts (vision).
+static std::string build_user_message_with_attachments(const std::string& text,
+                                                       const wspp_json& attachments) {
+  wspp_json msg;
+  msg["role"] = "user";
+  wspp_json content = wspp_json::array();
+  content.push_back(wspp_json::object({{"type", "text"}, {"text", text}}));
+  for (const auto& att : attachments) {
+    if (!att.is_object()) continue;
+    std::string mime = att.value("mimeType", "image/jpeg");
+    std::string b64 = att.value("content", "");
+    if (b64.empty()) continue;
+    std::string data_url = "data:" + mime + ";base64," + b64;
+    wspp_json part;
+    part["type"] = "image_url";
+    part["image_url"] = wspp_json::object({{"url", data_url}});
+    content.push_back(std::move(part));
+  }
+  msg["content"] = std::move(content);
+  return msg.dump();
+}
+
 typedef websocketpp::server<websocketpp::config::asio> ws_server_t;
 
 struct WsppSession {
   bool connected = false;
   std::unique_ptr<AsyncAgentManager> agent_manager;
+  std::unique_ptr<CallHandler> call_handler;
+  std::unique_ptr<HealthMonitor> health_monitor;
+  std::unique_ptr<IdleManager> idle_manager;
+  std::unique_ptr<IntentRouter> intent_router;
+  std::unique_ptr<NotificationHandler> notification_handler;
   std::shared_ptr<ToolRouter> tool_router;
   std::shared_ptr<session::SessionStore> session_store;
 };
@@ -365,6 +438,11 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
     };
 
     sessions[hdl].agent_manager = std::make_unique<AsyncAgentManager>(config, event_callback, sessions[hdl].session_store, sessions[hdl].tool_router);
+    sessions[hdl].call_handler = std::make_unique<CallHandler>(event_callback);
+    sessions[hdl].health_monitor = std::make_unique<HealthMonitor>(event_callback);
+    sessions[hdl].idle_manager = std::make_unique<IdleManager>(event_callback);
+    sessions[hdl].intent_router = std::make_unique<IntentRouter>(event_callback);
+    sessions[hdl].notification_handler = std::make_unique<NotificationHandler>(event_callback);
 
     // 发送 connect.challenge
     std::string nonce = "hiclaw-nonce-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
@@ -389,8 +467,8 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
     std::string id;
     try {
       nlohmann::json j = nlohmann::json::parse(payload);
-      method = get_string(j, "method");
-      id = get_string(j, "id");
+      method = wspp_get_string(j, "method");
+      id = wspp_get_string(j, "id");
     } catch (const nlohmann::json::parse_error&) {
       nlohmann::json err;
       err["type"] = "res";
@@ -433,15 +511,23 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
         // 解析参数
         std::string message;
         std::string session_key = "main";
+        wspp_json attachments = wspp_json::array();
         try {
           nlohmann::json j = nlohmann::json::parse(payload);
           if (j.contains("params") && j["params"].is_object()) {
-            message = get_string(j["params"], "message");
-            if (message.empty()) message = get_string(j["params"], "content");
-            session_key = get_string(j["params"], "sessionKey");
+            message = wspp_get_string(j["params"], "message");
+            if (message.empty()) message = wspp_get_string(j["params"], "content");
+            session_key = wspp_get_string(j["params"], "sessionKey");
             if (session_key.empty()) session_key = "main";
+            if (j["params"].contains("attachments") && j["params"]["attachments"].is_array()) {
+              attachments = j["params"]["attachments"];
+            }
           }
         } catch (...) {}
+
+        if (message.empty() && !attachments.empty()) {
+          message = "See attached.";
+        }
 
         if (message.empty()) {
           nlohmann::json res;
@@ -455,6 +541,11 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
           return;
         }
 
+        std::string user_msg_json_override;
+        if (!attachments.empty()) {
+          user_msg_json_override = build_user_message_with_attachments(message, attachments);
+        }
+
         // Save user message to session store
         if (it->second.session_store) {
           session::Message user_msg;
@@ -465,7 +556,7 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
           it->second.session_store->add_message(session_key, user_msg);
         }
 
-        std::string run_id = it->second.agent_manager->start_task(session_key, message);
+        std::string run_id = it->second.agent_manager->start_task(session_key, message, user_msg_json_override);
         nlohmann::json res;
         res["type"] = "res";
         res["id"] = id;
@@ -482,7 +573,7 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
         try {
           nlohmann::json j = nlohmann::json::parse(payload);
           if (j.contains("params") && j["params"].is_object()) {
-            run_id = get_string(j["params"], "runId");
+            run_id = wspp_get_string(j["params"], "runId");
           }
         } catch (...) {}
 
@@ -537,7 +628,7 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
         if (j.contains("params") && j["params"].is_object()) {
           auto& params = j["params"];
           // Extract toolCallId from id field (format: invoke_xxx -> xxx)
-          std::string invoke_id = get_string(params, "id");
+          std::string invoke_id = wspp_get_string(params, "id");
           if (invoke_id.rfind("invoke_", 0) == 0) {
             tool_call_id = invoke_id.substr(7);  // Remove "invoke_" prefix
           } else {
@@ -601,7 +692,7 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
       try {
         nlohmann::json j = nlohmann::json::parse(payload);
         if (j.contains("params") && j["params"].is_object()) {
-          session_key = get_string(j["params"], "sessionKey");
+          session_key = wspp_get_string(j["params"], "sessionKey");
           if (session_key.empty()) session_key = "main";
           if (j["params"].contains("limit")) {
             limit = j["params"]["limit"].get<int>();
@@ -620,7 +711,7 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
         for (const auto& m : messages) {
           nlohmann::json mj;
           mj["role"] = m.role;
-          mj["content"] = nlohmann::json::array({{{"type", "text"}, {"text", m.content}}});
+          mj["content"] = nlohmann::json::array({{{"type", "text"}, {"text", sanitize_utf8(m.content)}}});
           mj["timestamp"] = m.timestamp;
           if (!m.run_id.empty()) mj["runId"] = m.run_id;
           if (!m.tool_call_id.empty()) mj["toolCallId"] = m.tool_call_id;
@@ -695,7 +786,7 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
       try {
         nlohmann::json j = nlohmann::json::parse(payload);
         if (j.contains("params") && j["params"].is_object()) {
-          session_key = get_string(j["params"], "sessionKey");
+          session_key = wspp_get_string(j["params"], "sessionKey");
         }
       } catch (...) {}
 
@@ -732,7 +823,7 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
       try {
         nlohmann::json j = nlohmann::json::parse(payload);
         if (j.contains("params") && j["params"].is_object()) {
-          session_key = get_string(j["params"], "sessionKey");
+          session_key = wspp_get_string(j["params"], "sessionKey");
         }
       } catch (...) {}
 
@@ -770,8 +861,8 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
       try {
         nlohmann::json j = nlohmann::json::parse(payload);
         if (j.contains("params") && j["params"].is_object()) {
-          session_key = get_string(j["params"], "sessionKey");
-          display_name = get_string(j["params"], "displayName");
+          session_key = wspp_get_string(j["params"], "sessionKey");
+          display_name = wspp_get_string(j["params"], "displayName");
         }
       } catch (...) {}
 
@@ -936,7 +1027,7 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
       try {
         nlohmann::json j = nlohmann::json::parse(payload);
         if (j.contains("params") && j["params"].is_object()) {
-          skill_id = get_string(j["params"], "id");
+          skill_id = wspp_get_string(j["params"], "id");
         }
       } catch (...) {}
 
@@ -993,8 +1084,8 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
       try {
         nlohmann::json j = nlohmann::json::parse(payload);
         if (j.contains("params") && j["params"].is_object()) {
-          skill_id_val = get_string(j["params"], "id");
-          content = get_string(j["params"], "content");
+          skill_id_val = wspp_get_string(j["params"], "id");
+          content = wspp_get_string(j["params"], "content");
         }
       } catch (...) {}
 
@@ -1049,7 +1140,7 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
       try {
         nlohmann::json j = nlohmann::json::parse(payload);
         if (j.contains("params") && j["params"].is_object()) {
-          skill_id_val = get_string(j["params"], "id");
+          skill_id_val = wspp_get_string(j["params"], "id");
         }
       } catch (...) {}
 
@@ -1101,6 +1192,90 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
         server.send(hdl, res.dump(), websocketpp::frame::opcode::text);
       } catch (...) {}
       return;
+    }
+
+    // Handle node.event with CallHandler dispatch
+    if (method == "node.event" && it->second.connected && it->second.call_handler) {
+      std::string event_name;
+      std::string event_payload;
+      try {
+        nlohmann::json j = nlohmann::json::parse(payload);
+        if (j.contains("params") && j["params"].is_object()) {
+          event_name = wspp_get_string(j["params"], "event");
+          if (j["params"].contains("payload") && j["params"]["payload"].is_object()) {
+            event_payload = j["params"]["payload"].dump();
+          } else if (j["params"].contains("payloadJSON")) {
+            event_payload = wspp_get_string(j["params"], "payloadJSON");
+          }
+        }
+      } catch (...) {}
+
+      if (event_name == "telephony.incoming_call") {
+        it->second.call_handler->on_incoming_call(event_payload);
+      } else if (event_name == "telephony.user_response") {
+        it->second.call_handler->on_user_response(event_payload);
+      } else if (event_name == "telephony.call_ended") {
+        it->second.call_handler->on_call_ended(event_payload);
+      } else if (event_name == "telephony.call_answered") {
+        it->second.call_handler->on_call_answered(event_payload);
+      } else if (event_name == "call.tts.done") {
+        it->second.call_handler->on_tts_done(event_payload);
+      } else if (event_name == "notification.important") {
+        if (it->second.agent_manager) {
+          std::string prompt = "A new important notification arrived: " + event_payload +
+              "\nPlease briefly tell the user about this notification in a friendly way. Use notifications.list if you need more context.";
+          it->second.agent_manager->start_task("main", prompt);
+        }
+        nlohmann::json ev_notify;
+        ev_notify["type"] = "event";
+        ev_notify["event"] = "notification.important";
+        try {
+          ev_notify["payload"] = nlohmann::json::parse(event_payload);
+        } catch (...) {
+          ev_notify["payload"] = event_payload;
+        }
+        try {
+          server.send(hdl, ev_notify.dump(), websocketpp::frame::opcode::text);
+        } catch (...) {}
+      } else if (event_name == "notifications.changed") {
+        // Server-side importance classification
+        if (it->second.notification_handler) {
+          bool important = it->second.notification_handler->on_notification_changed(event_payload);
+          if (important && it->second.agent_manager) {
+            std::string prompt = "A new important notification arrived: " + event_payload +
+                "\nPlease briefly tell the user about this notification in a friendly way.";
+            it->second.agent_manager->start_task("main", prompt);
+          }
+        }
+      } else if (event_name == "device.status") {
+        if (it->second.health_monitor) {
+          it->second.health_monitor->on_device_status(event_payload);
+        }
+        if (it->second.idle_manager) {
+          it->second.idle_manager->on_device_status(event_payload);
+        }
+      } else if (event_name == "stt.final_result") {
+        if (it->second.call_handler && it->second.call_handler->is_handling()) {
+          // During active call, classify voice command
+          if (it->second.intent_router) {
+            try {
+              nlohmann::json stj = nlohmann::json::parse(event_payload);
+              std::string text = stj.value("text", "");
+              std::string last_tts = stj.value("lastTts", "");
+              std::string action = it->second.intent_router->classify_call_command(text, last_tts);
+              if (!action.empty()) {
+                nlohmann::json resp;
+                resp["action"] = action;
+                resp["source"] = "voice";
+                it->second.call_handler->on_user_response(resp.dump());
+              }
+            } catch (...) {}
+          }
+        } else if (it->second.intent_router) {
+          it->second.intent_router->on_stt_result(event_payload);
+        }
+      }
+      // All node.events still get logged and acknowledged via gateway_handle_frame below
     }
 
     // 其他方法使用原来的 gateway_handle_frame

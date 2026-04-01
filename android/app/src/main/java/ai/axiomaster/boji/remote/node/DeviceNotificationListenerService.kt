@@ -8,9 +8,12 @@ import android.content.Context
 import android.content.Intent
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import android.util.Log
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+
+private const val TAG = "BoJi.NotifListener"
 
 private const val MAX_NOTIFICATION_TEXT_CHARS = 512
 private const val NOTIFICATIONS_CHANGED_EVENT = "notifications.changed"
@@ -127,12 +130,14 @@ private object DeviceNotificationStore {
 class DeviceNotificationListenerService : NotificationListenerService() {
   override fun onListenerConnected() {
     super.onListenerConnected()
+    Log.i(TAG, "NotificationListener CONNECTED")
     activeService = this
     DeviceNotificationStore.setConnected(true)
     refreshActiveNotifications()
   }
 
   override fun onListenerDisconnected() {
+    Log.w(TAG, "NotificationListener DISCONNECTED")
     if (activeService === this) {
       activeService = null
     }
@@ -149,9 +154,13 @@ class DeviceNotificationListenerService : NotificationListenerService() {
 
   override fun onNotificationPosted(sbn: StatusBarNotification?) {
     super.onNotificationPosted(sbn)
-    val entry = sbn?.toEntry() ?: return
+    val posted = sbn ?: return
+    val entry = posted.toEntry()
     DeviceNotificationStore.upsert(entry)
+    Log.d(TAG, "onNotificationPosted: pkg=${entry.packageName} title=${entry.title} " +
+        "text=${entry.text?.take(50)} category=${entry.category}")
     if (entry.packageName == packageName) {
+      Log.d(TAG, "  -> skipped (self notification)")
       return
     }
     emitNotificationsChanged(

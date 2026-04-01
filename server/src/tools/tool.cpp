@@ -2,6 +2,7 @@
 #include "hiclaw/net/http_client.hpp"
 #include "hiclaw/security/path_guard.hpp"
 #include "hiclaw/skills/skill_manager.hpp"
+#include "hiclaw/tools/memo_tool.hpp"
 #include "hiclaw/tools/tool.hpp"
 #include <nlohmann/json.hpp>
 #include <cstdio>
@@ -192,7 +193,7 @@ bool is_remote_tool(const std::string& name) {
   static const char* remote_prefixes[] = {
     "screen.", "camera.", "location.", "device.", "notifications.",
     "system.", "sms.", "photos.", "contacts.", "calendar.", "motion.",
-    "canvas.",
+    "canvas.", "telephony.", "input.",
     nullptr
   };
   for (const char** p = remote_prefixes; *p; ++p) {
@@ -215,6 +216,8 @@ void register_builtin_tools() {
   register_tool("memory_forget", memory_forget_impl);
   register_tool("web_fetch", web_fetch_impl);
   register_tool("skill.read", skill_read_impl);
+  register_tool("memo.save", [](const std::string& args_json) -> ToolResult { return memo_save(args_json); });
+  register_tool("memo.list", [](const std::string& args_json) -> ToolResult { return memo_list(args_json); });
 }
 
 }  // namespace tools
