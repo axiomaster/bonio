@@ -82,8 +82,8 @@ dependencies {
     implementation(libs.androidx.camera.video)
     implementation(libs.androidx.camera.view)
 
-    // Vosk offline speech recognition
-    implementation("com.alphacephei:vosk-android:0.3.75")
+    // Sherpa-ONNX offline speech recognition (native libs in jniLibs/, Kotlin API in source)
+    // No Maven dependency needed — uses bundled .so files + com.k2fsa.sherpa.onnx source
 
     // Markdown
     implementation(libs.commonmark)

@@ -25,6 +25,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.*
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun ChatMessageList(
@@ -107,11 +110,25 @@ fun ChatMessageBubble(message: ChatMessage) {
                 modifier = Modifier.padding(horizontal = 11.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(3.dp),
             ) {
-                Text(
-                    text = if (isUser) "USER" else "ASSISTANT",
-                    style = mobileCaption2.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 0.6.sp),
-                    color = roleColor,
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = if (isUser) "USER" else "ASSISTANT",
+                        style = mobileCaption2.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 0.6.sp),
+                        color = roleColor,
+                    )
+                    val ts = message.timestampMs
+                    if (ts != null && ts > 0) {
+                        Text(
+                            text = remember(ts) { formatMessageTime(ts) },
+                            style = mobileCaption2,
+                            color = mobileTextTertiary,
+                        )
+                    }
+                }
                 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     for (part in message.content) {
@@ -305,5 +322,19 @@ fun VoiceMessagePlayer(base64: String, durationMs: Long?) {
             }
         }
         Text(formattedDuration, color = mobileTextSecondary, style = mobileCaption1)
+    }
+}
+
+private val todayDateFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+private val fullDateFormat = SimpleDateFormat("MM/dd HH:mm", Locale.getDefault())
+
+private fun formatMessageTime(timestampMs: Long): String {
+    val now = System.currentTimeMillis()
+    val date = Date(timestampMs)
+    val diff = now - timestampMs
+    return if (diff < 24 * 60 * 60 * 1000L) {
+        todayDateFormat.format(date)
+    } else {
+        fullDateFormat.format(date)
     }
 }

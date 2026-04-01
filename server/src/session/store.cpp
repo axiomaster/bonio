@@ -11,6 +11,38 @@ namespace session {
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 
+static std::string sanitize_utf8(const std::string& input) {
+  std::string out;
+  out.reserve(input.size());
+  size_t i = 0;
+  while (i < input.size()) {
+    unsigned char c = static_cast<unsigned char>(input[i]);
+    int expected = 0;
+    if (c <= 0x7F) { expected = 1; }
+    else if ((c & 0xE0) == 0xC0) { expected = 2; }
+    else if ((c & 0xF0) == 0xE0) { expected = 3; }
+    else if ((c & 0xF8) == 0xF0) { expected = 4; }
+    else { out += "\xEF\xBF\xBD"; ++i; continue; }
+
+    if (i + expected > input.size()) {
+      out += "\xEF\xBF\xBD"; ++i; continue;
+    }
+    bool valid = true;
+    for (int j = 1; j < expected; ++j) {
+      if ((static_cast<unsigned char>(input[i + j]) & 0xC0) != 0x80) {
+        valid = false; break;
+      }
+    }
+    if (valid) {
+      out.append(input, i, expected);
+      i += expected;
+    } else {
+      out += "\xEF\xBF\xBD"; ++i;
+    }
+  }
+  return out;
+}
+
 static int64_t now_ms() {
   return std::chrono::duration_cast<std::chrono::milliseconds>(
       std::chrono::system_clock::now().time_since_epoch()).count();
@@ -198,7 +230,7 @@ void SessionStore::save() {
     for (const auto& m : s.messages) {
       json mj;
       mj["role"] = m.role;
-      mj["content"] = m.content;
+      mj["content"] = sanitize_utf8(m.content);
       mj["timestamp"] = m.timestamp;
       if (!m.run_id.empty()) mj["runId"] = m.run_id;
       if (!m.tool_call_id.empty()) mj["toolCallId"] = m.tool_call_id;

@@ -131,6 +131,10 @@ class PermissionRequester(private val activity: ComponentActivity) {
       Manifest.permission.CAMERA -> "Camera"
       Manifest.permission.RECORD_AUDIO -> "Microphone"
       Manifest.permission.SEND_SMS -> "SMS"
+      Manifest.permission.READ_PHONE_STATE -> "Phone State"
+      Manifest.permission.READ_CALL_LOG -> "Call Log"
+      Manifest.permission.ANSWER_PHONE_CALLS -> "Answer Calls"
+      Manifest.permission.READ_CONTACTS -> "Contacts"
       else -> permission
     }
 }

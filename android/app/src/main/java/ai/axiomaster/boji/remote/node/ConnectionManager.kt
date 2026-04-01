@@ -17,6 +17,7 @@ class ConnectionManager(
   private val motionActivityAvailable: () -> Boolean,
   private val motionPedometerAvailable: () -> Boolean,
   private val smsAvailable: () -> Boolean,
+  private val telephonyAvailable: () -> Boolean,
   private val hasRecordAudioPermission: () -> Boolean,
   private val manualTls: () -> Boolean,
 ) {
@@ -71,6 +72,7 @@ class ConnectionManager(
       voiceWakeEnabled = voiceWakeMode() != VoiceWakeMode.Off && hasRecordAudioPermission(),
       motionActivityAvailable = motionActivityAvailable(),
       motionPedometerAvailable = motionPedometerAvailable(),
+      telephonyAvailable = telephonyAvailable(),
       debugBuild = true, // Force debug for now or link to BuildConfig
     )
 

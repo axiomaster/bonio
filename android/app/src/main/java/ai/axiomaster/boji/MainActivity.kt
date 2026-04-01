@@ -1,17 +1,24 @@
 package ai.axiomaster.boji
 
 import ai.axiomaster.boji.ui.theme.BoJiTheme
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.activity.enableEdgeToEdge
+import androidx.core.content.ContextCompat
 
 import android.provider.Settings
 import ai.axiomaster.boji.ui.screens.MainScreen
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
@@ -29,9 +36,11 @@ class MainActivity : ComponentActivity() {
         screenCaptureRequester = ScreenCaptureRequester(this)
         
         viewModel.screenRecorder.attachScreenCaptureRequester(screenCaptureRequester)
+        viewModel.screenCaptureManager.attachScreenCaptureRequester(screenCaptureRequester)
         viewModel.screenRecorder.attachPermissionRequester(permissionRequester)
 
         checkOverlayPermission()
+        requestTelephonyPermissions()
 
         setContent {
             BoJiTheme {
@@ -80,6 +89,23 @@ class MainActivity : ComponentActivity() {
                 }
                 .setNegativeButton("Later", null)
                 .show()
+        }
+    }
+
+    private fun requestTelephonyPermissions() {
+        val needed = listOf(
+            Manifest.permission.READ_PHONE_STATE,
+            Manifest.permission.READ_CALL_LOG,
+            Manifest.permission.ANSWER_PHONE_CALLS,
+            Manifest.permission.READ_CONTACTS,
+        ).filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+        if (needed.isNotEmpty()) {
+            Log.i("BoJiApp", "Requesting telephony permissions: $needed")
+            CoroutineScope(Dispatchers.Main).launch {
+                permissionRequester.requestIfMissing(needed)
+            }
         }
     }
 

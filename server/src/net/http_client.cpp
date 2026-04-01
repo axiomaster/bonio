@@ -3,11 +3,61 @@
 #include "hv/HttpMessage.h"
 #include "hv/hssl.h"
 #include "hv/herr.h"
+#include <cstring>
 #include <iostream>
 #include <string>
 
 namespace hiclaw {
 namespace net {
+
+namespace {
+
+std::string describe_error(int ret) {
+  if (ret == -1) return "SSL error";
+  if (ret == -2) return "SSL handshake: waiting for read";
+  if (ret == -3) return "SSL handshake: waiting for write";
+  if (ret == -4) return "SSL: would block";
+  if (ret == -1041) return "failed to create SSL context";
+  if (ret == -1042) return "failed to create SSL session";
+  if (ret == -1043) return "SSL handshake failed";
+
+  // libhv returns negated errno for socket errors
+  int posval = (ret < 0) ? -ret : ret;
+#ifdef ECONNREFUSED
+  if (posval == ECONNREFUSED) return "connection refused (is the server running?)";
+#endif
+#ifdef EHOSTUNREACH
+  if (posval == EHOSTUNREACH) return "host unreachable (network issue or server offline)";
+#endif
+#ifdef ENETUNREACH
+  if (posval == ENETUNREACH) return "network unreachable (check WiFi/network connection)";
+#endif
+#ifdef ETIMEDOUT
+  if (posval == ETIMEDOUT) return "connection timed out";
+#endif
+#ifdef ECONNRESET
+  if (posval == ECONNRESET) return "connection reset by server";
+#endif
+#ifdef ECONNABORTED
+  if (posval == ECONNABORTED) return "connection aborted";
+#endif
+#ifdef EPIPE
+  if (posval == EPIPE) return "broken pipe (server closed connection)";
+#endif
+
+  // Try libhv's own strerror, then system strerror
+  std::string hv_msg = hv_strerror(ret);
+  if (!hv_msg.empty() && hv_msg != "Unknown error" && hv_msg != "Undefined error") {
+    return hv_msg;
+  }
+  const char* sys_msg = strerror(posval);
+  if (sys_msg && std::string(sys_msg).find("nknown") == std::string::npos) {
+    return std::string(sys_msg) + " (code " + std::to_string(ret) + ")";
+  }
+  return "error code " + std::to_string(ret);
+}
+
+}  // namespace
 
 bool post_json(const std::string& url, const std::string& body, HttpResponse& res,
                const std::string& auth_header) {
@@ -41,31 +91,9 @@ bool post_json(const std::string& url, const std::string& body, HttpResponse& re
   int ret = cli.send(&req, &resp);
 
   if (ret != 0) {
-    std::string err_str;
-    // Handle SSL-specific error codes from hssl.h
-    if (ret == -1) {
-      err_str = "HSSL_ERROR";
-    } else if (ret == -2) {
-      err_str = "HSSL_WANT_READ (SSL handshake needs more data to read)";
-    } else if (ret == -3) {
-      err_str = "HSSL_WANT_WRITE (SSL handshake needs to write more data)";
-    } else if (ret == -4) {
-      err_str = "HSSL_WOULD_BLOCK";
-    } else if (ret == -1041) {
-      err_str = "ERR_NEW_SSL_CTX (failed to create SSL context)";
-    } else if (ret == -1042) {
-      err_str = "ERR_NEW_SSL (failed to create SSL session)";
-    } else if (ret == -1043) {
-      err_str = "ERR_SSL_HANDSHAKE (SSL handshake failed)";
-    } else {
-      // Try hv_strerror for other error codes
-      err_str = hv_strerror(ret);
-      if (err_str.empty() || err_str == "Unknown error") {
-        err_str = "error code " + std::to_string(ret);
-      }
-    }
+    std::string err_str = describe_error(ret);
     std::cerr << "[debug] HTTP error code: " << ret << ", msg: " << err_str << std::endl;
-    res.error = "HTTP request failed: " + err_str;
+    res.error = err_str;
     return false;
   }
 
@@ -112,9 +140,9 @@ bool get(const std::string& url, HttpResponse& res) {
   int ret = cli.send(&req, &resp);
 
   if (ret != 0) {
-    std::string err_str = hv_strerror(ret);
+    std::string err_str = describe_error(ret);
     std::cerr << "[debug] HTTP error code: " << ret << ", msg: " << err_str << std::endl;
-    res.error = "HTTP request failed (code=" + std::to_string(ret) + "): " + err_str;
+    res.error = err_str;
     return false;
   }
 
@@ -180,29 +208,9 @@ bool post_json_streaming(const std::string& url, const std::string& body,
   int ret = cli.send(&req, &resp);
 
   if (ret != 0) {
-    std::string err_str;
-    if (ret == -1) {
-      err_str = "HSSL_ERROR";
-    } else if (ret == -2) {
-      err_str = "HSSL_WANT_READ";
-    } else if (ret == -3) {
-      err_str = "HSSL_WANT_WRITE";
-    } else if (ret == -4) {
-      err_str = "HSSL_WOULD_BLOCK";
-    } else if (ret == -1041) {
-      err_str = "ERR_NEW_SSL_CTX";
-    } else if (ret == -1042) {
-      err_str = "ERR_NEW_SSL";
-    } else if (ret == -1043) {
-      err_str = "ERR_SSL_HANDSHAKE";
-    } else {
-      err_str = hv_strerror(ret);
-      if (err_str.empty() || err_str == "Unknown error") {
-        err_str = "error code " + std::to_string(ret);
-      }
-    }
+    std::string err_str = describe_error(ret);
     std::cerr << "[debug] HTTP streaming error code: " << ret << ", msg: " << err_str << std::endl;
-    res.error = "HTTP request failed: " + err_str;
+    res.error = err_str;
     return false;
   }
 

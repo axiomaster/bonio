@@ -64,6 +64,18 @@ class ChatController(
 
   private var lastHealthPollAtMs: Long? = null
 
+  @Volatile private var assistantCountBeforeSend = -1
+
+  fun addLocalMessage(role: String, text: String) {
+    val msg = ChatMessage(
+      id = UUID.randomUUID().toString(),
+      role = role,
+      content = listOf(ChatMessageContent(type = "text", text = text)),
+      timestampMs = System.currentTimeMillis(),
+    )
+    _messages.value = _messages.value + msg
+  }
+
   fun onDisconnected(message: String) {
     _healthOk.value = false
     _errorText.value = null
@@ -163,6 +175,8 @@ class ChatController(
     pendingToolCallsById.clear()
     publishPendingToolCalls()
 
+    assistantCountBeforeSend = _messages.value.count { it.role == "assistant" }
+
     ai.axiomaster.boji.ai.AgentManager.stateManager.transitionTo(ai.axiomaster.boji.ai.AgentState.Thinking)
 
     scope.launch {
@@ -257,6 +271,11 @@ class ChatController(
         }
       }
     }
+  }
+
+  /** Cancels the current assistant run(s) via gateway `chat.abort` (no local Job). */
+  fun stopStreaming() {
+    abort()
   }
 
   fun handleGatewayEvent(event: String, payloadJson: String?) {
@@ -409,12 +428,20 @@ class ChatController(
               _sessionId.value = history.sessionId
               history.thinkingLevel?.trim()?.takeIf { it.isNotEmpty() }?.let { _thinkingLevel.value = it }
               _streamingAssistantText.value = null
-              
-              val finalAssistantMessage = history.messages.lastOrNull { it.role == "assistant" }
-              val textToSpeak = finalAssistantMessage?.content?.find { it.type == "text" }?.text
-              if (!textToSpeak.isNullOrBlank()) {
-                 onAssistantSpoke?.invoke(textToSpeak)
+
+              val newAssistantCount = history.messages.count { it.role == "assistant" }
+              val prevCount = assistantCountBeforeSend
+              Log.d("ChatController", "handleChatEvent: assistant count before=$prevCount after=$newAssistantCount")
+              if (prevCount >= 0 && newAssistantCount > prevCount) {
+                val finalAssistantMessage = history.messages.lastOrNull { it.role == "assistant" }
+                val textToSpeak = finalAssistantMessage?.content?.find { it.type == "text" }?.text
+                if (!textToSpeak.isNullOrBlank()) {
+                  onAssistantSpoke?.invoke(textToSpeak)
+                }
+              } else {
+                Log.d("ChatController", "handleChatEvent: No new assistant message, skipping TTS")
               }
+              assistantCountBeforeSend = -1
             } else {
               // Server history is empty or old, append local streaming result as backup
               if (!streamingText.isNullOrBlank()) {

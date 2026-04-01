@@ -296,6 +296,27 @@ fun SettingsTab(
           colors = listItemColors
         )
       }
+      item {
+        var healthNagEnabled by remember {
+          mutableStateOf(
+            context.getSharedPreferences("boji_avatar", Context.MODE_PRIVATE)
+              .getBoolean("health_nag_enabled", true)
+          )
+        }
+        SwitchRow(
+          title = "Late Night Reminder",
+          description = "BoJi will remind you to rest when using phone late at night.",
+          checked = healthNagEnabled,
+          onCheckedChange = { checked ->
+            healthNagEnabled = checked
+            context.getSharedPreferences("boji_avatar", Context.MODE_PRIVATE)
+              .edit()
+              .putBoolean("health_nag_enabled", checked)
+              .apply()
+          },
+          colors = listItemColors
+        )
+      }
 
       item { HorizontalDivider(color = mobileBorder) }
 

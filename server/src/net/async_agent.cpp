@@ -13,6 +13,39 @@ namespace net {
 
 namespace {
 
+// Replace invalid UTF-8 bytes with U+FFFD so nlohmann::json doesn't throw type_error:316
+std::string sanitize_utf8(const std::string& input) {
+  std::string out;
+  out.reserve(input.size());
+  size_t i = 0;
+  while (i < input.size()) {
+    unsigned char c = static_cast<unsigned char>(input[i]);
+    int expected = 0;
+    if (c <= 0x7F) { expected = 1; }
+    else if ((c & 0xE0) == 0xC0) { expected = 2; }
+    else if ((c & 0xF0) == 0xE0) { expected = 3; }
+    else if ((c & 0xF8) == 0xF0) { expected = 4; }
+    else { out += "\xEF\xBF\xBD"; ++i; continue; }
+
+    if (i + expected > input.size()) {
+      out += "\xEF\xBF\xBD"; ++i; continue;
+    }
+    bool valid = true;
+    for (int j = 1; j < expected; ++j) {
+      if ((static_cast<unsigned char>(input[i + j]) & 0xC0) != 0x80) {
+        valid = false; break;
+      }
+    }
+    if (valid) {
+      out.append(input, i, expected);
+      i += expected;
+    } else {
+      out += "\xEF\xBF\xBD"; ++i;
+    }
+  }
+  return out;
+}
+
 std::string generate_run_id() {
   std::random_device rd;
   std::mt19937 gen(rd());
@@ -66,11 +99,13 @@ AsyncAgentManager::~AsyncAgentManager() {
   }
 }
 
-std::string AsyncAgentManager::start_task(const std::string& session_key, const std::string& message) {
+std::string AsyncAgentManager::start_task(const std::string& session_key, const std::string& message,
+                                          const std::string& user_message_json_override) {
   auto task = std::make_shared<AsyncTask>();
   task->run_id = generate_run_id();
   task->session_key = session_key;
   task->message = message;
+  task->user_message_json_override = user_message_json_override;
 
   std::string run_id = task->run_id;
 
@@ -113,7 +148,7 @@ void AsyncAgentManager::run_task(std::shared_ptr<AsyncTask> task) {
     // Load conversation history from session store
     std::vector<types::Message> history;
     if (session_store_) {
-      auto session_msgs = session_store_->get_messages(task->session_key, 128);
+      auto session_msgs = session_store_->get_messages(task->session_key, 20);
       history = session_messages_to_history(session_msgs);
       // Remove the last message if it's the same user message we're about to send
       // (it was already saved by the gateway before starting the task)
@@ -129,6 +164,7 @@ void AsyncAgentManager::run_task(std::shared_ptr<AsyncTask> task) {
     // Text streaming callback: emit both "chat" delta and "agent" assistant events
     auto stream_callback = [this, &session_key_copy, &run_id_copy, &task](const std::string& delta_text) {
       if (task->aborted) return;
+      std::string safe_text = sanitize_utf8(delta_text);
 
       // chat event with state: "delta" (expected by Android client)
       nlohmann::json chat_delta;
@@ -137,7 +173,7 @@ void AsyncAgentManager::run_task(std::shared_ptr<AsyncTask> task) {
       chat_delta["state"] = "delta";
       chat_delta["message"] = {
         {"role", "assistant"},
-        {"content", nlohmann::json::array({{{"type", "text"}, {"text", delta_text}}})}
+        {"content", nlohmann::json::array({{{"type", "text"}, {"text", safe_text}}})}
       };
       send_event("chat", chat_delta.dump());
 
@@ -147,7 +183,7 @@ void AsyncAgentManager::run_task(std::shared_ptr<AsyncTask> task) {
       agent_payload["stream"] = "assistant";
       agent_payload["message"] = {
         {"role", "assistant"},
-        {"content", nlohmann::json::array({{{"type", "text"}, {"text", delta_text}}})}
+        {"content", nlohmann::json::array({{{"type", "text"}, {"text", safe_text}}})}
       };
       send_event("agent", agent_payload.dump());
     };
@@ -228,9 +264,11 @@ void AsyncAgentManager::run_task(std::shared_ptr<AsyncTask> task) {
     // Execute multi-turn streaming agent with history and tool loop
     agent::RunResult result;
     if (!task->aborted) {
+      const std::string* user_override =
+          task->user_message_json_override.empty() ? nullptr : &task->user_message_json_override;
       result = agent::run_streaming_with_history(
           config_, history, task->message, 0.7,
-          stream_callback, tool_callback, &task->aborted, 5, remote_executor);
+          stream_callback, tool_callback, &task->aborted, 5, remote_executor, user_override);
     }
 
     // Save assistant response to session store
@@ -250,9 +288,9 @@ void AsyncAgentManager::run_task(std::shared_ptr<AsyncTask> task) {
     final_payload["runId"] = task->run_id;
     final_payload["state"] = task->aborted ? "aborted" : (result.ok ? "final" : "error");
     if (!result.ok && !task->aborted) {
-      final_payload["errorMessage"] = result.error;
+      final_payload["errorMessage"] = sanitize_utf8(result.error);
     } else if (!task->aborted && !result.content.empty()) {
-      final_payload["message"] = result.content;
+      final_payload["message"] = sanitize_utf8(result.content);
     }
     send_event("chat", final_payload.dump());
 
@@ -275,7 +313,7 @@ void AsyncAgentManager::run_task(std::shared_ptr<AsyncTask> task) {
     error_payload["sessionKey"] = task->session_key;
     error_payload["runId"] = task->run_id;
     error_payload["state"] = "error";
-    error_payload["errorMessage"] = e.what();
+    error_payload["errorMessage"] = sanitize_utf8(e.what());
     send_event("chat", error_payload.dump());
 
     {
