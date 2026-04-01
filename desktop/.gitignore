@@ -1,0 +1,27 @@
+# Flutter/Dart
+.dart_tool/
+.packages
+build/
+doc/
+*.iml
+.idea/
+.metadata
+pubspec.lock
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Platform build artifacts
+windows/flutter/ephemeral/
+macos/Flutter/ephemeral/
+linux/flutter/ephemeral/
+
+# Generated plugin registrants
+macos/Flutter/GeneratedPluginRegistrant.swift
+windows/flutter/generated_plugin_registrant.cc
+windows/flutter/generated_plugin_registrant.h
+windows/flutter/generated_plugins.cmake
+
+# IDE
+*.swp
+*.swo
+.vscode/
