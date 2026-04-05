@@ -26,6 +26,12 @@ class ChatController extends ChangeNotifier {
   static const _pendingRunTimeoutMs = 120000;
   int? _lastHealthPollAtMs;
 
+  /// Spoken when the assistant finishes a reply (OpenClaw may not send `avatar.command` tts).
+  final void Function(String plainText)? onAssistantReplyForTts;
+
+  String? _lastAssistantTtsDigest;
+  bool _ttsAfterChatFinal = false;
+
   String get sessionKey => _sessionKey;
   String? get sessionId => _sessionId;
   List<ChatMessage> get messages => _messages;
@@ -38,7 +44,10 @@ class ChatController extends ChangeNotifier {
   List<ChatSessionEntry> get sessions => _sessions;
   bool get isStreaming => _pendingRunCount > 0;
 
-  ChatController({required this.session});
+  ChatController({
+    required this.session,
+    this.onAssistantReplyForTts,
+  });
 
   void onDisconnected(String message) {
     _healthOk = false;
@@ -53,6 +62,12 @@ class ChatController extends ChangeNotifier {
 
   Future<void> load(String sessionKey) async {
     final key = sessionKey.trim().isEmpty ? 'main' : sessionKey.trim();
+    if (key != _sessionKey) {
+      _clearPendingRuns();
+      _pendingToolCallsById.clear();
+      _pendingToolCalls = [];
+      _streamingAssistantText = null;
+    }
     _sessionKey = key;
     notifyListeners();
     await _bootstrap(forceHealth: true);
@@ -79,6 +94,10 @@ class ChatController extends ChangeNotifier {
   Future<void> switchSession(String sessionKey) async {
     final key = sessionKey.trim();
     if (key.isEmpty || key == _sessionKey) return;
+    _clearPendingRuns();
+    _pendingToolCallsById.clear();
+    _pendingToolCalls = [];
+    _streamingAssistantText = null;
     _sessionKey = key;
     notifyListeners();
     await _bootstrap(forceHealth: true);
@@ -118,6 +137,7 @@ class ChatController extends ChangeNotifier {
         timestampMs: DateTime.now().millisecondsSinceEpoch,
       ),
     ];
+    _lastAssistantTtsDigest = null;
 
     _armPendingRunTimeout(runId);
     _pendingRuns.add(runId);
@@ -237,23 +257,34 @@ class ChatController extends ChangeNotifier {
   Future<void> _bootstrap({required bool forceHealth}) async {
     _errorText = null;
     _healthOk = false;
-    _clearPendingRuns();
-    _pendingToolCallsById.clear();
-    _pendingToolCalls = [];
-    _streamingAssistantText = null;
-    _sessionId = null;
-    notifyListeners();
+    // Do not clear _pendingRuns/_messages here: refresh/bootstrap runs while a
+    // chat.send is in flight would wipe the user's message and streaming state.
 
     try {
       final historyJson = await session.request(
           'chat.history', jsonEncode({'sessionKey': _sessionKey}));
       final history = _parseHistory(historyJson);
+      final inFlight = _pendingRuns.isNotEmpty ||
+          (_streamingAssistantText != null &&
+              _streamingAssistantText!.trim().isNotEmpty);
       if (history.messages.isNotEmpty) {
-        _messages = history.messages;
-        _sessionId = history.sessionId;
-        if (history.thinkingLevel != null &&
-            history.thinkingLevel!.trim().isNotEmpty) {
-          _thinkingLevel = history.thinkingLevel!;
+        if (!inFlight) {
+          _messages = history.messages;
+          _sessionId = history.sessionId;
+          if (history.thinkingLevel != null &&
+              history.thinkingLevel!.trim().isNotEmpty) {
+            _thinkingLevel = history.thinkingLevel!;
+          }
+        } else {
+          // Keep local tail (user bubble + streaming); still sync ids when server is ahead
+          _sessionId = history.sessionId ?? _sessionId;
+          if (history.messages.length > _messages.length) {
+            _messages = history.messages;
+            if (history.thinkingLevel != null &&
+                history.thinkingLevel!.trim().isNotEmpty) {
+              _thinkingLevel = history.thinkingLevel!;
+            }
+          }
         }
       }
       _healthOk = true;
@@ -300,13 +331,26 @@ class ChatController extends ChangeNotifier {
     }
   }
 
+  /// True when [eventKey] refers to the same chat session as [_sessionKey].
+  /// OpenClaw often canonicalizes `main` to `agent:main:main` in events while
+  /// connect may omit `snapshot.sessionDefaults.mainSessionKey`.
+  bool _sessionKeyMatchesEvent(String? eventKey) {
+    if (eventKey == null || eventKey.trim().isEmpty) return true;
+    final a = eventKey.trim();
+    final b = _sessionKey.trim();
+    if (a == b) return true;
+    if ((a == 'main' && b == 'agent:main:main') ||
+        (b == 'main' && a == 'agent:main:main')) {
+      return true;
+    }
+    return false;
+  }
+
   void _handleChatEvent(String payloadJson) {
     final payload = _tryParseJson(payloadJson);
     if (payload == null) return;
     final sessionKey = payload['sessionKey'] as String?;
-    if (sessionKey != null &&
-        sessionKey.trim().isNotEmpty &&
-        sessionKey != _sessionKey) return;
+    if (!_sessionKeyMatchesEvent(sessionKey)) return;
 
     final runId = payload['runId'] as String?;
     final state = payload['state'] as String?;
@@ -327,6 +371,7 @@ class ChatController extends ChangeNotifier {
           _errorText =
               payload['errorMessage'] as String? ?? 'Chat failed';
         }
+        _ttsAfterChatFinal = state == 'final';
         if (runId != null) {
           _clearPendingRun(runId);
         } else {
@@ -336,7 +381,7 @@ class ChatController extends ChangeNotifier {
         _pendingToolCalls = [];
         notifyListeners();
 
-        _fetchHistoryAndMerge();
+        unawaited(_fetchHistoryAndMerge());
         break;
     }
   }
@@ -345,9 +390,7 @@ class ChatController extends ChangeNotifier {
     final payload = _tryParseJson(payloadJson);
     if (payload == null) return;
     final sessionKey = payload['sessionKey'] as String?;
-    if (sessionKey != null &&
-        sessionKey.trim().isNotEmpty &&
-        sessionKey != _sessionKey) return;
+    if (!_sessionKeyMatchesEvent(sessionKey)) return;
 
     final stream = payload['stream'] as String?;
     final data = payload['data'] as Map<String, dynamic>?;
@@ -431,10 +474,30 @@ class ChatController extends ChangeNotifier {
         _streamingAssistantText = null;
       }
       notifyListeners();
+      _maybeSpeakAssistantAfterMerge();
     } catch (_) {
       _streamingAssistantText = null;
       notifyListeners();
     }
+  }
+
+  void _maybeSpeakAssistantAfterMerge() {
+    if (!_ttsAfterChatFinal) return;
+    _ttsAfterChatFinal = false;
+    final text = _lastAssistantPlainText();
+    if (text.isEmpty) return;
+    if (text == _lastAssistantTtsDigest) return;
+    _lastAssistantTtsDigest = text;
+    onAssistantReplyForTts?.call(text);
+  }
+
+  String _lastAssistantPlainText() {
+    for (var i = _messages.length - 1; i >= 0; i--) {
+      if (_messages[i].role == 'assistant') {
+        return _messages[i].textContent.trim();
+      }
+    }
+    return '';
   }
 
   String? _parseAssistantDeltaText(Map<String, dynamic> payload) {
@@ -544,6 +607,15 @@ class ChatController extends ChangeNotifier {
     _pendingRunTimeouts.remove(runId)?.cancel();
     _pendingRuns.remove(runId);
     _pendingRunCount = _pendingRuns.length;
+    // Some gateways end the run without a separate chat `final` event; merge + TTS anyway.
+    if (_pendingRuns.isEmpty &&
+        _streamingAssistantText != null &&
+        _streamingAssistantText!.trim().isNotEmpty) {
+      _ttsAfterChatFinal = true;
+      Future<void>.delayed(const Duration(milliseconds: 600), () {
+        unawaited(_fetchHistoryAndMerge());
+      });
+    }
   }
 
   void _clearPendingRuns() {

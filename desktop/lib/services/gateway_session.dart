@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../models/gateway_models.dart';
@@ -9,6 +12,13 @@ import 'device_identity_store.dart';
 import 'device_auth_store.dart';
 
 const int gatewayProtocolVersion = 3;
+
+String? _decodeWsFrameText(dynamic data) {
+  if (data is String) return data;
+  if (data is Uint8List) return utf8.decode(data);
+  if (data is List<int>) return utf8.decode(data);
+  return null;
+}
 
 class ErrorShape {
   final String code;
@@ -209,7 +219,12 @@ class GatewaySession {
 
     _subscription = _channel!.stream.listen(
       (data) {
-        _handleMessage(data as String, target, completer);
+        final text = _decodeWsFrameText(data);
+        if (text == null) {
+          debugPrint('gateway: dropped non-text WebSocket frame (${data.runtimeType})');
+          return;
+        }
+        _handleMessage(text, target, completer);
       },
       onError: (err) {
         if (!completer.isCompleted) {
@@ -231,8 +246,9 @@ class GatewaySession {
 
     // Wait for connect.challenge then send connect
     try {
+      // OpenClaw gateway may be slow to emit connect.challenge; official client uses ~6–12s.
       final nonce = await _connectNonceCompleter!.future
-          .timeout(const Duration(seconds: 2));
+          .timeout(const Duration(seconds: 12));
       await _sendConnect(nonce, target);
       // Keep connection alive until closed
       await completer.future;
@@ -254,8 +270,16 @@ class GatewaySession {
         case 'event':
           _handleEvent(frame);
           break;
+        default:
+          break;
       }
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('gateway: frame decode error: $e');
+      debugPrint('$st');
+      final preview =
+          text.length > 200 ? '${text.substring(0, 200)}...' : text;
+      debugPrint('gateway: frame preview: $preview');
+    }
   }
 
   void _handleResponse(Map<String, dynamic> frame) {

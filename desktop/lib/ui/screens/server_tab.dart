@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../models/gateway_profile.dart';
 import '../../providers/app_state.dart';
 import 'model_config_screen.dart';
 
@@ -79,6 +80,53 @@ class _ServerTabState extends State<ServerTab> {
                           isConnected: isConnected,
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Gateway',
+                      style: theme.textTheme.titleSmall
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 8),
+                    SegmentedButton<GatewayProfile>(
+                      segments: const [
+                        ButtonSegment<GatewayProfile>(
+                          value: GatewayProfile.openclaw,
+                          label: Text('OpenClaw'),
+                          tooltip:
+                              'OpenClaw-compatible gateway (default port 18789)',
+                        ),
+                        ButtonSegment<GatewayProfile>(
+                          value: GatewayProfile.hiclaw,
+                          label: Text('HiClaw'),
+                          tooltip: 'HiClaw server (default port 10724)',
+                        ),
+                      ],
+                      emptySelectionAllowed: false,
+                      showSelectedIcon: false,
+                      selected: {appState.gatewayProfile},
+                      onSelectionChanged:
+                          (Set<GatewayProfile> selection) async {
+                        if (isConnected) return;
+                        final app = context.read<AppState>();
+                        await app.updateConnectionSettings(
+                          gatewayProfile: selection.first,
+                        );
+                        if (!context.mounted) return;
+                        setState(() {
+                          _hostController.text = app.host;
+                          _portController.text = app.port.toString();
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      appState.gatewayProfile == GatewayProfile.openclaw
+                          ? 'Uses OpenClaw v3 connect scopes and UI client mode; default 127.0.0.1:18789.'
+                          : 'HiClaw server with OpenClaw-aligned protocol; default port 10724.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurface.withOpacity(0.65),
+                      ),
                     ),
                     const SizedBox(height: 20),
                     Row(

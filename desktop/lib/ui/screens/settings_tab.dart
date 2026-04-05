@@ -74,6 +74,58 @@ class SettingsTab extends StatelessWidget {
                   children: [
                     Row(
                       children: [
+                        Icon(Icons.pets,
+                            size: 20, color: colorScheme.primary),
+                        const SizedBox(width: 8),
+                        Text('Avatar',
+                            style: theme.textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Separate desktop window (stays visible when the main window is minimized). Reacts to gateway avatar.command; drag to move.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: colorScheme.onSurface.withOpacity(0.65),
+                        height: 1.35,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Show floating avatar window'),
+                      subtitle: const Text(
+                        'When connected, opens an always-on-top pet window',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      value: appState.showAvatarOverlay,
+                      onChanged: (v) => appState.setShowAvatarOverlay(v),
+                    ),
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Speak assistant replies'),
+                      subtitle: const Text(
+                        'Read the assistant message aloud when a turn completes',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      value: appState.speakAssistantReplies,
+                      onChanged: (v) => appState.setSpeakAssistantReplies(v),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
                         Icon(Icons.keyboard,
                             size: 20, color: colorScheme.primary),
                         const SizedBox(width: 8),
@@ -118,6 +170,12 @@ class SettingsTab extends StatelessWidget {
                     _CapabilityRow(
                       icon: Icons.chat,
                       label: 'Chat',
+                      status: _CapabilityStatus.supported,
+                    ),
+                    const SizedBox(height: 8),
+                    _CapabilityRow(
+                      icon: Icons.pets,
+                      label: 'Avatar (gateway events)',
                       status: _CapabilityStatus.supported,
                     ),
                     const SizedBox(height: 8),

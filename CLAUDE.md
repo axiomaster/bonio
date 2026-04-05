@@ -63,6 +63,18 @@ cd desktop && flutter build macos
 
 Requires Flutter SDK >=3.2.0. Cross-platform (Windows + macOS) via single Flutter codebase.
 
+**Desktop TTS (avatar commands)**
+
+- Avatar `tts` / `stopTts` use [`desktop/lib/services/desktop_tts.dart`](desktop/lib/services/desktop_tts.dart): **no** `flutter_tts` native plugin (avoids Windows CMake/NuGet). Speech is implemented with **PowerShell + System.Speech** on Windows, **`say`** on macOS, and **`spd-say` / `espeak-ng` / `espeak`** on Linux when available in `PATH`.
+- Assistant reply **speech** (when enabled in Settings) uses the same `DesktopTts` after each completed chat turn (`ChatController` → `onAssistantReplyForTts`), so OpenClaw does not need to emit `avatar.command` for basic read-aloud.
+- The pet is shown in a **second OS window** via [`desktop_multi_window`](desktop/pubspec.yaml) + [`window_manager`](desktop/pubspec.yaml) (see [`desktop/lib/main.dart`](desktop/lib/main.dart), [`desktop/lib/avatar_window_app.dart`](desktop/lib/avatar_window_app.dart)), so it stays visible when the main BoJi window is minimized. State is pushed from [`AvatarController`](desktop/lib/services/avatar_controller.dart) with `invokeMethod('sync', …)`; drag deltas go back through `avatarPan` on the main window controller.
+
+**Desktop STT (voice input)**
+
+- Uses **Sherpa-ONNX streaming paraformer** (bilingual zh-en), same engine as Android's `SherpaOnnxSpeechManager`. Architecture mirrors Android's `SpeechToTextManager` → `SherpaOnnxSpeechManager` with unified `SpeechToTextListener` callback interface (partial, final, error, ready, end).
+- Audio capture via [`record`](desktop/pubspec.yaml) package (PCM16, 16 kHz, mono) → `sherpa_onnx` FFI `OnlineRecognizer` with endpoint detection.
+- Model files (`encoder.int8.onnx`, `decoder.int8.onnx`, `tokens.txt`) must be placed next to the executable. Download with `powershell -ExecutionPolicy Bypass -File tool/download_model.ps1`.
+
 ## Architecture
 
 ### Server (HiClaw)

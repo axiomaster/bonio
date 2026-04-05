@@ -48,6 +48,37 @@ static std::string get_string(const json& j, const char* key) {
   return j[key].get<std::string>();
 }
 
+/// OpenClaw-style connect: token/password may be under `auth` or top-level in `params`.
+static std::string connect_auth_token(const json& params) {
+  if (params.contains("auth") && params["auth"].is_object()) {
+    const auto& a = params["auth"];
+    if (a.contains("token") && a["token"].is_string()) return a["token"].get<std::string>();
+  }
+  if (params.contains("token") && params["token"].is_string()) return params["token"].get<std::string>();
+  return "";
+}
+
+static std::string connect_auth_password(const json& params) {
+  if (params.contains("auth") && params["auth"].is_object()) {
+    const auto& a = params["auth"];
+    if (a.contains("password") && a["password"].is_string()) return a["password"].get<std::string>();
+  }
+  if (params.contains("password") && params["password"].is_string()) return params["password"].get<std::string>();
+  return "";
+}
+
+static bool connect_protocol_supported(const json& params) {
+  int min_p = 3;
+  int max_p = 3;
+  if (params.contains("minProtocol") && params["minProtocol"].is_number_integer()) {
+    min_p = params["minProtocol"].get<int>();
+  }
+  if (params.contains("maxProtocol") && params["maxProtocol"].is_number_integer()) {
+    max_p = params["maxProtocol"].get<int>();
+  }
+  return min_p <= 3 && max_p >= 3;
+}
+
 static std::string sanitize_utf8(const std::string& input) {
   std::string out;
   out.reserve(input.size());
@@ -105,26 +136,56 @@ std::string gateway_handle_frame(const std::string& frame,
   }
 
   if (method == "connect") {
-    bool auth_ok = pairing_code.empty();
-    if (!auth_ok) {
-      try {
-        json j = json::parse(frame);
-        if (j.contains("params") && j["params"].is_object()) {
-          std::string pw = get_string(j["params"], "password");
-          if (pw == pairing_code) auth_ok = true;
-          if (!auth_ok) { std::string tok = get_string(j["params"], "token"); if (tok == pairing_code) auth_ok = true; }
-        }
-      } catch (const json::parse_error&) {}
-    }
-    connected = auth_ok;
     json res;
     res["type"] = "res";
     res["id"] = id;
-    res["ok"] = auth_ok;
-    if (auth_ok) {
-      res["payload"] = {{"server", {{"host", "hiclaw"}}}, {"snapshot", {{"sessionDefaults", {{"mainSessionKey", "main"}}}}}};
-    } else {
-      res["error"] = {{"code", "AUTH_FAILED"}, {"message", "Invalid pairing code or token"}};
+    try {
+      json j = json::parse(frame);
+      json params = json::object();
+      if (j.contains("params") && j["params"].is_object()) {
+        params = j["params"];
+      }
+      if (!connect_protocol_supported(params)) {
+        res["ok"] = false;
+        res["error"] = {{"code", "INVALID_REQUEST"}, {"message", "protocol version mismatch"}};
+        return res.dump();
+      }
+
+      bool auth_ok = pairing_code.empty();
+      if (!auth_ok) {
+        std::string pw = connect_auth_password(params);
+        std::string tok = connect_auth_token(params);
+        if (!pw.empty() && pw == pairing_code) auth_ok = true;
+        if (!auth_ok && !tok.empty() && tok == pairing_code) auth_ok = true;
+      }
+
+      connected = auth_ok;
+      res["ok"] = auth_ok;
+      if (auth_ok) {
+        // OpenClaw hello-compatible payload (v3)
+        json policy;
+        policy["tickIntervalMs"] = 30000;
+        json features = json::object();
+        json server_obj;
+        server_obj["host"] = "hiclaw";
+        server_obj["name"] = "HiClaw";
+        json snapshot;
+        snapshot["sessionDefaults"] = {{"mainSessionKey", "main"}};
+        res["payload"] = {
+            {"type", "hello"},
+            {"protocol", 3},
+            {"server", server_obj},
+            {"features", features},
+            {"snapshot", snapshot},
+            {"canvasHostUrl", nullptr},
+            {"policy", policy},
+        };
+      } else {
+        res["error"] = {{"code", "AUTH_FAILED"}, {"message", "Invalid pairing code or token"}};
+      }
+    } catch (const json::parse_error&) {
+      res["ok"] = false;
+      res["error"] = {{"code", "BAD_REQUEST"}, {"message", "invalid JSON"}};
     }
     return res.dump();
   }
