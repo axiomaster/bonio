@@ -444,11 +444,11 @@ class ChatController extends ChangeNotifier {
   }
 
   Future<void> _fetchHistoryAndMerge() async {
+    final streamingText = _streamingAssistantText;
     try {
       final historyJson = await session.request(
           'chat.history', jsonEncode({'sessionKey': _sessionKey}));
       final history = _parseHistory(historyJson);
-      final streamingText = _streamingAssistantText;
 
       if (history.messages.isNotEmpty &&
           history.messages.length >= _messages.length) {
@@ -475,19 +475,43 @@ class ChatController extends ChangeNotifier {
       }
       notifyListeners();
       _maybeSpeakAssistantAfterMerge();
-    } catch (_) {
+    } catch (e) {
+      debugPrint('ChatController: _fetchHistoryAndMerge failed: $e');
+      // Still attempt TTS with whatever streaming text we captured.
+      if (streamingText != null && streamingText.isNotEmpty) {
+        _messages = [
+          ..._messages,
+          ChatMessage(
+            id: _uuid.v4(),
+            role: 'assistant',
+            content: [ChatMessageContent(type: 'text', text: streamingText)],
+            timestampMs: DateTime.now().millisecondsSinceEpoch,
+          ),
+        ];
+      }
       _streamingAssistantText = null;
       notifyListeners();
+      _maybeSpeakAssistantAfterMerge();
     }
   }
 
   void _maybeSpeakAssistantAfterMerge() {
-    if (!_ttsAfterChatFinal) return;
+    if (!_ttsAfterChatFinal) {
+      debugPrint('ChatController: TTS skipped (_ttsAfterChatFinal=false)');
+      return;
+    }
     _ttsAfterChatFinal = false;
     final text = _lastAssistantPlainText();
-    if (text.isEmpty) return;
-    if (text == _lastAssistantTtsDigest) return;
+    if (text.isEmpty) {
+      debugPrint('ChatController: TTS skipped (empty assistant text)');
+      return;
+    }
+    if (text == _lastAssistantTtsDigest) {
+      debugPrint('ChatController: TTS skipped (duplicate digest)');
+      return;
+    }
     _lastAssistantTtsDigest = text;
+    debugPrint('ChatController: triggering TTS (${text.length} chars)');
     onAssistantReplyForTts?.call(text);
   }
 

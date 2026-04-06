@@ -83,6 +83,7 @@ class DesktopTts {
   }
 
   Future<void> _speakMacOS(String text) async {
+    debugPrint('DesktopTts: macOS say starting (${text.length} chars)');
     final dir = await Directory.systemTemp.createTemp('boji_tts_');
     final txt = File('${dir.path}${Platform.pathSeparator}say.txt');
     await txt.writeAsString(text, encoding: utf8);
@@ -92,7 +93,8 @@ class DesktopTts {
         ['-f', txt.path],
         mode: ProcessStartMode.normal,
       );
-      await _process!.exitCode;
+      final exitCode = await _process!.exitCode;
+      debugPrint('DesktopTts: macOS say finished (exit=$exitCode)');
     } catch (e, st) {
       debugPrint('DesktopTts macOS: $e\n$st');
     } finally {

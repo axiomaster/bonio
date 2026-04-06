@@ -21,6 +21,21 @@ import 'chat_controller.dart';
 import 'camera_service.dart';
 import 'desktop_tts.dart';
 
+/// On macOS, `localhost` often resolves to IPv6 (`::1`) while a local OpenClaw
+/// gateway may listen on IPv4 only (`127.0.0.1`), causing connection failures
+/// that do not reproduce on Windows. Prefer explicit IPv4 loopback for WS.
+String _normalizeGatewayHost(String host) {
+  final t = host.trim();
+  if (t.isEmpty) return t;
+  switch (t.toLowerCase()) {
+    case 'localhost':
+    case '::1':
+      return '127.0.0.1';
+    default:
+      return t;
+  }
+}
+
 class NodeRuntime extends ChangeNotifier {
   final DeviceIdentityStore identityStore;
   final DeviceAuthStore deviceAuthStore;
@@ -98,13 +113,20 @@ class NodeRuntime extends ChangeNotifier {
   }
 
   void _onAssistantReplyForTts(String text) {
-    if (!speakAssistantReplies) return;
+    if (!speakAssistantReplies) {
+      debugPrint('NodeRuntime: TTS disabled by user setting');
+      return;
+    }
+    debugPrint('NodeRuntime: TTS speaking (${text.length} chars)');
     _avatarTtsSpeaking = true;
     avatarController.setActivity(AgentAvatarActivity.speaking);
     avatarController.setBubble(text: text);
     unawaited(() async {
       try {
         await desktopTts.speak(text);
+        debugPrint('NodeRuntime: TTS finished');
+      } catch (e) {
+        debugPrint('NodeRuntime: TTS error: $e');
       } finally {
         _avatarTtsSpeaking = false;
         avatarController.clearBubble();
@@ -165,6 +187,9 @@ class NodeRuntime extends ChangeNotifier {
       _avatarWindowController = await WindowController.create(
         WindowConfiguration(
           hiddenAtLaunch: true,
+          borderless: true,
+          width: AvatarSnapshot.kFloatingWindowSize.width,
+          height: AvatarSnapshot.kFloatingWindowSize.height,
           arguments: jsonEncode({
             'bojiWindow': 'avatar',
             'mainWindowId': main.windowId,
@@ -207,7 +232,7 @@ class NodeRuntime extends ChangeNotifier {
     String? password,
     bool tls = false,
   }) {
-    final endpoint = GatewayEndpoint.manual(host, port);
+    final endpoint = GatewayEndpoint.manual(_normalizeGatewayHost(host), port);
 
     final operatorOptions = GatewayConnectOptions(
       role: 'operator',

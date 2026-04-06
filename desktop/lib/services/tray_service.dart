@@ -14,7 +14,7 @@ class TrayService {
   Future<void> init() async {
     const iconPath = 'assets/app_icon.ico';
     await _systemTray.initSystemTray(
-      title: 'BoJi',
+      title: '',
       iconPath: iconPath,
       toolTip: 'BoJi Desktop',
     );

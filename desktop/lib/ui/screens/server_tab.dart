@@ -71,13 +71,24 @@ class _ServerTabState extends State<ServerTab> {
                         Icon(Icons.link,
                             size: 20, color: colorScheme.primary),
                         const SizedBox(width: 8),
-                        Text('Gateway Connection',
+                        Expanded(
+                          child: Text(
+                            'Gateway Connection',
                             style: theme.textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w600)),
-                        const Spacer(),
-                        _StatusChip(
-                          label: runtime.connectionStatus,
-                          isConnected: isConnected,
+                                ?.copyWith(fontWeight: FontWeight.w600),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          flex: 2,
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: _StatusChip(
+                              label: runtime.connectionStatus,
+                              isConnected: isConnected,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -330,7 +341,6 @@ class _StatusChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
             width: 6,
@@ -338,12 +348,16 @@ class _StatusChip extends StatelessWidget {
             decoration: BoxDecoration(shape: BoxShape.circle, color: color),
           ),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: color,
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: color,
+              ),
             ),
           ),
         ],

@@ -223,28 +223,30 @@ class _ChatMessageList extends StatefulWidget {
 
 class _ChatMessageListState extends State<_ChatMessageList> {
   final ScrollController _scrollController = ScrollController();
-  bool _autoScroll = true;
+  bool _stickToBottom = true;
 
   @override
   void initState() {
     super.initState();
-    _scrollController.addListener(() {
-      if (_scrollController.hasClients) {
-        final atBottom = _scrollController.offset >=
-            _scrollController.position.maxScrollExtent - 50;
-        _autoScroll = atBottom;
-      }
-    });
+    _scrollController.addListener(_onScrollChanged);
+  }
+
+  void _onScrollChanged() {
+    if (_scrollController.hasClients) {
+      // reverse list: offset 0 = bottom (newest). User scrolled up ⟹ offset > 0.
+      _stickToBottom = _scrollController.offset <= 50;
+    }
   }
 
   @override
   void didUpdateWidget(_ChatMessageList oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (_autoScroll) {
+    if (_stickToBottom) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scrollController.hasClients) {
+        if (!mounted || !_scrollController.hasClients) return;
+        if (_scrollController.offset > 0.1) {
           _scrollController.animateTo(
-            _scrollController.position.maxScrollExtent,
+            0,
             duration: const Duration(milliseconds: 100),
             curve: Curves.easeOut,
           );
@@ -287,12 +289,17 @@ class _ChatMessageListState extends State<_ChatMessageList> {
       );
     }
 
+    // reverse: true makes offset 0 = bottom (newest messages).
+    // Items are rendered bottom-to-top, so we reverse the list.
+    final reversed = allItems.reversed.toList();
+
     return ListView.builder(
       controller: _scrollController,
+      reverse: true,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      itemCount: allItems.length,
+      itemCount: reversed.length,
       itemBuilder: (context, index) {
-        final item = allItems[index];
+        final item = reversed[index];
         return _MessageBubble(
           message: item.message,
           isStreaming: item.isStreaming,

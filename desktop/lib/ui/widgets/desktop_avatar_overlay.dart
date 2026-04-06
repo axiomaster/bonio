@@ -76,12 +76,16 @@ class DesktopAvatarView extends StatefulWidget {
   /// [windowManager.startDragging] so the OS moves the window flicker-free.
   final bool isFloatingWindow;
 
+  /// Flip the cat horizontally so it faces left (e.g. walking leftward).
+  final bool facingLeft;
+
   const DesktopAvatarView({
     super.key,
     required this.snapshot,
     this.onPanUpdate,
     this.onAvatarTap,
     this.isFloatingWindow = false,
+    this.facingLeft = false,
   });
 
   @override
@@ -95,7 +99,10 @@ class _DesktopAvatarViewState extends State<DesktopAvatarView> {
   void initState() {
     super.initState();
     DesktopAvatarTheme.load().then((t) {
+      debugPrint('AvatarView: theme loaded (${t.toString()})');
       if (mounted) setState(() => _theme = t);
+    }).catchError((e) {
+      debugPrint('AvatarView: theme load FAILED: $e');
     });
   }
 
@@ -122,14 +129,25 @@ class _DesktopAvatarViewState extends State<DesktopAvatarView> {
       fit: BoxFit.contain,
       repeat: true,
       addRepaintBoundary: !widget.isFloatingWindow,
-      errorBuilder: (_, __, ___) => _fallbackAvatar(context, tint, primary),
+      errorBuilder: (_, error, ___) {
+        debugPrint('AvatarView: Lottie error for "$asset": $error');
+        return _fallbackAvatar(context, tint, primary);
+      },
     );
 
-    final avatarCore = widget.isFloatingWindow
+    Widget avatarCore = widget.isFloatingWindow
         ? SizedBox(width: visual, height: visual, child: lottie)
         : RepaintBoundary(
             child: SizedBox(width: visual, height: visual, child: lottie),
           );
+
+    if (widget.facingLeft) {
+      avatarCore = Transform(
+        alignment: Alignment.center,
+        transform: Matrix4.identity()..scale(-1.0, 1.0),
+        child: avatarCore,
+      );
+    }
 
     final avatarStack = Stack(
       clipBehavior: Clip.none,
@@ -224,11 +242,13 @@ class _DesktopAvatarViewState extends State<DesktopAvatarView> {
     // Floating avatar: anchor at the bottom-center so the bubble grows upward
     // from the cat.  Avoid Material (extra composited layer on transparent HWND).
     if (widget.isFloatingWindow) {
-      return Align(
-        alignment: Alignment.bottomCenter,
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: AvatarSnapshot.kFloatingWindowPadding),
-          child: content,
+      return ClipRect(
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: AvatarSnapshot.kFloatingWindowPadding),
+            child: content,
+          ),
         ),
       );
     }
