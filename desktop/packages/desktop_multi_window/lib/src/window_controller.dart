@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -55,6 +56,18 @@ class WindowController {
     return WindowController._(windowId, windowArgument);
   }
 
+  /// Returns main screen metrics (macOS only).
+  ///
+  /// Keys: screenWidth, screenHeight, visibleX, visibleY, visibleWidth, visibleHeight.
+  /// macOS coordinates: origin is bottom-left. visibleFrame excludes Dock and menu bar.
+  static Future<Map<String, double>?> getScreenInfo() async {
+    final result =
+        await _channel.invokeMethod<Map<dynamic, dynamic>>('getScreenInfo');
+    if (result == null) return null;
+    return result
+        .map((k, v) => MapEntry(k.toString(), (v as num).toDouble()));
+  }
+
   static Future<List<WindowController>> getAll() async {
     final result = await _channel.invokeMethod<List<dynamic>>('getAllWindows');
     if (result == null) {
@@ -83,6 +96,36 @@ class WindowController {
   Future<void> show() => _callWindowMethod('window_show', {});
 
   Future<void> hide() => _callWindowMethod('window_hide', {});
+
+  /// Set window position in Flutter coordinates (y=0 at top of screen).
+  Future<void> setPosition(Offset pos) =>
+      _callWindowMethod('window_setPosition', {'x': pos.dx, 'y': pos.dy});
+
+  /// Get window position in Flutter coordinates (y=0 at top of screen).
+  Future<Offset> getPosition() async {
+    final result = await _channel.invokeMethod<Map<dynamic, dynamic>>(
+      'window_getPosition',
+      {'windowId': windowId},
+    );
+    return Offset(
+      (result?['x'] as num?)?.toDouble() ?? 0,
+      (result?['y'] as num?)?.toDouble() ?? 0,
+    );
+  }
+
+  /// Start native window drag using the current event.
+  Future<void> startDragging() =>
+      _callWindowMethod('window_startDragging', {});
+
+  /// Get Dock info from the screen this window is on.
+  Future<Map<String, dynamic>?> getDockInfo() async {
+    final result = await _channel.invokeMethod<Map<dynamic, dynamic>>(
+      'window_getDockInfo',
+      {'windowId': windowId},
+    );
+    if (result == null) return null;
+    return result.cast<String, dynamic>();
+  }
 
   @optionalTypeArgs
   Future<T?> invokeMethod<T>(String method, [dynamic arguments]) =>

@@ -65,6 +65,24 @@ public class FlutterMultiWindowPlugin: NSObject, FlutterPlugin {
         case "getAllWindows":
             let windows = MultiWindowManager.shared.getAllWindows()
             result(windows)
+        case "getScreenInfo":
+            if let screen = NSScreen.main {
+                let f = screen.frame
+                let v = screen.visibleFrame
+
+                let info: [String: Double] = [
+                    "screenWidth": f.size.width,
+                    "screenHeight": f.size.height,
+                    "visibleX": v.origin.x,
+                    "visibleY": v.origin.y,
+                    "visibleWidth": v.size.width,
+                    "visibleHeight": v.size.height,
+                ]
+
+                result(info)
+            } else {
+                result(FlutterError(code: "-1", message: "No main screen", details: nil))
+            }
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -108,7 +126,16 @@ class MultiWindowManager: NSObject {
         project.dartEntrypointArguments = ["multi_window", windowId, config.arguments]
         let flutterViewController = FlutterViewController(project: project)
         window.contentViewController = flutterViewController
-        window.setFrame(NSRect(x: 0, y: 0, width: 96, height: 96), display: true)
+        let w = config.width > 0 ? config.width : 96.0
+        let h = config.height > 0 ? config.height : 96.0
+        window.setFrame(NSRect(x: 0, y: 0, width: w, height: h), display: true)
+        window.center()
+
+        if config.borderless {
+            flutterViewController.backgroundColor = .clear
+            window.contentView?.wantsLayer = true
+            window.contentView?.layer?.backgroundColor = CGColor.clear
+        }
 
         window.orderFront(nil)
         window.setIsVisible(!config.hiddenAtLaunch)

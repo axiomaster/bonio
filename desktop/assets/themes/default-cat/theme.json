@@ -1,7 +1,7 @@
 {
   "id": "default-cat",
   "name": "Default Cat",
-  "version": "2.1",
+  "version": "2.2",
   "description": "Default cat avatar theme with Lottie animations for different agent states",
 
   "states": {
@@ -10,10 +10,10 @@
     "sleeping":  "cat-sleeping.lottie",
     "listening": "cat-listening.lottie",
     "thinking":  "cat-thinking.lottie",
-    "speaking":  "cat-speaking.lottie",
+    "speaking":  "cat-happy.lottie",
     "working":   "cat-working.lottie",
     "happy":     "cat-happy.lottie",
-    "confused":  "cat-confused.lottie",
+    "confused":  "cat-bored.lottie",
     "angry":     "cat-angry.lottie",
     "watching":  "cat-watching.lottie"
   },
@@ -42,7 +42,7 @@
     "disappear":             "cat-disappear.lottie",
     "idle_to_listening":     "cat-idle-to-listening.lottie",
     "listening_to_thinking": "cat-thinking.lottie",
-    "thinking_to_speaking":  "cat-speaking.lottie",
+    "thinking_to_speaking":  "cat-happy.lottie",
     "speaking_to_idle":      "cat-idle.lottie",
     "idle_to_working":       "cat-working.lottie",
     "working_to_idle":       "cat-idle.lottie",
@@ -53,5 +53,30 @@
     "startdrag":             "cat-startdrag.lottie",
     "enddrag":               "cat-enddrag.lottie",
     "error_shake":           "cat-error-shake.lottie"
+  },
+
+  "bottomInsets": {
+    "default":                  10,
+    "cat-idle.lottie":          18,
+    "cat-sleeping.lottie":      18,
+    "cat-listening.lottie":     18,
+    "cat-idle-to-listening.lottie": 18,
+    "cat-thinking.lottie":      8,
+    "cat-speaking.lottie":      5,
+    "cat-happy.lottie":         13,
+    "cat-confused.lottie":      5,
+    "cat-bored.lottie":         22,
+    "cat-watching.lottie":      25,
+    "cat-appear.lottie":        25,
+    "cat-working.lottie":       14,
+    "cat-typing.lottie":        14,
+    "cat-take-photo.lottie":    10,
+    "cat-walking.lottie":       10,
+    "cat-running.lottie":       0,
+    "cat-angry.lottie":         10,
+    "cat-dragging.lottie":      10,
+    "cat-startdrag.lottie":     10,
+    "cat-enddrag.lottie":      10,
+    "cat-error-shake.lottie":   10
   }
 }

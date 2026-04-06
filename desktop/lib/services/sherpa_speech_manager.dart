@@ -5,7 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 
-import '../platform/win32_microphone.dart';
+import '../platform/microphone.dart';
 import 'speech_to_text_manager.dart';
 
 /// Model directory name (same as Android's `MODEL_DIR` constant).
@@ -26,16 +26,22 @@ class SherpaOnnxSpeechManager {
   bool _running = false;
   bool _cancelled = false;
   SpeechToTextListener? _listener;
-  Win32Microphone? _mic;
+  PlatformMicrophone? _mic;
   StreamSubscription<Uint8List>? _audioSub;
 
   bool get isModelReady => _modelReady;
 
   // ── Model loading ──────────────────────────────────────────────────────
 
-  /// Resolve the model directory next to the running executable.
+  /// Resolve the model directory.
+  /// - Windows: next to the executable (Contents/MacOS equivalent).
+  /// - macOS: inside Contents/Resources (avoids codesign issues with .onnx in MacOS/).
   String _modelBasePath() {
     final exeDir = File(Platform.resolvedExecutable).parent.path;
+    if (Platform.isMacOS) {
+      final contentsDir = Directory(exeDir).parent.path;
+      return '$contentsDir${Platform.pathSeparator}Resources${Platform.pathSeparator}$_kModelDir';
+    }
     return '$exeDir${Platform.pathSeparator}$_kModelDir';
   }
 
@@ -99,7 +105,7 @@ class SherpaOnnxSpeechManager {
     }
 
     final stream = _recognizer!.createStream();
-    _mic = Win32Microphone();
+    _mic = PlatformMicrophone();
 
     try {
       final audioStream = _mic!.start();

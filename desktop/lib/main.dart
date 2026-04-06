@@ -126,17 +126,22 @@ class _BoJiDesktopAppState extends State<BoJiDesktopApp> with WindowListener {
     super.dispose();
   }
 
+  bool _exiting = false;
+
   /// Close button → hide to tray (avatar stays visible).
   @override
   void onWindowClose() {
+    if (_exiting) return;
     windowManager.hide();
   }
 
   /// Tray "Exit" → truly quit (close avatar + destroy main).
   Future<void> _realExit() async {
-    _appState.runtime.syncAvatarFloatingWindow(show: false);
+    if (_exiting) return;
+    _exiting = true;
+    await _appState.runtime.syncAvatarFloatingWindow(show: false);
     await windowManager.setPreventClose(false);
-    await windowManager.close();
+    await windowManager.destroy();
   }
 
   @override

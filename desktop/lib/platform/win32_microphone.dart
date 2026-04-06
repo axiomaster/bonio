@@ -5,6 +5,8 @@ import 'dart:typed_data';
 import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
 
+import 'microphone.dart';
+
 // ── Win32 waveIn constants ────────────────────────────────────────────────────
 const int _WAVE_FORMAT_PCM = 0x0001;
 const int _CALLBACK_NULL = 0x00000000;
@@ -69,29 +71,29 @@ typedef _WaveInHdrNative = Uint32 Function(
 typedef _WaveInHdrDart = int Function(
     int hwi, Pointer<_WAVEHDR> pwh, int cbwh);
 
-// ── Loaded Win32 functions ──────────────────────────────────────────────────
+// ── Loaded Win32 functions (lazy to avoid crash on non-Windows) ─────────────
 
-final _winmm = DynamicLibrary.open('winmm.dll');
+late final DynamicLibrary _winmm = DynamicLibrary.open('winmm.dll');
 
-final _waveInOpen =
+late final _waveInOpen =
     _winmm.lookupFunction<_WaveInOpenNative, _WaveInOpenDart>('waveInOpen');
-final _waveInPrepareHeader =
+late final _waveInPrepareHeader =
     _winmm.lookupFunction<_WaveInHdrNative, _WaveInHdrDart>(
         'waveInPrepareHeader');
-final _waveInUnprepareHeader =
+late final _waveInUnprepareHeader =
     _winmm.lookupFunction<_WaveInHdrNative, _WaveInHdrDart>(
         'waveInUnprepareHeader');
-final _waveInAddBuffer =
+late final _waveInAddBuffer =
     _winmm.lookupFunction<_WaveInHdrNative, _WaveInHdrDart>('waveInAddBuffer');
-final _waveInStart =
+late final _waveInStart =
     _winmm.lookupFunction<_WaveInSimpleNative, _WaveInSimpleDart>(
         'waveInStart');
-final _waveInStop =
+late final _waveInStop =
     _winmm.lookupFunction<_WaveInSimpleNative, _WaveInSimpleDart>('waveInStop');
-final _waveInReset =
+late final _waveInReset =
     _winmm.lookupFunction<_WaveInSimpleNative, _WaveInSimpleDart>(
         'waveInReset');
-final _waveInClose =
+late final _waveInClose =
     _winmm.lookupFunction<_WaveInSimpleNative, _WaveInSimpleDart>(
         'waveInClose');
 
@@ -102,7 +104,7 @@ final _waveInClose =
 /// Uses Win32 waveIn API via dart:ffi with CALLBACK_NULL (polling mode) —
 /// no native-thread callbacks that would crash the Dart VM, and no Flutter
 /// platform channels, so it works correctly with multiple Flutter engines.
-class Win32Microphone {
+class Win32Microphone implements PlatformMicrophone {
   static const int _sampleRate = 16000;
   static const int _channels = 1;
   static const int _bitsPerSample = 16;
