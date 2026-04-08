@@ -15,6 +15,7 @@ class AvatarSnapshot {
   final int? colorArgb;
   final String gesture;
   final bool isMoving;
+  final bool showInput;
 
   const AvatarSnapshot({
     required this.posX,
@@ -28,6 +29,7 @@ class AvatarSnapshot {
     this.colorArgb,
     required this.gesture,
     required this.isMoving,
+    this.showInput = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -42,6 +44,7 @@ class AvatarSnapshot {
         'colorArgb': colorArgb,
         'gesture': gesture,
         'isMoving': isMoving,
+        'showInput': showInput,
       };
 
   factory AvatarSnapshot.fromJson(Map<String, dynamic> m) {
@@ -57,6 +60,7 @@ class AvatarSnapshot {
       colorArgb: (m['colorArgb'] as num?)?.toInt(),
       gesture: m['gesture'] as String? ?? 'none',
       isMoving: m['isMoving'] as bool? ?? false,
+      showInput: m['showInput'] as bool? ?? false,
     );
   }
 
@@ -84,5 +88,11 @@ class AvatarSnapshot {
   static const kFloatingWindowSize = Size(
     220 + kFloatingWindowPadding * 2,
     72 + _kBubbleMaxHeight + kFloatingWindowPadding * 2,
+  );
+
+  static const kInputFieldHeight = 100.0;
+  static const kFloatingWindowSizeWithInput = Size(
+    220 + kFloatingWindowPadding * 2,
+    72 + _kBubbleMaxHeight + kInputFieldHeight + kFloatingWindowPadding * 2,
   );
 }

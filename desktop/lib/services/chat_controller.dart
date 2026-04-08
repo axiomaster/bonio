@@ -17,6 +17,11 @@ class ChatController extends ChangeNotifier {
   String _thinkingLevel = 'off';
   int _pendingRunCount = 0;
   String? _streamingAssistantText;
+
+  /// Locally-sent image attachments indexed by message text digest.
+  /// Server history doesn't return raw image data, so we preserve them here
+  /// and re-attach when merging server history.
+  final Map<String, List<ChatMessageContent>> _localImageAttachments = {};
   List<ChatPendingToolCall> _pendingToolCalls = [];
   List<ChatSessionEntry> _sessions = [];
 
@@ -24,6 +29,15 @@ class ChatController extends ChangeNotifier {
   final Map<String, Timer> _pendingRunTimeouts = {};
   final Map<String, ChatPendingToolCall> _pendingToolCallsById = {};
   static const _pendingRunTimeoutMs = 120000;
+
+  /// RunIds that arrived in a `final`/`aborted`/`error` event before the
+  /// `chat.send` RPC response mapped them into [_pendingRuns].
+  final Set<String> _completedRunIds = {};
+
+  /// Client-side runIds whose `chat.send` RPC is still in flight.
+  /// Prevents duplicate sends and allows early-final cleanup.
+  final Set<String> _inflightClientRunIds = {};
+
   int? _lastHealthPollAtMs;
 
   /// Spoken when the assistant finishes a reply (OpenClaw may not send `avatar.command` tts).
@@ -114,8 +128,26 @@ class ChatController extends ChangeNotifier {
     }
 
     final runId = _uuid.v4();
+    // Guard: skip if another send is already in flight with the same text
+    if (_inflightClientRunIds.isNotEmpty) {
+      debugPrint('ChatController: send skipped — another send is in flight');
+      return;
+    }
+    _inflightClientRunIds.add(runId);
+
     final text =
         trimmed.isEmpty && attachments.isNotEmpty ? 'See attached.' : trimmed;
+
+    final imageContents = attachments
+        .where((a) => a.type == 'image' || a.mimeType.startsWith('image/'))
+        .map((a) => ChatMessageContent(
+              type: a.type,
+              mimeType: a.mimeType,
+              fileName: a.fileName,
+              base64: a.base64,
+              durationMs: a.durationMs,
+            ))
+        .toList();
 
     final userContent = <ChatMessageContent>[
       ChatMessageContent(type: 'text', text: text),
@@ -127,6 +159,10 @@ class ChatController extends ChangeNotifier {
             durationMs: a.durationMs,
           )),
     ];
+
+    if (imageContents.isNotEmpty) {
+      _localImageAttachments[text] = imageContents;
+    }
 
     _messages = [
       ..._messages,
@@ -168,16 +204,28 @@ class ChatController extends ChangeNotifier {
             .toList();
       }
 
-      final res = await session.request('chat.send', jsonEncode(params));
+      final rpcTimeout = attachments.isNotEmpty ? 30000 : 15000;
+      final res = await session.request('chat.send', jsonEncode(params),
+          timeoutMs: rpcTimeout);
+      _inflightClientRunIds.remove(runId);
       final resObj = _tryParseJson(res);
       final actualRunId = resObj?['runId'] as String?;
 
       if (actualRunId != null) {
         if (actualRunId != runId) {
-          _clearPendingRun(runId);
-          _armPendingRunTimeout(actualRunId);
-          _pendingRuns.add(actualRunId);
-          _pendingRunCount = _pendingRuns.length;
+          // Server assigned a different runId. Swap the tracking.
+          _pendingRunTimeouts.remove(runId)?.cancel();
+          _pendingRuns.remove(runId);
+
+          if (_completedRunIds.remove(actualRunId)) {
+            // The final event already arrived — run is done.
+            debugPrint('ChatController: runId $actualRunId already completed');
+            _pendingRunCount = _pendingRuns.length;
+          } else {
+            _armPendingRunTimeout(actualRunId);
+            _pendingRuns.add(actualRunId);
+            _pendingRunCount = _pendingRuns.length;
+          }
           notifyListeners();
         }
       } else {
@@ -198,6 +246,7 @@ class ChatController extends ChangeNotifier {
         notifyListeners();
       }
     } catch (err) {
+      _inflightClientRunIds.remove(runId);
       _clearPendingRun(runId);
       _errorText = err.toString();
       notifyListeners();
@@ -269,7 +318,7 @@ class ChatController extends ChangeNotifier {
               _streamingAssistantText!.trim().isNotEmpty);
       if (history.messages.isNotEmpty) {
         if (!inFlight) {
-          _messages = history.messages;
+          _messages = _reattachLocalImages(history.messages);
           _sessionId = history.sessionId;
           if (history.thinkingLevel != null &&
               history.thinkingLevel!.trim().isNotEmpty) {
@@ -279,7 +328,7 @@ class ChatController extends ChangeNotifier {
           // Keep local tail (user bubble + streaming); still sync ids when server is ahead
           _sessionId = history.sessionId ?? _sessionId;
           if (history.messages.length > _messages.length) {
-            _messages = history.messages;
+            _messages = _reattachLocalImages(history.messages);
             if (history.thinkingLevel != null &&
                 history.thinkingLevel!.trim().isNotEmpty) {
               _thinkingLevel = history.thinkingLevel!;
@@ -373,7 +422,26 @@ class ChatController extends ChangeNotifier {
         }
         _ttsAfterChatFinal = state == 'final';
         if (runId != null) {
-          _clearPendingRun(runId);
+          if (_pendingRuns.contains(runId)) {
+            // Normal path: clear this specific run. Don't trigger the
+            // delayed _fetchHistoryAndMerge inside _clearPendingRun —
+            // we call it explicitly below.
+            _pendingRunTimeouts.remove(runId)?.cancel();
+            _pendingRuns.remove(runId);
+            _pendingRunCount = _pendingRuns.length;
+          } else {
+            // Race: final event arrived before chat.send RPC response.
+            // Record the runId so the RPC response handler won't re-add it.
+            // Do NOT call _clearPendingRuns() — that destroys _completedRunIds.
+            _completedRunIds.add(runId);
+            debugPrint('ChatController: early final for runId $runId, '
+                'inflight=${_inflightClientRunIds.length}');
+            // If no RPC is in flight, the client-side runId is already in
+            // _pendingRuns; clear it since the server is done.
+            if (_inflightClientRunIds.isEmpty) {
+              _clearPendingRuns();
+            }
+          }
         } else {
           _clearPendingRuns();
         }
@@ -452,7 +520,7 @@ class ChatController extends ChangeNotifier {
 
       if (history.messages.isNotEmpty &&
           history.messages.length >= _messages.length) {
-        _messages = history.messages;
+        _messages = _reattachLocalImages(history.messages);
         _sessionId = history.sessionId;
         if (history.thinkingLevel != null &&
             history.thinkingLevel!.trim().isNotEmpty) {
@@ -539,6 +607,27 @@ class ChatController extends ChangeNotifier {
     return null;
   }
 
+  /// Re-attach locally cached image attachments to server-fetched messages.
+  /// Server history only returns text content; we match by user message text.
+  List<ChatMessage> _reattachLocalImages(List<ChatMessage> messages) {
+    if (_localImageAttachments.isEmpty) return messages;
+    return messages.map((m) {
+      if (m.role != 'user') return m;
+      final text = m.textContent;
+      final images = _localImageAttachments[text];
+      if (images == null || images.isEmpty) return m;
+      final hasImage = m.content.any((c) =>
+          c.type == 'image' && c.base64 != null && c.base64!.isNotEmpty);
+      if (hasImage) return m;
+      return ChatMessage(
+        id: m.id,
+        role: m.role,
+        content: [...m.content, ...images],
+        timestampMs: m.timestampMs,
+      );
+    }).toList();
+  }
+
   ChatHistory _parseHistory(String historyJson) {
     final root = _tryParseJson(historyJson);
     if (root == null) {
@@ -620,7 +709,14 @@ class ChatController extends ChangeNotifier {
       () {
         if (_pendingRuns.contains(runId)) {
           _clearPendingRun(runId);
-          _errorText = 'Timed out waiting for a reply; try again or refresh.';
+          // If there's unsaved streaming text, merge it before timing out.
+          if (_streamingAssistantText != null &&
+              _streamingAssistantText!.trim().isNotEmpty) {
+            _ttsAfterChatFinal = true;
+            unawaited(_fetchHistoryAndMerge());
+          } else {
+            _errorText = 'Timed out waiting for a reply; try again or refresh.';
+          }
           notifyListeners();
         }
       },
@@ -631,15 +727,6 @@ class ChatController extends ChangeNotifier {
     _pendingRunTimeouts.remove(runId)?.cancel();
     _pendingRuns.remove(runId);
     _pendingRunCount = _pendingRuns.length;
-    // Some gateways end the run without a separate chat `final` event; merge + TTS anyway.
-    if (_pendingRuns.isEmpty &&
-        _streamingAssistantText != null &&
-        _streamingAssistantText!.trim().isNotEmpty) {
-      _ttsAfterChatFinal = true;
-      Future<void>.delayed(const Duration(milliseconds: 600), () {
-        unawaited(_fetchHistoryAndMerge());
-      });
-    }
   }
 
   void _clearPendingRuns() {
@@ -649,6 +736,8 @@ class ChatController extends ChangeNotifier {
     _pendingRunTimeouts.clear();
     _pendingRuns.clear();
     _pendingRunCount = 0;
+    _completedRunIds.clear();
+    _inflightClientRunIds.clear();
   }
 
   String _normalizeThinking(String raw) {

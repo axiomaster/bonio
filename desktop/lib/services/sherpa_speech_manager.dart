@@ -22,6 +22,7 @@ class SherpaOnnxSpeechManager {
   SherpaOnnxSpeechManager();
 
   sherpa.OnlineRecognizer? _recognizer;
+  sherpa.OnlineStream? _currentStream;
   bool _modelReady = false;
   bool _running = false;
   bool _cancelled = false;
@@ -105,6 +106,7 @@ class SherpaOnnxSpeechManager {
     }
 
     final stream = _recognizer!.createStream();
+    _currentStream = stream;
     _mic = PlatformMicrophone();
 
     try {
@@ -151,17 +153,7 @@ class SherpaOnnxSpeechManager {
           _listener?.onError(SttErrorCodes.audio);
         },
         onDone: () {
-          if (_running && !_cancelled) {
-            final result = _recognizer!.getResult(stream);
-            final text = result.text.trim();
-            if (text.isNotEmpty) {
-              _listener?.onFinalResult(text);
-            }
-          }
-          _running = false;
-          if (!_cancelled) {
-            _listener?.onEndOfSpeech();
-          }
+          _currentStream = null;
           stream.free();
         },
       );
@@ -172,16 +164,37 @@ class SherpaOnnxSpeechManager {
     }
   }
 
-  /// Stop recognition gracefully.
+  /// Stop recognition gracefully — delivers any accumulated partial text
+  /// as a final result before shutting down.
   void stopListening() {
+    if (!_running) return;
     _running = false;
+
+    // Grab accumulated text before stopping the mic, since _stopRecording
+    // cancels the audio subscription (onDone won't have _running == true).
+    final rec = _recognizer;
+    final stream = _currentStream;
+    String pending = '';
+    if (rec != null && stream != null) {
+      try {
+        final result = rec.getResult(stream);
+        pending = result.text.trim();
+      } catch (_) {}
+    }
+
     _stopRecording();
+
+    if (pending.isNotEmpty) {
+      _listener?.onFinalResult(pending);
+    }
+    _listener?.onEndOfSpeech();
   }
 
   /// Cancel without delivering a result.
   void cancelListening() {
     _cancelled = true;
     _running = false;
+    _currentStream = null;
     _stopRecording();
     _listener = null;
   }

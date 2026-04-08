@@ -539,6 +539,39 @@ RunResult run_streaming(const config::Config& config,
   return r;
 }
 
+/// Rewrite image_url parts for providers that don't accept the data URI prefix.
+/// ZhipuAI (bigmodel.cn) expects raw base64 in image_url.url, not "data:image/...;base64,...".
+static std::string adapt_image_urls_for_provider(const std::string& msg_json,
+                                                  const std::string& base_url) {
+  bool is_zhipu = base_url.find("bigmodel.cn") != std::string::npos;
+  if (!is_zhipu) return msg_json;
+
+  try {
+    json msg = json::parse(msg_json);
+    if (!msg.contains("content") || !msg["content"].is_array()) return msg_json;
+    bool changed = false;
+    for (auto& part : msg["content"]) {
+      if (!part.is_object()) continue;
+      if (part.value("type", "") != "image_url") continue;
+      if (!part.contains("image_url") || !part["image_url"].is_object()) continue;
+      std::string url = part["image_url"].value("url", "");
+      // Strip "data:image/...;base64," prefix
+      const std::string marker = ";base64,";
+      auto pos = url.find(marker);
+      if (pos != std::string::npos && url.substr(0, 5) == "data:") {
+        part["image_url"]["url"] = url.substr(pos + marker.size());
+        part["image_url"].erase("detail");
+        changed = true;
+      }
+    }
+    if (changed) {
+      log::info("adapt_image_urls_for_provider: stripped data URI prefix for ZhipuAI");
+      return msg.dump();
+    }
+  } catch (...) {}
+  return msg_json;
+}
+
 RunResult run_streaming_with_history(
     const config::Config& config,
     const std::vector<types::Message>& history,
@@ -625,7 +658,7 @@ RunResult run_streaming_with_history(
     messages_json.push_back(mj.dump());
   }
   if (user_message_json_override != nullptr && !user_message_json_override->empty()) {
-    messages_json.push_back(*user_message_json_override);
+    messages_json.push_back(adapt_image_urls_for_provider(*user_message_json_override, base_url));
   } else {
     messages_json.push_back(user_message_json(to_utf8(user_prompt)));
   }
@@ -688,7 +721,11 @@ RunResult run_streaming_with_history(
     };
 
     net::HttpResponse http_res;
-    bool ok = net::post_json_streaming(url, req_body.dump(), stream_cb, http_res, auth);
+    std::string req_body_str = req_body.dump();
+    log::debug("run_streaming_with_history round " + std::to_string(round) +
+               " req_body_len=" + std::to_string(req_body_str.size()) +
+               " messages=" + std::to_string(req_body["messages"].size()));
+    bool ok = net::post_json_streaming(url, req_body_str, stream_cb, http_res, auth);
 
     // Process remaining buffer
     if (!line_buffer.empty()) {

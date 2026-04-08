@@ -59,6 +59,11 @@ std::string MultiWindowManager::Create(const flutter::EncodableMap* args) {
     return "";
   }
 
+  // Sub-windows are WS_POPUP overlays positioned by the Dart side.
+  // Suppress OS-driven WM_DPICHANGED repositioning to prevent incorrect
+  // placement when moving across monitors with different DPI.
+  flutter_window->SetIgnoreDpiChange(true);
+
   ::ShowWindow(flutter_window->GetHandle(),
                config.hidden_at_launch ? SW_HIDE : SW_SHOW);
 
@@ -150,6 +155,14 @@ void MultiWindowManager::RemoveWindow(const std::string& window_id) {
   // quit application if no windows left
   if (windows_.empty()) {
     PostQuitMessage(0);
+  }
+}
+
+void MultiWindowManager::SetIgnoreDpiChange(const std::string& window_id,
+                                             bool ignore) {
+  auto it = managed_flutter_windows_.find(window_id);
+  if (it != managed_flutter_windows_.end()) {
+    it->second->SetIgnoreDpiChange(ignore);
   }
 }
 

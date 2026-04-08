@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
@@ -321,12 +323,17 @@ class _MessageBubble extends StatelessWidget {
 
   const _MessageBubble({required this.message, this.isStreaming = false});
 
+  List<ChatMessageContent> get _imageContents =>
+      message.content.where((c) =>
+          c.type == 'image' && c.base64 != null && c.base64!.isNotEmpty).toList();
+
   @override
   Widget build(BuildContext context) {
     final isUser = message.role == 'user';
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final text = message.textContent;
+    final images = _imageContents;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -364,39 +371,51 @@ class _MessageBubble extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (isUser)
-                    SelectableText(
-                      text,
-                      style: TextStyle(
-                        color: colorScheme.onSurface,
-                        fontSize: 14,
-                        height: 1.5,
-                      ),
-                    )
-                  else
-                    MarkdownBody(
-                      data: text,
-                      selectable: true,
-                      styleSheet: MarkdownStyleSheet(
-                        p: TextStyle(
+                  // Image thumbnails
+                  if (images.isNotEmpty) ...[
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: images.map((img) =>
+                        _ImageThumbnail(content: img)).toList(),
+                    ),
+                    if (text.isNotEmpty) const SizedBox(height: 8),
+                  ],
+                  if (text.isNotEmpty) ...[
+                    if (isUser)
+                      SelectableText(
+                        text,
+                        style: TextStyle(
                           color: colorScheme.onSurface,
                           fontSize: 14,
                           height: 1.5,
                         ),
-                        code: TextStyle(
-                          fontFamily: 'Consolas',
-                          fontSize: 13,
-                          color: colorScheme.onSurface,
-                          backgroundColor:
-                              colorScheme.surface.withOpacity(0.6),
+                      )
+                    else
+                      MarkdownBody(
+                        data: text,
+                        selectable: true,
+                        styleSheet: MarkdownStyleSheet(
+                          p: TextStyle(
+                            color: colorScheme.onSurface,
+                            fontSize: 14,
+                            height: 1.5,
+                          ),
+                          code: TextStyle(
+                            fontFamily: 'Consolas',
+                            fontSize: 13,
+                            color: colorScheme.onSurface,
+                            backgroundColor:
+                                colorScheme.surface.withOpacity(0.6),
+                          ),
+                          codeblockDecoration: BoxDecoration(
+                            color: const Color(0xFF1E1E2E),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          codeblockPadding: const EdgeInsets.all(12),
                         ),
-                        codeblockDecoration: BoxDecoration(
-                          color: const Color(0xFF1E1E2E),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        codeblockPadding: const EdgeInsets.all(12),
                       ),
-                    ),
+                  ],
                   if (isStreaming)
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
@@ -446,6 +465,133 @@ class _MessageBubble extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// Thumbnail widget for an image attachment in a chat message.
+/// Click to open a full-size preview dialog.
+class _ImageThumbnail extends StatelessWidget {
+  final ChatMessageContent content;
+
+  const _ImageThumbnail({required this.content});
+
+  @override
+  Widget build(BuildContext context) {
+    final b64 = content.base64;
+    if (b64 == null || b64.isEmpty) return const SizedBox.shrink();
+
+    final bytes = base64Decode(b64);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return GestureDetector(
+      onTap: () => _showFullImage(context, bytes, content.fileName),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Stack(
+          children: [
+            ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: 240,
+                maxHeight: 160,
+              ),
+              child: Image.memory(
+                bytes,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  width: 120,
+                  height: 80,
+                  color: colorScheme.surfaceContainerHighest,
+                  child: Icon(Icons.broken_image,
+                      color: colorScheme.onSurface.withOpacity(0.4)),
+                ),
+              ),
+            ),
+            Positioned(
+              right: 4,
+              bottom: 4,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.zoom_in, size: 12, color: Colors.white70),
+                    if (content.fileName != null) ...[
+                      const SizedBox(width: 4),
+                      Text(
+                        content.fileName!,
+                        style: const TextStyle(
+                            fontSize: 10, color: Colors.white70),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showFullImage(BuildContext context, Uint8List bytes, String? fileName) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(24),
+        child: Stack(
+          children: [
+            Center(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: InteractiveViewer(
+                  minScale: 0.5,
+                  maxScale: 4.0,
+                  child: Image.memory(bytes, fit: BoxFit.contain),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 0,
+              right: 0,
+              child: Material(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(20),
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () => Navigator.of(ctx).pop(),
+                ),
+              ),
+            ),
+            if (fileName != null)
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      fileName,
+                      style: const TextStyle(
+                          color: Colors.white70, fontSize: 12),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

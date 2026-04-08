@@ -11,10 +11,12 @@ import '../models/avatar_snapshot.dart';
 import '../models/gateway_models.dart';
 import '../models/gateway_profile.dart';
 import '../models/server_config.dart';
+import '../models/skill_models.dart';
 import 'gateway_session.dart';
 import 'device_identity_store.dart';
 import 'device_auth_store.dart';
 import 'config_repository.dart';
+import 'skill_repository.dart';
 import 'avatar_command_executor.dart';
 import 'avatar_controller.dart';
 import 'chat_controller.dart';
@@ -44,6 +46,7 @@ class NodeRuntime extends ChangeNotifier {
   late final GatewaySession operatorSession;
   late final GatewaySession nodeSession;
   late final ConfigRepository configRepository;
+  late final SkillRepository skillRepository;
   late final ChatController chatController;
   late final AvatarController avatarController;
   late final AvatarCommandExecutor avatarCommandExecutor;
@@ -63,6 +66,14 @@ class NodeRuntime extends ChangeNotifier {
   String? _serverName;
   String? _remoteAddress;
   ServerConfig? _serverConfig;
+
+  List<SkillInfo> _skills = [];
+  bool _skillsLoading = false;
+  String? _skillsError;
+
+  List<SkillInfo> get skills => _skills;
+  bool get skillsLoading => _skillsLoading;
+  String? get skillsError => _skillsError;
 
   /// Stagger second WebSocket so OpenClaw completes operator handshake first.
   Timer? _nodeConnectTimer;
@@ -97,6 +108,7 @@ class NodeRuntime extends ChangeNotifier {
     );
 
     configRepository = ConfigRepository(session: operatorSession);
+    skillRepository = SkillRepository(operatorSession);
     desktopTts = DesktopTts();
     chatController = ChatController(
       session: operatorSession,
@@ -301,6 +313,56 @@ class NodeRuntime extends ChangeNotifier {
     } catch (_) {}
   }
 
+  // -- Skills management --
+
+  Future<void> refreshSkills() async {
+    _skillsLoading = true;
+    _skillsError = null;
+    notifyListeners();
+    try {
+      _skills = await skillRepository.listSkills();
+    } catch (e) {
+      _skillsError = e.toString();
+    } finally {
+      _skillsLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> toggleSkill(String id, bool enable) async {
+    try {
+      if (enable) {
+        await skillRepository.enableSkill(id);
+      } else {
+        await skillRepository.disableSkill(id);
+      }
+      await refreshSkills();
+    } catch (e) {
+      _skillsError = e.toString();
+      notifyListeners();
+    }
+  }
+
+  Future<void> installSkill(String id, String content) async {
+    try {
+      await skillRepository.installSkill(id, content);
+      await refreshSkills();
+    } catch (e) {
+      _skillsError = e.toString();
+      notifyListeners();
+    }
+  }
+
+  Future<void> removeSkill(String id) async {
+    try {
+      await skillRepository.removeSkill(id);
+      await refreshSkills();
+    } catch (e) {
+      _skillsError = e.toString();
+      notifyListeners();
+    }
+  }
+
   // -- Node capabilities (dynamic) --
 
   List<String> _buildNodeCaps() {
@@ -336,11 +398,14 @@ class NodeRuntime extends ChangeNotifier {
       chatController.load(chatController.sessionKey);
     }
     refreshServerConfig();
+    refreshSkills();
   }
 
   void _onOperatorDisconnected(String message) {
     _isConnected = false;
     _connectionStatus = message;
+    _skills = [];
+    _skillsError = null;
     chatController.onDisconnected(message);
     notifyListeners();
   }

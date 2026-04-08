@@ -436,10 +436,15 @@ static std::string build_user_message_with_attachments(const std::string& text,
     std::string b64 = att.value("content", "");
     if (b64.empty()) continue;
     std::string data_url = "data:" + mime + ";base64," + b64;
+    wspp_json img_obj;
+    img_obj["url"] = data_url;
+    img_obj["detail"] = "auto";
     wspp_json part;
     part["type"] = "image_url";
-    part["image_url"] = wspp_json::object({{"url", data_url}});
+    part["image_url"] = std::move(img_obj);
     content.push_back(std::move(part));
+    log::debug("build_user_message_with_attachments: added image part, mime=" + mime +
+               " b64_len=" + std::to_string(b64.size()));
   }
   msg["content"] = std::move(content);
   return msg.dump();
@@ -605,6 +610,8 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
         std::string user_msg_json_override;
         if (!attachments.empty()) {
           user_msg_json_override = build_user_message_with_attachments(message, attachments);
+          log::info("chat.send: " + std::to_string(attachments.size()) + " attachment(s), "
+                    "override_len=" + std::to_string(user_msg_json_override.size()));
         }
 
         // Save user message to session store
