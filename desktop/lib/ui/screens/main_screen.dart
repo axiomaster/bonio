@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/app_state.dart';
 import 'chat_tab.dart';
+import 'marketplace_tab.dart';
 import 'server_tab.dart';
 import 'settings_tab.dart';
 
@@ -15,6 +16,11 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
 
+  @override
+  void initState() {
+    super.initState();
+  }
+
   static const _destinations = [
     NavigationRailDestination(
       icon: Icon(Icons.chat_outlined),
@@ -25,6 +31,11 @@ class _MainScreenState extends State<MainScreen> {
       icon: Icon(Icons.dns_outlined),
       selectedIcon: Icon(Icons.dns),
       label: Text('Server'),
+    ),
+    NavigationRailDestination(
+      icon: Icon(Icons.store_outlined),
+      selectedIcon: Icon(Icons.store),
+      label: Text('Market'),
     ),
     NavigationRailDestination(
       icon: Icon(Icons.settings_outlined),
@@ -97,6 +108,7 @@ class _MainScreenState extends State<MainScreen> {
               children: const [
                 ChatTab(),
                 ServerTab(),
+                MarketplaceTab(),
                 SettingsTab(),
               ],
             ),

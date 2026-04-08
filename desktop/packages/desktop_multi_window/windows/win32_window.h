@@ -52,6 +52,9 @@ class Win32Window {
   // If true, closing this window will quit the application.
   void SetQuitOnClose(bool quit_on_close);
 
+  // If true, WM_DPICHANGED will not reposition/resize the window.
+  void SetIgnoreDpiChange(bool ignore) { ignore_dpi_change_ = ignore; }
+
   // Return a RECT representing the bounds of the current client area.
   RECT GetClientArea();
 
@@ -91,6 +94,10 @@ class Win32Window {
   static void UpdateTheme(HWND const window);
 
   bool quit_on_close_ = false;
+
+  // When true, WM_DPICHANGED is ignored so the caller can manage cross-monitor
+  // positioning without the OS overriding the window rect.
+  bool ignore_dpi_change_ = false;
 
   // window handle for top level window.
   HWND window_handle_ = nullptr;

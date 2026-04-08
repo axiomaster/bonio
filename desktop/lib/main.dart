@@ -135,13 +135,18 @@ class _BoJiDesktopAppState extends State<BoJiDesktopApp> with WindowListener {
     windowManager.hide();
   }
 
-  /// Tray "Exit" → truly quit (close avatar + destroy main).
+  /// Tray "Exit" → close avatar window, then let TrayService call exit(0).
+  /// Do NOT call windowManager.destroy() here — it kills the event loop
+  /// and prevents exit(0) from firing in TrayService.
   Future<void> _realExit() async {
     if (_exiting) return;
     _exiting = true;
-    await _appState.runtime.syncAvatarFloatingWindow(show: false);
-    await windowManager.setPreventClose(false);
-    await windowManager.destroy();
+    try {
+      await _appState.runtime.syncAvatarFloatingWindow(show: false);
+    } catch (_) {}
+    try {
+      await windowManager.setPreventClose(false);
+    } catch (_) {}
   }
 
   @override

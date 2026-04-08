@@ -101,6 +101,13 @@ class WindowController {
   Future<void> setPosition(Offset pos) =>
       _callWindowMethod('window_setPosition', {'x': pos.dx, 'y': pos.dy});
 
+  /// Set window position using raw physical pixel coordinates.
+  ///
+  /// Bypasses DPI conversion — the coordinates are passed directly to
+  /// SetWindowPos. Use this for cross-monitor moves where DPI differs.
+  Future<void> setPositionPhysical(double px, double py) =>
+      _callWindowMethod('window_setPositionPhysical', {'x': px, 'y': py});
+
   /// Get window position in Flutter coordinates (y=0 at top of screen).
   Future<Offset> getPosition() async {
     final result = await _channel.invokeMethod<Map<dynamic, dynamic>>(
@@ -116,6 +123,26 @@ class WindowController {
   /// Start native window drag using the current event.
   Future<void> startDragging() =>
       _callWindowMethod('window_startDragging', {});
+
+  /// Show a native Win32 popup menu at the current cursor position.
+  ///
+  /// [items] is a list of maps with keys: id (int), label (String), enabled (bool).
+  /// Use id=0 for separators. [actions] maps id → action string.
+  /// Returns the action string of the selected item, or empty string if dismissed.
+  Future<String> showPopupMenu({
+    required List<Map<String, dynamic>> items,
+    required Map<int, String> actions,
+  }) async {
+    final result = await _channel.invokeMethod<String>(
+      'window_showPopupMenu',
+      {
+        'windowId': windowId,
+        'items': items,
+        'actions': actions,
+      },
+    );
+    return result ?? '';
+  }
 
   /// Get Dock info from the screen this window is on.
   Future<Map<String, dynamic>?> getDockInfo() async {

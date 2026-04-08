@@ -28,6 +28,8 @@ dependencies:
   system_tray: ^0.1.1
   sherpa_onnx: ^1.12.35
   ffi: ^2.1.0
+  archive: ^4.0.9
+  file_picker: ^11.0.2
 
 dev_dependencies:
   flutter_test:

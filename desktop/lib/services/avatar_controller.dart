@@ -98,6 +98,9 @@ class AvatarController extends ChangeNotifier {
     });
   }
 
+  Timer? _bubbleAutoHideTimer;
+  static const _bubbleAutoHideMs = 10000;
+
   void setBubble({
     required String text,
     int? bgArgb,
@@ -108,6 +111,7 @@ class AvatarController extends ChangeNotifier {
     _bubbleBgArgb = bgArgb;
     _bubbleTextArgb = textArgb;
     _bubbleCountdown = countdown;
+    _restartBubbleAutoHide();
     notifyListeners();
   }
 
@@ -117,11 +121,24 @@ class AvatarController extends ChangeNotifier {
   }
 
   void clearBubble() {
+    _bubbleAutoHideTimer?.cancel();
+    _bubbleAutoHideTimer = null;
     _bubbleText = null;
     _bubbleBgArgb = null;
     _bubbleTextArgb = null;
     _bubbleCountdown = null;
     notifyListeners();
+  }
+
+  void _restartBubbleAutoHide() {
+    _bubbleAutoHideTimer?.cancel();
+    _bubbleAutoHideTimer = Timer(
+      const Duration(milliseconds: _bubbleAutoHideMs),
+      () {
+        _bubbleAutoHideTimer = null;
+        clearBubble();
+      },
+    );
   }
 
   void setColorFilter(Color? color) {
@@ -268,6 +285,57 @@ class AvatarController extends ChangeNotifier {
     );
   }
 
+  static final _clickAnimations = [
+    AgentAvatarActivity.happy,
+    AgentAvatarActivity.bored,
+    AgentAvatarActivity.watching,
+    AgentAvatarActivity.confused,
+    AgentAvatarActivity.angry,
+  ];
+
+  static const _emotionBubbles = [
+    '(=^・ω・^=)',
+    '(=^-ω-^=) zzZ',
+    '(ↀДↀ)⁼³₌₃',
+    '(=^・^=)',
+    '₍˄·͈༝·͈˄₎◞ ̑̑',
+    '♪(=^∇^=)',
+    '(=ↀωↀ=)✧',
+    '(=^◡^=)',
+    'ฅ(^・ω・^ฅ)',
+    '(≧◡≦)',
+  ];
+
+  Timer? _clickBubbleTimer;
+  bool _showInput = false;
+  bool get showInput => _showInput;
+
+  void toggleInput() {
+    _showInput = !_showInput;
+    notifyListeners();
+  }
+
+  void hideInput() {
+    if (!_showInput) return;
+    _showInput = false;
+    notifyListeners();
+  }
+
+  void triggerClickReaction() {
+    final rng = math.Random();
+    final anim = _clickAnimations[rng.nextInt(_clickAnimations.length)];
+    final emoji = _emotionBubbles[rng.nextInt(_emotionBubbles.length)];
+
+    showTemporaryState(anim);
+
+    _clickBubbleTimer?.cancel();
+    setBubble(text: emoji);
+    _clickBubbleTimer = Timer(const Duration(seconds: 3), () {
+      clearBubble();
+      _clickBubbleTimer = null;
+    });
+  }
+
   /// For the floating avatar window (separate engine).
   AvatarSnapshot toSnapshot() {
     return AvatarSnapshot(
@@ -282,6 +350,7 @@ class AvatarController extends ChangeNotifier {
       colorArgb: _colorFilter?.toARGB32(),
       gesture: _gesture.name,
       isMoving: isMoving,
+      showInput: _showInput,
     );
   }
 
@@ -290,6 +359,7 @@ class AvatarController extends ChangeNotifier {
     _temporaryTimer?.cancel();
     _gestureClearTimer?.cancel();
     _moveTimer?.cancel();
+    _clickBubbleTimer?.cancel();
     super.dispose();
   }
 }

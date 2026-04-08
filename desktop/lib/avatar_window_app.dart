@@ -1,15 +1,22 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:ffi' hide Size;
 import 'dart:io';
 import 'dart:math';
 
 import 'package:desktop_multi_window/desktop_multi_window.dart';
+import 'package:ffi/ffi.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'models/avatar_snapshot.dart';
+import 'models/chat_models.dart';
+import 'platform/win32_screen_capture.dart';
 import 'services/desktop_avatar_theme.dart';
 import 'ui/widgets/desktop_avatar_overlay.dart';
+
+enum _PlacementState { anchoredWindow, fullscreenCorner, userOffset, onDock }
 
 /// Second engine: OS-level floating avatar (main BoJi window can be minimized).
 class AvatarFloatingApp extends StatefulWidget {
@@ -35,28 +42,69 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
   WindowController? _wc;
   DesktopAvatarTheme? _theme;
 
-  // Dock behavior
+  // Screen / dock geometry (for ON_DOCK fallback)
   bool _dockAtBottom = false;
   double _dockHeight = 0;
   double _screenWidth = 0;
   double _screenHeight = 0;
   double _dockLeft = 0;
   double _dockRight = 0;
-  bool _onDock = true;
+
+  // Placement state machine
+  _PlacementState _placement = _PlacementState.onDock;
+  int _anchoredHwnd = 0;
+
+  // User-drag offset: relative X from window top-center (0 = centered)
+  double _userOffsetX = 0;
+
   bool _programmaticMove = false;
   String? _localActivityOverride;
   bool _facingLeft = false;
 
   Timer? _wanderTimer;
-  Timer? _returnToDockTimer;
   Timer? _moveAnimTimer;
+  Completer<void>? _moveAnimCompleter;
+  Timer? _fgPollTimer;
+  Timer? _anchorTrackTimer;
+  Timer? _springTimer;
 
-  static const _returnToDockTimeout = Duration(minutes: 5);
-  static const _wanderMinSec = 15;
-  static const _wanderMaxSec = 45;
+  // Elastic spring tracking
+  double _targetX = 0;
+  double _targetY = 0;
+  double _currentX = 0;
+  double _currentY = 0;
+  bool _springActive = false;
+
+  // Last known anchored window rect — skip setPosition when unchanged
+  double _lastAnchoredLeft = 0;
+  double _lastAnchoredTop = 0;
+  double _lastAnchoredWidth = 0;
+
+  // BoJi Lens (圈一圈) annotation state
+  bool _lensActive = false;
+  ScreenCaptureResult? _lensCapture;
+  List<Rect> _lensRects = [];
+  Rect? _lensDrawingRect; // rect currently being drawn
+  String _lensWindowTitle = '';
+  // Saved avatar position before lens expansion
+  double _lensPreX = 0;
+  double _lensPreY = 0;
+  Size _lensPreSize = Size.zero;
+
+  static const _fgPollInterval = Duration(seconds: 3);
+  static const _anchorTrackInterval = Duration(milliseconds: 50);
+  static const _springInterval = Duration(milliseconds: 16);
+  static const _springFactor = 0.12; // lerp factor per 16ms frame (~200ms settle)
+  static const _springThreshold = 0.5; // stop when within 0.5px
+
+  static const _idleMinSec = 10;
+  static const _idleMaxSec = 30;
+  static const _walkSpeed = 0.04; // px per ms
   static final _rng = Random();
 
-  final _windowSize = AvatarSnapshot.kFloatingWindowSize;
+  Size get _windowSize => _snapshot.showInput
+      ? AvatarSnapshot.kFloatingWindowSizeWithInput
+      : AvatarSnapshot.kFloatingWindowSize;
 
   @override
   void initState() {
@@ -69,50 +117,93 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
   void dispose() {
     windowManager.removeListener(this);
     _wanderTimer?.cancel();
-    _returnToDockTimer?.cancel();
     _moveAnimTimer?.cancel();
+    _fgPollTimer?.cancel();
+    _anchorTrackTimer?.cancel();
+    _springTimer?.cancel();
     super.dispose();
   }
 
   // ---------------------------------------------------------------------------
-  // Dock detection & initial positioning
+  // Initialization
   // ---------------------------------------------------------------------------
 
-  Future<void> _initDockBehavior() async {
-    if (!Platform.isMacOS) return;
+  Future<void> _initPlacement() async {
     final wc = _wc;
     if (wc == null) return;
     try {
-      // Use the native plugin's getDockInfo — it reads from the window's
-      // own screen, so coordinates match setPosition exactly.
-      final dockInfo = await wc.getDockInfo();
-      if (dockInfo == null) return;
-
-      _screenWidth = (dockInfo['screenWidth'] as num?)?.toDouble() ?? 0;
-      _screenHeight = (dockInfo['screenHeight'] as num?)?.toDouble() ?? 0;
-      _dockAtBottom = dockInfo['dockAtBottom'] as bool? ?? false;
-      _dockHeight = (dockInfo['dockHeight'] as num?)?.toDouble() ?? 0;
-
-      // Estimate Dock horizontal span via `defaults read`.
-      final dockMetrics = await _readDockMetrics();
-      final tileSize = dockMetrics.tileSize;
-      final itemCount = dockMetrics.itemCount;
-      final dockWidth = itemCount * (tileSize + 4) + 24;
-      _dockLeft = ((_screenWidth - dockWidth) / 2).clamp(0.0, _screenWidth);
-      _dockRight = ((_screenWidth + dockWidth) / 2).clamp(0.0, _screenWidth);
-
-      debugPrint('AvatarDock: screen=${_screenWidth}x$_screenHeight, '
-          'dockAtBottom=$_dockAtBottom, dockHeight=$_dockHeight, '
-          'dockX=[$_dockLeft..$_dockRight] (items=$itemCount, tile=$tileSize)');
-
-      if (_dockAtBottom) {
-        _onDock = true;
-        await _moveToDockPosition(animate: false);
-        _scheduleNextWander();
+      // Always init dock/screen geometry for fallback
+      if (Platform.isMacOS) {
+        await _initDockMacOS(wc);
+      } else if (Platform.isWindows) {
+        await _initTaskbarWindows(wc);
       }
+
+      // Find our own HWND so we can distinguish the avatar window from
+      // other windows in the same process (e.g. the main BoJi window).
+      if (Platform.isWindows) {
+        _avatarSelfHwnd = _findWindowByTitle('BoJi Avatar');
+        if (_avatarSelfHwnd == 0) {
+          // Fallback: use GetActiveWindow which should be the avatar at this point
+          _avatarSelfHwnd = _getActiveWindow();
+        }
+        debugPrint('AvatarPlacement: selfHwnd=$_avatarSelfHwnd');
+      }
+
+      debugPrint('AvatarPlacement: screen=${_screenWidth}x$_screenHeight, '
+          'dockAtBottom=$_dockAtBottom, dockHeight=$_dockHeight');
+
+      // Try to anchor to the current foreground window immediately
+      if (Platform.isWindows) {
+        final fgInfo = _getWinForegroundInfo();
+        final isAvatar = fgInfo != null &&
+            (fgInfo.hwnd == _avatarSelfHwnd || _isLikelyAvatarWindow(fgInfo));
+        final isDesktop = fgInfo?.isDesktop ?? false;
+        if (fgInfo != null && !isAvatar && !isDesktop && !fgInfo.isFullscreen &&
+            fgInfo.hwnd != 0 && fgInfo.width > 50 && fgInfo.height > 50) {
+          _anchorToWindow(fgInfo.hwnd, fgInfo);
+        } else if (fgInfo != null && !isAvatar && !isDesktop && fgInfo.isFullscreen) {
+          _transitionToFullscreenCorner();
+        } else {
+          _transitionToDock();
+        }
+      } else {
+        _transitionToDock();
+      }
+
+      _startForegroundPolling();
     } catch (e) {
-      debugPrint('AvatarDock: init failed: $e');
+      debugPrint('AvatarPlacement: init failed: $e');
     }
+  }
+
+  Future<void> _initDockMacOS(WindowController wc) async {
+    final dockInfo = await wc.getDockInfo();
+    if (dockInfo == null) return;
+
+    _screenWidth = (dockInfo['screenWidth'] as num?)?.toDouble() ?? 0;
+    _screenHeight = (dockInfo['screenHeight'] as num?)?.toDouble() ?? 0;
+    _dockAtBottom = dockInfo['dockAtBottom'] as bool? ?? false;
+    _dockHeight = (dockInfo['dockHeight'] as num?)?.toDouble() ?? 0;
+
+    final dockMetrics = await _readDockMetrics();
+    final tileSize = dockMetrics.tileSize;
+    final itemCount = dockMetrics.itemCount;
+    final dockWidth = itemCount * (tileSize + 4) + 24;
+    _dockLeft = ((_screenWidth - dockWidth) / 2).clamp(0.0, _screenWidth);
+    _dockRight = ((_screenWidth + dockWidth) / 2).clamp(0.0, _screenWidth);
+  }
+
+  Future<void> _initTaskbarWindows(WindowController wc) async {
+    final info = _getWindowsTaskbarInfo();
+    if (info == null) return;
+
+    _screenWidth = info.screenWidth;
+    _screenHeight = info.screenHeight;
+    _dockAtBottom = info.atBottom;
+    _dockHeight = info.taskbarHeight;
+    _dockLeft = info.taskbarLeft;
+    _dockRight = info.taskbarRight;
   }
 
   static Future<({double tileSize, int itemCount})> _readDockMetrics() async {
@@ -155,16 +246,17 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
   }
 
   // ---------------------------------------------------------------------------
-  // Dock positioning helpers
+  // Dock positioning helpers (ON_DOCK fallback)
   // ---------------------------------------------------------------------------
 
-  /// Flutter y for the avatar visually sitting ON the Dock bar.
-  /// [inset] is the per-animation bottom transparent padding from theme.json.
+  /// Always use the base (non-input) window height for anchor calculations.
+  /// The input area extends the window downward; the anchor Y never changes.
+  static final double _anchorHeight = AvatarSnapshot.kFloatingWindowSize.height;
+
   double _dockTopYFor(double inset) =>
-      _screenHeight - _dockHeight - _windowSize.height +
+      _screenHeight - _dockHeight - _anchorHeight +
       AvatarSnapshot.kFloatingWindowPadding + inset;
 
-  /// Shortcut: dock Y for the currently displayed animation.
   double get _dockTopY => _dockTopYFor(_currentBottomInset);
 
   double get _currentBottomInset =>
@@ -184,11 +276,38 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     } else {
       _programmaticMove = true;
       await wc.setPosition(target);
+      _currentX = target.dx;
+      _currentY = target.dy;
       _programmaticMove = false;
     }
   }
 
-  Future<void> _animateWindowTo(Offset target) async {
+  /// Lift the avatar a few pixels above the window edge so that lying-down
+  /// animations (sleeping, bored) don't overlap the visible title bar.
+  /// On Windows 10/11 GetWindowRect includes the invisible shadow frame
+  /// (~7px above the visible edge), so a 5px lift keeps the avatar clearly
+  /// above the visible title bar content.
+  static const _titleBarClearance = 5.0;
+
+  /// Window top-center Y for a given window rect.
+  /// Uses constant base height (not the dynamic _windowSize) so that the
+  /// anchor position is independent of whether the input field is visible.
+  double _windowTopY(_WindowRectInfo info) {
+    final inset = _currentBottomInset;
+    return info.top - _anchorHeight +
+        AvatarSnapshot.kFloatingWindowPadding + inset - _titleBarClearance;
+  }
+
+  /// Window top-center X for a given window rect (centered).
+  double _windowCenterX(_WindowRectInfo info) {
+    return info.left + (info.width - _windowSize.width) / 2;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Movement animation
+  // ---------------------------------------------------------------------------
+
+  Future<void> _animateWindowTo(Offset target, {bool stroll = false}) async {
     final wc = _wc;
     if (wc == null) return;
 
@@ -211,9 +330,11 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
       return;
     }
 
-    final durationMs = (distance / 0.25).clamp(400.0, 4000.0).toInt();
-    final steps = (durationMs / 16).round().clamp(1, 250);
+    final speed = stroll ? _walkSpeed : _walkSpeed * 3;
+    final durationMs = (distance / speed).clamp(300.0, 20000.0).toInt();
+    final steps = (durationMs / 16).round().clamp(1, 1250);
     final completer = Completer<void>();
+    _moveAnimCompleter = completer;
     var step = 0;
 
     _moveAnimTimer = Timer.periodic(const Duration(milliseconds: 16), (t) {
@@ -232,7 +353,10 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
       if (step >= steps) {
         t.cancel();
         _moveAnimTimer = null;
+        _moveAnimCompleter = null;
         _programmaticMove = false;
+        _currentX = target.dx;
+        _currentY = target.dy;
         if (mounted) setState(() { _localActivityOverride = null; _facingLeft = false; });
         if (!completer.isCompleted) completer.complete();
       }
@@ -242,51 +366,426 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
   }
 
   // ---------------------------------------------------------------------------
-  // Idle wandering along the Dock
+  // Walk cancellation — single entry point for stopping any walk/wander
   // ---------------------------------------------------------------------------
+
+  /// Immediately stops any in-progress walk animation and wander timer,
+  /// resets the walking visual state (activity override + facing direction).
+  /// Must be called from every user-interaction entry point and every
+  /// placement transition that should NOT show the cat walking.
+  void _cancelWalk() {
+    _wanderTimer?.cancel();
+    _wanderTimer = null;
+    if (_moveAnimTimer != null) {
+      _moveAnimTimer?.cancel();
+      _moveAnimTimer = null;
+      _programmaticMove = false;
+      if (_moveAnimCompleter != null && !_moveAnimCompleter!.isCompleted) {
+        _moveAnimCompleter!.complete();
+      }
+      _moveAnimCompleter = null;
+    }
+    if (_localActivityOverride != null || _facingLeft) {
+      if (mounted) {
+        setState(() {
+          _localActivityOverride = null;
+          _facingLeft = false;
+        });
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Idle wandering
+  // ---------------------------------------------------------------------------
+
+  bool get _interactionActive => _menuVisible || _snapshot.showInput || _lensActive;
 
   void _scheduleNextWander() {
     _wanderTimer?.cancel();
-    if (!_onDock || !_dockAtBottom) return;
+    if (_interactionActive) return;
+    if (_placement == _PlacementState.userOffset ||
+        _placement == _PlacementState.fullscreenCorner) return;
 
     final delaySec =
-        _wanderMinSec + _rng.nextInt(_wanderMaxSec - _wanderMinSec);
+        _idleMinSec + _rng.nextInt(_idleMaxSec - _idleMinSec);
     _wanderTimer = Timer(Duration(seconds: delaySec), _wander);
   }
 
   Future<void> _wander() async {
-    if (!_onDock || !_dockAtBottom || !mounted) return;
-    await _moveToDockPosition(animate: true);
+    if (!mounted || _interactionActive) return;
+    if (_placement == _PlacementState.userOffset ||
+        _placement == _PlacementState.fullscreenCorner) return;
+
+    final legs = 2 + _rng.nextInt(3);
+    for (var i = 0; i < legs; i++) {
+      if (!mounted || _interactionActive ||
+          _placement == _PlacementState.userOffset ||
+          _placement == _PlacementState.fullscreenCorner) break;
+
+      final target = _pickStrollTarget();
+      if (target == null) break;
+      await _animateWindowTo(target, stroll: true);
+
+      if (i < legs - 1 && mounted) {
+        final pauseMs = 500 + _rng.nextInt(1500);
+        await Future.delayed(Duration(milliseconds: pauseMs));
+      }
+    }
+
     _scheduleNextWander();
   }
 
+  Offset? _pickStrollTarget() {
+    if (_placement == _PlacementState.onDock) {
+      return _pickDockTarget();
+    } else if (_placement == _PlacementState.anchoredWindow && _anchoredHwnd != 0) {
+      final info = _getWinWindowRect(_anchoredHwnd);
+      if (info != null) return _pickWindowTarget(info);
+    }
+    return null;
+  }
+
+  Offset? _pickDockTarget() {
+    final minX = _dockLeft.clamp(0.0, double.infinity);
+    final maxX = (_dockRight - _windowSize.width).clamp(minX, double.infinity);
+    final targetX = minX + _rng.nextDouble() * (maxX - minX);
+    return Offset(targetX, _dockTopY);
+  }
+
+  Offset? _pickWindowTarget(_WindowRectInfo info) {
+    final avatarW = _windowSize.width;
+    final minX = info.left;
+    final maxX = (info.left + info.width - avatarW).clamp(minX, double.infinity);
+    final targetX = minX + _rng.nextDouble() * (maxX - minX);
+    final targetY = _windowTopY(info);
+    return Offset(targetX, targetY);
+  }
+
   // ---------------------------------------------------------------------------
-  // User drag detection (WindowListener from window_manager)
+  // User drag detection
   // ---------------------------------------------------------------------------
 
   @override
   void onWindowMoved() {
     if (_programmaticMove) return;
-    if (_onDock) {
-      debugPrint('AvatarDock: user dragged off dock');
-      _onDock = false;
-      _wanderTimer?.cancel();
+
+    _cancelWalk();
+
+    if (_placement == _PlacementState.anchoredWindow && _anchoredHwnd != 0) {
+      final info = _getWinWindowRect(_anchoredHwnd);
+      if (info != null) {
+        final centerX = _windowCenterX(info);
+        _wc?.getPosition().then((pos) {
+          _userOffsetX = pos.dx - centerX;
+          debugPrint('AvatarDrag: user offset from center = $_userOffsetX');
+        });
+      }
+      _placement = _PlacementState.userOffset;
+      _stopAnchorTracking();
+      debugPrint('AvatarDrag: entered USER_OFFSET');
+    } else if (_placement == _PlacementState.onDock) {
+      _placement = _PlacementState.userOffset;
+      debugPrint('AvatarDrag: dragged off dock');
+    } else if (_placement == _PlacementState.fullscreenCorner) {
+      _placement = _PlacementState.userOffset;
+      debugPrint('AvatarDrag: dragged off fullscreen corner');
     }
-    _resetReturnToDockTimer();
   }
 
-  void _resetReturnToDockTimer() {
-    _returnToDockTimer?.cancel();
-    if (!_dockAtBottom) return;
-    _returnToDockTimer = Timer(_returnToDockTimeout, _returnToDock);
+  // ---------------------------------------------------------------------------
+  // Foreground polling & state transitions
+  // ---------------------------------------------------------------------------
+
+  void _startForegroundPolling() {
+    _fgPollTimer?.cancel();
+    if (!Platform.isWindows && !Platform.isMacOS) return;
+    _fgPollTimer = Timer.periodic(_fgPollInterval, (_) => _pollForeground());
   }
 
-  Future<void> _returnToDock() async {
-    if (!_dockAtBottom || !mounted) return;
-    debugPrint('AvatarDock: returning to dock after timeout');
-    _onDock = true;
-    await _moveToDockPosition(animate: true);
+  void _pollForeground() {
+    if (!mounted) return;
+    if (!Platform.isWindows) return;
+    if (_interactionActive) return;
+
+    // --- Health check for anchored window ---
+    if ((_placement == _PlacementState.anchoredWindow ||
+         _placement == _PlacementState.userOffset) && _anchoredHwnd != 0) {
+      if (!_isWindowValid(_anchoredHwnd) || _isWindowMinimized(_anchoredHwnd)) {
+        debugPrint('AvatarAnchor: anchored window lost');
+        _anchoredHwnd = 0;
+        _handleAnchoredWindowLost();
+        return;
+      }
+      final rect = _getWinWindowRect(_anchoredHwnd);
+      if (rect != null && rect.isFullscreen) {
+        debugPrint('AvatarAnchor: anchored window went fullscreen');
+        _transitionToFullscreenCorner();
+        return;
+      }
+    }
+
+    // --- Foreground window tracking ---
+    final fgInfo = _getWinForegroundInfo();
+    if (fgInfo == null || fgInfo.hwnd == 0) return;
+
+    // Skip the avatar window itself (but NOT the main BoJi window)
+    if (fgInfo.hwnd == _avatarSelfHwnd) return;
+
+    // Safety net: if selfHwnd wasn't resolved, check by remembering the HWND now
+    if (_avatarSelfHwnd == 0 && fgInfo.isSelf) {
+      final avatarW = _windowSize.width;
+      final avatarH = _windowSize.height;
+      if ((fgInfo.width - avatarW).abs() < 2 &&
+          (fgInfo.height - avatarH).abs() < 2) {
+        _avatarSelfHwnd = fgInfo.hwnd;
+        debugPrint('AvatarPlacement: resolved selfHwnd=${fgInfo.hwnd} by size match');
+        return;
+      }
+    }
+
+    // Desktop shell windows (Progman, WorkerW) = "no app window"
+    if (fgInfo.isDesktop) {
+      if (_placement == _PlacementState.anchoredWindow ||
+          _placement == _PlacementState.userOffset) {
+        // Keep anchored — user just clicked on desktop but our window is still there
+        if (_anchoredHwnd != 0 && _isWindowValid(_anchoredHwnd) &&
+            !_isWindowMinimized(_anchoredHwnd)) {
+          return;
+        }
+        _handleAnchoredWindowLost();
+      }
+      return;
+    }
+
+    final fgHwnd = fgInfo.hwnd;
+
+    if (fgInfo.isFullscreen) {
+      if (_placement != _PlacementState.fullscreenCorner) {
+        _transitionToFullscreenCorner();
+      }
+      return;
+    }
+
+    // Ignore tiny windows (e.g., tooltips)
+    if (fgInfo.width < 100 || fgInfo.height < 100) return;
+
+    // Already anchored to this window
+    if (_placement == _PlacementState.anchoredWindow && fgHwnd == _anchoredHwnd) return;
+
+    // USER_OFFSET on same window — window geometry change will reset
+    if (_placement == _PlacementState.userOffset && fgHwnd == _anchoredHwnd) return;
+
+    // New foreground window — switch immediately
+    _anchorToWindow(fgHwnd, fgInfo);
+  }
+
+  void _handleAnchoredWindowLost() {
+    _stopAnchorTracking();
+    _stopSpring();
+    final fgInfo = _getWinForegroundInfo();
+    if (fgInfo != null && fgInfo.hwnd != _avatarSelfHwnd &&
+        !_isLikelyAvatarWindow(fgInfo) && !fgInfo.isDesktop &&
+        !fgInfo.isFullscreen && fgInfo.hwnd != 0 &&
+        fgInfo.width >= 100 && fgInfo.height >= 100 &&
+        _isWindowValid(fgInfo.hwnd) && !_isWindowMinimized(fgInfo.hwnd)) {
+      _anchorToWindow(fgInfo.hwnd, fgInfo);
+    } else {
+      _transitionToDock();
+    }
+  }
+
+  bool _isLikelyAvatarWindow(_ForegroundWindowInfo info) {
+    if (info.hwnd == _avatarSelfHwnd && _avatarSelfHwnd != 0) return true;
+    if (!info.isSelf) return false;
+    final aw = _windowSize.width;
+    final ah = _windowSize.height;
+    return (info.width - aw).abs() < 2 && (info.height - ah).abs() < 2;
+  }
+
+  void _transitionToDock() {
+    debugPrint('AvatarPlacement: -> ON_DOCK');
+    _cancelWalk();
+    _placement = _PlacementState.onDock;
+    _anchoredHwnd = 0;
+    _userOffsetX = 0;
+    _stopAnchorTracking();
+    _stopSpring();
+    if (_dockAtBottom) {
+      _moveToDockPosition(animate: false);
+    }
     _scheduleNextWander();
+  }
+
+  void _transitionToFullscreenCorner() {
+    debugPrint('AvatarPlacement: -> FULLSCREEN_CORNER');
+    _cancelWalk();
+    _placement = _PlacementState.fullscreenCorner;
+    _stopAnchorTracking();
+    _stopSpring();
+
+    final wc = _wc;
+    if (wc == null) return;
+    final x = _screenWidth - _windowSize.width - 20;
+    const y = 8.0;
+    _programmaticMove = true;
+    wc.setPosition(Offset(x, y)).then((_) {
+      _currentX = x;
+      _currentY = y;
+      _programmaticMove = false;
+    });
+  }
+
+  void _anchorToWindow(int hwnd, _ForegroundWindowInfo info) {
+    final wc = _wc;
+    if (wc == null) return;
+
+    debugPrint('AvatarAnchor: anchoring to hwnd=$hwnd '
+        '(${info.left},${info.top}) ${info.width}x${info.height}');
+
+    _cancelWalk();
+    _stopAnchorTracking();
+    _stopSpring();
+    _placement = _PlacementState.anchoredWindow;
+    _anchoredHwnd = hwnd;
+    _userOffsetX = 0;
+
+    _lastAnchoredLeft = info.left;
+    _lastAnchoredTop = info.top;
+    _lastAnchoredWidth = info.width;
+
+    final rectInfo = _WindowRectInfo(
+      left: info.left, top: info.top,
+      width: info.width, height: info.height,
+      isFullscreen: info.isFullscreen,
+    );
+    final x = _windowCenterX(rectInfo);
+    final y = _windowTopY(rectInfo);
+
+    _programmaticMove = true;
+    wc.setPosition(Offset(x, y)).then((_) {
+      _currentX = x;
+      _currentY = y;
+      _targetX = x;
+      _targetY = y;
+      _programmaticMove = false;
+    });
+    _scheduleNextWander();
+    _startAnchorTracking();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Fast anchor tracking (50ms) + elastic spring (16ms)
+  // ---------------------------------------------------------------------------
+
+  void _startAnchorTracking() {
+    _anchorTrackTimer?.cancel();
+    if (!Platform.isWindows) return;
+    _anchorTrackTimer = Timer.periodic(
+        _anchorTrackInterval, (_) => _trackAnchoredWindow());
+  }
+
+  void _stopAnchorTracking() {
+    _anchorTrackTimer?.cancel();
+    _anchorTrackTimer = null;
+  }
+
+  void _trackAnchoredWindow() {
+    if (!mounted || _anchoredHwnd == 0) {
+      _stopAnchorTracking();
+      return;
+    }
+    if (_interactionActive) return;
+    if (_placement != _PlacementState.anchoredWindow &&
+        _placement != _PlacementState.userOffset) {
+      _stopAnchorTracking();
+      return;
+    }
+
+    final info = _getWinWindowRect(_anchoredHwnd);
+    if (info == null) return;
+
+    final moved = (info.left - _lastAnchoredLeft).abs() > 0.5 ||
+        (info.top - _lastAnchoredTop).abs() > 0.5;
+    final resized = (info.width - _lastAnchoredWidth).abs() > 0.5;
+
+    if (!moved && !resized) return;
+
+    _lastAnchoredLeft = info.left;
+    _lastAnchoredTop = info.top;
+    _lastAnchoredWidth = info.width;
+
+    _cancelWalk();
+
+    // If USER_OFFSET and window geometry changed, reset to center
+    if (_placement == _PlacementState.userOffset && (moved || resized)) {
+      debugPrint('AvatarAnchor: window moved/resized, resetting to center');
+      _placement = _PlacementState.anchoredWindow;
+      _userOffsetX = 0;
+    }
+
+    // Compute target position
+    final y = _windowTopY(info);
+    double x;
+    if (_placement == _PlacementState.userOffset) {
+      x = _windowCenterX(info) + _userOffsetX;
+      final avatarW = _windowSize.width;
+      x = x.clamp(info.left, info.left + info.width - avatarW);
+    } else {
+      x = _windowCenterX(info);
+    }
+
+    _targetX = x;
+    _targetY = y;
+    _startSpring();
+  }
+
+  void _startSpring() {
+    if (_springActive) return;
+    _springActive = true;
+    _springTimer?.cancel();
+    _springTimer = Timer.periodic(_springInterval, (_) => _stepSpring());
+  }
+
+  void _stopSpring() {
+    _springActive = false;
+    _springTimer?.cancel();
+    _springTimer = null;
+  }
+
+  void _stepSpring() {
+    if (!mounted || !_springActive) {
+      _stopSpring();
+      return;
+    }
+
+    final dx = _targetX - _currentX;
+    final dy = _targetY - _currentY;
+
+    if (dx.abs() < _springThreshold && dy.abs() < _springThreshold) {
+      _currentX = _targetX;
+      _currentY = _targetY;
+      _stopSpring();
+      final wc = _wc;
+      if (wc != null) {
+        _programmaticMove = true;
+        wc.setPosition(Offset(_currentX, _currentY)).then((_) {
+          _programmaticMove = false;
+        });
+      }
+      return;
+    }
+
+    _currentX += dx * _springFactor;
+    _currentY += dy * _springFactor;
+
+    final wc = _wc;
+    if (wc != null) {
+      _programmaticMove = true;
+      wc.setPosition(Offset(_currentX, _currentY)).then((_) {
+        _programmaticMove = false;
+      });
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -306,27 +805,29 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
             if (!mounted) return null;
             final prev = _snapshot;
             setState(() => _snapshot = AvatarSnapshot.fromJson(m));
-            _adjustDockYIfNeeded(prev);
+            _adjustYIfNeeded(prev);
+            _handleInputVisibilityChange(prev.showInput, _snapshot.showInput);
           }
           return null;
         case 'window_close':
           _wanderTimer?.cancel();
-          _returnToDockTimer?.cancel();
           _moveAnimTimer?.cancel();
+          _fgPollTimer?.cancel();
+          _anchorTrackTimer?.cancel();
+          _springTimer?.cancel();
           await windowManager.close();
           return null;
         default:
           throw MissingPluginException(call.method);
       }
     });
-    // Now that we have the window controller, init dock behavior.
-    unawaited(_initDockBehavior());
+    unawaited(_initPlacement());
   }
 
-  /// When the animation changes while on the dock, adjust Y so the cat stays
-  /// visually on the Dock bar (different animations have different bottom insets).
-  void _adjustDockYIfNeeded(AvatarSnapshot prev) {
-    if (!_onDock || !_dockAtBottom || _programmaticMove) return;
+  void _adjustYIfNeeded(AvatarSnapshot prev) {
+    if (_programmaticMove) return;
+    if (_placement != _PlacementState.onDock &&
+        _placement != _PlacementState.anchoredWindow) return;
     final theme = _theme;
     if (theme == null) return;
 
@@ -337,22 +838,398 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     final wc = _wc;
     if (wc == null) return;
 
-    // Set flag synchronously to prevent onWindowMoved from falsely
-    // detecting the position change as a user drag.
     _programmaticMove = true;
     wc.getPosition().then((pos) async {
-      if (!mounted || !_onDock) return;
-      final newY = _dockTopYFor(newInset);
+      if (!mounted) return;
+      double newY;
+      if (_placement == _PlacementState.onDock) {
+        newY = _dockTopYFor(newInset);
+      } else if (_placement == _PlacementState.anchoredWindow && _anchoredHwnd != 0) {
+        final info = _getWinWindowRect(_anchoredHwnd);
+        if (info == null) return;
+        newY = info.top - _anchorHeight +
+            AvatarSnapshot.kFloatingWindowPadding + newInset - _titleBarClearance;
+      } else {
+        return;
+      }
       await wc.setPosition(Offset(pos.dx, newY));
+      _currentY = newY;
     }).whenComplete(() {
       _programmaticMove = false;
     });
   }
 
-  Future<void> _sendVoiceTapToMain() async {
+  void _handleInputVisibilityChange(bool wasVisible, bool isVisible) {
+    if (wasVisible == isVisible) return;
+
+    final newSize = isVisible
+        ? AvatarSnapshot.kFloatingWindowSizeWithInput
+        : AvatarSnapshot.kFloatingWindowSize;
+
+    // Just resize — the window expands/shrinks downward.
+    // The Stack layout in DesktopAvatarView keeps the avatar at a fixed
+    // position from the (new) bottom, so it stays visually in place.
+    windowManager.setSize(newSize);
+
+    if (isVisible) {
+      _cancelWalk();
+    } else {
+      // Clear lens attachments when input is dismissed
+      if (mounted) {
+        setState(() {
+          _pendingLensAttachments = null;
+          _pendingLensPrompt = null;
+        });
+      }
+      _scheduleNextWander();
+    }
+  }
+
+  Future<void> _sendVoiceStartToMain() async {
+    _cancelWalk();
     try {
       final main = WindowController.fromWindowId(widget.mainWindowId);
-      await main.invokeMethod('avatarVoiceTap');
+      await main.invokeMethod('avatarVoiceStart');
+    } catch (_) {}
+  }
+
+  Future<void> _sendVoiceStopToMain() async {
+    try {
+      final main = WindowController.fromWindowId(widget.mainWindowId);
+      await main.invokeMethod('avatarVoiceStop');
+    } catch (_) {}
+  }
+
+  Future<void> _sendClickToMain() async {
+    _cancelWalk();
+    try {
+      final main = WindowController.fromWindowId(widget.mainWindowId);
+      await main.invokeMethod('avatarClick');
+    } catch (_) {}
+  }
+
+  Future<void> _sendDoubleClickToMain() async {
+    _cancelWalk();
+    try {
+      final main = WindowController.fromWindowId(widget.mainWindowId);
+      await main.invokeMethod('avatarDoubleClick');
+    } catch (_) {}
+  }
+
+  Future<void> _sendMenuActionToMain(String action) async {
+    try {
+      final main = WindowController.fromWindowId(widget.mainWindowId);
+      await main.invokeMethod('avatarMenuAction', action);
+    } catch (_) {}
+  }
+
+  bool _menuVisible = false;
+
+  Future<void> _onShowNativeMenu() async {
+    if (_menuVisible) return;
+    _menuVisible = true;
+
+    _cancelWalk();
+
+    final wc = _wc;
+    if (wc == null) {
+      _menuVisible = false;
+      return;
+    }
+
+    try {
+      final action = await wc.showPopupMenu(
+        items: const [
+          {'id': 1, 'label': '圈一圈', 'enabled': true},
+          {'id': 0, 'label': '', 'enabled': false},
+          {'id': 2, 'label': 'BoJi Desktop', 'enabled': true},
+          {'id': 3, 'label': 'Switch Window', 'enabled': false},
+        ],
+        actions: const {1: 'ai_lens', 2: 'show_main', 3: 'switch_window'},
+      );
+
+      _menuVisible = false;
+      if (!mounted) return;
+
+      if (action == 'ai_lens') {
+        await _enterLensMode();
+        return;
+      }
+
+      _scheduleNextWander();
+
+      if (action.isNotEmpty) {
+        _sendMenuActionToMain(action);
+      }
+    } catch (e) {
+      debugPrint('showPopupMenu error: $e');
+      _menuVisible = false;
+      if (mounted) _scheduleNextWander();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // BoJi Lens (圈一圈) — annotation mode
+  // ---------------------------------------------------------------------------
+
+  Future<void> _enterLensMode() async {
+    if (_lensActive) return;
+    if (_anchoredHwnd == 0) {
+      debugPrint('BoJiLens: no anchored window');
+      _scheduleNextWander();
+      return;
+    }
+    if (!Platform.isWindows) return;
+
+    // Capture anchored window screenshot before any UI changes
+    final capture = Win32ScreenCapture.captureWindow(_anchoredHwnd);
+    if (capture == null) {
+      debugPrint('BoJiLens: capture failed');
+      _scheduleNextWander();
+      return;
+    }
+    final title = Win32ScreenCapture.getWindowTitle(_anchoredHwnd);
+
+    // Get anchored window rect for expansion
+    final info = _getWinWindowRect(_anchoredHwnd);
+    if (info == null) {
+      debugPrint('BoJiLens: cannot get window rect');
+      _scheduleNextWander();
+      return;
+    }
+
+    // Save current avatar position and size
+    _lensPreX = _currentX;
+    _lensPreY = _currentY;
+    _lensPreSize = _windowSize;
+
+    final wc = _wc;
+    if (wc == null) return;
+
+    // Expand avatar window to cover anchored window
+    final expandW = info.width;
+    final expandH = info.height;
+    _programmaticMove = true;
+    await windowManager.setSize(Size(expandW, expandH));
+    await wc.setPosition(Offset(info.left, info.top));
+    _currentX = info.left;
+    _currentY = info.top;
+    _programmaticMove = false;
+
+    if (!mounted) return;
+    setState(() {
+      _lensActive = true;
+      _lensCapture = capture;
+      _lensRects = [];
+      _lensDrawingRect = null;
+      _lensWindowTitle = title;
+    });
+
+    debugPrint('BoJiLens: entered annotation mode for "$title" '
+        '(${capture.width}x${capture.height})');
+  }
+
+  // Pending lens attachments to push into the input field after lens exit
+  List<OutgoingAttachment>? _pendingLensAttachments;
+  String? _pendingLensPrompt;
+
+  Future<void> _exitLensMode({bool submit = false}) async {
+    if (!_lensActive) return;
+    debugPrint('BoJiLens: exiting annotation mode (submit=$submit, '
+        'rects=${_lensRects.length}, hasCapture=${_lensCapture != null})');
+
+    List<OutgoingAttachment>? lensAttachments;
+    String? lensPrompt;
+
+    if (submit && _lensCapture != null) {
+      final result = await _buildLensAttachment();
+      if (result != null) {
+        lensAttachments = [result.attachment];
+        lensPrompt = result.prompt;
+      }
+    }
+
+    final wc = _wc;
+    if (wc == null) return;
+
+    // Restore avatar window size — if we have lens results, use
+    // the "with input" size so the input field appears immediately.
+    _programmaticMove = true;
+    if (lensAttachments != null) {
+      await windowManager.setSize(AvatarSnapshot.kFloatingWindowSizeWithInput);
+    } else {
+      await windowManager.setSize(_lensPreSize);
+    }
+    await wc.setPosition(Offset(_lensPreX, _lensPreY));
+    _currentX = _lensPreX;
+    _currentY = _lensPreY;
+    _programmaticMove = false;
+
+    if (!mounted) return;
+    setState(() {
+      _lensActive = false;
+      _lensCapture = null;
+      _lensRects = [];
+      _lensDrawingRect = null;
+      _lensWindowTitle = '';
+      _pendingLensAttachments = lensAttachments;
+      _pendingLensPrompt = lensPrompt;
+    });
+
+    if (lensAttachments != null) {
+      // Tell main window to show input (toggles _showInput in AvatarController)
+      _sendDoubleClickToMain();
+    } else {
+      _scheduleNextWander();
+    }
+    debugPrint('BoJiLens: exited annotation mode');
+  }
+
+  /// Build an OutgoingAttachment + prompt from the current lens state.
+  Future<({OutgoingAttachment attachment, String prompt})?> _buildLensAttachment() async {
+    final capture = _lensCapture;
+    if (capture == null) return null;
+
+    debugPrint('BoJiLens: encoding PNG (${capture.width}x${capture.height})...');
+    final png = await capture.toPng();
+    if (png == null) {
+      debugPrint('BoJiLens: PNG encoding failed');
+      return null;
+    }
+    debugPrint('BoJiLens: PNG encoded, ${png.length} bytes');
+
+    final b64 = base64Encode(png);
+
+    final buf = StringBuffer();
+    buf.writeln('[BoJi Lens capture] Window: "$_lensWindowTitle"');
+    if (_lensRects.isNotEmpty) {
+      buf.writeln('Annotated regions:');
+      for (var i = 0; i < _lensRects.length; i++) {
+        final r = _lensRects[i];
+        final x = (r.left * capture.dpiScale).round();
+        final y = (r.top * capture.dpiScale).round();
+        final w = (r.width * capture.dpiScale).round();
+        final h = (r.height * capture.dpiScale).round();
+        buf.writeln('  ${i + 1}. ($x, $y): ${w}x$h');
+      }
+    }
+
+    return (
+      attachment: OutgoingAttachment(
+        type: 'image',
+        mimeType: 'image/png',
+        fileName: 'boji_lens_capture.png',
+        base64: b64,
+      ),
+      prompt: buf.toString(),
+    );
+  }
+
+  void _onLensRectStart(Offset localPos) {
+    if (!_lensActive) return;
+    setState(() {
+      _lensDrawingRect = Rect.fromLTWH(localPos.dx, localPos.dy, 0, 0);
+    });
+  }
+
+  void _onLensRectUpdate(Offset localPos, Offset startPos) {
+    if (!_lensActive) return;
+    setState(() {
+      _lensDrawingRect = Rect.fromPoints(startPos, localPos);
+    });
+  }
+
+  void _onLensRectEnd() {
+    if (!_lensActive || _lensDrawingRect == null) return;
+    final r = _lensDrawingRect!;
+    if (r.width.abs() >= 5 && r.height.abs() >= 5) {
+      final normalized = Rect.fromLTRB(
+        min(r.left, r.right), min(r.top, r.bottom),
+        max(r.left, r.right), max(r.top, r.bottom),
+      );
+      setState(() {
+        _lensRects = [..._lensRects, normalized];
+        _lensDrawingRect = null;
+      });
+    } else {
+      setState(() => _lensDrawingRect = null);
+    }
+  }
+
+  void _onLensUndo() {
+    if (!_lensActive || _lensRects.isEmpty) return;
+    setState(() {
+      _lensRects = List.from(_lensRects)..removeLast();
+    });
+  }
+
+  Future<void> _sendLensResultToMain() async {
+    final capture = _lensCapture;
+    if (capture == null) {
+      debugPrint('BoJiLens: no capture to send');
+      return;
+    }
+
+    debugPrint('BoJiLens: encoding PNG (${capture.width}x${capture.height})...');
+    final png = await capture.toPng();
+    if (png == null) {
+      debugPrint('BoJiLens: PNG encoding failed');
+      return;
+    }
+    debugPrint('BoJiLens: PNG encoded, ${png.length} bytes');
+
+    final rectsJson = _lensRects.map((r) => {
+      'x': (r.left * capture.dpiScale).round(),
+      'y': (r.top * capture.dpiScale).round(),
+      'w': (r.width * capture.dpiScale).round(),
+      'h': (r.height * capture.dpiScale).round(),
+    }).toList();
+
+    final b64 = base64Encode(png);
+    debugPrint('BoJiLens: base64 length=${b64.length}, rects=${rectsJson.length}, '
+        'title=$_lensWindowTitle, sending to main...');
+
+    try {
+      final main = WindowController.fromWindowId(widget.mainWindowId);
+      await main.invokeMethod('avatarLensResult', {
+        'windowTitle': _lensWindowTitle,
+        'rects': rectsJson,
+        'pngBase64': b64,
+      });
+      debugPrint('BoJiLens: result sent to main window');
+    } catch (e) {
+      debugPrint('BoJiLens: send result failed: $e');
+    }
+  }
+
+  Future<void> _sendTextSubmitToMain(String text,
+      {List<OutgoingAttachment> attachments = const []}) async {
+    try {
+      final main = WindowController.fromWindowId(widget.mainWindowId);
+      if (attachments.isEmpty) {
+        await main.invokeMethod('avatarTextSubmit', text);
+      } else {
+        await main.invokeMethod('avatarTextSubmitWithAttachments', {
+          'text': text,
+          'attachments': attachments
+              .map((a) => {
+                    'type': a.type,
+                    'mimeType': a.mimeType,
+                    'fileName': a.fileName,
+                    'base64': a.base64,
+                  })
+              .toList(),
+        });
+      }
+    } catch (e) {
+      debugPrint('AvatarInput: sendTextSubmitToMain error: $e');
+    }
+  }
+
+  Future<void> _sendInputDismissToMain() async {
+    try {
+      final main = WindowController.fromWindowId(widget.mainWindowId);
+      await main.invokeMethod('avatarInputDismiss');
     } catch (_) {}
   }
 
@@ -374,6 +1251,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
       colorArgb: _snapshot.colorArgb,
       gesture: _snapshot.gesture,
       isMoving: _snapshot.isMoving,
+      showInput: _snapshot.showInput,
     );
   }
 
@@ -390,12 +1268,35 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
         ),
       ),
       home: SizedBox.expand(
-        child: DesktopAvatarView(
-          snapshot: _displaySnapshot,
-          onAvatarTap: _sendVoiceTapToMain,
-          isFloatingWindow: true,
-          facingLeft: _facingLeft,
-        ),
+        child: _lensActive
+            ? LensAnnotationOverlay(
+                capture: _lensCapture,
+                rects: _lensRects,
+                drawingRect: _lensDrawingRect,
+                onRectStart: _onLensRectStart,
+                onRectUpdate: _onLensRectUpdate,
+                onRectEnd: _onLensRectEnd,
+                onUndo: _onLensUndo,
+                onCancel: () => _exitLensMode(submit: false),
+                onConfirm: () => _exitLensMode(submit: true),
+              )
+            : DesktopAvatarView(
+                snapshot: _displaySnapshot,
+                onVoiceStart: _sendVoiceStartToMain,
+                onVoiceStop: _sendVoiceStopToMain,
+                onAvatarClick: _sendClickToMain,
+                onAvatarDoubleClick: _sendDoubleClickToMain,
+                onShowNativeMenu: _onShowNativeMenu,
+                onTextSubmit: (text, {List<OutgoingAttachment> attachments = const []}) {
+                  _sendTextSubmitToMain(text, attachments: attachments);
+                },
+                onInputDismiss: _sendInputDismissToMain,
+                initialAttachments: _pendingLensAttachments,
+                initialText: _pendingLensPrompt,
+                preloadedTheme: _theme,
+                isFloatingWindow: true,
+                facingLeft: _facingLeft,
+              ),
       ),
     );
   }
@@ -405,7 +1306,400 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
 Future<void> initAvatarWindowEngine() async {
   await windowManager.ensureInitialized();
   await windowManager.waitUntilReadyToShow(null, () async {
+    await windowManager.setHasShadow(false);
+    await windowManager.setBackgroundColor(Colors.transparent);
+    await windowManager.setResizable(false);
+    await windowManager.setAlwaysOnTop(true);
     await windowManager.setSkipTaskbar(true);
     await windowManager.setTitle('BoJi Avatar');
+    await windowManager.show();
   });
 }
+
+// ---------------------------------------------------------------------------
+// Windows taskbar position via SHAppBarMessage (dart:ffi)
+// ---------------------------------------------------------------------------
+
+class _WinTaskbarInfo {
+  final double screenWidth;
+  final double screenHeight;
+  final bool atBottom;
+  final double taskbarHeight;
+  final double taskbarLeft;
+  final double taskbarRight;
+
+  _WinTaskbarInfo({
+    required this.screenWidth,
+    required this.screenHeight,
+    required this.atBottom,
+    required this.taskbarHeight,
+    required this.taskbarLeft,
+    required this.taskbarRight,
+  });
+}
+
+base class _RECT extends Struct {
+  @Int32()
+  external int left;
+  @Int32()
+  external int top;
+  @Int32()
+  external int right;
+  @Int32()
+  external int bottom;
+}
+
+base class _APPBARDATA extends Struct {
+  @Uint32()
+  external int cbSize;
+  @IntPtr()
+  external int hWnd;
+  @Uint32()
+  external int uCallbackMessage;
+  @Uint32()
+  external int uEdge;
+  external _RECT rc;
+  @IntPtr()
+  external int lParam;
+}
+
+const int _ABM_GETTASKBARPOS = 5;
+const int _ABE_BOTTOM = 3;
+
+typedef _SHAppBarMessageNative = IntPtr Function(
+    Uint32 dwMessage, Pointer<_APPBARDATA> pData);
+typedef _SHAppBarMessageDart = int Function(
+    int dwMessage, Pointer<_APPBARDATA> pData);
+
+typedef _GetSystemMetricsNative = Int32 Function(Int32 nIndex);
+typedef _GetSystemMetricsDart = int Function(int nIndex);
+
+const int _SM_CXSCREEN = 0;
+const int _SM_CYSCREEN = 1;
+
+typedef _GetDpiForSystemNative = Uint32 Function();
+typedef _GetDpiForSystemDart = int Function();
+
+_WinTaskbarInfo? _getWindowsTaskbarInfo() {
+  try {
+    final shell32 = DynamicLibrary.open('shell32.dll');
+    final user32 = DynamicLibrary.open('user32.dll');
+
+    final shAppBarMessage = shell32
+        .lookupFunction<_SHAppBarMessageNative, _SHAppBarMessageDart>(
+            'SHAppBarMessage');
+    final getSystemMetrics = user32
+        .lookupFunction<_GetSystemMetricsNative, _GetSystemMetricsDart>(
+            'GetSystemMetrics');
+
+    double scale = 1.0;
+    try {
+      final getDpiForSystem = user32
+          .lookupFunction<_GetDpiForSystemNative, _GetDpiForSystemDart>(
+              'GetDpiForSystem');
+      final dpi = getDpiForSystem();
+      if (dpi > 0) scale = dpi / 96.0;
+    } catch (_) {}
+
+    final screenWPhysical = getSystemMetrics(_SM_CXSCREEN);
+    final screenHPhysical = getSystemMetrics(_SM_CYSCREEN);
+    final screenW = screenWPhysical / scale;
+    final screenH = screenHPhysical / scale;
+
+    final abd = calloc<_APPBARDATA>();
+    abd.ref.cbSize = sizeOf<_APPBARDATA>();
+    final result = shAppBarMessage(_ABM_GETTASKBARPOS, abd);
+
+    if (result == 0) {
+      calloc.free(abd);
+      return null;
+    }
+
+    final edge = abd.ref.uEdge;
+    final rc = abd.ref.rc;
+    final tbLeft = rc.left / scale;
+    final tbTop = rc.top / scale;
+    final tbRight = rc.right / scale;
+    final tbBottom = rc.bottom / scale;
+    calloc.free(abd);
+
+    final atBottom = edge == _ABE_BOTTOM;
+    final tbHeight = atBottom ? (tbBottom - tbTop) : 0.0;
+
+    debugPrint('WinTaskbar: screen=${screenW}x$screenH, '
+        'edge=$edge, rect=($tbLeft,$tbTop)-($tbRight,$tbBottom), '
+        'scale=$scale');
+
+    return _WinTaskbarInfo(
+      screenWidth: screenW,
+      screenHeight: screenH,
+      atBottom: atBottom,
+      taskbarHeight: tbHeight,
+      taskbarLeft: tbLeft,
+      taskbarRight: tbRight,
+    );
+  } catch (e) {
+    debugPrint('_getWindowsTaskbarInfo failed: $e');
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Foreground / window rect helpers (Windows)
+// ---------------------------------------------------------------------------
+
+class _ForegroundWindowInfo {
+  final int hwnd;
+  final double left, top, width, height;
+  final bool isFullscreen;
+  final bool isSelf;
+  final bool isDesktop;
+  final int pid;
+
+  _ForegroundWindowInfo({
+    required this.hwnd,
+    required this.left,
+    required this.top,
+    required this.width,
+    required this.height,
+    required this.isFullscreen,
+    required this.isSelf,
+    required this.isDesktop,
+    required this.pid,
+  });
+}
+
+class _WindowRectInfo {
+  final double left, top, width, height;
+  final bool isFullscreen;
+
+  _WindowRectInfo({
+    required this.left,
+    required this.top,
+    required this.width,
+    required this.height,
+    required this.isFullscreen,
+  });
+}
+
+typedef _GetForegroundWindowNative = IntPtr Function();
+typedef _GetForegroundWindowDart = int Function();
+
+typedef _GetWindowRectNative = Int32 Function(IntPtr hWnd, Pointer<_RECT> lpRect);
+typedef _GetWindowRectDart = int Function(int hWnd, Pointer<_RECT> lpRect);
+
+typedef _GetWindowThreadProcessIdNative = Uint32 Function(
+    IntPtr hWnd, Pointer<Uint32> lpdwProcessId);
+typedef _GetWindowThreadProcessIdDart = int Function(
+    int hWnd, Pointer<Uint32> lpdwProcessId);
+
+typedef _IsWindowNative = Int32 Function(IntPtr hWnd);
+typedef _IsWindowDart = int Function(int hWnd);
+
+typedef _IsIconicNative = Int32 Function(IntPtr hWnd);
+typedef _IsIconicDart = int Function(int hWnd);
+
+typedef _GetDpiForWindowNative = Uint32 Function(IntPtr hWnd);
+typedef _GetDpiForWindowDart = int Function(int hWnd);
+
+typedef _GetClassNameNative = Int32 Function(
+    IntPtr hWnd, Pointer<Utf16> lpClassName, Int32 nMaxCount);
+typedef _GetClassNameDart = int Function(
+    int hWnd, Pointer<Utf16> lpClassName, int nMaxCount);
+
+typedef _FindWindowNative = IntPtr Function(
+    Pointer<Utf16> lpClassName, Pointer<Utf16> lpWindowName);
+typedef _FindWindowDart = int Function(
+    Pointer<Utf16> lpClassName, Pointer<Utf16> lpWindowName);
+
+late final DynamicLibrary _user32Lib = DynamicLibrary.open('user32.dll');
+
+/// HWND of the avatar window itself, set once at startup.
+/// Used to exclude self from foreground checks and for DPI-consistent positioning.
+int _avatarSelfHwnd = 0;
+
+int _getActiveWindow() {
+  try {
+    final fn = _user32Lib
+        .lookupFunction<IntPtr Function(), int Function()>('GetActiveWindow');
+    return fn();
+  } catch (_) {
+    return 0;
+  }
+}
+
+int _findWindowByTitle(String title) {
+  try {
+    final findWindow = _user32Lib
+        .lookupFunction<_FindWindowNative, _FindWindowDart>('FindWindowW');
+    final titlePtr = title.toNativeUtf16();
+    final hwnd = findWindow(Pointer.fromAddress(0), titlePtr);
+    malloc.free(titlePtr);
+    return hwnd;
+  } catch (_) {
+    return 0;
+  }
+}
+
+bool _isWindowValid(int hwnd) {
+  try {
+    final isWindow = _user32Lib
+        .lookupFunction<_IsWindowNative, _IsWindowDart>('IsWindow');
+    return isWindow(hwnd) != 0;
+  } catch (_) {
+    return false;
+  }
+}
+
+bool _isWindowMinimized(int hwnd) {
+  try {
+    final isIconic = _user32Lib
+        .lookupFunction<_IsIconicNative, _IsIconicDart>('IsIconic');
+    return isIconic(hwnd) != 0;
+  } catch (_) {
+    return false;
+  }
+}
+
+/// Returns the DPI scale for a specific window's monitor (per-monitor DPI).
+/// Falls back to system DPI if GetDpiForWindow is unavailable.
+double _getWinDpiScaleForWindow(int hwnd) {
+  try {
+    final getDpiForWindow = _user32Lib
+        .lookupFunction<_GetDpiForWindowNative, _GetDpiForWindowDart>(
+            'GetDpiForWindow');
+    final dpi = getDpiForWindow(hwnd);
+    if (dpi > 0) return dpi / 96.0;
+  } catch (_) {}
+  return _getWinDpiScaleSystem();
+}
+
+double _getWinDpiScaleSystem() {
+  try {
+    final getDpiForSystem = _user32Lib
+        .lookupFunction<_GetDpiForSystemNative, _GetDpiForSystemDart>(
+            'GetDpiForSystem');
+    final dpi = getDpiForSystem();
+    return dpi > 0 ? dpi / 96.0 : 1.0;
+  } catch (_) {
+    return 1.0;
+  }
+}
+
+/// Check if a window is a desktop shell window (Progman, WorkerW).
+bool _isDesktopWindow(int hwnd) {
+  try {
+    final getClassName = _user32Lib
+        .lookupFunction<_GetClassNameNative, _GetClassNameDart>('GetClassNameW');
+    final buf = calloc<Uint16>(256);
+    final len = getClassName(hwnd, buf.cast<Utf16>(), 256);
+    if (len <= 0) {
+      calloc.free(buf);
+      return false;
+    }
+    final className = buf.cast<Utf16>().toDartString();
+    calloc.free(buf);
+    return className == 'Progman' || className == 'WorkerW';
+  } catch (_) {
+    return false;
+  }
+}
+
+/// Get the rect of any window by HWND.
+///
+/// Coordinates are returned in the **avatar window's DPI space** so that
+/// `setPosition` (which multiplies by the avatar's DPI) produces the correct
+/// physical position. This is critical for multi-monitor setups where the
+/// target window may be on a monitor with a different DPI than the avatar.
+///
+/// [avatarHwnd] is the avatar window's HWND; pass 0 to fall back to system DPI.
+_WindowRectInfo? _getWinWindowRect(int hwnd, {int avatarHwnd = 0}) {
+  try {
+    final getWindowRect = _user32Lib
+        .lookupFunction<_GetWindowRectNative, _GetWindowRectDart>(
+            'GetWindowRect');
+    final getSystemMetrics = _user32Lib
+        .lookupFunction<_GetSystemMetricsNative, _GetSystemMetricsDart>(
+            'GetSystemMetrics');
+
+    // Use the avatar window's DPI for coordinate conversion so the round-trip
+    // through setPosition (which also uses the avatar's DPI) is consistent.
+    // This ensures cross-monitor positioning works even when monitors have
+    // different DPI (e.g. primary 150% + external 1080p at 100%).
+    final effectiveAvatarHwnd = avatarHwnd != 0 ? avatarHwnd : _avatarSelfHwnd;
+    final scale = effectiveAvatarHwnd != 0
+        ? _getWinDpiScaleForWindow(effectiveAvatarHwnd)
+        : _getWinDpiScaleSystem();
+
+    final rect = calloc<_RECT>();
+    final ok = getWindowRect(hwnd, rect);
+    if (ok == 0) {
+      calloc.free(rect);
+      return null;
+    }
+    final l = rect.ref.left / scale;
+    final t = rect.ref.top / scale;
+    final r = rect.ref.right / scale;
+    final b = rect.ref.bottom / scale;
+    calloc.free(rect);
+
+    final w = r - l;
+    final h = b - t;
+
+    final screenW = getSystemMetrics(_SM_CXSCREEN) / scale;
+    final screenH = getSystemMetrics(_SM_CYSCREEN) / scale;
+    final isFullscreen = w >= screenW * 0.95 && h >= screenH * 0.95;
+
+    return _WindowRectInfo(
+      left: l,
+      top: t,
+      width: w,
+      height: h,
+      isFullscreen: isFullscreen,
+    );
+  } catch (e) {
+    debugPrint('_getWinWindowRect failed: $e');
+    return null;
+  }
+}
+
+_ForegroundWindowInfo? _getWinForegroundInfo() {
+  try {
+    final getForegroundWindow = _user32Lib
+        .lookupFunction<_GetForegroundWindowNative, _GetForegroundWindowDart>(
+            'GetForegroundWindow');
+    final getWindowThreadProcessId = _user32Lib.lookupFunction<
+        _GetWindowThreadProcessIdNative,
+        _GetWindowThreadProcessIdDart>('GetWindowThreadProcessId');
+
+    final fgHwnd = getForegroundWindow();
+    if (fgHwnd == 0) return null;
+
+    final pidPtr = calloc<Uint32>();
+    getWindowThreadProcessId(fgHwnd, pidPtr);
+    final fgPid = pidPtr.value;
+    calloc.free(pidPtr);
+    final isSelf = fgPid == pid;
+    final isDesktop = _isDesktopWindow(fgHwnd);
+
+    final rectInfo = _getWinWindowRect(fgHwnd);
+    if (rectInfo == null) return null;
+
+    return _ForegroundWindowInfo(
+      hwnd: fgHwnd,
+      left: rectInfo.left,
+      top: rectInfo.top,
+      width: rectInfo.width,
+      height: rectInfo.height,
+      isFullscreen: rectInfo.isFullscreen,
+      isSelf: isSelf,
+      isDesktop: isDesktop,
+      pid: fgPid,
+    );
+  } catch (e) {
+    debugPrint('_getWinForegroundInfo failed: $e');
+    return null;
+  }
+}
+
+ 

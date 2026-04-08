@@ -24,6 +24,8 @@ class MultiWindowManager {
 
   void RemoveWindow(const std::string& window_id);
 
+  void SetIgnoreDpiChange(const std::string& window_id, bool ignore);
+
   void RemoveManagedFlutterWindowLater(const std::string& window_id);
 
   flutter::EncodableList GetAllWindows();
