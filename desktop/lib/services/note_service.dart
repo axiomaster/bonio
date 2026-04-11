@@ -250,6 +250,29 @@ class NoteService extends ChangeNotifier {
     return null;
   }
 
+  /// Save a reading companion note (Markdown text + URL) with #伴读 tag.
+  Future<BojiNote> saveReadingNote(String url, String markdown) async {
+    await init();
+    final id = const Uuid().v4();
+    final now = DateTime.now();
+    final ts = '${now.year}${_p2(now.month)}${_p2(now.day)}_'
+        '${_p2(now.hour)}${_p2(now.minute)}${_p2(now.second)}';
+    final fileName = '${ts}_${id.substring(0, 8)}.md';
+    final note = BojiNote(
+      id: id,
+      createdAt: now,
+      type: NoteType.text,
+      sourceApp: '伴读',
+      sourceUrl: url,
+      rawText: markdown,
+      fileName: fileName,
+      tags: ['伴读'],
+      summary: markdown.length > 80 ? '${markdown.substring(0, 80)}...' : markdown,
+      analyzed: true,
+    );
+    return saveNote(note, attachment: Uint8List.fromList(utf8.encode(markdown)));
+  }
+
   // ---------------------------------------------------------------------------
   // Gateway event handling (for async AI analysis responses)
   // ---------------------------------------------------------------------------
@@ -268,15 +291,13 @@ class NoteService extends ChangeNotifier {
     if (payload == null) return false;
 
     final sessionKey = payload['sessionKey'] as String?;
-    if (sessionKey != _analysisSessionKey) return false;
+    if (!_matchesNoteSession(sessionKey)) return false;
 
     if (event == 'agent') {
       final stream = payload['stream'] as String?;
-      final data = payload['data'] as Map<String, dynamic>?;
-      if (stream == 'assistant' && data != null) {
-        final text = data['text'] as String? ?? data['delta'] as String? ?? '';
+      if (stream == 'assistant') {
+        final text = _extractDeltaText(payload);
         if (text.isNotEmpty) {
-          // Accumulate text for all pending analyses (typically just one)
           for (final buf in _pendingAnalysis.values) {
             buf.write(text);
           }
@@ -288,13 +309,22 @@ class NoteService extends ChangeNotifier {
     if (event == 'chat') {
       final state = payload['state'] as String?;
       final runId = payload['runId'] as String?;
+
+      if (state == 'delta') {
+        final text = _extractDeltaText(payload);
+        if (text.isNotEmpty) {
+          for (final buf in _pendingAnalysis.values) {
+            buf.write(text);
+          }
+        }
+        return true;
+      }
+
       if (state == 'final' || state == 'aborted' || state == 'error') {
-        // Try to match by runId first
         if (runId != null && _analysisCompleters.containsKey(runId)) {
           final text = _pendingAnalysis.remove(runId)?.toString() ?? '';
           _analysisCompleters.remove(runId)?.complete(text);
         } else if (_analysisCompleters.length == 1) {
-          // Fallback: if only one pending analysis, complete it
           final key = _analysisCompleters.keys.first;
           final text = _pendingAnalysis.remove(key)?.toString() ?? '';
           _analysisCompleters.remove(key)?.complete(text);
@@ -304,6 +334,46 @@ class NoteService extends ChangeNotifier {
     }
 
     return false;
+  }
+
+  /// OpenClaw canonicalizes session keys, e.g. `boji-notes` may become
+  /// `agent:boji-notes:main`. Match flexibly so streaming events are captured.
+  static const _readingSessionKey = 'boji-reading';
+
+  bool _matchesNoteSession(String? eventKey) {
+    if (eventKey == null || eventKey.trim().isEmpty) return false;
+    final k = eventKey.trim();
+    if (k == _analysisSessionKey || k == _readingSessionKey) return true;
+    if (k.contains(_analysisSessionKey) || k.contains(_readingSessionKey)) {
+      return true;
+    }
+    return false;
+  }
+
+  /// Extract assistant text from either format the server may use:
+  ///  - `payload.data.text` / `payload.data.delta`  (agent event)
+  ///  - `payload.message.content[{type:"text", text:"..."}]`  (chat delta)
+  static String _extractDeltaText(Map<String, dynamic> payload) {
+    // Format 1: message.content[].text (used by chat delta events)
+    final message = payload['message'] as Map<String, dynamic>?;
+    if (message != null) {
+      final content = message['content'] as List<dynamic>?;
+      if (content != null) {
+        for (final item in content) {
+          if (item is Map<String, dynamic> && item['type'] == 'text') {
+            final t = item['text'] as String?;
+            if (t != null && t.isNotEmpty) return t;
+          }
+        }
+      }
+    }
+    // Format 2: data.text or data.delta (used by agent events)
+    final data = payload['data'] as Map<String, dynamic>?;
+    if (data != null) {
+      final t = data['text'] as String? ?? data['delta'] as String?;
+      if (t != null && t.isNotEmpty) return t;
+    }
+    return '';
   }
 
   // ---------------------------------------------------------------------------

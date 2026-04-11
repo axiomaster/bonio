@@ -11,6 +11,7 @@ import 'l10n/app_strings.dart';
 import 'providers/app_state.dart';
 import 'services/tray_service.dart';
 import 'ui/screens/main_screen.dart';
+import 'ui/screens/reading_companion_screen.dart';
 import 'ui/screens/search_similar_screen.dart';
 
 /// Resolves `bojiWindow: avatar` JSON from plugin + entrypoint args.
@@ -80,6 +81,13 @@ Future<void> main(List<String> args) async {
   if (windowType == 'search_similar') {
     final imagePath = payload['imagePath'] as String? ?? '';
     runApp(SearchSimilarApp(imagePath: imagePath));
+    return;
+  }
+
+  if (windowType == 'reading_companion') {
+    final url = payload['url'] as String? ?? '';
+    final mainId = payload['mainWindowId']?.toString() ?? '';
+    runApp(ReadingCompanionApp(url: url, mainWindowId: mainId));
     return;
   }
 
