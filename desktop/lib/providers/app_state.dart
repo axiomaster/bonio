@@ -11,6 +11,7 @@ import 'package:window_manager/window_manager.dart';
 
 import '../l10n/app_strings.dart';
 import '../models/agent_avatar_models.dart';
+import '../platform/win32_screen_capture.dart';
 import '../models/chat_models.dart';
 import '../models/gateway_profile.dart';
 import '../models/note_models.dart';
@@ -155,6 +156,49 @@ class AppState extends ChangeNotifier {
       await runtime.createSearchWindow(path, avatarX, avatarY);
     } catch (e) {
       debugPrint('AppState: search_similar error: $e');
+    }
+  }
+
+  Future<void> _handleReadingSave(Map<String, dynamic> data) async {
+    final url = data['url'] as String? ?? '';
+    final markdown = data['markdown'] as String? ?? '';
+    if (markdown.isEmpty) return;
+    try {
+      await runtime.noteService.saveReadingNote(url, markdown);
+      debugPrint('AppState: reading note saved');
+    } catch (e) {
+      debugPrint('AppState: reading save error: $e');
+    }
+  }
+
+  Future<void> _handleStartReading(Map<String, dynamic> data) async {
+    final hwnd = (data['hwnd'] as num?)?.toInt() ?? 0;
+    final url = data['url'] as String? ?? '';
+    if (url.isEmpty) {
+      debugPrint('AppState: start_reading has no URL');
+      return;
+    }
+
+    final ctrl = runtime.avatarController;
+    ctrl.setBubble(text: S.current.readingExtracting);
+    ctrl.showTemporaryState(AgentAvatarActivity.thinking);
+
+    final workArea = Win32ScreenCapture.getMonitorWorkArea(hwnd);
+    if (workArea != null && hwnd != 0) {
+      final monX = workArea[0];
+      final monY = workArea[1];
+      final monW = workArea[2];
+      final monH = workArea[3];
+      final browserW = (monW * 0.7).round();
+      Win32ScreenCapture.resizeWindow(hwnd, monX, monY, browserW, monH);
+      final companionX = (monX + browserW).toDouble();
+      final companionY = monY.toDouble();
+      final companionW = (monW - browserW).toDouble();
+      final companionH = monH.toDouble();
+      await runtime.createReadingWindow(
+          url, companionX, companionY, companionW, companionH);
+    } else {
+      await runtime.createReadingWindow(url, 0, 0, 500, 800);
     }
   }
 
@@ -344,12 +388,19 @@ class AppState extends ChangeNotifier {
                 _handleNoteCaptureWithData(m);
               } else if (action == 'search_similar') {
                 _handleSearchSimilar(m);
+              } else if (action == 'start_reading') {
+                _handleStartReading(m);
               }
             }
           case 'avatarDrop':
             final data = call.arguments;
             if (data is Map) {
               _handleAvatarDrop(Map<String, dynamic>.from(data));
+            }
+          case 'readingSave':
+            final data = call.arguments;
+            if (data is Map) {
+              _handleReadingSave(Map<String, dynamic>.from(data));
             }
           case 'avatarInputDismiss':
             runtime.avatarController.hideInput();

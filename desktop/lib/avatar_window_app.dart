@@ -976,13 +976,14 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
           {'id': 1, 'label': s.menuTakeNote, 'enabled': true},
           {'id': 4, 'label': s.menuAiLens, 'enabled': true},
           {'id': 5, 'label': s.menuSearchSimilar, 'enabled': true},
+          {'id': 6, 'label': s.menuStartReading, 'enabled': true},
           {'id': 0, 'label': '', 'enabled': false},
           {'id': 2, 'label': s.appName, 'enabled': true},
           {'id': 3, 'label': s.menuSwitchWindow, 'enabled': false},
         ],
         actions: const {
           1: 'note_capture', 4: 'ai_lens', 5: 'search_similar',
-          2: 'show_main', 3: 'switch_window',
+          6: 'start_reading', 2: 'show_main', 3: 'switch_window',
         },
       );
 
@@ -1001,6 +1002,11 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
 
       if (action == 'note_capture') {
         _handleNoteCapture();
+        return;
+      }
+
+      if (action == 'start_reading') {
+        _handleStartReading();
         return;
       }
 
@@ -1026,9 +1032,26 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
       _scheduleNextWander();
       return;
     }
-    // Send both the action and the HWND to the main engine so it can
-    // capture the window and store the note.
     _sendMenuActionToMainWithData('note_capture', {'hwnd': _anchoredHwnd});
+    _scheduleNextWander();
+  }
+
+  void _handleStartReading() {
+    if (_anchoredHwnd == 0) {
+      debugPrint('StartReading: no anchored window');
+      _scheduleNextWander();
+      return;
+    }
+    final url = Win32ScreenCapture.getBrowserUrl(_anchoredHwnd);
+    if (url == null || url.isEmpty) {
+      debugPrint('StartReading: no browser URL detected');
+      _scheduleNextWander();
+      return;
+    }
+    _sendMenuActionToMainWithData('start_reading', {
+      'hwnd': _anchoredHwnd,
+      'url': url,
+    });
     _scheduleNextWander();
   }
 

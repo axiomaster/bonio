@@ -41,4 +41,5 @@ flutter:
   uses-material-design: true
   assets:
     - assets/themes/default-cat/
+    - assets/reading/
     - assets/app_icon.ico

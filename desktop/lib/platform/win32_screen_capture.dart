@@ -17,6 +17,17 @@ typedef _GetWindowTextWDart = int Function(int hwnd, Pointer<Utf16> buf, int max
 typedef _GetDpiForWindowNative = Uint32 Function(IntPtr hwnd);
 typedef _GetDpiForWindowDart = int Function(int hwnd);
 
+typedef _SetWindowPosNative = Int32 Function(
+    IntPtr hwnd, IntPtr insertAfter, Int32 x, Int32 y, Int32 cx, Int32 cy, Uint32 flags);
+typedef _SetWindowPosDart = int Function(
+    int hwnd, int insertAfter, int x, int y, int cx, int cy, int flags);
+
+typedef _MonitorFromWindowNative = IntPtr Function(IntPtr hwnd, Uint32 flags);
+typedef _MonitorFromWindowDart = int Function(int hwnd, int flags);
+
+typedef _GetMonitorInfoNative = Int32 Function(IntPtr hMonitor, Pointer info);
+typedef _GetMonitorInfoDart = int Function(int hMonitor, Pointer info);
+
 /// Win32 FFI screen/window capture using BitBlt / PrintWindow.
 class Win32ScreenCapture {
   static final _user32 = DynamicLibrary.open('user32.dll');
@@ -278,6 +289,56 @@ class Win32ScreenCapture {
       return null;
     } catch (e) {
       debugPrint('Win32ScreenCapture.getBrowserUrl: failed: $e');
+      return null;
+    }
+  }
+
+  /// Resize and reposition a window using Win32 SetWindowPos.
+  static bool resizeWindow(int hwnd, int x, int y, int w, int h) {
+    if (hwnd == 0) return false;
+    try {
+      final setWindowPos = _user32.lookupFunction<
+          _SetWindowPosNative, _SetWindowPosDart>('SetWindowPos');
+      const swpNoZOrder = 0x0004;
+      const swpNoActivate = 0x0010;
+      return setWindowPos(hwnd, 0, x, y, w, h, swpNoZOrder | swpNoActivate) != 0;
+    } catch (e) {
+      debugPrint('Win32ScreenCapture.resizeWindow: $e');
+      return false;
+    }
+  }
+
+  /// Returns the work area (excluding taskbar) of the monitor containing [hwnd]
+  /// as [left, top, width, height] in physical pixels.
+  static List<int>? getMonitorWorkArea(int hwnd) {
+    if (hwnd == 0) return null;
+    try {
+      final monitorFromWindow = _user32.lookupFunction<
+          _MonitorFromWindowNative, _MonitorFromWindowDart>('MonitorFromWindow');
+      const monitorDefaultToNearest = 2;
+      final hMonitor = monitorFromWindow(hwnd, monitorDefaultToNearest);
+      if (hMonitor == 0) return null;
+
+      // MONITORINFO: cbSize(4) + rcMonitor(16) + rcWork(16) + dwFlags(4) = 40 bytes
+      final info = calloc<Uint8>(40);
+      info.cast<Uint32>().value = 40; // cbSize
+      final getMonitorInfo = _user32.lookupFunction<
+          _GetMonitorInfoNative, _GetMonitorInfoDart>('GetMonitorInfoW');
+      final ok = getMonitorInfo(hMonitor, info.cast());
+      if (ok == 0) {
+        calloc.free(info);
+        return null;
+      }
+      // rcWork starts at offset 20 (after cbSize=4 + rcMonitor=16)
+      final rcWork = info.cast<Int32>().elementAt(5); // offset 20 / 4
+      final left = rcWork[0];
+      final top = rcWork[1];
+      final right = rcWork[2];
+      final bottom = rcWork[3];
+      calloc.free(info);
+      return [left, top, right - left, bottom - top];
+    } catch (e) {
+      debugPrint('Win32ScreenCapture.getMonitorWorkArea: $e');
       return null;
     }
   }

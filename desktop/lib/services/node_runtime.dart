@@ -219,6 +219,30 @@ class NodeRuntime extends ChangeNotifier {
     }
   }
 
+  Future<void> createReadingWindow(
+      String url, double x, double y, double w, double h) async {
+    try {
+      final main = await WindowController.fromCurrentEngine();
+      final wc = await WindowController.create(
+        WindowConfiguration(
+          hiddenAtLaunch: true,
+          borderless: false,
+          width: w,
+          height: h,
+          arguments: jsonEncode({
+            'bojiWindow': 'reading_companion',
+            'url': url,
+            'mainWindowId': main.windowId,
+          }),
+        ),
+      );
+      await wc.setPosition(Offset(x, y));
+      await wc.show();
+    } catch (e, st) {
+      debugPrint('createReadingWindow: $e\n$st');
+    }
+  }
+
   Future<void> createSearchWindow(String imagePath, double x, double y) async {
     try {
       final main = await WindowController.fromCurrentEngine();

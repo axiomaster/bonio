@@ -47,7 +47,19 @@ abstract class S {
   String get menuTakeNote;
   String get menuAiLens;
   String get menuSearchSimilar;
+  String get menuStartReading;
   String get menuSwitchWindow;
+
+  // ── Reading companion ──
+  String get readingTitle;
+  String get readingExtracting;
+  String get readingAnalyzing;
+  String get readingSave;
+  String get readingSaveSuccess;
+  String get readingTocTitle;
+  String get readingClose;
+  String get readingNoBrowserUrl;
+  String get readingEditorLoading;
 
   // ── Chat ──
   String get chatConnectToStart;
@@ -255,7 +267,18 @@ class _SZh extends S {
   @override String get menuTakeNote => '记一记';
   @override String get menuAiLens => '圈一圈';
   @override String get menuSearchSimilar => '搜同款';
+  @override String get menuStartReading => '伴读';
   @override String get menuSwitchWindow => '切换窗口';
+
+  @override String get readingTitle => '伴读';
+  @override String get readingExtracting => '正在提取内容...';
+  @override String get readingAnalyzing => '正在生成摘要...';
+  @override String get readingSave => '入库';
+  @override String get readingSaveSuccess => '已存入记忆';
+  @override String get readingTocTitle => '目录';
+  @override String get readingClose => '关闭伴读';
+  @override String get readingNoBrowserUrl => '未检测到浏览器URL';
+  @override String get readingEditorLoading => '编辑器加载中...';
 
   @override String get chatConnectToStart => '连接网关开始聊天';
   @override String get chatDisconnected => '已断开';
@@ -449,7 +472,18 @@ class _SEn extends S {
   @override String get menuTakeNote => 'Take Note';
   @override String get menuAiLens => 'AI Lens';
   @override String get menuSearchSimilar => 'Search Similar';
+  @override String get menuStartReading => 'Reading';
   @override String get menuSwitchWindow => 'Switch Window';
+
+  @override String get readingTitle => 'Reading Companion';
+  @override String get readingExtracting => 'Extracting content...';
+  @override String get readingAnalyzing => 'Generating summary...';
+  @override String get readingSave => 'Save';
+  @override String get readingSaveSuccess => 'Saved to memory';
+  @override String get readingTocTitle => 'Table of Contents';
+  @override String get readingClose => 'Close';
+  @override String get readingNoBrowserUrl => 'No browser URL detected';
+  @override String get readingEditorLoading => 'Loading editor...';
 
   @override String get chatConnectToStart => 'Connect to a gateway to start chatting';
   @override String get chatDisconnected => 'Disconnected';

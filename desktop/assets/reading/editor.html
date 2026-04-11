@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/vditor/dist/index.css" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; background: #fff; }
+  #vditor { height: 100%; }
+  .vditor { border: none !important; }
+</style>
+</head>
+<body>
+<div id="vditor"></div>
+<script src="https://cdn.jsdelivr.net/npm/vditor/dist/index.min.js"></script>
+<script>
+let vditor;
+function initEditor(initialContent) {
+  vditor = new Vditor('vditor', {
+    mode: 'ir',
+    toolbar: [
+      'headings', 'bold', 'italic', 'strike', '|',
+      'list', 'ordered-list', 'check', '|',
+      'quote', 'code', 'inline-code', '|',
+      'undo', 'redo'
+    ],
+    cache: { enable: false },
+    value: initialContent || '',
+    height: '100%',
+    placeholder: '伴读笔记...',
+    after: function() {
+      if (initialContent) vditor.setValue(initialContent);
+    }
+  });
+}
+
+function setContent(md) {
+  if (vditor) vditor.setValue(md);
+}
+
+function getContent() {
+  return vditor ? vditor.getValue() : '';
+}
+</script>
+</body>
+</html>
