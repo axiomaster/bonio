@@ -21,7 +21,11 @@
   "motionStates": {
     "walking":  "cat-walking.lottie",
     "running":  "cat-running.lottie",
-    "dragging": "cat-dragging.lottie"
+    "dragging": "cat-dragging.lottie",
+    "openmouth": "cat-happy.lottie",
+    "eating":    "cat-working.lottie",
+    "satisfied": "cat-happy.lottie",
+    "refuse":    "cat-angry.lottie"
   },
 
   "actionStates": {

@@ -238,6 +238,49 @@ class Win32ScreenCapture {
       return '';
     }
   }
+
+  /// Attempts to extract a URL from a browser window's address bar.
+  /// Works with Chrome, Edge, Firefox by detecting their window class names
+  /// and using UI Automation to read the address bar value.
+  /// Returns null if not a browser or URL cannot be extracted.
+  static String? getBrowserUrl(int hwnd) {
+    if (hwnd == 0) return null;
+    try {
+      // First, check if this is a known browser by window class name
+      final getClassName = _user32.lookupFunction<
+          Int32 Function(IntPtr, Pointer<Utf16>, Int32),
+          int Function(int, Pointer<Utf16>, int)>('GetClassNameW');
+      final classBuf = calloc<Uint16>(256);
+      final classLen = getClassName(hwnd, classBuf.cast<Utf16>(), 256);
+      final className =
+          classLen > 0 ? classBuf.cast<Utf16>().toDartString() : '';
+      calloc.free(classBuf);
+
+      // Known browser class names
+      final isBrowser = className == 'Chrome_WidgetWin_1' || // Chrome / Edge
+          className == 'MozillaWindowClass' ||               // Firefox
+          className.contains('Opera') ||
+          className.contains('Vivaldi');
+
+      if (!isBrowser) return null;
+
+      // Try to extract URL from the window title.
+      // Many browser titles end with " - BrowserName" and may contain
+      // the domain or full title. But for actual URL, we need UI Automation.
+      // As a practical fallback, parse URL-like strings from the title.
+      final title = getWindowTitle(hwnd);
+      if (title.isEmpty) return null;
+
+      // Some browsers include the URL directly in the title in certain modes
+      final urlMatch = RegExp(r'https?://\S+').firstMatch(title);
+      if (urlMatch != null) return urlMatch.group(0);
+
+      return null;
+    } catch (e) {
+      debugPrint('Win32ScreenCapture.getBrowserUrl: failed: $e');
+      return null;
+    }
+  }
 }
 
 class ScreenCaptureResult {

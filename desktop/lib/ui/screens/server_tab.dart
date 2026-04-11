@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../l10n/app_strings.dart';
 import '../../models/gateway_profile.dart';
 import '../../models/skill_models.dart';
 import '../../providers/app_state.dart';
@@ -55,7 +56,7 @@ class _ServerTabState extends State<ServerTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Server',
+            Text(S.current.serverTitle,
                 style: theme.textTheme.headlineSmall
                     ?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 24),
@@ -74,7 +75,7 @@ class _ServerTabState extends State<ServerTab> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Gateway Connection',
+                            S.current.serverGatewayConnection,
                             style: theme.textTheme.titleMedium
                                 ?.copyWith(fontWeight: FontWeight.w600),
                             overflow: TextOverflow.ellipsis,
@@ -95,23 +96,22 @@ class _ServerTabState extends State<ServerTab> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Gateway',
+                      S.current.serverGateway,
                       style: theme.textTheme.titleSmall
                           ?.copyWith(fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 8),
                     SegmentedButton<GatewayProfile>(
-                      segments: const [
+                      segments: [
                         ButtonSegment<GatewayProfile>(
                           value: GatewayProfile.openclaw,
-                          label: Text('OpenClaw'),
-                          tooltip:
-                              'OpenClaw-compatible gateway (default port 18789)',
+                          label: Text(S.current.serverOpenClaw),
+                          tooltip: S.current.serverOpenClawDesc,
                         ),
                         ButtonSegment<GatewayProfile>(
                           value: GatewayProfile.hiclaw,
-                          label: Text('HiClaw'),
-                          tooltip: 'HiClaw server (default port 10724)',
+                          label: Text(S.current.serverHiClaw),
+                          tooltip: S.current.serverHiClawDesc,
                         ),
                       ],
                       emptySelectionAllowed: false,
@@ -148,7 +148,7 @@ class _ServerTabState extends State<ServerTab> {
                           child: TextField(
                             controller: _hostController,
                             decoration:
-                                const InputDecoration(labelText: 'Host'),
+                                InputDecoration(labelText: S.current.serverHost),
                             enabled: !isConnected,
                             onChanged: (v) => appState.updateConnectionSettings(
                                 host: v),
@@ -159,7 +159,7 @@ class _ServerTabState extends State<ServerTab> {
                           child: TextField(
                             controller: _portController,
                             decoration:
-                                const InputDecoration(labelText: 'Port'),
+                                InputDecoration(labelText: S.current.serverPort),
                             enabled: !isConnected,
                             keyboardType: TextInputType.number,
                             onChanged: (v) {
@@ -175,8 +175,8 @@ class _ServerTabState extends State<ServerTab> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: _tokenController,
-                      decoration: const InputDecoration(
-                        labelText: 'Token (optional)',
+                      decoration: InputDecoration(
+                        labelText: S.current.serverToken,
                       ),
                       obscureText: true,
                       enabled: !isConnected,
@@ -194,7 +194,7 @@ class _ServerTabState extends State<ServerTab> {
                                   appState.updateConnectionSettings(tls: v),
                         ),
                         const SizedBox(width: 8),
-                        Text('TLS', style: theme.textTheme.bodyMedium),
+                        Text(S.current.serverTls, style: theme.textTheme.bodyMedium),
                         const Spacer(),
                         if (isConnected)
                           FilledButton.tonal(
@@ -204,14 +204,14 @@ class _ServerTabState extends State<ServerTab> {
                                   colorScheme.error.withOpacity(0.15),
                               foregroundColor: colorScheme.error,
                             ),
-                            child: const Text('Disconnect'),
+                            child: Text(S.current.serverDisconnect),
                           )
                         else
                           FilledButton(
                             onPressed: appState.host.trim().isEmpty
                                 ? null
                                 : appState.connectToGateway,
-                            child: const Text('Connect'),
+                            child: Text(S.current.serverConnect),
                           ),
                       ],
                     ),
@@ -233,7 +233,7 @@ class _ServerTabState extends State<ServerTab> {
                         Icon(Icons.model_training,
                             size: 20, color: colorScheme.primary),
                         const SizedBox(width: 8),
-                        Text('Model Configuration',
+                        Text(S.current.serverModelConfig,
                             style: theme.textTheme.titleMedium
                                 ?.copyWith(fontWeight: FontWeight.w600)),
                       ],
@@ -241,28 +241,28 @@ class _ServerTabState extends State<ServerTab> {
                     const SizedBox(height: 16),
                     if (runtime.serverConfig != null) ...[
                       _InfoRow(
-                        label: 'Default Model',
+                        label: S.current.serverDefaultModel,
                         value: runtime.serverConfig!.defaultModel.isEmpty
-                            ? '(not set)'
+                            ? S.current.serverNotSet
                             : runtime.serverConfig!.defaultModel,
                       ),
                       const SizedBox(height: 8),
                       _InfoRow(
-                        label: 'Configured Models',
-                        value:
-                            '${runtime.serverConfig!.models.length} model(s)',
+                        label: S.current.serverConfiguredModels,
+                        value: S.current.serverModelsCount(
+                            runtime.serverConfig!.models.length),
                       ),
                       const SizedBox(height: 8),
                       _InfoRow(
-                        label: 'Providers',
-                        value:
-                            '${runtime.serverConfig!.providers.length} provider(s)',
+                        label: S.current.serverProviders,
+                        value: S.current.serverProvidersCount(
+                            runtime.serverConfig!.providers.length),
                       ),
                     ] else ...[
                       Text(
                         isConnected
-                            ? 'Loading configuration...'
-                            : 'Connect to view configuration',
+                            ? S.current.serverLoadingConfig
+                            : S.current.serverConnectToView,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: colorScheme.onSurface.withOpacity(0.5),
                         ),
@@ -275,7 +275,7 @@ class _ServerTabState extends State<ServerTab> {
                         onPressed: isConnected
                             ? () => setState(() => _showModelConfig = true)
                             : null,
-                        child: const Text('Configure Models'),
+                        child: Text(S.current.serverConfigureModels),
                       ),
                     ),
                   ],
@@ -303,24 +303,25 @@ class _ServerTabState extends State<ServerTab> {
                           Icon(Icons.info_outline,
                               size: 20, color: colorScheme.primary),
                           const SizedBox(width: 8),
-                          Text('Server Info',
+                          Text(S.current.serverInfo,
                               style: theme.textTheme.titleMedium
                                   ?.copyWith(fontWeight: FontWeight.w600)),
                         ],
                       ),
                       const SizedBox(height: 16),
                       _InfoRow(
-                          label: 'Server',
-                          value: runtime.serverName ?? 'Unknown'),
+                          label: S.current.serverTitle,
+                          value: runtime.serverName ?? S.current.serverUnknown),
                       const SizedBox(height: 8),
                       _InfoRow(
-                          label: 'Address',
-                          value: runtime.remoteAddress ?? 'Unknown'),
+                          label: S.current.serverAddress,
+                          value: runtime.remoteAddress ?? S.current.serverUnknown),
                       const SizedBox(height: 8),
                       _InfoRow(
-                        label: 'Node Session',
-                        value:
-                            runtime.nodeConnected ? 'Connected' : 'Offline',
+                        label: S.current.serverNodeSession,
+                        value: runtime.nodeConnected
+                            ? S.current.serverConnected
+                            : S.current.serverOffline,
                       ),
                     ],
                   ),
@@ -452,11 +453,11 @@ class _SkillsSectionCardState extends State<_SkillsSectionCard> {
                 Icon(Icons.extension, size: 20, color: colorScheme.primary),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text('Skills',
+                  child: Text(S.current.serverSkills,
                       style: theme.textTheme.titleMedium
                           ?.copyWith(fontWeight: FontWeight.w600)),
                 ),
-                Text('${skills.length} total',
+                Text(S.current.serverSkillsTotal(skills.length),
                     style: theme.textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurface.withOpacity(0.5))),
                 const SizedBox(width: 4),
@@ -487,7 +488,7 @@ class _SkillsSectionCardState extends State<_SkillsSectionCard> {
                     onPressed: widget.isConnected && !skillsLoading
                         ? () => runtime.refreshSkills()
                         : null,
-                    tooltip: 'Refresh',
+                    tooltip: S.current.chatRefresh,
                     visualDensity: VisualDensity.compact,
                   ),
                   const SizedBox(width: 4),
@@ -496,7 +497,7 @@ class _SkillsSectionCardState extends State<_SkillsSectionCard> {
                     onPressed: widget.isConnected
                         ? () => _showInstallDialog(context)
                         : null,
-                    tooltip: 'Install Skill',
+                    tooltip: S.current.serverInstallSkill,
                     visualDensity: VisualDensity.compact,
                   ),
                 ],
@@ -517,7 +518,7 @@ class _SkillsSectionCardState extends State<_SkillsSectionCard> {
                   ),
                 ),
               if (!widget.isConnected)
-                Text('Not connected to server',
+                Text(S.current.serverNotConnected,
                     style: theme.textTheme.bodyMedium?.copyWith(
                         color: colorScheme.onSurface.withOpacity(0.5)))
               else if (skillsLoading && skills.isEmpty)
@@ -526,7 +527,7 @@ class _SkillsSectionCardState extends State<_SkillsSectionCard> {
                   child: Center(child: CircularProgressIndicator()),
                 )
               else if (skills.isEmpty)
-                Text('No skills found',
+                Text(S.current.serverNoSkills,
                     style: theme.textTheme.bodyMedium?.copyWith(
                         color: colorScheme.onSurface.withOpacity(0.5)))
               else
@@ -542,14 +543,13 @@ class _SkillsSectionCardState extends State<_SkillsSectionCard> {
       BuildContext context, List<SkillInfo> skills, dynamic runtime) {
     final builtins = skills.where((s) => s.builtin).toList();
     final custom = skills.where((s) => !s.builtin).toList();
-    final theme = Theme.of(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (builtins.isNotEmpty) ...[
           _CollapsibleHeader(
-            title: 'Built-in',
+            title: S.current.serverBuiltIn,
             count: builtins.length,
             expanded: _builtinExpanded,
             onToggle: () =>
@@ -564,7 +564,7 @@ class _SkillsSectionCardState extends State<_SkillsSectionCard> {
         ],
         if (custom.isNotEmpty) ...[
           _CollapsibleHeader(
-            title: 'Installed',
+            title: S.current.serverInstalled,
             count: custom.length,
             expanded: _customExpanded,
             onToggle: () =>
@@ -586,13 +586,13 @@ class _SkillsSectionCardState extends State<_SkillsSectionCard> {
     showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Remove Skill'),
-        content: Text(
-            'Remove "${skill.name.isNotEmpty ? skill.name : skill.id}"? This cannot be undone.'),
+        title: Text(S.current.serverRemoveSkillTitle),
+        content: Text(S.current.serverRemoveSkillBody(
+            skill.name.isNotEmpty ? skill.name : skill.id)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel'),
+            child: Text(S.current.cancel),
           ),
           TextButton(
             onPressed: () {
@@ -600,7 +600,7 @@ class _SkillsSectionCardState extends State<_SkillsSectionCard> {
               runtime.removeSkill(skill.id);
             },
             child:
-                Text('Remove', style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
+                Text(S.current.remove, style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
           ),
         ],
       ),
@@ -727,7 +727,7 @@ class _SkillTile extends StatelessWidget {
                     color: theme.colorScheme.error.withOpacity(0.7)),
                 onPressed: onRemove,
                 visualDensity: VisualDensity.compact,
-                tooltip: 'Remove',
+                tooltip: S.current.remove,
               ),
             Switch(
               value: skill.enabled,
@@ -762,7 +762,7 @@ class _InstallSkillDialogState extends State<_InstallSkillDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Install Skill'),
+      title: Text(S.current.serverInstallSkill),
       content: SizedBox(
         width: 400,
         child: Column(
@@ -770,13 +770,13 @@ class _InstallSkillDialogState extends State<_InstallSkillDialog> {
           children: [
             TextField(
               controller: _idController,
-              decoration: const InputDecoration(labelText: 'Skill ID'),
+              decoration: InputDecoration(labelText: S.current.serverSkillId),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _contentController,
               decoration:
-                  const InputDecoration(labelText: 'SKILL.md Content'),
+                  InputDecoration(labelText: S.current.serverSkillContent),
               minLines: 4,
               maxLines: 8,
             ),
@@ -786,7 +786,7 @@ class _InstallSkillDialogState extends State<_InstallSkillDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(S.current.cancel),
         ),
         TextButton(
           onPressed: _idController.text.trim().isNotEmpty &&
@@ -799,7 +799,7 @@ class _InstallSkillDialogState extends State<_InstallSkillDialog> {
                   Navigator.of(context).pop();
                 }
               : null,
-          child: const Text('Install'),
+          child: Text(S.current.install),
         ),
       ],
     );

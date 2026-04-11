@@ -12,6 +12,7 @@ add_library(${PLUGIN_NAME} SHARED
   "flutter_window.cc"
   "window_channel_plugin.cc"
   "win32_window.cpp"
+  "drop_target.cpp"
   )
 apply_standard_settings(${PLUGIN_NAME})
 set_target_properties(${PLUGIN_NAME} PROPERTIES
@@ -21,6 +22,7 @@ target_include_directories(${PLUGIN_NAME} INTERFACE
   "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin flutter_wrapper_app)
 target_link_libraries(${PLUGIN_NAME} PRIVATE "dwmapi.lib")
+target_link_libraries(${PLUGIN_NAME} PRIVATE "ole32.lib" "shell32.lib")
 
 # List of absolute paths to libraries that should be bundled with the plugin
 set(desktop_multi_window_bundled_libraries

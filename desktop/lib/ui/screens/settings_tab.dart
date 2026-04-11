@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../l10n/app_strings.dart';
 import '../../providers/app_state.dart';
 
 class SettingsTab extends StatelessWidget {
@@ -19,7 +20,7 @@ class SettingsTab extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Settings',
+            Text(S.current.settingsTitle,
                 style: theme.textTheme.headlineSmall
                     ?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 24),
@@ -35,29 +36,29 @@ class SettingsTab extends StatelessWidget {
                         Icon(Icons.info_outline,
                             size: 20, color: colorScheme.primary),
                         const SizedBox(width: 8),
-                        Text('About',
+                        Text(S.current.settingsAbout,
                             style: theme.textTheme.titleMedium
                                 ?.copyWith(fontWeight: FontWeight.w600)),
                       ],
                     ),
                     const SizedBox(height: 16),
                     _SettingsRow(
-                      label: 'App Version',
+                      label: S.current.settingsAppVersion,
                       value: '1.0.0',
                     ),
                     const SizedBox(height: 8),
                     _SettingsRow(
-                      label: 'Platform',
+                      label: S.current.settingsPlatform,
                       value: Platform.operatingSystem,
                     ),
                     const SizedBox(height: 8),
                     _SettingsRow(
-                      label: 'OS Version',
+                      label: S.current.settingsOsVersion,
                       value: Platform.operatingSystemVersion,
                     ),
                     const SizedBox(height: 8),
                     _SettingsRow(
-                      label: 'Gateway Protocol',
+                      label: S.current.settingsGatewayProtocol,
                       value: 'v3',
                     ),
                   ],
@@ -77,14 +78,14 @@ class SettingsTab extends StatelessWidget {
                         Icon(Icons.pets,
                             size: 20, color: colorScheme.primary),
                         const SizedBox(width: 8),
-                        Text('Avatar',
+                        Text(S.current.settingsAvatar,
                             style: theme.textTheme.titleMedium
                                 ?.copyWith(fontWeight: FontWeight.w600)),
                       ],
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Separate desktop window (stays visible when the main window is minimized). Reacts to gateway avatar.command; drag to move.',
+                      S.current.settingsAvatarDesc,
                       style: TextStyle(
                         fontSize: 13,
                         color: colorScheme.onSurface.withOpacity(0.65),
@@ -94,20 +95,20 @@ class SettingsTab extends StatelessWidget {
                     const SizedBox(height: 12),
                     SwitchListTile.adaptive(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text('Show floating avatar window'),
-                      subtitle: const Text(
-                        'When connected, opens an always-on-top pet window',
-                        style: TextStyle(fontSize: 12),
+                      title: Text(S.current.settingsShowFloating),
+                      subtitle: Text(
+                        S.current.settingsShowFloatingSub,
+                        style: const TextStyle(fontSize: 12),
                       ),
                       value: appState.showAvatarOverlay,
                       onChanged: (v) => appState.setShowAvatarOverlay(v),
                     ),
                     SwitchListTile.adaptive(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text('Speak assistant replies'),
-                      subtitle: const Text(
-                        'Read the assistant message aloud when a turn completes',
-                        style: TextStyle(fontSize: 12),
+                      title: Text(S.current.settingsSpeakReplies),
+                      subtitle: Text(
+                        S.current.settingsSpeakRepliesSub,
+                        style: const TextStyle(fontSize: 12),
                       ),
                       value: appState.speakAssistantReplies,
                       onChanged: (v) => appState.setSpeakAssistantReplies(v),
@@ -126,22 +127,53 @@ class SettingsTab extends StatelessWidget {
                   children: [
                     Row(
                       children: [
+                        Icon(Icons.language, size: 20, color: colorScheme.primary),
+                        const SizedBox(width: 8),
+                        Text(S.current.settingsLanguage,
+                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      S.current.settingsLanguageSub,
+                      style: TextStyle(fontSize: 13, color: colorScheme.onSurface.withOpacity(0.65), height: 1.35),
+                    ),
+                    const SizedBox(height: 12),
+                    SegmentedButton<AppLocale>(
+                      segments: AppLocale.values.map((l) => ButtonSegment(value: l, label: Text(l.label))).toList(),
+                      selected: {appState.locale},
+                      onSelectionChanged: (s) => appState.setLocale(s.first),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
                         Icon(Icons.keyboard,
                             size: 20, color: colorScheme.primary),
                         const SizedBox(width: 8),
-                        Text('Keyboard Shortcuts',
+                        Text(S.current.settingsKeyboard,
                             style: theme.textTheme.titleMedium
                                 ?.copyWith(fontWeight: FontWeight.w600)),
                       ],
                     ),
                     const SizedBox(height: 16),
                     _SettingsRow(
-                      label: 'Send Message',
+                      label: S.current.settingsSendMessage,
                       value: 'Enter',
                     ),
                     const SizedBox(height: 8),
                     _SettingsRow(
-                      label: 'New Line',
+                      label: S.current.settingsNewLine,
                       value: 'Shift + Enter',
                     ),
                   ],
@@ -161,7 +193,7 @@ class SettingsTab extends StatelessWidget {
                         Icon(Icons.build_outlined,
                             size: 20, color: colorScheme.primary),
                         const SizedBox(width: 8),
-                        Text('Desktop Capabilities',
+                        Text(S.current.settingsCapabilities,
                             style: theme.textTheme.titleMedium
                                 ?.copyWith(fontWeight: FontWeight.w600)),
                       ],
@@ -169,47 +201,47 @@ class SettingsTab extends StatelessWidget {
                     const SizedBox(height: 16),
                     _CapabilityRow(
                       icon: Icons.chat,
-                      label: 'Chat',
+                      label: S.current.capChat,
                       status: _CapabilityStatus.supported,
                     ),
                     const SizedBox(height: 8),
                     _CapabilityRow(
                       icon: Icons.pets,
-                      label: 'Avatar (gateway events)',
+                      label: S.current.capAvatar,
                       status: _CapabilityStatus.supported,
                     ),
                     const SizedBox(height: 8),
                     _CapabilityRow(
                       icon: Icons.settings,
-                      label: 'Config Management',
+                      label: S.current.capConfig,
                       status: _CapabilityStatus.supported,
                     ),
                     const SizedBox(height: 8),
                     _CapabilityRow(
                       icon: Icons.history,
-                      label: 'Session Management',
+                      label: S.current.capSession,
                       status: _CapabilityStatus.supported,
                     ),
                     const SizedBox(height: 8),
                     _CapabilityRow(
                       icon: Icons.vpn_key,
-                      label: 'Ed25519 Device Auth',
+                      label: S.current.capDeviceAuth,
                       status: _CapabilityStatus.supported,
                     ),
                     const SizedBox(height: 8),
                     _CapabilityRow(
                       icon: Icons.devices,
-                      label: 'Device Info (Node)',
+                      label: S.current.capDeviceInfo,
                       status: _CapabilityStatus.supported,
                     ),
                     const SizedBox(height: 8),
                     _CapabilityRow(
                       icon: Icons.camera_alt,
                       label: camera.available
-                          ? 'Camera (${camera.cameraCount} detected)'
+                          ? S.current.capCamera(camera.cameraCount)
                           : camera.initialized
-                              ? 'Camera (none detected)'
-                              : 'Camera (detecting...)',
+                              ? S.current.capCameraNone
+                              : S.current.capCameraDetecting,
                       status: camera.available
                           ? _CapabilityStatus.supported
                           : camera.initialized
@@ -220,13 +252,13 @@ class SettingsTab extends StatelessWidget {
                     const SizedBox(height: 8),
                     _CapabilityRow(
                       icon: Icons.location_on,
-                      label: 'Location',
+                      label: S.current.capLocation,
                       status: _CapabilityStatus.unsupported,
                     ),
                     const SizedBox(height: 8),
                     _CapabilityRow(
                       icon: Icons.sms,
-                      label: 'SMS',
+                      label: S.current.capSms,
                       status: _CapabilityStatus.unsupported,
                     ),
                   ],

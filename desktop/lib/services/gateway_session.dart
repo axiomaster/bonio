@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import '../l10n/app_strings.dart';
 import '../models/gateway_models.dart';
 import '../models/device_identity.dart';
 import 'device_identity_store.dart';
@@ -127,7 +128,7 @@ class GatewaySession {
     _desired = null;
     _closeQuietly();
     _mainSessionKey = null;
-    onDisconnected('Offline');
+    onDisconnected(S.current.statusOffline);
   }
 
   void reconnect() {
@@ -194,7 +195,7 @@ class GatewaySession {
         continue;
       }
       try {
-        onDisconnected(_attempt == 0 ? 'Connecting...' : 'Reconnecting...');
+        onDisconnected(_attempt == 0 ? S.current.statusConnecting : S.current.statusReconnecting);
         await _connectOnce(target);
         _attempt = 0;
       } catch (err) {

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
+import '../../l10n/app_strings.dart';
 import '../../models/chat_models.dart';
 import '../../providers/app_state.dart';
 import '../widgets/chat_composer.dart';
@@ -98,7 +99,7 @@ class ChatTab extends StatelessWidget {
                           color: colorScheme.onSurface.withOpacity(0.3)),
                       const SizedBox(height: 12),
                       Text(
-                        'Connect to a gateway to start chatting',
+                        S.current.chatConnectToStart,
                         style: TextStyle(
                           color: colorScheme.onSurface.withOpacity(0.5),
                         ),
@@ -187,19 +188,19 @@ class _ChatTopBar extends StatelessWidget {
           ] else ...[
             Expanded(
               child: Text(
-                isConnected ? 'Chat' : 'Disconnected',
+                isConnected ? S.current.tabChat : S.current.chatDisconnected,
                 style: theme.textTheme.titleSmall,
               ),
             ),
           ],
           IconButton(
             icon: const Icon(Icons.add, size: 18),
-            tooltip: 'New session',
+            tooltip: S.current.chatNewSession,
             onPressed: isConnected ? onNewSession : null,
           ),
           IconButton(
             icon: const Icon(Icons.refresh, size: 18),
-            tooltip: 'Refresh',
+            tooltip: S.current.chatRefresh,
             onPressed: isConnected ? onRefresh : null,
           ),
         ],
@@ -283,7 +284,7 @@ class _ChatMessageListState extends State<_ChatMessageList> {
     if (allItems.isEmpty) {
       return Center(
         child: Text(
-          'Send a message to start',
+          S.current.chatSendToStart,
           style: TextStyle(
             color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
           ),
@@ -435,13 +436,13 @@ class _MessageBubble extends StatelessWidget {
                         icon: Icon(Icons.copy,
                             size: 14,
                             color: colorScheme.onSurface.withOpacity(0.3)),
-                        tooltip: 'Copy',
+                        tooltip: S.current.chatCopy,
                         onPressed: () {
                           Clipboard.setData(ClipboardData(text: text));
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Copied to clipboard'),
-                              duration: Duration(seconds: 1),
+                            SnackBar(
+                              content: Text(S.current.chatCopied),
+                              duration: const Duration(seconds: 1),
                             ),
                           );
                         },

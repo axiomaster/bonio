@@ -1,6 +1,11 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../models/clawhub_models.dart';
 import '../../providers/app_state.dart';
 import '../../services/clawhub_client.dart';
@@ -45,10 +50,10 @@ class _MarketplaceTabState extends State<MarketplaceTab>
             unselectedLabelColor:
                 theme.colorScheme.onSurface.withOpacity(0.6),
             indicatorColor: theme.colorScheme.primary,
-            tabs: const [
-              Tab(text: 'Skills'),
-              Tab(text: 'Models'),
-              Tab(text: 'Themes'),
+            tabs: [
+              Tab(text: S.current.marketSkills),
+              Tab(text: S.current.marketModels),
+              Tab(text: S.current.marketThemes),
             ],
           ),
         ),
@@ -57,8 +62,8 @@ class _MarketplaceTabState extends State<MarketplaceTab>
             controller: _tabController,
             children: const [
               _SkillMarketplaceContent(),
-              _ModelProviderPlaceholder(),
-              _ThemePlaceholder(),
+              _ProviderMarketContent(),
+              _ThemeMarketContent(),
             ],
           ),
         ),
@@ -134,7 +139,7 @@ class _SkillMarketplaceContentState extends State<_SkillMarketplaceContent> {
     final appState = context.read<AppState>();
     if (!appState.runtime.isConnected) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Not connected to server')),
+        SnackBar(content: Text(S.current.marketNotConnected)),
       );
       return;
     }
@@ -177,7 +182,7 @@ class _SkillMarketplaceContentState extends State<_SkillMarketplaceContent> {
           child: TextField(
             controller: _searchController,
             decoration: InputDecoration(
-              hintText: 'Search skills on ClawHub...',
+              hintText: S.current.marketSearchHint,
               prefixIcon: const Icon(Icons.search, size: 20),
               suffixIcon: _searchController.text.isNotEmpty
                   ? IconButton(
@@ -223,7 +228,7 @@ class _SkillMarketplaceContentState extends State<_SkillMarketplaceContent> {
                   : _results.isEmpty
                       ? Center(
                           child: Text(
-                            'No skills found for "${_searchController.text}"',
+                            S.current.marketNoSkills(_searchController.text),
                             style: theme.textTheme.bodyMedium?.copyWith(
                               color: theme.colorScheme.onSurface
                                   .withOpacity(0.6),
@@ -254,11 +259,11 @@ class _SkillMarketplaceContentState extends State<_SkillMarketplaceContent> {
           Icon(Icons.store_outlined, size: 48,
               color: theme.colorScheme.onSurface.withOpacity(0.3)),
           const SizedBox(height: 12),
-          Text('ClawHub Marketplace',
+          Text(S.current.marketTitle,
               style: theme.textTheme.titleMedium),
           const SizedBox(height: 4),
           Text(
-            'Search for community skills to extend your agent',
+            S.current.marketSubtitle,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurface.withOpacity(0.6),
             ),
@@ -445,8 +450,8 @@ class _SkillDetailOverlay extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               installProgress == 'downloading'
-                  ? 'Downloading...'
-                  : 'Installing...',
+                  ? S.current.marketDownloading
+                  : S.current.marketInstalling,
               style: theme.textTheme.bodySmall,
             ),
           ],
@@ -456,23 +461,23 @@ class _SkillDetailOverlay extends StatelessWidget {
           children: [
             Icon(Icons.check_circle, size: 18, color: Colors.green.shade700),
             const SizedBox(width: 8),
-            Text('Installed successfully!',
+            Text(S.current.marketInstallSuccess,
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: Colors.green.shade700)),
             const Spacer(),
-            TextButton(onPressed: onDismiss, child: const Text('Done')),
+            TextButton(onPressed: onDismiss, child: Text(S.current.done)),
           ],
         );
       default:
         return Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            TextButton(onPressed: onDismiss, child: const Text('Cancel')),
+            TextButton(onPressed: onDismiss, child: Text(S.current.cancel)),
             const SizedBox(width: 8),
             FilledButton.icon(
               onPressed: onInstall,
               icon: const Icon(Icons.download, size: 18),
-              label: const Text('Install'),
+              label: Text(S.current.install),
             ),
           ],
         );
@@ -506,44 +511,255 @@ class _StatBadge extends StatelessWidget {
 }
 
 // ════════════════════════════════════════════════════════════════
-//  Model/Provider Marketplace (placeholder)
+//  Model/Provider Marketplace
 // ════════════════════════════════════════════════════════════════
 
-class _ModelProviderPlaceholder extends StatelessWidget {
-  const _ModelProviderPlaceholder();
+class _ProviderMarketContent extends StatefulWidget {
+  const _ProviderMarketContent();
+  @override
+  State<_ProviderMarketContent> createState() => _ProviderMarketContentState();
+}
+
+class _ProviderMarketContentState extends State<_ProviderMarketContent> {
+  static const _url =
+      'https://axiomaster.github.io/boji-market/releases/providers.json';
+
+  List<Map<String, dynamic>> _providers = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetch();
+  }
+
+  Future<void> _fetch() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final data = await _fetchJson(_url);
+      final list = (data['providers'] as List<dynamic>?) ?? [];
+      if (mounted) {
+        setState(() {
+          _providers = list.cast<Map<String, dynamic>>();
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.storage_outlined, size: 48,
-              color: theme.colorScheme.onSurface.withOpacity(0.3)),
-          const SizedBox(height: 12),
-          Text('Model & Provider Marketplace',
-              style: theme.textTheme.titleMedium),
-          const SizedBox(height: 4),
-          Text(
-            'Browse and add OpenAI, Anthropic, and other providers.\nComing soon.',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.6),
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_error != null) {
+      return _MarketErrorView(
+        icon: Icons.storage_outlined,
+        error: _error!,
+        onRetry: _fetch,
+      );
+    }
+    if (_providers.isEmpty) {
+      return Center(
+        child: Text(S.current.marketModelPlaceholder,
+            style: theme.textTheme.bodyMedium),
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: _fetch,
+      child: ListView.separated(
+        padding: const EdgeInsets.all(16),
+        itemCount: _providers.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 6),
+        itemBuilder: (context, i) {
+          final p = _providers[i];
+          final id = p['id'] as String? ?? '';
+          final name = p['name'] as String? ?? id;
+          final baseUrl = p['base_url'] as String?;
+          return Card(
+            margin: EdgeInsets.zero,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10)),
+            child: ListTile(
+              dense: true,
+              leading: Icon(_providerIcon(id),
+                  color: theme.colorScheme.primary, size: 24),
+              title: Text(name, style: theme.textTheme.titleSmall),
+              subtitle: baseUrl != null
+                  ? Text(baseUrl,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface
+                              .withOpacity(0.5)),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis)
+                  : null,
+              trailing: Text(id,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withOpacity(0.4))),
             ),
-            textAlign: TextAlign.center,
-          ),
-        ],
+          );
+        },
       ),
     );
+  }
+
+  static IconData _providerIcon(String id) {
+    switch (id) {
+      case 'openai':
+      case 'openai-codex':
+        return Icons.auto_awesome;
+      case 'anthropic':
+        return Icons.psychology;
+      case 'google':
+        return Icons.diamond_outlined;
+      case 'ollama':
+      case 'vllm':
+        return Icons.computer;
+      case 'github-copilot':
+        return Icons.code;
+      case 'openrouter':
+        return Icons.router;
+      default:
+        return Icons.cloud_outlined;
+    }
   }
 }
 
 // ════════════════════════════════════════════════════════════════
-//  Theme Marketplace (placeholder)
+//  Theme Marketplace
 // ════════════════════════════════════════════════════════════════
 
-class _ThemePlaceholder extends StatelessWidget {
-  const _ThemePlaceholder();
+class _ThemeMarketContent extends StatefulWidget {
+  const _ThemeMarketContent();
+  @override
+  State<_ThemeMarketContent> createState() => _ThemeMarketContentState();
+}
+
+class _ThemeMarketContentState extends State<_ThemeMarketContent> {
+  static const _url = 'https://axiomaster.github.io/boji-market/themes.json';
+
+  List<Map<String, dynamic>> _themes = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetch();
+  }
+
+  Future<void> _fetch() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final data = await _fetchJson(_url);
+      final list = (data['themes'] as List<dynamic>?) ?? [];
+      if (mounted) {
+        setState(() {
+          _themes = list.cast<Map<String, dynamic>>();
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_error != null) {
+      return _MarketErrorView(
+        icon: Icons.palette_outlined,
+        error: _error!,
+        onRetry: _fetch,
+      );
+    }
+    if (_themes.isEmpty) {
+      return Center(
+        child: Text(S.current.marketThemePlaceholder,
+            style: theme.textTheme.bodyMedium),
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: _fetch,
+      child: ListView.separated(
+        padding: const EdgeInsets.all(16),
+        itemCount: _themes.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 6),
+        itemBuilder: (context, i) {
+          final t = _themes[i];
+          final id = t['id'] as String? ?? '';
+          final name = t['name'] as String? ?? id;
+          final desc = t['description'] as String? ?? '';
+          final downloadUrl = t['downloadUrl'] as String?;
+          return Card(
+            margin: EdgeInsets.zero,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10)),
+            child: ListTile(
+              dense: true,
+              leading: Icon(Icons.palette_outlined,
+                  color: theme.colorScheme.primary, size: 24),
+              title: Text(name, style: theme.textTheme.titleSmall),
+              subtitle: desc.isNotEmpty
+                  ? Text(desc,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface
+                              .withOpacity(0.5)),
+                      maxLines: 2, overflow: TextOverflow.ellipsis)
+                  : null,
+              trailing: downloadUrl != null && downloadUrl.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.download_outlined, size: 20),
+                      tooltip: S.current.install,
+                      onPressed: () => _openDownload(downloadUrl),
+                    )
+                  : null,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _openDownload(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri != null) await launchUrl(uri);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+//  Shared helpers
+// ════════════════════════════════════════════════════════════════
+
+Future<Map<String, dynamic>> _fetchJson(String url) async {
+  final client = HttpClient()
+    ..connectionTimeout = const Duration(seconds: 10);
+  try {
+    final request = await client.getUrl(Uri.parse(url));
+    final response = await request.close();
+    if (response.statusCode != 200) {
+      throw HttpException('HTTP ${response.statusCode}', uri: Uri.parse(url));
+    }
+    final body = await response.transform(utf8.decoder).join();
+    return jsonDecode(body) as Map<String, dynamic>;
+  } finally {
+    client.close(force: false);
+  }
+}
+
+class _MarketErrorView extends StatelessWidget {
+  final IconData icon;
+  final String error;
+  final VoidCallback onRetry;
+  const _MarketErrorView({
+    required this.icon,
+    required this.error,
+    required this.onRetry,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -552,17 +768,18 @@ class _ThemePlaceholder extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.palette_outlined, size: 48,
+          Icon(icon, size: 48,
               color: theme.colorScheme.onSurface.withOpacity(0.3)),
           const SizedBox(height: 12),
-          Text('Theme Marketplace', style: theme.textTheme.titleMedium),
-          const SizedBox(height: 4),
-          Text(
-            'Browse themes from designers.\nReplace the cat avatar with custom styles.\nComing soon.',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.6),
-            ),
-            textAlign: TextAlign.center,
+          Text(error,
+              style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error),
+              textAlign: TextAlign.center),
+          const SizedBox(height: 12),
+          FilledButton.tonalIcon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh, size: 18),
+            label: Text(S.current.chatRefresh),
           ),
         ],
       ),

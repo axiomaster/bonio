@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../l10n/app_strings.dart';
+
 class ChatComposer extends StatefulWidget {
   final bool enabled;
   final bool isStreaming;
@@ -60,7 +62,7 @@ class _ChatComposerState extends State<ChatComposer> {
           // Thinking level selector
           Row(
             children: [
-              Text('Thinking: ',
+              Text(S.current.composerThinking,
                   style: TextStyle(
                       fontSize: 11,
                       color: colorScheme.onSurface.withOpacity(0.5))),
@@ -68,7 +70,14 @@ class _ChatComposerState extends State<ChatComposer> {
                 Padding(
                   padding: const EdgeInsets.only(right: 4),
                   child: ChoiceChip(
-                    label: Text(level,
+                    label: Text(
+                        switch (level) {
+                          'off' => S.current.composerOff,
+                          'low' => S.current.composerLow,
+                          'medium' => S.current.composerMedium,
+                          'high' => S.current.composerHigh,
+                          _ => level,
+                        },
                         style: const TextStyle(fontSize: 11)),
                     selected: widget.thinkingLevel == level,
                     onSelected: widget.enabled
@@ -105,8 +114,8 @@ class _ChatComposerState extends State<ChatComposer> {
                     enabled: widget.enabled,
                     decoration: InputDecoration(
                       hintText: widget.enabled
-                          ? 'Type a message... (Enter to send, Shift+Enter for newline)'
-                          : 'Connect to send messages',
+                          ? S.current.composerHint
+                          : S.current.composerConnectHint,
                       hintStyle: TextStyle(
                         color: colorScheme.onSurface.withOpacity(0.3),
                         fontSize: 14,
@@ -122,7 +131,7 @@ class _ChatComposerState extends State<ChatComposer> {
                 IconButton.filled(
                   onPressed: widget.onAbort,
                   icon: const Icon(Icons.stop, size: 20),
-                  tooltip: 'Stop',
+                  tooltip: S.current.composerStop,
                   style: IconButton.styleFrom(
                     backgroundColor: colorScheme.error.withOpacity(0.15),
                     foregroundColor: colorScheme.error,
@@ -132,7 +141,7 @@ class _ChatComposerState extends State<ChatComposer> {
                 IconButton.filled(
                   onPressed: widget.enabled ? _send : null,
                   icon: const Icon(Icons.send, size: 20),
-                  tooltip: 'Send',
+                  tooltip: S.current.composerSend,
                 ),
             ],
           ),
