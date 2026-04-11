@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'l10n/app_strings.dart';
 import 'models/avatar_snapshot.dart';
 import 'models/chat_models.dart';
 import 'platform/win32_screen_capture.dart';
@@ -82,6 +83,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
 
   // BoJi Lens (圈一圈) annotation state
   bool _lensActive = false;
+  bool _searchSimilarMode = false; // true when lens is used for 搜同款
   ScreenCaptureResult? _lensCapture;
   List<Rect> _lensRects = [];
   Rect? _lensDrawingRect; // rect currently being drawn
@@ -142,7 +144,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
       // Find our own HWND so we can distinguish the avatar window from
       // other windows in the same process (e.g. the main BoJi window).
       if (Platform.isWindows) {
-        _avatarSelfHwnd = _findWindowByTitle('BoJi Avatar');
+        _avatarSelfHwnd = _findWindowByTitle(S.current.avatarWindowTitle);
         if (_avatarSelfHwnd == 0) {
           // Fallback: use GetActiveWindow which should be the avatar at this point
           _avatarSelfHwnd = _getActiveWindow();
@@ -570,6 +572,9 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     // Ignore tiny windows (e.g., tooltips)
     if (fgInfo.width < 100 || fgInfo.height < 100) return;
 
+    // Ignore system popups, flyouts, and transient panels
+    if (_isSystemPopup(fgHwnd)) return;
+
     // Already anchored to this window
     if (_placement == _PlacementState.anchoredWindow && fgHwnd == _anchoredHwnd) return;
 
@@ -588,6 +593,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
         !_isLikelyAvatarWindow(fgInfo) && !fgInfo.isDesktop &&
         !fgInfo.isFullscreen && fgInfo.hwnd != 0 &&
         fgInfo.width >= 100 && fgInfo.height >= 100 &&
+        !_isSystemPopup(fgInfo.hwnd) &&
         _isWindowValid(fgInfo.hwnd) && !_isWindowMinimized(fgInfo.hwnd)) {
       _anchorToWindow(fgInfo.hwnd, fgInfo);
     } else {
@@ -796,6 +802,32 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     final wc = await WindowController.fromCurrentEngine();
     _wc = wc;
     _theme = await DesktopAvatarTheme.load();
+
+    // Listen for native OLE drag-and-drop events on the dedicated channel
+    // created on this engine's messenger by the C++ side.
+    const dropChannel = MethodChannel('boji/avatar_drop');
+    dropChannel.setMethodCallHandler((call) async {
+      switch (call.method) {
+        case 'avatarDragEnter':
+          if (mounted) {
+            _cancelWalk();
+            setState(() => _localActivityOverride = 'openmouth');
+          }
+          return null;
+        case 'avatarDragLeave':
+          if (mounted) {
+            setState(() => _localActivityOverride = null);
+            _scheduleNextWander();
+          }
+          return null;
+        case 'avatarDrop':
+          _handleDropEvent(call.arguments);
+          return null;
+        default:
+          return null;
+      }
+    });
+
     await wc.setWindowMethodHandler((call) async {
       switch (call.method) {
         case 'sync':
@@ -938,14 +970,20 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     }
 
     try {
+      final s = S.current;
       final action = await wc.showPopupMenu(
-        items: const [
-          {'id': 1, 'label': '圈一圈', 'enabled': true},
+        items: [
+          {'id': 1, 'label': s.menuTakeNote, 'enabled': true},
+          {'id': 4, 'label': s.menuAiLens, 'enabled': true},
+          {'id': 5, 'label': s.menuSearchSimilar, 'enabled': true},
           {'id': 0, 'label': '', 'enabled': false},
-          {'id': 2, 'label': 'BoJi Desktop', 'enabled': true},
-          {'id': 3, 'label': 'Switch Window', 'enabled': false},
+          {'id': 2, 'label': s.appName, 'enabled': true},
+          {'id': 3, 'label': s.menuSwitchWindow, 'enabled': false},
         ],
-        actions: const {1: 'ai_lens', 2: 'show_main', 3: 'switch_window'},
+        actions: const {
+          1: 'note_capture', 4: 'ai_lens', 5: 'search_similar',
+          2: 'show_main', 3: 'switch_window',
+        },
       );
 
       _menuVisible = false;
@@ -953,6 +991,16 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
 
       if (action == 'ai_lens') {
         await _enterLensMode();
+        return;
+      }
+
+      if (action == 'search_similar') {
+        await _enterLensMode(searchSimilar: true);
+        return;
+      }
+
+      if (action == 'note_capture') {
+        _handleNoteCapture();
         return;
       }
 
@@ -969,10 +1017,73 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
   }
 
   // ---------------------------------------------------------------------------
+  // 记一记 — quick window capture
+  // ---------------------------------------------------------------------------
+
+  void _handleNoteCapture() {
+    if (_anchoredHwnd == 0) {
+      debugPrint('NoteCapture: no anchored window');
+      _scheduleNextWander();
+      return;
+    }
+    // Send both the action and the HWND to the main engine so it can
+    // capture the window and store the note.
+    _sendMenuActionToMainWithData('note_capture', {'hwnd': _anchoredHwnd});
+    _scheduleNextWander();
+  }
+
+  Future<void> _sendMenuActionToMainWithData(
+      String action, Map<String, dynamic> data) async {
+    try {
+      final main = WindowController.fromWindowId(widget.mainWindowId);
+      await main.invokeMethod('avatarMenuActionWithData', {
+        'action': action,
+        ...data,
+      });
+    } catch (e) {
+      debugPrint('sendMenuActionToMainWithData error: $e');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Drag & Drop handling (from native IDropTarget)
+  // ---------------------------------------------------------------------------
+
+  void _handleDropEvent(dynamic args) {
+    if (args == null) return;
+    final data = Map<String, dynamic>.from(args as Map);
+    // Show "eating" animation briefly, then forward to main engine
+    if (mounted) {
+      setState(() => _localActivityOverride = 'eating');
+    }
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        setState(() => _localActivityOverride = 'satisfied');
+      }
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted) {
+          setState(() => _localActivityOverride = null);
+          _scheduleNextWander();
+        }
+      });
+    });
+    _sendDropToMain(data);
+  }
+
+  Future<void> _sendDropToMain(Map<String, dynamic> data) async {
+    try {
+      final main = WindowController.fromWindowId(widget.mainWindowId);
+      await main.invokeMethod('avatarDrop', data);
+    } catch (e) {
+      debugPrint('sendDropToMain error: $e');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // BoJi Lens (圈一圈) — annotation mode
   // ---------------------------------------------------------------------------
 
-  Future<void> _enterLensMode() async {
+  Future<void> _enterLensMode({bool searchSimilar = false}) async {
     if (_lensActive) return;
     if (_anchoredHwnd == 0) {
       debugPrint('BoJiLens: no anchored window');
@@ -1019,6 +1130,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     if (!mounted) return;
     setState(() {
       _lensActive = true;
+      _searchSimilarMode = searchSimilar;
       _lensCapture = capture;
       _lensRects = [];
       _lensDrawingRect = null;
@@ -1026,7 +1138,8 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     });
 
     debugPrint('BoJiLens: entered annotation mode for "$title" '
-        '(${capture.width}x${capture.height})');
+        '(${capture.width}x${capture.height}), '
+        'searchSimilar=$searchSimilar');
   }
 
   // Pending lens attachments to push into the input field after lens exit
@@ -1035,8 +1148,26 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
 
   Future<void> _exitLensMode({bool submit = false}) async {
     if (!_lensActive) return;
+    final isSearchSimilar = _searchSimilarMode;
     debugPrint('BoJiLens: exiting annotation mode (submit=$submit, '
-        'rects=${_lensRects.length}, hasCapture=${_lensCapture != null})');
+        'rects=${_lensRects.length}, hasCapture=${_lensCapture != null}, '
+        'searchSimilar=$isSearchSimilar)');
+
+    // For search_similar: crop the first rect → send to main window
+    if (isSearchSimilar && submit && _lensCapture != null && _lensRects.isNotEmpty) {
+      final croppedBase64 = await _buildSearchSimilarCrop();
+      await _restoreLensWindow();
+      if (croppedBase64 != null) {
+        _sendMenuActionToMainWithData('search_similar', {
+          'pngBase64': croppedBase64,
+          'avatarX': _currentX,
+          'avatarY': _currentY,
+        });
+      } else {
+        _scheduleNextWander();
+      }
+      return;
+    }
 
     List<OutgoingAttachment>? lensAttachments;
     String? lensPrompt;
@@ -1049,13 +1180,28 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
       }
     }
 
+    await _restoreLensWindow(
+      attachments: lensAttachments,
+      prompt: lensPrompt,
+    );
+
+    if (lensAttachments != null) {
+      _sendDoubleClickToMain();
+    } else {
+      _scheduleNextWander();
+    }
+    debugPrint('BoJiLens: exited annotation mode');
+  }
+
+  Future<void> _restoreLensWindow({
+    List<OutgoingAttachment>? attachments,
+    String? prompt,
+  }) async {
     final wc = _wc;
     if (wc == null) return;
 
-    // Restore avatar window size — if we have lens results, use
-    // the "with input" size so the input field appears immediately.
     _programmaticMove = true;
-    if (lensAttachments != null) {
+    if (attachments != null) {
       await windowManager.setSize(AvatarSnapshot.kFloatingWindowSizeWithInput);
     } else {
       await windowManager.setSize(_lensPreSize);
@@ -1068,21 +1214,37 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     if (!mounted) return;
     setState(() {
       _lensActive = false;
+      _searchSimilarMode = false;
       _lensCapture = null;
       _lensRects = [];
       _lensDrawingRect = null;
       _lensWindowTitle = '';
-      _pendingLensAttachments = lensAttachments;
-      _pendingLensPrompt = lensPrompt;
+      _pendingLensAttachments = attachments;
+      _pendingLensPrompt = prompt;
     });
+  }
 
-    if (lensAttachments != null) {
-      // Tell main window to show input (toggles _showInput in AvatarController)
-      _sendDoubleClickToMain();
-    } else {
-      _scheduleNextWander();
+  /// Crop the first selection rect from the capture for search_similar.
+  Future<String?> _buildSearchSimilarCrop() async {
+    final capture = _lensCapture;
+    if (capture == null || _lensRects.isEmpty) return null;
+
+    final r = _lensRects.first;
+    final px = (r.left * capture.dpiScale).round();
+    final py = (r.top * capture.dpiScale).round();
+    final pw = (r.width * capture.dpiScale).round();
+    final ph = (r.height * capture.dpiScale).round();
+
+    debugPrint('SearchSimilar: cropping (${px}x$py, ${pw}x$ph) from '
+        '${capture.width}x${capture.height}');
+
+    final png = await capture.cropToPng(px, py, pw, ph);
+    if (png == null) {
+      debugPrint('SearchSimilar: crop failed');
+      return null;
     }
-    debugPrint('BoJiLens: exited annotation mode');
+
+    return base64Encode(png);
   }
 
   /// Build an OutgoingAttachment + prompt from the current lens state.
@@ -1151,6 +1313,9 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
         _lensRects = [..._lensRects, normalized];
         _lensDrawingRect = null;
       });
+      if (_searchSimilarMode) {
+        _exitLensMode(submit: true);
+      }
     } else {
       setState(() => _lensDrawingRect = null);
     }
@@ -1273,6 +1438,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
                 capture: _lensCapture,
                 rects: _lensRects,
                 drawingRect: _lensDrawingRect,
+                searchSimilarMode: _searchSimilarMode,
                 onRectStart: _onLensRectStart,
                 onRectUpdate: _onLensRectUpdate,
                 onRectEnd: _onLensRectEnd,
@@ -1311,7 +1477,7 @@ Future<void> initAvatarWindowEngine() async {
     await windowManager.setResizable(false);
     await windowManager.setAlwaysOnTop(true);
     await windowManager.setSkipTaskbar(true);
-    await windowManager.setTitle('BoJi Avatar');
+    await windowManager.setTitle(S.current.avatarWindowTitle);
     await windowManager.show();
   });
 }
@@ -1499,6 +1665,9 @@ typedef _IsWindowDart = int Function(int hWnd);
 typedef _IsIconicNative = Int32 Function(IntPtr hWnd);
 typedef _IsIconicDart = int Function(int hWnd);
 
+typedef _GetWindowLongNative = Int32 Function(IntPtr hWnd, Int32 nIndex);
+typedef _GetWindowLongDart = int Function(int hWnd, int nIndex);
+
 typedef _GetDpiForWindowNative = Uint32 Function(IntPtr hWnd);
 typedef _GetDpiForWindowDart = int Function(int hWnd);
 
@@ -1603,6 +1772,60 @@ bool _isDesktopWindow(int hwnd) {
   } catch (_) {
     return false;
   }
+}
+
+/// Check if a window is a system popup, flyout, or transient panel that should
+/// not receive avatar anchoring. Uses window class name + extended style bits.
+bool _isSystemPopup(int hwnd) {
+  try {
+    final getClassName = _user32Lib
+        .lookupFunction<_GetClassNameNative, _GetClassNameDart>('GetClassNameW');
+    final buf = calloc<Uint16>(256);
+    final len = getClassName(hwnd, buf.cast<Utf16>(), 256);
+    String className = '';
+    if (len > 0) {
+      className = buf.cast<Utf16>().toDartString();
+    }
+    calloc.free(buf);
+
+    const systemClasses = {
+      'Shell_TrayWnd',
+      'Shell_SecondaryTrayWnd',
+      'NotifyIconOverflowWindow',
+      'TaskListThumbnailWnd',
+      'DV2ControlHost',
+      'Shell_InputSwitchTopLevelWindow',
+      'XamlExplorerHostIslandWindow',
+      'TopLevelWindowForOverflowXamlIsland',
+      'Windows.UI.Core.CoreWindow',
+      'Windows.UI.Input.InputSite.WindowClass',
+      'ForegroundStaging',
+      'tooltips_class32',
+      '#32768', // context menus
+      '#32770', // system dialogs (some)
+    };
+    if (systemClasses.contains(className)) return true;
+
+    // Flyout/system panel class names often start with these prefixes
+    if (className.startsWith('Windows.UI.') ||
+        className.startsWith('Shell_') ||
+        className.startsWith('TaskList')) {
+      return true;
+    }
+
+    // Check WS_EX_TOOLWINDOW style — common on transient system panels
+    const gwlExStyle = -20;
+    const wsExToolWindow = 0x00000080;
+    const wsExNoActivate = 0x08000000;
+    final getWindowLong = _user32Lib
+        .lookupFunction<_GetWindowLongNative, _GetWindowLongDart>(
+            'GetWindowLongW');
+    final exStyle = getWindowLong(hwnd, gwlExStyle);
+    if ((exStyle & wsExToolWindow) != 0 && (exStyle & wsExNoActivate) != 0) {
+      return true;
+    }
+  } catch (_) {}
+  return false;
 }
 
 /// Get the rect of any window by HWND.

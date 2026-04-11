@@ -22,6 +22,8 @@ import 'avatar_controller.dart';
 import 'chat_controller.dart';
 import 'camera_service.dart';
 import 'desktop_tts.dart';
+import 'note_service.dart';
+import '../l10n/app_strings.dart';
 
 /// On macOS, `localhost` often resolves to IPv6 (`::1`) while a local OpenClaw
 /// gateway may listen on IPv4 only (`127.0.0.1`), causing connection failures
@@ -51,6 +53,7 @@ class NodeRuntime extends ChangeNotifier {
   late final AvatarController avatarController;
   late final AvatarCommandExecutor avatarCommandExecutor;
   late final DesktopTts desktopTts;
+  late final NoteService noteService;
 
   WindowController? _avatarWindowController;
 
@@ -62,7 +65,7 @@ class NodeRuntime extends ChangeNotifier {
 
   bool _isConnected = false;
   bool _nodeConnected = false;
-  String _connectionStatus = 'Offline';
+  String _connectionStatus = S.current.statusOffline;
   String? _serverName;
   String? _remoteAddress;
   ServerConfig? _serverConfig;
@@ -119,6 +122,7 @@ class NodeRuntime extends ChangeNotifier {
       controller: avatarController,
       tts: desktopTts,
     );
+    noteService = NoteService(session: operatorSession);
     // ChatController / AvatarController updates must bubble to AppState.
     chatController.addListener(_onChatControllerChanged);
     avatarController.addListener(_onAvatarControllerChanged);
@@ -215,6 +219,31 @@ class NodeRuntime extends ChangeNotifier {
     }
   }
 
+  Future<void> createSearchWindow(String imagePath, double x, double y) async {
+    try {
+      final main = await WindowController.fromCurrentEngine();
+      const w = 420.0;
+      const h = 560.0;
+      final wc = await WindowController.create(
+        WindowConfiguration(
+          hiddenAtLaunch: true,
+          borderless: false,
+          width: w,
+          height: h,
+          arguments: jsonEncode({
+            'bojiWindow': 'search_similar',
+            'imagePath': imagePath,
+            'mainWindowId': main.windowId,
+          }),
+        ),
+      );
+      await wc.setPosition(Offset(x - w / 2, y + 80));
+      await wc.show();
+    } catch (e, st) {
+      debugPrint('createSearchWindow: $e\n$st');
+    }
+  }
+
   void _pushAvatarSync() {
     final ctrl = _avatarWindowController;
     if (ctrl == null) return;
@@ -279,17 +308,18 @@ class NodeRuntime extends ChangeNotifier {
   }
 
   void disconnect() {
+    desktopTts.stop();
     _nodeConnectTimer?.cancel();
     _nodeConnectTimer = null;
     operatorSession.disconnect();
     nodeSession.disconnect();
     _isConnected = false;
     _nodeConnected = false;
-    _connectionStatus = 'Offline';
+    _connectionStatus = S.current.statusOffline;
     _serverName = null;
     _remoteAddress = null;
     _serverConfig = null;
-    chatController.onDisconnected('Offline');
+    chatController.onDisconnected(S.current.statusOffline);
     notifyListeners();
   }
 
@@ -414,7 +444,11 @@ class NodeRuntime extends ChangeNotifier {
     if (event == 'avatar.command') {
       avatarCommandExecutor.execute(payloadJson);
     }
-    chatController.handleGatewayEvent(event, payloadJson);
+    // Let NoteService intercept events for the boji-notes session first.
+    // If consumed, don't forward to ChatController (avoids confusion).
+    if (!noteService.handleGatewayEvent(event, payloadJson)) {
+      chatController.handleGatewayEvent(event, payloadJson);
+    }
   }
 
   void _onNodeConnected(
@@ -492,11 +526,11 @@ class NodeRuntime extends ChangeNotifier {
 
   void _updateConnectionStatus() {
     if (_isConnected && _nodeConnected) {
-      _connectionStatus = 'Connected';
+      _connectionStatus = S.current.statusConnected;
     } else if (_isConnected) {
-      _connectionStatus = 'Connected (node offline)';
+      _connectionStatus = S.current.statusConnectedNodeOffline;
     } else {
-      _connectionStatus = 'Offline';
+      _connectionStatus = S.current.statusOffline;
     }
   }
 
@@ -504,7 +538,7 @@ class NodeRuntime extends ChangeNotifier {
           {required String role}) =>
       GatewayClientInfo(
         id: profile.clientId,
-        displayName: 'BoJi Desktop',
+        displayName: S.current.appName,
         version: '1.0.0',
         platform: Platform.operatingSystem,
         mode: profile.clientModeForRole(role),

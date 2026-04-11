@@ -32,13 +32,21 @@ class DesktopTts {
     _process = null;
     if (p != null) {
       try {
-        p.kill(ProcessSignal.sigterm);
+        // On Windows, POSIX signals don't work; use kill() which sends
+        // SIGTERM on POSIX and TerminateProcess on Windows.
+        p.kill();
       } catch (_) {}
       try {
-        await p.exitCode.timeout(const Duration(seconds: 2));
+        await p.exitCode.timeout(const Duration(milliseconds: 500));
       } catch (_) {
         try {
           p.kill(ProcessSignal.sigkill);
+        } catch (_) {}
+      }
+      // On Windows, kill the entire process tree to stop SAPI speech
+      if (Platform.isWindows) {
+        try {
+          await Process.run('taskkill', ['/F', '/T', '/PID', '${p.pid}']);
         } catch (_) {}
       }
     }

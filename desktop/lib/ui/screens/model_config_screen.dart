@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../l10n/app_strings.dart';
 import '../../models/server_config.dart';
 import '../../providers/app_state.dart';
 
@@ -84,7 +85,7 @@ class _ModelConfigScreenState extends State<ModelConfigScreen> {
                 onPressed: widget.onBack,
               ),
               const SizedBox(width: 8),
-              Text('Model Configuration',
+              Text(S.current.modelConfigTitle,
                   style: theme.textTheme.headlineSmall
                       ?.copyWith(fontWeight: FontWeight.bold)),
               const Spacer(),
@@ -98,7 +99,7 @@ class _ModelConfigScreenState extends State<ModelConfigScreen> {
                           child:
                               CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('Save'),
+                      : Text(S.current.modelSave),
                 ),
             ],
           ),
@@ -110,7 +111,7 @@ class _ModelConfigScreenState extends State<ModelConfigScreen> {
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  Text('Default Model',
+                  Text(S.current.modelDefaultModel,
                       style: theme.textTheme.titleSmall),
                   const SizedBox(width: 16),
                   Expanded(
@@ -133,8 +134,8 @@ class _ModelConfigScreenState extends State<ModelConfigScreen> {
                           });
                         }
                       },
-                      decoration: const InputDecoration(
-                        hintText: 'Select default model',
+                      decoration: InputDecoration(
+                        hintText: S.current.modelSelectDefault,
                       ),
                     ),
                   ),
@@ -147,16 +148,16 @@ class _ModelConfigScreenState extends State<ModelConfigScreen> {
           // Model list
           Row(
             children: [
-              Text('Models', style: theme.textTheme.titleMedium),
+              Text(S.current.modelModels, style: theme.textTheme.titleMedium),
               const Spacer(),
               FilledButton.tonal(
                 onPressed: _addModel,
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.add, size: 18),
-                    SizedBox(width: 4),
-                    Text('Add Model'),
+                    const Icon(Icons.add, size: 18),
+                    const SizedBox(width: 4),
+                    Text(S.current.modelAddModel),
                   ],
                 ),
               ),
@@ -167,7 +168,7 @@ class _ModelConfigScreenState extends State<ModelConfigScreen> {
             child: _models.isEmpty
                 ? Center(
                     child: Text(
-                      'No models configured. Add one to get started.',
+                      S.current.modelNoModels,
                       style: TextStyle(
                         color: colorScheme.onSurface.withOpacity(0.5),
                       ),
@@ -259,7 +260,7 @@ class _ModelEditor extends StatelessWidget {
                   icon: Icon(Icons.delete_outline,
                       color: colorScheme.error, size: 20),
                   onPressed: onRemove,
-                  tooltip: 'Remove model',
+                  tooltip: S.current.modelRemove,
                 ),
               ],
             ),

@@ -1,13 +1,19 @@
 #include "multi_window_manager.h"
 
 #include <rpc.h>
+#include <oleidl.h>
 #include <iomanip>
 #include <memory>
 #include <random>
 #include <sstream>
 #pragma comment(lib, "rpcrt4.lib")
 
+#include <flutter/encodable_value.h>
+#include <flutter/method_channel.h>
+#include <flutter/standard_method_codec.h>
+
 #include <iostream>
+#include "drop_target.h"
 #include "flutter_window.h"
 #include "flutter_window_wrapper.h"
 #include "include/desktop_multi_window/desktop_multi_window_plugin.h"
@@ -81,6 +87,41 @@ std::string MultiWindowManager::Create(const flutter::EncodableMap* args) {
   InternalMultiWindowPluginRegisterWithRegistrar(registrar,
                                                  windows_[window_id].get());
 
+  // Register OLE drag-and-drop on the Flutter *view* child HWND, not the
+  // parent WS_POPUP.  The child covers the full client area and receives all
+  // mouse hit-testing; registering on the parent silently fails because
+  // Windows dispatches drag events to the topmost child at the cursor.
+  {
+    HWND parent_hwnd = windows_[window_id]->GetWindowHandle();
+    HWND view_hwnd = nullptr;
+    auto* vc = flutter_window->GetFlutterViewController();
+    if (vc && vc->view()) {
+      view_hwnd = vc->view()->GetNativeWindow();
+    }
+    HWND target_hwnd = view_hwnd ? view_hwnd : parent_hwnd;
+
+    // Create a dedicated MethodChannel on the sub-window engine so that
+    // AvatarDropTarget can send events directly to the Dart side.
+    auto drop_channel =
+        std::make_shared<flutter::MethodChannel<flutter::EncodableValue>>(
+            flutter_window->GetFlutterViewController()->engine()->messenger(),
+            "boji/avatar_drop",
+            &flutter::StandardMethodCodec::GetInstance());
+
+    HRESULT hr = ::OleInitialize(nullptr);
+    if (SUCCEEDED(hr) || hr == S_FALSE) {
+      auto* dt = new AvatarDropTarget(target_hwnd, drop_channel);
+      HRESULT reg = ::RegisterDragDrop(target_hwnd, dt);
+      if (FAILED(reg)) {
+        std::cerr << "RegisterDragDrop failed: 0x" << std::hex << reg
+                  << std::endl;
+        dt->Release();
+      }
+    }
+    // Store the registered HWND for RevokeDragDrop later
+    drop_target_hwnds_[window_id] = target_hwnd;
+  }
+
   // keep flutter_window alive
   managed_flutter_windows_[window_id] = std::move(flutter_window);
 
@@ -146,6 +187,11 @@ std::vector<std::string> MultiWindowManager::GetAllWindowIds() {
 }
 
 void MultiWindowManager::RemoveWindow(const std::string& window_id) {
+  auto dt_it = drop_target_hwnds_.find(window_id);
+  if (dt_it != drop_target_hwnds_.end()) {
+    ::RevokeDragDrop(dt_it->second);
+    drop_target_hwnds_.erase(dt_it);
+  }
   auto it = windows_.find(window_id);
   if (it != windows_.end()) {
     windows_.erase(it);

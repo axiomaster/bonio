@@ -1,15 +1,19 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 
-import 'dart:convert';
-
+import '../l10n/app_strings.dart';
 import '../models/agent_avatar_models.dart';
 import '../models/chat_models.dart';
 import '../models/gateway_profile.dart';
+import '../models/note_models.dart';
 import '../services/node_runtime.dart';
 import '../services/device_identity_store.dart';
 import '../services/device_auth_store.dart';
@@ -29,6 +33,11 @@ class AppState extends ChangeNotifier {
   GatewayProfile _gatewayProfile = GatewayProfile.hiclaw;
   bool _showAvatarOverlay = true;
   bool _speakAssistantReplies = true;
+  AppLocale _locale = AppLocale.zh;
+
+  /// When non-null, the main screen should navigate to the search-similar
+  /// screen with this base64 PNG. Consumed (set to null) after navigation.
+  
 
   final SpeechToTextManager _sttManager = SpeechToTextManager();
 
@@ -39,6 +48,8 @@ class AppState extends ChangeNotifier {
   GatewayProfile get gatewayProfile => _gatewayProfile;
   bool get showAvatarOverlay => _showAvatarOverlay;
   bool get speakAssistantReplies => _speakAssistantReplies;
+  AppLocale get locale => _locale;
+  S get strings => S.current;
 
   AppState() {
     _initCamera();
@@ -119,6 +130,57 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  Future<void> _handleSearchSimilar(Map<String, dynamic> data) async {
+    final pngBase64 = data['pngBase64'] as String? ?? '';
+    if (pngBase64.isEmpty) {
+      debugPrint('AppState: search_similar has no image data');
+      return;
+    }
+    final avatarX = (data['avatarX'] as num?)?.toDouble() ?? 200;
+    final avatarY = (data['avatarY'] as num?)?.toDouble() ?? 200;
+
+    debugPrint('AppState: search_similar received, '
+        'base64Len=${pngBase64.length}, avatar=($avatarX,$avatarY)');
+
+    final ctrl = runtime.avatarController;
+    ctrl.setBubble(text: S.current.bubbleSearching);
+    ctrl.showTemporaryState(AgentAvatarActivity.thinking);
+
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final path = '${tempDir.path}${Platform.pathSeparator}'
+          'boji_search_${DateTime.now().millisecondsSinceEpoch}.png';
+      await File(path).writeAsBytes(base64Decode(pngBase64));
+      debugPrint('AppState: search image saved to $path');
+      await runtime.createSearchWindow(path, avatarX, avatarY);
+    } catch (e) {
+      debugPrint('AppState: search_similar error: $e');
+    }
+  }
+
+  Future<void> _handleNoteCaptureWithData(Map<String, dynamic> data) async {
+    final hwnd = (data['hwnd'] as num?)?.toInt() ?? 0;
+    if (hwnd == 0) return;
+
+    final ctrl = runtime.avatarController;
+    ctrl.showTemporaryState(AgentAvatarActivity.happy);
+    ctrl.setBubble(text: S.current.bubbleCapturing);
+
+    final note = await runtime.noteService.captureWindow(hwnd);
+    if (note != null) {
+      ctrl.setBubble(text: S.current.bubbleCaptured);
+      unawaited(runtime.noteService.analyzeNote(note).then((_) {
+        final updated =
+            runtime.noteService.notes.where((n) => n.id == note.id).firstOrNull;
+        if (updated != null && updated.tags.isNotEmpty) {
+          ctrl.setBubble(text: S.current.bubbleSaved(updated.tags.join(' ')));
+        }
+      }));
+    } else {
+      ctrl.setBubble(text: S.current.bubbleCaptureFailed);
+    }
+  }
+
   void _handleAvatarTextSubmit(String text) {
     if (text.trim().isEmpty) return;
     runtime.avatarController.hideInput();
@@ -143,7 +205,7 @@ class AppState extends ChangeNotifier {
     if (text.isEmpty && attachments.isEmpty) return;
     runtime.avatarController.hideInput();
     runtime.chatController.sendMessage(
-      text.isNotEmpty ? text : '[Image attachment]',
+      text.isNotEmpty ? text : S.current.bubbleImageAttachment,
       attachments: attachments,
     );
   }
@@ -196,6 +258,58 @@ class AppState extends ChangeNotifier {
     debugPrint('AppState: lens chat.send dispatched');
   }
 
+  Future<void> _handleAvatarDrop(Map<String, dynamic> data) async {
+    final dropType = data['type'] as String? ?? '';
+    if (dropType.isEmpty) return;
+
+    final ctrl = runtime.avatarController;
+    ctrl.setBubble(text: S.current.bubbleReceived);
+
+    try {
+      BojiNote? note;
+      if (dropType == 'file') {
+        final paths = (data['paths'] as List?)?.cast<String>() ?? [];
+        for (final path in paths) {
+          note = await runtime.noteService.saveDroppedContent(
+            dropType: 'file',
+            filePath: path,
+          );
+        }
+      } else if (dropType == 'text') {
+        note = await runtime.noteService.saveDroppedContent(
+          dropType: 'text',
+          text: data['text'] as String? ?? '',
+        );
+      } else if (dropType == 'image') {
+        final b64 = data['base64'] as String?;
+        if (b64 != null && b64.isNotEmpty) {
+          final bytes = Uint8List.fromList(base64Decode(b64));
+          note = await runtime.noteService.saveDroppedContent(
+            dropType: 'image',
+            imageBytes: bytes,
+          );
+        }
+      }
+
+      if (note != null) {
+        ctrl.setBubble(text: S.current.bubbleAnalyzing);
+        unawaited(runtime.noteService.analyzeNote(note).then((_) {
+          final updated = runtime.noteService.notes
+              .where((n) => n.id == note!.id)
+              .firstOrNull;
+          if (updated != null && updated.tags.isNotEmpty) {
+            ctrl.setBubble(text: S.current.bubbleDigested(updated.tags.join(' ')));
+          }
+        }));
+      } else {
+        ctrl.setBubble(text: S.current.bubbleCantEat);
+      }
+    } catch (e) {
+      debugPrint('AppState: drop handling error: $e');
+      ctrl.setBubble(text: S.current.bubbleCantDigest);
+    }
+  }
+
   Future<void> _registerMainWindowHandler() async {
     try {
       final wc = await WindowController.fromCurrentEngine();
@@ -220,6 +334,22 @@ class AppState extends ChangeNotifier {
             if (data is Map) {
               _handleAvatarTextSubmitWithAttachments(
                   Map<String, dynamic>.from(data));
+            }
+          case 'avatarMenuActionWithData':
+            final data = call.arguments;
+            if (data is Map) {
+              final m = Map<String, dynamic>.from(data);
+              final action = m.remove('action') as String? ?? '';
+              if (action == 'note_capture') {
+                _handleNoteCaptureWithData(m);
+              } else if (action == 'search_similar') {
+                _handleSearchSimilar(m);
+              }
+            }
+          case 'avatarDrop':
+            final data = call.arguments;
+            if (data is Map) {
+              _handleAvatarDrop(Map<String, dynamic>.from(data));
             }
           case 'avatarInputDismiss':
             runtime.avatarController.hideInput();
@@ -256,6 +386,8 @@ class AppState extends ChangeNotifier {
     _speakAssistantReplies =
         prefs.getBool('desktop.speak_assistant_replies') ?? true;
     runtime.speakAssistantReplies = _speakAssistantReplies;
+    _locale = AppLocale.fromCode(prefs.getString('app.locale'));
+    S.setLocale(_locale);
     notifyListeners();
     unawaited(syncAvatarFloatingWindow());
   }
@@ -274,6 +406,13 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('desktop.speak_assistant_replies', value);
+  }
+
+  Future<void> setLocale(AppLocale locale) async {
+    _locale = locale;
+    S.setLocale(locale);
+    notifyListeners();
+    await S.saveLocale(locale);
   }
 
   Future<void> updateConnectionSettings({

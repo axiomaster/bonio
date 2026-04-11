@@ -7,9 +7,11 @@ import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 import 'package:window_manager/window_manager.dart';
 
 import 'avatar_window_app.dart';
+import 'l10n/app_strings.dart';
 import 'providers/app_state.dart';
 import 'services/tray_service.dart';
 import 'ui/screens/main_screen.dart';
+import 'ui/screens/search_similar_screen.dart';
 
 /// Resolves `bojiWindow: avatar` JSON from plugin + entrypoint args.
 ///
@@ -25,14 +27,14 @@ String _trimJsonCandidate(String raw) {
   return t;
 }
 
-Map<String, dynamic>? _decodeAvatarWindowPayload(String raw) {
+Map<String, dynamic>? _decodeWindowPayload(String raw) {
   final t = _trimJsonCandidate(raw);
   if (t.isEmpty || !t.startsWith('{')) return null;
   try {
     final decoded = jsonDecode(t);
     if (decoded is! Map) return null;
     final m = Map<String, dynamic>.from(decoded);
-    if (m['bojiWindow'] == 'avatar') return m;
+    if (m.containsKey('bojiWindow')) return m;
   } catch (_) {}
   return null;
 }
@@ -40,6 +42,8 @@ Map<String, dynamic>? _decodeAvatarWindowPayload(String raw) {
 Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
   sherpa.initBindings();
+  final locale = await S.loadLocale();
+  S.setLocale(locale);
   final wc = await WindowController.fromCurrentEngine();
 
   final candidates = <String>[];
@@ -51,33 +55,46 @@ Future<void> main(List<String> args) async {
     candidates.add(wArg);
   }
 
-  Map<String, dynamic>? avatarPayload;
+  Map<String, dynamic>? payload;
   for (final c in candidates) {
-    avatarPayload = _decodeAvatarWindowPayload(c);
-    if (avatarPayload != null) break;
+    payload = _decodeWindowPayload(c);
+    if (payload != null) break;
   }
 
-  if (avatarPayload == null) {
+  if (payload == null) {
     if (candidates.isEmpty || candidates.every((c) => c.trim().isEmpty)) {
       await _initMainWindow();
       runApp(const BoJiDesktopApp());
       return;
     }
     debugPrint(
-      'avatar engine: could not parse bojiWindow=avatar; '
+      'sub-window engine: could not parse bojiWindow; '
       'candidates=$candidates fullArgs=$args',
     );
-    runApp(const _AvatarErrorApp(message: 'Invalid avatar window arguments'));
+    runApp(const _AvatarErrorApp(message: 'Invalid window arguments'));
     return;
   }
 
-  final mainId = avatarPayload['mainWindowId']?.toString();
-  if (mainId == null || mainId.isEmpty) {
-    runApp(const _AvatarErrorApp(message: 'Missing mainWindowId'));
+  final windowType = payload['bojiWindow'] as String?;
+
+  if (windowType == 'search_similar') {
+    final imagePath = payload['imagePath'] as String? ?? '';
+    runApp(SearchSimilarApp(imagePath: imagePath));
     return;
   }
-  await initAvatarWindowEngine();
-  runApp(AvatarFloatingApp(mainWindowId: mainId));
+
+  if (windowType == 'avatar') {
+    final mainId = payload['mainWindowId']?.toString();
+    if (mainId == null || mainId.isEmpty) {
+      runApp(const _AvatarErrorApp(message: 'Missing mainWindowId'));
+      return;
+    }
+    await initAvatarWindowEngine();
+    runApp(AvatarFloatingApp(mainWindowId: mainId));
+    return;
+  }
+
+  runApp(_AvatarErrorApp(message: 'Unknown window type: $windowType'));
 }
 
 class _AvatarErrorApp extends StatelessWidget {
@@ -97,7 +114,7 @@ class _AvatarErrorApp extends StatelessWidget {
 Future<void> _initMainWindow() async {
   await windowManager.ensureInitialized();
   await windowManager.setPreventClose(true);
-  await windowManager.setTitle('BoJi Desktop');
+  await windowManager.setTitle(S.current.appName);
 }
 
 class BoJiDesktopApp extends StatefulWidget {
@@ -142,6 +159,9 @@ class _BoJiDesktopAppState extends State<BoJiDesktopApp> with WindowListener {
     if (_exiting) return;
     _exiting = true;
     try {
+      await _appState.runtime.desktopTts.stop();
+    } catch (_) {}
+    try {
       await _appState.runtime.syncAvatarFloatingWindow(show: false);
     } catch (_) {}
     try {
@@ -154,7 +174,7 @@ class _BoJiDesktopAppState extends State<BoJiDesktopApp> with WindowListener {
     return ChangeNotifierProvider.value(
       value: _appState,
       child: MaterialApp(
-        title: 'BoJi Desktop',
+        title: S.current.appName,
         debugShowCheckedModeBanner: false,
         theme: _buildTheme(Brightness.dark),
         home: const MainScreen(),

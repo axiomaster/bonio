@@ -41,6 +41,10 @@ class MultiWindowManager {
   std::map<std::string, std::unique_ptr<FlutterWindow>>
       managed_flutter_windows_;
   std::vector<std::string> pending_remove_ids_;
+
+  // HWNDs registered via RegisterDragDrop (may be child Flutter view HWNDs,
+  // not necessarily the top-level parent).
+  std::map<std::string, HWND> drop_target_hwnds_;
 };
 
 #endif  // DESKTOP_MULTI_WINDOW_WINDOWS_MULTI_WINDOW_MANAGER_H_

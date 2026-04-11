@@ -2,6 +2,7 @@
 #define DESKTOP_MULTI_WINDOW_WINDOWS_FLUTTER_WINDOW_H_
 
 #include <Windows.h>
+#include <oleidl.h>
 
 #include <flutter/flutter_view_controller.h>
 
@@ -10,6 +11,8 @@
 
 #include "win32_window.h"
 #include "window_configuration.h"
+
+class AvatarDropTarget;
 
 class FlutterWindow : public Win32Window {
  public:
@@ -39,6 +42,9 @@ class FlutterWindow : public Win32Window {
 
   // The Flutter instance hosted by this window.
   std::unique_ptr<flutter::FlutterViewController> flutter_controller_;
+
+  // OLE drag-and-drop target (registered after window creation).
+  AvatarDropTarget* drop_target_ = nullptr;
 };
 
 #endif  // DESKTOP_MULTI_WINDOW_WINDOWS_FLUTTER_WINDOW_H_

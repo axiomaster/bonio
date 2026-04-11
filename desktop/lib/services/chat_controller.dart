@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
+import '../l10n/app_strings.dart';
 import '../models/chat_models.dart';
 import 'gateway_session.dart';
 
@@ -122,7 +123,7 @@ class ChatController extends ChangeNotifier {
     final trimmed = message.trim();
     if (trimmed.isEmpty && attachments.isEmpty) return;
     if (!_healthOk) {
-      _errorText = 'Gateway health not OK; cannot send';
+      _errorText = S.current.chatGatewayNotReady;
       notifyListeners();
       return;
     }
@@ -277,7 +278,7 @@ class ChatController extends ChangeNotifier {
         notifyListeners();
         break;
       case 'seqGap':
-        _errorText = 'Event stream interrupted; try refreshing.';
+        _errorText = S.current.chatStreamInterrupted;
         _clearPendingRuns();
         notifyListeners();
         break;
@@ -418,7 +419,7 @@ class ChatController extends ChangeNotifier {
       case 'error':
         if (state == 'error') {
           _errorText =
-              payload['errorMessage'] as String? ?? 'Chat failed';
+              payload['errorMessage'] as String? ?? S.current.chatFailed;
         }
         _ttsAfterChatFinal = state == 'final';
         if (runId != null) {
@@ -501,7 +502,7 @@ class ChatController extends ChangeNotifier {
         }
         break;
       case 'error':
-        _errorText = 'Event stream interrupted; try refreshing.';
+        _errorText = S.current.chatStreamInterrupted;
         _clearPendingRuns();
         _pendingToolCallsById.clear();
         _pendingToolCalls = [];

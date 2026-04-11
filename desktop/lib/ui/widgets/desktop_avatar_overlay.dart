@@ -16,6 +16,7 @@ import '../../models/chat_models.dart';
 import '../../platform/win32_screen_capture.dart';
 import '../../services/avatar_controller.dart';
 import '../../services/desktop_avatar_theme.dart';
+import '../../l10n/app_strings.dart';
 
 /// A text widget that auto-scrolls to the bottom when content exceeds
 /// [maxLines], creating a teleprompter effect for streaming assistant replies.
@@ -621,7 +622,7 @@ class _DesktopAvatarViewState extends State<DesktopAvatarView> {
                   textInputAction: TextInputAction.newline,
                   keyboardType: TextInputType.multiline,
                   decoration: InputDecoration(
-                    hintText: 'Ask something...',
+                    hintText: S.current.avatarAskHint,
                     hintStyle: TextStyle(
                       fontSize: 13,
                       color: cs.onSurface.withValues(alpha: 0.4),
@@ -639,13 +640,13 @@ class _DesktopAvatarViewState extends State<DesktopAvatarView> {
                   children: [
                     _InputIconButton(
                       icon: Icons.add,
-                      tooltip: 'Add attachment',
+                      tooltip: S.current.avatarAddAttachment,
                       onPressed: _pickAttachment,
                     ),
                     const Spacer(),
                     _InputIconButton(
                       icon: Icons.send,
-                      tooltip: 'Send',
+                      tooltip: S.current.composerSend,
                       onPressed: _submitInput,
                     ),
                   ],
@@ -792,6 +793,7 @@ class LensAnnotationOverlay extends StatefulWidget {
   final VoidCallback onUndo;
   final VoidCallback onCancel;
   final VoidCallback onConfirm;
+  final bool searchSimilarMode;
 
   const LensAnnotationOverlay({
     super.key,
@@ -804,6 +806,7 @@ class LensAnnotationOverlay extends StatefulWidget {
     required this.onUndo,
     required this.onCancel,
     required this.onConfirm,
+    this.searchSimilarMode = false,
   });
 
   @override
@@ -813,6 +816,7 @@ class LensAnnotationOverlay extends StatefulWidget {
 class _LensAnnotationOverlayState extends State<LensAnnotationOverlay> {
   Offset? _panStart;
   ui.Image? _screenshotImage;
+  final _focusNode = FocusNode();
 
   @override
   void initState() {
@@ -851,124 +855,137 @@ class _LensAnnotationOverlayState extends State<LensAnnotationOverlay> {
 
   @override
   void dispose() {
+    _focusNode.dispose();
     _screenshotImage?.dispose();
     super.dispose();
+  }
+
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is KeyDownEvent &&
+        event.logicalKey == LogicalKeyboardKey.escape) {
+      widget.onCancel();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   @override
   Widget build(BuildContext context) {
     const borderWidth = 3.0;
     const borderColor = Colors.red;
+    final isSearch = widget.searchSimilarMode;
 
-    return MouseRegion(
-      cursor: SystemMouseCursors.precise,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Screenshot background (semi-transparent so the annotation is visible)
-          if (_screenshotImage != null)
+    return Focus(
+      focusNode: _focusNode,
+      autofocus: true,
+      onKeyEvent: _handleKeyEvent,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.precise,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (_screenshotImage != null)
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: _ScreenshotPainter(_screenshotImage!),
+                ),
+              ),
+
+            if (!isSearch)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: borderColor, width: borderWidth),
+                    ),
+                  ),
+                ),
+              ),
+
+            // Drawing surface
             Positioned.fill(
-              child: CustomPaint(
-                painter: _ScreenshotPainter(_screenshotImage!),
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onPanStart: (details) {
+                  _panStart = details.localPosition;
+                  widget.onRectStart(details.localPosition);
+                },
+                onPanUpdate: (details) {
+                  if (_panStart != null) {
+                    widget.onRectUpdate(details.localPosition, _panStart!);
+                  }
+                },
+                onPanEnd: (_) {
+                  _panStart = null;
+                  widget.onRectEnd();
+                },
               ),
             ),
 
-          // Red border around the entire window
-          Positioned.fill(
-            child: IgnorePointer(
-              child: Container(
-                decoration: BoxDecoration(
-                  border: Border.all(color: borderColor, width: borderWidth),
-                ),
-              ),
-            ),
-          ),
-
-          // Drawing surface
-          Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onPanStart: (details) {
-                _panStart = details.localPosition;
-                widget.onRectStart(details.localPosition);
-              },
-              onPanUpdate: (details) {
-                if (_panStart != null) {
-                  widget.onRectUpdate(details.localPosition, _panStart!);
-                }
-              },
-              onPanEnd: (_) {
-                _panStart = null;
-                widget.onRectEnd();
-              },
-            ),
-          ),
-
-          // Saved annotation rectangles
-          for (final rect in widget.rects)
-            Positioned(
-              left: rect.left,
-              top: rect.top,
-              width: rect.width,
-              height: rect.height,
-              child: IgnorePointer(
-                child: Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: borderColor, width: 2),
-                    color: borderColor.withValues(alpha: 0.08),
+            for (final rect in widget.rects)
+              Positioned(
+                left: rect.left,
+                top: rect.top,
+                width: rect.width,
+                height: rect.height,
+                child: IgnorePointer(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: borderColor, width: 2),
+                      color: borderColor.withValues(alpha: 0.08),
+                    ),
                   ),
                 ),
               ),
-            ),
 
-          // Currently-drawing rectangle
-          if (widget.drawingRect != null)
-            Positioned(
-              left: widget.drawingRect!.left,
-              top: widget.drawingRect!.top,
-              width: widget.drawingRect!.width,
-              height: widget.drawingRect!.height,
-              child: IgnorePointer(
-                child: Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: borderColor, width: 2),
-                    color: borderColor.withValues(alpha: 0.12),
+            if (widget.drawingRect != null)
+              Positioned(
+                left: widget.drawingRect!.left,
+                top: widget.drawingRect!.top,
+                width: widget.drawingRect!.width,
+                height: widget.drawingRect!.height,
+                child: IgnorePointer(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: borderColor, width: 2),
+                      color: borderColor.withValues(alpha: 0.12),
+                    ),
                   ),
                 ),
               ),
-            ),
 
-          // Toolbar: Cancel, Undo, Confirm — positioned at top-right
-          Positioned(
-            top: borderWidth + 8,
-            right: borderWidth + 8,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _LensToolbarButton(
-                  label: '取消',
-                  icon: Icons.close,
-                  onPressed: widget.onCancel,
-                  color: Colors.grey.shade700,
+            if (!isSearch)
+              Positioned(
+                top: borderWidth + 8,
+                right: borderWidth + 8,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _LensToolbarButton(
+                      label: S.current.lensCancel,
+                      icon: Icons.close,
+                      onPressed: widget.onCancel,
+                      color: Colors.grey.shade700,
+                    ),
+                    const SizedBox(width: 6),
+                    _LensToolbarButton(
+                      label: S.current.lensUndo,
+                      icon: Icons.undo,
+                      onPressed: widget.rects.isEmpty ? null : widget.onUndo,
+                      color: Colors.orange.shade700,
+                    ),
+                    const SizedBox(width: 6),
+                    _LensToolbarButton(
+                      label: S.current.lensConfirm,
+                      icon: Icons.check,
+                      onPressed: widget.onConfirm,
+                      color: Colors.green.shade700,
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 6),
-                _LensToolbarButton(
-                  label: '撤回',
-                  icon: Icons.undo,
-                  onPressed: widget.rects.isEmpty ? null : widget.onUndo,
-                  color: Colors.orange.shade700,
-                ),
-                const SizedBox(width: 6),
-                _LensToolbarButton(
-                  label: '确认',
-                  icon: Icons.check,
-                  onPressed: widget.onConfirm,
-                  color: Colors.green.shade700,
-                ),
-              ],
-            ),
-          ),
-        ],
+              ),
+          ],
+        ),
       ),
     );
   }

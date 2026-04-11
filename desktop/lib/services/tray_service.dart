@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:system_tray/system_tray.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../l10n/app_strings.dart';
+
 /// Manages the system tray icon and menu for the main BoJi window.
 ///
 /// - Left-click on tray icon: show the main window.
@@ -21,17 +23,17 @@ class TrayService {
     await _systemTray.initSystemTray(
       title: '',
       iconPath: iconPath,
-      toolTip: 'BoJi Desktop',
+      toolTip: S.current.appName,
     );
 
     await _systemTray.setContextMenu([
       MenuItem(
-        label: 'Show',
+        label: S.current.trayShow,
         onClicked: _showMainWindow,
       ),
       MenuSeparator(),
       MenuItem(
-        label: 'Exit',
+        label: S.current.trayExit,
         onClicked: _exitApp,
       ),
     ]);

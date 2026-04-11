@@ -6,6 +6,7 @@
 
 #include <iostream>
 
+#include "drop_target.h"
 #include "multi_window_manager.h"
 #include "multi_window_plugin_internal.h"
 
