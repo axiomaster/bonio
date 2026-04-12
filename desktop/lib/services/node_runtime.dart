@@ -56,6 +56,7 @@ class NodeRuntime extends ChangeNotifier {
   late final NoteService noteService;
 
   WindowController? _avatarWindowController;
+  WindowController? _readingWindowController;
 
   /// When true, read assistant replies aloud after each completed turn.
   bool speakAssistantReplies = true;
@@ -220,27 +221,39 @@ class NodeRuntime extends ChangeNotifier {
   }
 
   Future<void> createReadingWindow(
-      String url, double x, double y, double w, double h) async {
+      String url, String title,
+      double x, double y, double w, double h) async {
+    await _closeReadingWindow();
     try {
       final main = await WindowController.fromCurrentEngine();
       final wc = await WindowController.create(
         WindowConfiguration(
-          hiddenAtLaunch: true,
+          hiddenAtLaunch: false,
           borderless: false,
           width: w,
           height: h,
           arguments: jsonEncode({
             'bojiWindow': 'reading_companion',
             'url': url,
+            'title': title,
             'mainWindowId': main.windowId,
           }),
         ),
       );
+      _readingWindowController = wc;
       await wc.setPosition(Offset(x, y));
-      await wc.show();
     } catch (e, st) {
       debugPrint('createReadingWindow: $e\n$st');
     }
+  }
+
+  Future<void> _closeReadingWindow() async {
+    final ctrl = _readingWindowController;
+    _readingWindowController = null;
+    if (ctrl == null) return;
+    try {
+      await ctrl.invokeMethod('window_close');
+    } catch (_) {}
   }
 
   Future<void> createSearchWindow(String imagePath, double x, double y) async {
@@ -574,6 +587,7 @@ class NodeRuntime extends ChangeNotifier {
     _nodeConnectTimer?.cancel();
     _nodeConnectTimer = null;
     unawaited(_closeAvatarWindow());
+    unawaited(_closeReadingWindow());
     chatController.removeListener(_onChatControllerChanged);
     avatarController.removeListener(_onAvatarControllerChanged);
     operatorSession.dispose();

@@ -1042,15 +1042,17 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
       _scheduleNextWander();
       return;
     }
-    final url = Win32ScreenCapture.getBrowserUrl(_anchoredHwnd);
-    if (url == null || url.isEmpty) {
-      debugPrint('StartReading: no browser URL detected');
+    if (!Win32ScreenCapture.isBrowserWindow(_anchoredHwnd)) {
+      debugPrint('StartReading: not a browser window');
       _scheduleNextWander();
       return;
     }
+    final url = Win32ScreenCapture.getBrowserUrl(_anchoredHwnd) ?? '';
+    final title = Win32ScreenCapture.getWindowTitle(_anchoredHwnd);
     _sendMenuActionToMainWithData('start_reading', {
       'hwnd': _anchoredHwnd,
       'url': url,
+      'title': title,
     });
     _scheduleNextWander();
   }

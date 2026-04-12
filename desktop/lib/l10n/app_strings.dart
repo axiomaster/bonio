@@ -52,6 +52,7 @@ abstract class S {
 
   // ── Reading companion ──
   String get readingTitle;
+  String get readingConnecting;
   String get readingExtracting;
   String get readingAnalyzing;
   String get readingSave;
@@ -59,6 +60,8 @@ abstract class S {
   String get readingTocTitle;
   String get readingClose;
   String get readingNoBrowserUrl;
+  String get readingPasteUrlHint;
+  String get readingStartButton;
   String get readingEditorLoading;
 
   // ── Chat ──
@@ -271,13 +274,16 @@ class _SZh extends S {
   @override String get menuSwitchWindow => '切换窗口';
 
   @override String get readingTitle => '伴读';
+  @override String get readingConnecting => '正在连接页面...';
   @override String get readingExtracting => '正在提取内容...';
-  @override String get readingAnalyzing => '正在生成摘要...';
+  @override String get readingAnalyzing => '正在整理摘要...';
   @override String get readingSave => '入库';
   @override String get readingSaveSuccess => '已存入记忆';
   @override String get readingTocTitle => '目录';
   @override String get readingClose => '关闭伴读';
   @override String get readingNoBrowserUrl => '未检测到浏览器URL';
+  @override String get readingPasteUrlHint => '请粘贴要伴读的网页链接';
+  @override String get readingStartButton => '开始';
   @override String get readingEditorLoading => '编辑器加载中...';
 
   @override String get chatConnectToStart => '连接网关开始聊天';
@@ -476,6 +482,7 @@ class _SEn extends S {
   @override String get menuSwitchWindow => 'Switch Window';
 
   @override String get readingTitle => 'Reading Companion';
+  @override String get readingConnecting => 'Connecting to page...';
   @override String get readingExtracting => 'Extracting content...';
   @override String get readingAnalyzing => 'Generating summary...';
   @override String get readingSave => 'Save';
@@ -483,6 +490,8 @@ class _SEn extends S {
   @override String get readingTocTitle => 'Table of Contents';
   @override String get readingClose => 'Close';
   @override String get readingNoBrowserUrl => 'No browser URL detected';
+  @override String get readingPasteUrlHint => 'Paste the URL of the page you want to read';
+  @override String get readingStartButton => 'Start';
   @override String get readingEditorLoading => 'Loading editor...';
 
   @override String get chatConnectToStart => 'Connect to a gateway to start chatting';
