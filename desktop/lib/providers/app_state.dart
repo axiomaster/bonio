@@ -174,10 +174,7 @@ class AppState extends ChangeNotifier {
   Future<void> _handleStartReading(Map<String, dynamic> data) async {
     final hwnd = (data['hwnd'] as num?)?.toInt() ?? 0;
     final url = data['url'] as String? ?? '';
-    if (url.isEmpty) {
-      debugPrint('AppState: start_reading has no URL');
-      return;
-    }
+    final title = data['title'] as String? ?? '';
 
     final ctrl = runtime.avatarController;
     ctrl.setBubble(text: S.current.readingExtracting);
@@ -185,20 +182,23 @@ class AppState extends ChangeNotifier {
 
     final workArea = Win32ScreenCapture.getMonitorWorkArea(hwnd);
     if (workArea != null && hwnd != 0) {
+      final dpi = Win32ScreenCapture.getDpiScaleForWindow(hwnd);
       final monX = workArea[0];
       final monY = workArea[1];
       final monW = workArea[2];
       final monH = workArea[3];
       final browserW = (monW * 0.7).round();
+      // Win32 SetWindowPos works in physical pixels
       Win32ScreenCapture.resizeWindow(hwnd, monX, monY, browserW, monH);
-      final companionX = (monX + browserW).toDouble();
-      final companionY = monY.toDouble();
-      final companionW = (monW - browserW).toDouble();
-      final companionH = monH.toDouble();
+      // Flutter WindowController works in logical pixels
+      final companionX = (monX + browserW) / dpi;
+      final companionY = monY / dpi;
+      final companionW = (monW - browserW) / dpi;
+      final companionH = monH / dpi;
       await runtime.createReadingWindow(
-          url, companionX, companionY, companionW, companionH);
+          url, title, companionX, companionY, companionW, companionH);
     } else {
-      await runtime.createReadingWindow(url, 0, 0, 500, 800);
+      await runtime.createReadingWindow(url, title, 0, 0, 500, 800);
     }
   }
 

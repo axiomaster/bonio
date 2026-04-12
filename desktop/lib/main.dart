@@ -86,8 +86,10 @@ Future<void> main(List<String> args) async {
 
   if (windowType == 'reading_companion') {
     final url = payload['url'] as String? ?? '';
+    final title = payload['title'] as String? ?? '';
     final mainId = payload['mainWindowId']?.toString() ?? '';
-    runApp(ReadingCompanionApp(url: url, mainWindowId: mainId));
+    runApp(ReadingCompanionApp(
+        url: url, browserTitle: title, mainWindowId: mainId));
     return;
   }
 

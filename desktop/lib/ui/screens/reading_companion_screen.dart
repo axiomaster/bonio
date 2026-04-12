@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -13,10 +14,12 @@ import '../../l10n/app_strings.dart';
 
 class ReadingCompanionApp extends StatelessWidget {
   final String url;
+  final String browserTitle;
   final String mainWindowId;
   const ReadingCompanionApp({
     super.key,
     required this.url,
+    this.browserTitle = '',
     required this.mainWindowId,
   });
 
@@ -30,7 +33,8 @@ class ReadingCompanionApp extends StatelessWidget {
         useMaterial3: true,
         brightness: Brightness.light,
       ),
-      home: _ReadingCompanionPage(url: url, mainWindowId: mainWindowId),
+      home: _ReadingCompanionPage(
+          url: url, browserTitle: browserTitle, mainWindowId: mainWindowId),
     );
   }
 }
@@ -39,13 +43,21 @@ class _HeadingInfo {
   final int level;
   final String text;
   final String id;
-  const _HeadingInfo({required this.level, required this.text, required this.id});
+  const _HeadingInfo(
+      {required this.level, required this.text, required this.id});
 }
+
+enum _LoadPhase { waitingForUrl, connecting, extracting, summarizing, ready }
 
 class _ReadingCompanionPage extends StatefulWidget {
   final String url;
+  final String browserTitle;
   final String mainWindowId;
-  const _ReadingCompanionPage({required this.url, required this.mainWindowId});
+  const _ReadingCompanionPage({
+    required this.url,
+    this.browserTitle = '',
+    required this.mainWindowId,
+  });
 
   @override
   State<_ReadingCompanionPage> createState() => _ReadingCompanionPageState();
@@ -54,26 +66,33 @@ class _ReadingCompanionPage extends StatefulWidget {
 class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
   final WebviewController _extractorController = WebviewController();
   final WebviewController _editorController = WebviewController();
+  final TextEditingController _urlInputController = TextEditingController();
 
   List<_HeadingInfo> _headings = [];
-  String _extractedText = '';
   String _summary = '';
-  String _statusText = '';
+  String _activeUrl = '';
+  _LoadPhase _phase = _LoadPhase.connecting;
   bool _extractorReady = false;
   bool _editorReady = false;
-  bool _contentExtracted = false;
-  bool _analyzing = false;
   bool _tocExpanded = true;
+  String? _errorText;
 
   @override
   void initState() {
     super.initState();
+    _activeUrl = widget.url;
     _initWindow();
-    _initExtractor();
+    if (_activeUrl.isNotEmpty) {
+      _startExtraction();
+    } else {
+      _phase = _LoadPhase.waitingForUrl;
+      _tryClipboardUrl();
+    }
   }
 
   @override
   void dispose() {
+    _urlInputController.dispose();
     _extractorController.dispose();
     _editorController.dispose();
     super.dispose();
@@ -86,27 +105,79 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
   }
 
   // ---------------------------------------------------------------------------
+  // Clipboard URL auto-read
+  // ---------------------------------------------------------------------------
+
+  Future<void> _tryClipboardUrl() async {
+    try {
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      final text = data?.text?.trim() ?? '';
+      if (text.startsWith('http://') || text.startsWith('https://')) {
+        _urlInputController.text = text;
+      }
+    } catch (_) {}
+  }
+
+  void _onUrlSubmitted() {
+    final input = _urlInputController.text.trim();
+    if (input.isEmpty) return;
+    final url = input.startsWith('http') ? input : 'https://$input';
+    setState(() {
+      _activeUrl = url;
+      _phase = _LoadPhase.connecting;
+      _errorText = null;
+    });
+    _startExtraction();
+  }
+
+  // ---------------------------------------------------------------------------
   // Content extraction WebView
   // ---------------------------------------------------------------------------
 
-  Future<void> _initExtractor() async {
-    setState(() => _statusText = S.current.readingExtracting);
+  Future<void> _startExtraction() async {
+    setState(() {
+      _phase = _LoadPhase.connecting;
+      _errorText = null;
+    });
+
     try {
       await _extractorController.initialize();
       await _extractorController.setBackgroundColor(Colors.white);
       await _extractorController.setPopupWindowPolicy(
           WebviewPopupWindowPolicy.deny);
 
-      _extractorController.url.listen((url) {
-        debugPrint('Reading extractor: navigated to $url');
+      setState(() => _extractorReady = true);
+
+      // Wait for navigation to complete via loadingState stream
+      final loadComplete = Completer<void>();
+      late StreamSubscription<LoadingState> sub;
+      sub = _extractorController.loadingState.listen((state) {
+        if (state == LoadingState.navigationCompleted &&
+            !loadComplete.isCompleted) {
+          loadComplete.complete();
+          sub.cancel();
+        }
       });
 
-      await _extractorController.loadUrl(widget.url);
-      await Future.delayed(const Duration(seconds: 3));
+      setState(() => _phase = _LoadPhase.extracting);
+      await _extractorController.loadUrl(_activeUrl);
+
+      // Wait for page load with timeout
+      await loadComplete.future.timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          if (!loadComplete.isCompleted) sub.cancel();
+        },
+      );
+
+      // Small grace period for JS frameworks to render
+      await Future.delayed(const Duration(milliseconds: 800));
       await _extractContent();
     } catch (e) {
       debugPrint('Reading extractor init failed: $e');
-      setState(() => _statusText = 'Error: $e');
+      if (mounted) {
+        setState(() => _errorText = e.toString());
+      }
     }
   }
 
@@ -134,7 +205,7 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
       ''');
 
       if (jsResult == null || jsResult == 'null') {
-        setState(() => _statusText = 'Content extraction returned empty');
+        setState(() => _errorText = 'Content extraction returned empty');
         return;
       }
 
@@ -158,16 +229,15 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
 
       setState(() {
         _headings = headings;
-        _extractedText = text;
-        _contentExtracted = true;
-        _statusText = S.current.readingAnalyzing;
+        _phase = _LoadPhase.summarizing;
       });
 
-      await _initEditor();
+      // Start editor init in parallel with analysis
+      unawaited(_initEditor());
       await _analyzeContent(text, data['title'] as String? ?? '');
     } catch (e) {
       debugPrint('Content extraction failed: $e');
-      setState(() => _statusText = 'Extraction error: $e');
+      if (mounted) setState(() => _errorText = 'Extraction error: $e');
     }
   }
 
@@ -182,17 +252,35 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
       await _editorController.setPopupWindowPolicy(
           WebviewPopupWindowPolicy.deny);
 
-      final htmlContent = await rootBundle.loadString('assets/reading/editor.html');
+      final htmlContent =
+          await rootBundle.loadString('assets/reading/editor.html');
 
       final tempDir = await getTemporaryDirectory();
       final htmlFile = File(
           '${tempDir.path}${Platform.pathSeparator}boji_reading_editor.html');
       await htmlFile.writeAsString(htmlContent);
 
-      await _editorController.loadUrl(htmlFile.uri.toString());
-      await Future.delayed(const Duration(seconds: 2));
+      final editorLoaded = Completer<void>();
+      late StreamSubscription<LoadingState> sub;
+      sub = _editorController.loadingState.listen((state) {
+        if (state == LoadingState.navigationCompleted &&
+            !editorLoaded.isCompleted) {
+          editorLoaded.complete();
+          sub.cancel();
+        }
+      });
 
-      setState(() => _editorReady = true);
+      await _editorController.loadUrl(htmlFile.uri.toString());
+      await editorLoaded.future.timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          if (!editorLoaded.isCompleted) sub.cancel();
+        },
+      );
+      // Small delay for Vditor JS initialization
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      if (mounted) setState(() => _editorReady = true);
     } catch (e) {
       debugPrint('Editor init failed: $e');
     }
@@ -220,38 +308,17 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
   }
 
   // ---------------------------------------------------------------------------
-  // LLM analysis
+  // LLM analysis (local template for now)
   // ---------------------------------------------------------------------------
 
   Future<void> _analyzeContent(String text, String title) async {
-    setState(() => _analyzing = true);
-
     final truncated = text.length > 15000 ? text.substring(0, 15000) : text;
 
-    final prompt = StringBuffer();
-    prompt.writeln('请阅读以下网页内容，生成结构化的伴读笔记（Markdown格式）。');
-    if (title.isNotEmpty) prompt.writeln('标题: $title');
-    prompt.writeln('URL: ${widget.url}');
-    prompt.writeln();
-    prompt.writeln('请按以下格式输出：');
-    prompt.writeln('1. 一句话总结（不超过50字）');
-    prompt.writeln('2. 核心要点（3-5个要点，每个1-2句话）');
-    prompt.writeln('3. 分段摘要（按文章主要段落/章节组织）');
-    prompt.writeln('4. 留空的"我的笔记"区域供用户填写');
-    prompt.writeln();
-    prompt.writeln('直接输出Markdown，不要包含```代码块。');
-    prompt.writeln();
-    prompt.writeln('--- 网页内容 ---');
-    prompt.writeln(truncated);
-
     try {
-      // Build summary locally via simple HTTP-style prompt
-      // The companion window runs in a separate engine without direct gateway access,
-      // so we generate a template and the user can edit it.
       final summaryMd = StringBuffer();
       summaryMd.writeln('# ${title.isNotEmpty ? title : "阅读笔记"}');
       summaryMd.writeln();
-      summaryMd.writeln('> 来源: [${widget.url}](${widget.url})');
+      summaryMd.writeln('> 来源: [$_activeUrl]($_activeUrl)');
       summaryMd.writeln();
 
       if (_headings.isNotEmpty) {
@@ -267,7 +334,6 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
       summaryMd.writeln('## 内容摘要');
       summaryMd.writeln();
 
-      // Extract first meaningful paragraphs as summary
       final paragraphs = truncated
           .split(RegExp(r'\n{2,}'))
           .where((p) => p.trim().length > 20)
@@ -288,18 +354,22 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
       summaryMd.writeln();
 
       _summary = summaryMd.toString();
+
+      // Wait for editor to be ready before setting content
+      while (!_editorReady && mounted) {
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
       await _setEditorContent(_summary);
 
-      setState(() {
-        _analyzing = false;
-        _statusText = '';
-      });
+      if (mounted) {
+        setState(() {
+          _phase = _LoadPhase.ready;
+          _errorText = null;
+        });
+      }
     } catch (e) {
       debugPrint('Analysis failed: $e');
-      setState(() {
-        _analyzing = false;
-        _statusText = 'Analysis error: $e';
-      });
+      if (mounted) setState(() => _errorText = 'Analysis error: $e');
     }
   }
 
@@ -313,7 +383,7 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
       if (widget.mainWindowId.isNotEmpty) {
         final main = WindowController.fromWindowId(widget.mainWindowId);
         await main.invokeMethod('readingSave', {
-          'url': widget.url,
+          'url': _activeUrl,
           'markdown': content,
         });
       }
@@ -349,7 +419,7 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
 
   void _scrollToHeading(_HeadingInfo heading) {
     if (heading.id.isNotEmpty) {
-      final uri = Uri.parse('${widget.url}#${heading.id}');
+      final uri = Uri.parse('$_activeUrl#${heading.id}');
       launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
@@ -357,6 +427,26 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
   // ---------------------------------------------------------------------------
   // Build
   // ---------------------------------------------------------------------------
+
+  String get _statusLabel {
+    switch (_phase) {
+      case _LoadPhase.waitingForUrl:
+        return '';
+      case _LoadPhase.connecting:
+        return S.current.readingConnecting;
+      case _LoadPhase.extracting:
+        return S.current.readingExtracting;
+      case _LoadPhase.summarizing:
+        return S.current.readingAnalyzing;
+      case _LoadPhase.ready:
+        return '';
+    }
+  }
+
+  bool get _isLoading =>
+      _phase == _LoadPhase.connecting ||
+      _phase == _LoadPhase.extracting ||
+      _phase == _LoadPhase.summarizing;
 
   @override
   Widget build(BuildContext context) {
@@ -369,26 +459,27 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
         titleSpacing: 12,
         toolbarHeight: 42,
         actions: [
-          if (_analyzing)
+          if (_isLoading)
             Padding(
               padding: const EdgeInsets.only(right: 8),
               child: SizedBox(
-                width: 16, height: 16,
+                width: 16,
+                height: 16,
                 child: CircularProgressIndicator(
                     strokeWidth: 2, color: cs.primary),
               ),
             ),
-          if (_statusText.isNotEmpty)
+          if (_statusLabel.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(right: 8),
-              child: Text(_statusText,
+              child: Text(_statusLabel,
                   style: theme.textTheme.bodySmall
                       ?.copyWith(color: cs.onSurface.withOpacity(0.6))),
             ),
           IconButton(
             icon: const Icon(Icons.save_outlined, size: 20),
             tooltip: S.current.readingSave,
-            onPressed: _contentExtracted ? _saveToMemory : null,
+            onPressed: _phase == _LoadPhase.ready ? _saveToMemory : null,
           ),
           IconButton(
             icon: const Icon(Icons.close, size: 20),
@@ -398,32 +489,161 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
           const SizedBox(width: 4),
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          // TOC panel
-          if (_headings.isNotEmpty) _buildTocPanel(cs),
-          // Editor
-          Expanded(
-            child: _editorReady
-                ? Webview(_editorController)
-                : Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const CircularProgressIndicator(),
-                        const SizedBox(height: 12),
-                        Text(
-                          _contentExtracted
-                              ? S.current.readingEditorLoading
-                              : S.current.readingExtracting,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                              color: cs.onSurface.withOpacity(0.6)),
-                        ),
-                      ],
-                    ),
-                  ),
-          ),
+          // Hidden extractor WebView -- must be in tree for JS execution
+          if (_extractorReady)
+            SizedBox(
+              width: 0,
+              height: 0,
+              child: Webview(_extractorController),
+            ),
+          // Main content
+          _buildBody(theme, cs),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBody(ThemeData theme, ColorScheme cs) {
+    if (_phase == _LoadPhase.waitingForUrl) {
+      return _buildUrlInputBody(theme, cs);
+    }
+
+    return Column(
+      children: [
+        if (_headings.isNotEmpty) _buildTocPanel(cs),
+        if (_errorText != null)
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(_errorText!,
+                style: TextStyle(color: cs.error, fontSize: 13)),
+          ),
+        Expanded(
+          child: _editorReady
+              ? Webview(_editorController)
+              : _buildLoadingIndicator(theme, cs),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLoadingIndicator(ThemeData theme, ColorScheme cs) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CircularProgressIndicator(),
+          const SizedBox(height: 16),
+          Text(
+            _statusLabel.isNotEmpty
+                ? _statusLabel
+                : S.current.readingEditorLoading,
+            style: theme.textTheme.bodyMedium
+                ?.copyWith(color: cs.onSurface.withOpacity(0.6)),
+          ),
+          const SizedBox(height: 8),
+          _buildProgressSteps(theme, cs),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProgressSteps(ThemeData theme, ColorScheme cs) {
+    final steps = [
+      (S.current.readingConnecting, _LoadPhase.connecting),
+      (S.current.readingExtracting, _LoadPhase.extracting),
+      (S.current.readingAnalyzing, _LoadPhase.summarizing),
+    ];
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: steps.map((entry) {
+        final label = entry.$1;
+        final step = entry.$2;
+        final done = _phase.index > step.index;
+        final active = _phase == step;
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                done
+                    ? Icons.check_circle
+                    : active
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked,
+                size: 14,
+                color: done
+                    ? Colors.green
+                    : active
+                        ? cs.primary
+                        : cs.onSurface.withOpacity(0.3),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: done || active
+                      ? cs.onSurface
+                      : cs.onSurface.withOpacity(0.4),
+                  fontWeight: active ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildUrlInputBody(ThemeData theme, ColorScheme cs) {
+    final titleHint = widget.browserTitle.isNotEmpty
+        ? widget.browserTitle
+        : S.current.readingNoBrowserUrl;
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.auto_stories_outlined,
+                size: 48, color: cs.primary.withOpacity(0.5)),
+            const SizedBox(height: 12),
+            Text(titleHint,
+                style: theme.textTheme.titleMedium,
+                textAlign: TextAlign.center),
+            const SizedBox(height: 6),
+            Text(S.current.readingPasteUrlHint,
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: cs.onSurface.withOpacity(0.6)),
+                textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _urlInputController,
+                    decoration: const InputDecoration(
+                      hintText: 'https://',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                    onSubmitted: (_) => _onUrlSubmitted(),
+                    autofocus: true,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: _onUrlSubmitted,
+                  child: Text(S.current.readingStartButton),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -439,9 +659,7 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
             child: Row(
               children: [
                 Icon(
-                  _tocExpanded
-                      ? Icons.expand_less
-                      : Icons.expand_more,
+                  _tocExpanded ? Icons.expand_less : Icons.expand_more,
                   size: 18,
                   color: cs.primary,
                 ),
