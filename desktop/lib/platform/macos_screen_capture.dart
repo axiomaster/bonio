@@ -1,4 +1,5 @@
 import 'dart:ffi';
+import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:ffi/ffi.dart';
@@ -562,22 +563,69 @@ class MacosScreenCapture {
     }
   }
 
-  /// Get browser URL. Placeholder — requires AppleScript for full implementation.
+  /// Get browser URL using AppleScript, with regex fallback from window title.
   static String? getBrowserUrl(int windowID) {
     if (windowID == 0) return null;
     try {
-      final title = getWindowTitle(windowID);
-      if (title.isEmpty) return null;
+      // Look up the window to find the owner (browser) name.
+      final windows = getWindowList();
+      if (windows == null) return _browserUrlFallback(windowID);
 
-      // Some browsers include the URL in the window title.
-      final urlMatch = RegExp(r'https?://\S+').firstMatch(title);
-      if (urlMatch != null) return urlMatch.group(0);
+      final match = windows.where((w) => w.windowID == windowID).firstOrNull;
+      if (match == null) return _browserUrlFallback(windowID);
 
-      return null; // Placeholder — AppleScript approach needed for full support
+      final ownerName = match.ownerName;
+      final appName = _mapBrowserAppName(ownerName);
+      if (appName == null) return _browserUrlFallback(windowID);
+
+      // Build AppleScript to retrieve the active tab URL.
+      String script;
+      switch (appName) {
+        case 'Safari':
+          script = 'tell application "Safari" to get URL of current tab of front window';
+          break;
+        case 'Firefox':
+          // Firefox does not expose URL via AppleScript reliably.
+          return _browserUrlFallback(windowID);
+        default:
+          // Chrome, Edge, Brave, Arc all use "active tab".
+          script = 'tell application "$appName" to get URL of active tab of front window';
+          break;
+      }
+
+      final result = Process.runSync('osascript', ['-e', script]);
+      final url = result.stdout?.toString().trim();
+      if (result.exitCode == 0 && url != null && url.isNotEmpty && url != 'missing value') {
+        return url;
+      }
+
+      // Fall back to regex from window title.
+      return _browserUrlFallback(windowID);
     } catch (e) {
       debugPrint('MacosScreenCapture.getBrowserUrl: failed: $e');
-      return null;
+      return _browserUrlFallback(windowID);
     }
+  }
+
+  /// Map a window owner name to the AppleScript application name.
+  /// Returns null if the owner is not a recognised browser.
+  static String? _mapBrowserAppName(String ownerName) {
+    final lower = ownerName.toLowerCase();
+    if (lower.contains('safari')) return 'Safari';
+    if (lower.contains('chrome') && !lower.contains('chromium')) return 'Google Chrome';
+    if (lower.contains('firefox')) return 'Firefox';
+    if (lower.contains('edge')) return 'Microsoft Edge';
+    if (lower.contains('brave')) return 'Brave';
+    if (lower.contains('arc')) return 'Arc';
+    return null;
+  }
+
+  /// Fall back to extracting a URL from the window title via regex.
+  static String? _browserUrlFallback(int windowID) {
+    final title = getWindowTitle(windowID);
+    if (title.isEmpty) return null;
+    final urlMatch = RegExp(r'https?://\S+').firstMatch(title);
+    return urlMatch?.group(0);
   }
 
   /// Returns the DPI scale factor.
@@ -597,12 +645,35 @@ class MacosScreenCapture {
     }
   }
 
-  /// Resize and reposition a window. Stub — needs AppleScript.
+  /// Resize and reposition a window using AppleScript via System Events.
+  /// Requires Accessibility permission (System Preferences > Privacy & Security > Accessibility).
   static bool resizeWindow(int windowID, int x, int y, int w, int h) {
     if (windowID == 0) return false;
     try {
-      debugPrint('MacosScreenCapture.resizeWindow: not yet implemented');
-      return false;
+      // Find the window owner name so we can target the correct process.
+      final windows = getWindowList();
+      if (windows == null) return false;
+
+      final match = windows.where((w) => w.windowID == windowID).firstOrNull;
+      if (match == null) return false;
+
+      final ownerName = match.ownerName;
+
+      final script = '''
+tell application "System Events"
+  tell process "$ownerName"
+    set position of front window to {$x, $y}
+    set size of front window to {$w, $h}
+  end tell
+end tell
+''';
+
+      final result = Process.runSync('osascript', ['-e', script]);
+      if (result.exitCode != 0) {
+        debugPrint('MacosScreenCapture.resizeWindow: osascript failed: ${result.stderr}');
+        return false;
+      }
+      return true;
     } catch (e) {
       debugPrint('MacosScreenCapture.resizeWindow: $e');
       return false;
@@ -610,19 +681,82 @@ class MacosScreenCapture {
   }
 
   /// Returns the work area (excluding menu bar and dock) as [x, y, w, h].
+  /// Uses CGDisplay APIs for screen size and reads dock configuration via defaults.
   static List<int>? getMonitorWorkArea(int windowID) {
     try {
       final displayID = _cgMainDisplayID();
       final screenHeight = _cgDisplayPixelsHigh(displayID);
       final screenWidth = _cgDisplayPixelsWide(displayID);
 
-      // Account for menu bar (~25 points) and dock (varies).
-      // Simplified — full implementation would use NSScreen.visibleFrame.
-      return [0, 25, screenWidth, screenHeight - 25];
+      // Menu bar height.
+      int menuBarHeight = _readIntDefault('-g', 'AppleMenuBarHeight') ?? 25;
+
+      // Dock configuration.
+      final dockOrientation = _readStringDefault('com.apple.dock', 'orientation') ?? 'bottom';
+      final dockTileSize = _readIntDefault('com.apple.dock', 'tilesize') ?? 64;
+      final dockAutohide = _readBoolDefault('com.apple.dock', 'autohide') ?? false;
+
+      // If dock is hidden, it doesn't consume space (a thin stripe still appears
+      // on hover, but the work area is considered full).
+      final dockThickness = dockAutohide ? 0 : dockTileSize;
+
+      int top = menuBarHeight;
+      int height = screenHeight - menuBarHeight;
+      int workX = 0;
+      int workWidth = screenWidth;
+
+      switch (dockOrientation) {
+        case 'bottom':
+          height -= dockThickness;
+          break;
+        case 'left':
+          workX = dockThickness;
+          workWidth -= dockThickness;
+          break;
+        case 'right':
+          workWidth -= dockThickness;
+          break;
+      }
+
+      return [workX, top, workWidth, height];
     } catch (e) {
       debugPrint('MacosScreenCapture.getMonitorWorkArea: $e');
       return null;
     }
+  }
+
+  /// Read an integer default value via `defaults read`.
+  static int? _readIntDefault(String domain, String key) {
+    try {
+      final result = Process.runSync('defaults', ['read', domain, key]);
+      if (result.exitCode == 0) {
+        return int.tryParse(result.stdout.toString().trim());
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Read a string default value via `defaults read`.
+  static String? _readStringDefault(String domain, String key) {
+    try {
+      final result = Process.runSync('defaults', ['read', domain, key]);
+      if (result.exitCode == 0) {
+        return result.stdout.toString().trim();
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Read a boolean default value via `defaults read`.
+  static bool? _readBoolDefault(String domain, String key) {
+    try {
+      final result = Process.runSync('defaults', ['read', domain, key]);
+      if (result.exitCode == 0) {
+        final val = result.stdout.toString().trim().toLowerCase();
+        return val == '1' || val == 'true' || val == 'yes';
+      }
+    } catch (_) {}
+    return null;
   }
 }
 
