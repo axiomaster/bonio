@@ -647,6 +647,20 @@ class MacosScreenCapture {
     }
   }
 
+  /// Returns the main display size in physical pixels as [width, height].
+  /// Returns null on failure.
+  static List<int>? getScreenSize() {
+    try {
+      final displayID = _cgMainDisplayID();
+      final w = _cgDisplayPixelsWide(displayID);
+      final h = _cgDisplayPixelsHigh(displayID);
+      if (w <= 0 || h <= 0) return null;
+      return [w, h];
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Resize and reposition a window using AppleScript via System Events.
   /// Requires Accessibility permission (System Preferences > Privacy & Security > Accessibility).
   static bool resizeWindow(int windowID, int x, int y, int w, int h) {
