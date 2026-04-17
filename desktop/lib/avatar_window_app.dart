@@ -13,7 +13,8 @@ import 'package:window_manager/window_manager.dart';
 import 'l10n/app_strings.dart';
 import 'models/avatar_snapshot.dart';
 import 'models/chat_models.dart';
-import 'platform/win32_screen_capture.dart';
+import 'platform/macos_screen_capture.dart';
+import 'platform/screen_capture.dart';
 import 'services/desktop_avatar_theme.dart';
 import 'ui/widgets/desktop_avatar_overlay.dart';
 
@@ -166,6 +167,22 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
           _anchorToWindow(fgInfo.hwnd, fgInfo);
         } else if (fgInfo != null && !isAvatar && !isDesktop && fgInfo.isFullscreen) {
           _transitionToFullscreenCorner();
+        } else {
+          _transitionToDock();
+        }
+      } else if (Platform.isMacOS) {
+        final fgWindow = _getMacForegroundWindow();
+        if (fgWindow != null) {
+          final bounds = fgWindow.bounds;
+          if (bounds != null && bounds['Width']! > 50 && bounds['Height']! > 50) {
+            if (_isMacWindowFullscreen(bounds)) {
+              _transitionToFullscreenCorner();
+            } else {
+              _transitionToAnchoredWindowMacOS(fgWindow);
+            }
+          } else {
+            _transitionToDock();
+          }
         } else {
           _transitionToDock();
         }
@@ -442,7 +459,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     if (_placement == _PlacementState.onDock) {
       return _pickDockTarget();
     } else if (_placement == _PlacementState.anchoredWindow && _anchoredHwnd != 0) {
-      final info = _getWinWindowRect(_anchoredHwnd);
+      final info = _getWindowRect(_anchoredHwnd);
       if (info != null) return _pickWindowTarget(info);
     }
     return null;
@@ -475,7 +492,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     _cancelWalk();
 
     if (_placement == _PlacementState.anchoredWindow && _anchoredHwnd != 0) {
-      final info = _getWinWindowRect(_anchoredHwnd);
+      final info = _getWindowRect(_anchoredHwnd);
       if (info != null) {
         final centerX = _windowCenterX(info);
         _wc?.getPosition().then((pos) {
@@ -507,8 +524,13 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
 
   void _pollForeground() {
     if (!mounted) return;
-    if (!Platform.isWindows) return;
+    if (!Platform.isWindows && !Platform.isMacOS) return;
     if (_interactionActive) return;
+
+    if (Platform.isMacOS) {
+      _pollForegroundMacOS();
+      return;
+    }
 
     // --- Health check for anchored window ---
     if ((_placement == _PlacementState.anchoredWindow ||
@@ -519,7 +541,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
         _handleAnchoredWindowLost();
         return;
       }
-      final rect = _getWinWindowRect(_anchoredHwnd);
+      final rect = _getWindowRect(_anchoredHwnd);
       if (rect != null && rect.isFullscreen) {
         debugPrint('AvatarAnchor: anchored window went fullscreen');
         _transitionToFullscreenCorner();
@@ -583,6 +605,136 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
 
     // New foreground window — switch immediately
     _anchorToWindow(fgHwnd, fgInfo);
+  }
+
+  // ---------------------------------------------------------------------------
+  // macOS foreground window tracking
+  // ---------------------------------------------------------------------------
+
+  /// Find the frontmost usable window on macOS via CGWindowListCopyWindowInfo.
+  /// Returns null if no suitable window is found.
+  WindowInfo? _getMacForegroundWindow() {
+    final windows = MacosScreenCapture.getWindowList();
+    if (windows == null || windows.isEmpty) return null;
+
+    for (final w in windows) {
+      // Skip our own app's windows
+      if (w.ownerName == 'boji_desktop') continue;
+      // Skip system/daemon windows
+      final owner = w.ownerName.toLowerCase();
+      if (owner.contains('window server') || owner.contains('systemuiserver') ||
+          owner.contains('dock') || owner.contains('controlcenter') ||
+          owner.contains('notification center')) continue;
+      // Skip windows without names
+      if (w.windowName == null || w.windowName!.isEmpty) continue;
+      // Skip tiny windows
+      if (w.bounds != null && (w.bounds!['Width']! < 100 || w.bounds!['Height']! < 100)) continue;
+      return w;
+    }
+    return null;
+  }
+
+  /// Check if a macOS window bounds represent a fullscreen window.
+  bool _isMacWindowFullscreen(Map<String, int> bounds) {
+    final screenSize = MacosScreenCapture.getScreenSize();
+    if (screenSize == null) return false;
+    final screenW = screenSize[0];
+    final screenH = screenSize[1];
+    return bounds['Width'] == screenW && bounds['Height'] == screenH &&
+        bounds['X'] == 0 && bounds['Y'] == 0;
+  }
+
+  void _pollForegroundMacOS() {
+    final w = _getMacForegroundWindow();
+    if (w == null) return;
+
+    final fgWindowId = w.windowID;
+
+    // --- Health check for anchored window ---
+    if ((_placement == _PlacementState.anchoredWindow ||
+         _placement == _PlacementState.userOffset) && _anchoredHwnd != 0) {
+      // Check if anchored window still exists
+      final anchored = _getMacWindowRect(_anchoredHwnd);
+      if (anchored == null) {
+        debugPrint('AvatarAnchor macOS: anchored window lost');
+        _anchoredHwnd = 0;
+        _handleAnchoredWindowLostMacOS();
+        return;
+      }
+      if (anchored.isFullscreen) {
+        debugPrint('AvatarAnchor macOS: anchored window went fullscreen');
+        _transitionToFullscreenCorner();
+        return;
+      }
+    }
+
+    // Already anchored to this window
+    if (_placement == _PlacementState.anchoredWindow && fgWindowId == _anchoredHwnd) return;
+
+    // USER_OFFSET on same window
+    if (_placement == _PlacementState.userOffset && fgWindowId == _anchoredHwnd) return;
+
+    // Check for fullscreen
+    if (w.bounds != null && _isMacWindowFullscreen(w.bounds!)) {
+      if (_placement != _PlacementState.fullscreenCorner) {
+        _transitionToFullscreenCorner();
+      }
+      return;
+    }
+
+    // New foreground window — anchor to it
+    if (w.bounds == null || w.bounds!['Width']! < 100 || w.bounds!['Height']! < 100) return;
+    _transitionToAnchoredWindowMacOS(w);
+  }
+
+  void _handleAnchoredWindowLostMacOS() {
+    _stopAnchorTracking();
+    _stopSpring();
+    final w = _getMacForegroundWindow();
+    if (w != null && w.bounds != null &&
+        w.bounds!['Width']! >= 100 && w.bounds!['Height']! >= 100) {
+      _transitionToAnchoredWindowMacOS(w);
+    } else {
+      _transitionToDock();
+    }
+  }
+
+  void _transitionToAnchoredWindowMacOS(WindowInfo w) {
+    if (w.bounds == null) {
+      _transitionToDock();
+      return;
+    }
+    final b = w.bounds!;
+    final centerX = b['X']! + b['Width']! / 2 - _windowSize.width / 2;
+    final topY = b['Y']! - _anchorHeight +
+        AvatarSnapshot.kFloatingWindowPadding + _currentBottomInset - _titleBarClearance;
+
+    debugPrint('AvatarAnchor macOS: anchoring to windowID=${w.windowID} '
+        'owner=${w.ownerName} (${b['X']},${b['Y']}) ${b['Width']}x${b['Height']}');
+
+    _cancelWalk();
+    _stopAnchorTracking();
+    _stopSpring();
+    _placement = _PlacementState.anchoredWindow;
+    _anchoredHwnd = w.windowID;
+    _userOffsetX = 0;
+
+    _lastAnchoredLeft = b['X']!.toDouble();
+    _lastAnchoredTop = b['Y']!.toDouble();
+    _lastAnchoredWidth = b['Width']!.toDouble();
+
+    _programmaticMove = true;
+    final targetX = centerX;
+    final targetY = topY;
+    _wc?.setPosition(Offset(targetX, targetY)).then((_) {
+      _currentX = targetX;
+      _currentY = targetY;
+      _targetX = targetX;
+      _targetY = targetY;
+      _programmaticMove = false;
+    });
+    _scheduleNextWander();
+    _startAnchorTracking();
   }
 
   void _handleAnchoredWindowLost() {
@@ -686,7 +838,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
 
   void _startAnchorTracking() {
     _anchorTrackTimer?.cancel();
-    if (!Platform.isWindows) return;
+    if (!Platform.isWindows && !Platform.isMacOS) return;
     _anchorTrackTimer = Timer.periodic(
         _anchorTrackInterval, (_) => _trackAnchoredWindow());
   }
@@ -708,7 +860,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
       return;
     }
 
-    final info = _getWinWindowRect(_anchoredHwnd);
+    final info = _getWindowRect(_anchoredHwnd);
     if (info == null) return;
 
     final moved = (info.left - _lastAnchoredLeft).abs() > 0.5 ||
@@ -877,7 +1029,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
       if (_placement == _PlacementState.onDock) {
         newY = _dockTopYFor(newInset);
       } else if (_placement == _PlacementState.anchoredWindow && _anchoredHwnd != 0) {
-        final info = _getWinWindowRect(_anchoredHwnd);
+        final info = _getWindowRect(_anchoredHwnd);
         if (info == null) return;
         newY = info.top - _anchorHeight +
             AvatarSnapshot.kFloatingWindowPadding + newInset - _titleBarClearance;
@@ -1042,13 +1194,13 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
       _scheduleNextWander();
       return;
     }
-    if (!Win32ScreenCapture.isBrowserWindow(_anchoredHwnd)) {
+    if (!ScreenCapture.isBrowserWindow(_anchoredHwnd)) {
       debugPrint('StartReading: not a browser window');
       _scheduleNextWander();
       return;
     }
-    final url = Win32ScreenCapture.getBrowserUrl(_anchoredHwnd) ?? '';
-    final title = Win32ScreenCapture.getWindowTitle(_anchoredHwnd);
+    final url = ScreenCapture.getBrowserUrl(_anchoredHwnd) ?? '';
+    final title = ScreenCapture.getWindowTitle(_anchoredHwnd);
     _sendMenuActionToMainWithData('start_reading', {
       'hwnd': _anchoredHwnd,
       'url': url,
@@ -1115,19 +1267,19 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
       _scheduleNextWander();
       return;
     }
-    if (!Platform.isWindows) return;
+    if (!Platform.isWindows && !Platform.isMacOS) return;
 
     // Capture anchored window screenshot before any UI changes
-    final capture = Win32ScreenCapture.captureWindow(_anchoredHwnd);
+    final capture = ScreenCapture.captureWindow(_anchoredHwnd);
     if (capture == null) {
       debugPrint('BoJiLens: capture failed');
       _scheduleNextWander();
       return;
     }
-    final title = Win32ScreenCapture.getWindowTitle(_anchoredHwnd);
+    final title = ScreenCapture.getWindowTitle(_anchoredHwnd);
 
     // Get anchored window rect for expansion
-    final info = _getWinWindowRect(_anchoredHwnd);
+    final info = _getWindowRect(_anchoredHwnd);
     if (info == null) {
       debugPrint('BoJiLens: cannot get window rect');
       _scheduleNextWander();
@@ -1950,4 +2102,49 @@ _ForegroundWindowInfo? _getWinForegroundInfo() {
   }
 }
 
- 
+// ---------------------------------------------------------------------------
+// Cross-platform window rect helper
+// ---------------------------------------------------------------------------
+
+/// Returns the rect of a window by platform-specific ID.
+/// On Windows, uses _getWinWindowRect (Win32 FFI).
+/// On macOS, uses MacosScreenCapture.getWindowList() to look up bounds.
+_WindowRectInfo? _getWindowRect(int windowId) {
+  if (Platform.isWindows) {
+    return _getWinWindowRect(windowId);
+  }
+  if (Platform.isMacOS) {
+    return _getMacWindowRect(windowId);
+  }
+  return null;
+}
+
+/// macOS implementation: look up window bounds from getWindowList().
+_WindowRectInfo? _getMacWindowRect(int windowID) {
+  try {
+    final windows = MacosScreenCapture.getWindowList();
+    if (windows == null) return null;
+    for (final w in windows) {
+      if (w.windowID == windowID && w.bounds != null) {
+        final b = w.bounds!;
+        bool isFullscreen = false;
+        final screenSize = MacosScreenCapture.getScreenSize();
+        if (screenSize != null) {
+          isFullscreen = b['Width'] == screenSize[0] && b['Height'] == screenSize[1] &&
+              b['X'] == 0 && b['Y'] == 0;
+        }
+        return _WindowRectInfo(
+          left: b['X']!.toDouble(),
+          top: b['Y']!.toDouble(),
+          width: b['Width']!.toDouble(),
+          height: b['Height']!.toDouble(),
+          isFullscreen: isFullscreen,
+        );
+      }
+    }
+    return null;
+  } catch (e) {
+    debugPrint('_getMacWindowRect failed: $e');
+    return null;
+  }
+}
