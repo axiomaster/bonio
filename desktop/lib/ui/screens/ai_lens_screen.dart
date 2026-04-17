@@ -1,10 +1,9 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
-import '../../platform/win32_screen_capture.dart';
+import '../../platform/screen_capture.dart';
 
 /// Fullscreen overlay for AI Lens: shows a captured screenshot with a dark
 /// mask, lets the user drag-select a region, then returns the cropped PNG.
@@ -14,12 +13,7 @@ class AiLensScreen extends StatefulWidget {
   /// Shows the AI Lens overlay and returns the selected region as PNG bytes,
   /// or null if cancelled.
   static Future<Uint8List?> show(BuildContext context) async {
-    if (!Platform.isWindows) {
-      debugPrint('AiLens: only supported on Windows');
-      return null;
-    }
-
-    final capture = Win32ScreenCapture.captureScreen();
+    final capture = ScreenCapture.captureScreen();
     if (capture == null) {
       debugPrint('AiLens: screen capture failed');
       return null;

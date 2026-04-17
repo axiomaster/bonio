@@ -10,7 +10,7 @@ import 'package:uuid/uuid.dart';
 
 import '../models/note_models.dart';
 import '../models/chat_models.dart';
-import '../platform/win32_screen_capture.dart';
+import '../platform/screen_capture.dart';
 import 'gateway_session.dart';
 
 class NoteService extends ChangeNotifier {
@@ -138,14 +138,14 @@ class NoteService extends ChangeNotifier {
     await init();
 
     debugPrint('NoteService: capturing window hwnd=$hwnd');
-    final capture = Win32ScreenCapture.captureWindow(hwnd);
+    final capture = ScreenCapture.captureWindow(hwnd);
     if (capture == null) {
       debugPrint('NoteService: capture failed');
       return null;
     }
 
-    final title = Win32ScreenCapture.getWindowTitle(hwnd);
-    final browserUrl = Win32ScreenCapture.getBrowserUrl(hwnd);
+    final title = ScreenCapture.getWindowTitle(hwnd);
+    final browserUrl = ScreenCapture.getBrowserUrl(hwnd);
     final png = await capture.toPng();
     if (png == null) {
       debugPrint('NoteService: PNG encode failed');
