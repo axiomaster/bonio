@@ -7,10 +7,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:webview_windows/webview_windows.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../l10n/app_strings.dart';
+
+// WebView2 is Windows-only; import unconditionally so the package
+// resolves at compile time, but guard all usage with Platform.isWindows.
+import 'package:webview_windows/webview_windows.dart';
 
 class ReadingCompanionApp extends StatelessWidget {
   final String url;
@@ -67,6 +70,7 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
   final WebviewController _extractorController = WebviewController();
   final WebviewController _editorController = WebviewController();
   final TextEditingController _urlInputController = TextEditingController();
+  final TextEditingController _macEditorController = TextEditingController();
 
   List<_HeadingInfo> _headings = [];
   String _summary = '';
@@ -76,6 +80,8 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
   bool _editorReady = false;
   bool _tocExpanded = true;
   String? _errorText;
+
+  bool get _isMacOS => Platform.isMacOS;
 
   @override
   void initState() {
@@ -95,6 +101,7 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
     _urlInputController.dispose();
     _extractorController.dispose();
     _editorController.dispose();
+    _macEditorController.dispose();
     super.dispose();
   }
 
@@ -131,7 +138,7 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
   }
 
   // ---------------------------------------------------------------------------
-  // Content extraction WebView
+  // Content extraction – platform dispatch
   // ---------------------------------------------------------------------------
 
   Future<void> _startExtraction() async {
@@ -140,6 +147,12 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
       _errorText = null;
     });
 
+    if (_isMacOS) {
+      await _startExtractionMacOS();
+      return;
+    }
+
+    // Windows: use WebView2
     try {
       await _extractorController.initialize();
       await _extractorController.setBackgroundColor(Colors.white);
@@ -180,6 +193,89 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
       }
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Content extraction – macOS (HTTP fetch + HTML parsing)
+  // ---------------------------------------------------------------------------
+
+  Future<void> _startExtractionMacOS() async {
+    try {
+      setState(() => _phase = _LoadPhase.extracting);
+
+      // Fetch page HTML via HttpClient
+      final client = HttpClient();
+      final request = await client.getUrl(Uri.parse(_activeUrl));
+      request.headers.set('User-Agent',
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36');
+      final response = await request.close();
+      final html = await response.transform(utf8.decoder).join();
+      client.close();
+
+      // Parse headings with regex
+      final headingRegex =
+          RegExp(r'<h([1-6])[^>]*>(.*?)</h\1>', dotAll: true);
+      final headings = <_HeadingInfo>[];
+      for (final match in headingRegex.allMatches(html)) {
+        final level = int.parse(match.group(1)!);
+        final text = _stripHtmlTags(match.group(2)!).trim();
+        if (text.isNotEmpty) {
+          headings.add(_HeadingInfo(level: level, text: text, id: ''));
+        }
+      }
+
+      // Extract text from body
+      String bodyHtml = html;
+      final bodyMatch =
+          RegExp(r'<body[^>]*>(.*)', dotAll: true).firstMatch(html);
+      if (bodyMatch != null) {
+        bodyHtml = bodyMatch.group(1)!;
+      }
+      // Remove script/style/nav/footer tags, then strip remaining tags
+      final cleaned = bodyHtml
+          .replaceAll(RegExp(r'<script[^>]*>.*?</script>', dotAll: true), '')
+          .replaceAll(RegExp(r'<style[^>]*>.*?</style>', dotAll: true), '')
+          .replaceAll(RegExp(r'<nav[^>]*>.*?</nav>', dotAll: true), '')
+          .replaceAll(RegExp(r'<footer[^>]*>.*?</footer>', dotAll: true), '')
+          .replaceAll(RegExp(r'<[^>]+>'), ' ')
+          .replaceAll(RegExp(r'&[a-zA-Z]+;'), ' ')
+          .replaceAll(RegExp(r'&#\d+;'), ' ')
+          .replaceAll(RegExp(r'\s+'), ' ')
+          .trim();
+      final text = cleaned.substring(
+          0, cleaned.length > 50000 ? 50000 : cleaned.length);
+
+      // Extract title
+      final titleMatch =
+          RegExp(r'<title[^>]*>(.*?)</title>', dotAll: true).firstMatch(html);
+      final title = _stripHtmlTags(titleMatch?.group(1) ?? '').trim();
+
+      setState(() {
+        _headings = headings;
+        _phase = _LoadPhase.summarizing;
+      });
+      // Mark editor ready immediately on macOS (uses plain TextField)
+      _initEditor();
+      await _analyzeContent(text, title);
+    } catch (e) {
+      debugPrint('Reading extraction (macOS) failed: $e');
+      if (mounted) setState(() => _errorText = 'Extraction error: $e');
+    }
+  }
+
+  String _stripHtmlTags(String html) {
+    return html
+        .replaceAll(RegExp(r'<[^>]+>'), '')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&#39;', "'")
+        .replaceAll('&nbsp;', ' ');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Content extraction – Windows (WebView2 JS)
+  // ---------------------------------------------------------------------------
 
   Future<void> _extractContent() async {
     try {
@@ -242,10 +338,16 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
   }
 
   // ---------------------------------------------------------------------------
-  // Markdown editor WebView
+  // Markdown editor – platform dispatch
   // ---------------------------------------------------------------------------
 
   Future<void> _initEditor() async {
+    if (_isMacOS) {
+      if (mounted) setState(() => _editorReady = true);
+      return;
+    }
+
+    // Windows: WebView2-based editor
     try {
       await _editorController.initialize();
       await _editorController.setBackgroundColor(Colors.white);
@@ -287,6 +389,10 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
   }
 
   Future<void> _setEditorContent(String markdown) async {
+    if (_isMacOS) {
+      _macEditorController.text = markdown;
+      return;
+    }
     if (!_editorReady) return;
     final escaped = markdown
         .replaceAll('\\', '\\\\')
@@ -297,6 +403,7 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
   }
 
   Future<String> _getEditorContent() async {
+    if (_isMacOS) return _macEditorController.text;
     if (!_editorReady) return _summary;
     final result = await _editorController.executeScript('getContent()');
     if (result == null || result == 'null') return _summary;
@@ -491,8 +598,8 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
       ),
       body: Stack(
         children: [
-          // Hidden extractor WebView -- must be in tree for JS execution
-          if (_extractorReady)
+          // Hidden extractor WebView -- must be in tree for JS execution (Windows only)
+          if (!_isMacOS && _extractorReady)
             SizedBox(
               width: 0,
               height: 0,
@@ -521,10 +628,37 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
           ),
         Expanded(
           child: _editorReady
-              ? Webview(_editorController)
+              ? _buildEditor(theme, cs)
               : _buildLoadingIndicator(theme, cs),
         ),
       ],
+    );
+  }
+
+  Widget _buildEditor(ThemeData theme, ColorScheme cs) {
+    if (_isMacOS) return _buildMacOSEditor(theme, cs);
+    return Webview(_editorController);
+  }
+
+  Widget _buildMacOSEditor(ThemeData theme, ColorScheme cs) {
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: TextField(
+        controller: _macEditorController,
+        maxLines: null,
+        expands: true,
+        textAlignVertical: TextAlignVertical.top,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          fontFamily: 'monospace',
+          height: 1.5,
+        ),
+        decoration: InputDecoration(
+          border: const OutlineInputBorder(),
+          hintText: S.current.readingEditorHint,
+          filled: true,
+          fillColor: cs.surface,
+        ),
+      ),
     );
   }
 

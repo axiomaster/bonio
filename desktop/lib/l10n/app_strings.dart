@@ -63,6 +63,7 @@ abstract class S {
   String get readingPasteUrlHint;
   String get readingStartButton;
   String get readingEditorLoading;
+  String get readingEditorHint;
 
   // ── Chat ──
   String get chatConnectToStart;
@@ -285,6 +286,7 @@ class _SZh extends S {
   @override String get readingPasteUrlHint => '请粘贴要伴读的网页链接';
   @override String get readingStartButton => '开始';
   @override String get readingEditorLoading => '编辑器加载中...';
+  @override String get readingEditorHint => '在此编辑阅读笔记...';
 
   @override String get chatConnectToStart => '连接网关开始聊天';
   @override String get chatDisconnected => '已断开';
@@ -493,6 +495,7 @@ class _SEn extends S {
   @override String get readingPasteUrlHint => 'Paste the URL of the page you want to read';
   @override String get readingStartButton => 'Start';
   @override String get readingEditorLoading => 'Loading editor...';
+  @override String get readingEditorHint => 'Edit your reading notes here...';
 
   @override String get chatConnectToStart => 'Connect to a gateway to start chatting';
   @override String get chatDisconnected => 'Disconnected';
