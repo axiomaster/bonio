@@ -11,7 +11,7 @@ import 'package:window_manager/window_manager.dart';
 
 import '../l10n/app_strings.dart';
 import '../models/agent_avatar_models.dart';
-import '../platform/win32_screen_capture.dart';
+import '../platform/screen_capture.dart';
 import '../models/chat_models.dart';
 import '../models/gateway_profile.dart';
 import '../models/note_models.dart';
@@ -180,16 +180,16 @@ class AppState extends ChangeNotifier {
     ctrl.setBubble(text: S.current.readingExtracting);
     ctrl.showTemporaryState(AgentAvatarActivity.thinking);
 
-    final workArea = Win32ScreenCapture.getMonitorWorkArea(hwnd);
+    final workArea = ScreenCapture.getMonitorWorkArea(hwnd);
     if (workArea != null && hwnd != 0) {
-      final dpi = Win32ScreenCapture.getDpiScaleForWindow(hwnd);
+      final dpi = ScreenCapture.getDpiScaleForWindow(hwnd);
       final monX = workArea[0];
       final monY = workArea[1];
       final monW = workArea[2];
       final monH = workArea[3];
       final browserW = (monW * 0.7).round();
       // Win32 SetWindowPos works in physical pixels
-      Win32ScreenCapture.resizeWindow(hwnd, monX, monY, browserW, monH);
+      ScreenCapture.resizeWindow(hwnd, monX, monY, browserW, monH);
       // Flutter WindowController works in logical pixels
       final companionX = (monX + browserW) / dpi;
       final companionY = monY / dpi;

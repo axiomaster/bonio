@@ -13,7 +13,7 @@ import 'package:window_manager/window_manager.dart';
 import '../../models/agent_avatar_models.dart';
 import '../../models/avatar_snapshot.dart';
 import '../../models/chat_models.dart';
-import '../../platform/win32_screen_capture.dart';
+import '../../platform/screen_capture.dart';
 import '../../services/avatar_controller.dart';
 import '../../services/desktop_avatar_theme.dart';
 import '../../l10n/app_strings.dart';
