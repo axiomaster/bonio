@@ -15,6 +15,7 @@ import 'models/avatar_snapshot.dart';
 import 'models/chat_models.dart';
 import 'platform/macos_screen_capture.dart';
 import 'platform/screen_capture.dart';
+import 'platform/win32_screen_capture.dart';
 import 'services/desktop_avatar_theme.dart';
 import 'ui/widgets/desktop_avatar_overlay.dart';
 
@@ -993,6 +994,12 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
             _handleInputVisibilityChange(prev.showInput, _snapshot.showInput);
           }
           return null;
+        case 'syncPluginMenu':
+          final raw = call.arguments;
+          if (raw is List) {
+            _pluginMenuItems = raw.cast<Map<String, dynamic>>();
+          }
+          return null;
         case 'window_close':
           _wanderTimer?.cancel();
           _moveAnimTimer?.cancel();
@@ -1107,7 +1114,25 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     } catch (_) {}
   }
 
+  Future<void> _sendPluginActionToMain(String pluginId) async {
+    try {
+      final main = WindowController.fromWindowId(widget.mainWindowId);
+      await main.invokeMethod('pluginMenuAction', {
+        'pluginId': pluginId,
+        'hwnd': _anchoredHwnd,
+        'isBrowser': _anchoredHwnd != 0
+            ? Win32ScreenCapture.isBrowserWindow(_anchoredHwnd)
+            : false,
+      });
+    } catch (e) {
+      debugPrint('sendPluginActionToMain error: $e');
+    }
+  }
+
   bool _menuVisible = false;
+
+  /// Dynamic plugin menu items pushed from the main window.
+  List<Map<String, dynamic>> _pluginMenuItems = [];
 
   Future<void> _onShowNativeMenu() async {
     if (_menuVisible) return;
@@ -1123,8 +1148,23 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
 
     try {
       final s = S.current;
-      final action = await wc.showPopupMenu(
-        items: [
+
+      // Build menu items: use plugin system if available, else fallback
+      final List<Map<String, dynamic>> items;
+      final Map<int, String> actions;
+      if (_pluginMenuItems.isNotEmpty) {
+        items = [
+          ..._pluginMenuItems,
+          {'id': 0, 'label': '', 'enabled': false},
+          {'id': 9990, 'label': s.appName, 'enabled': true},
+        ];
+        actions = {
+          for (final item in _pluginMenuItems)
+            (item['id'] as int): item['pluginId'] as String? ?? '',
+          9990: 'show_main',
+        };
+      } else {
+        items = [
           {'id': 1, 'label': s.menuTakeNote, 'enabled': true},
           {'id': 4, 'label': s.menuAiLens, 'enabled': true},
           {'id': 5, 'label': s.menuSearchSimilar, 'enabled': true},
@@ -1132,16 +1172,22 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
           {'id': 0, 'label': '', 'enabled': false},
           {'id': 2, 'label': s.appName, 'enabled': true},
           {'id': 3, 'label': s.menuSwitchWindow, 'enabled': false},
-        ],
-        actions: const {
+        ];
+        actions = const {
           1: 'note_capture', 4: 'ai_lens', 5: 'search_similar',
           6: 'start_reading', 2: 'show_main', 3: 'switch_window',
-        },
+        };
+      }
+
+      final action = await wc.showPopupMenu(
+        items: items,
+        actions: actions,
       );
 
       _menuVisible = false;
       if (!mounted) return;
 
+      // Static built-in actions handled locally in avatar engine
       if (action == 'ai_lens') {
         await _enterLensMode();
         return;
@@ -1158,14 +1204,20 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
       }
 
       if (action == 'start_reading') {
-        _handleStartReading();
+        await _handleStartReading();
         return;
       }
 
       _scheduleNextWander();
 
-      if (action.isNotEmpty) {
+      if (action == 'show_main') {
         _sendMenuActionToMain(action);
+        return;
+      }
+
+      // Plugin action -- forward to main window with context
+      if (action.isNotEmpty) {
+        _sendPluginActionToMain(action);
       }
     } catch (e) {
       debugPrint('showPopupMenu error: $e');
@@ -1188,7 +1240,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     _scheduleNextWander();
   }
 
-  void _handleStartReading() {
+  Future<void> _handleStartReading() async {
     if (_anchoredHwnd == 0) {
       debugPrint('StartReading: no anchored window');
       _scheduleNextWander();
@@ -1199,9 +1251,19 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
       _scheduleNextWander();
       return;
     }
-    final url = ScreenCapture.getBrowserUrl(_anchoredHwnd) ?? '';
+
+    var url = '';
+    // On Windows, try keyboard-based extraction first (most reliable)
+    if (Platform.isWindows) {
+      url = await Win32ScreenCapture.getBrowserUrlViaKeyboard(_anchoredHwnd) ?? '';
+    }
+    // Fallback to window-title regex
+    if (url.isEmpty) {
+      url = ScreenCapture.getBrowserUrl(_anchoredHwnd) ?? '';
+    }
+
     final title = ScreenCapture.getWindowTitle(_anchoredHwnd);
-    _sendMenuActionToMainWithData('start_reading', {
+    await _sendMenuActionToMainWithData('start_reading', {
       'hwnd': _anchoredHwnd,
       'url': url,
       'title': title,

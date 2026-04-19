@@ -60,7 +60,11 @@ std::string MultiWindowManager::Create(const flutter::EncodableMap* args) {
   // BoJi avatar: 244×156 (72px cat + bubble area + padding).
   Win32Window::Size size(244, 156);
 
-  if (!flutter_window->Create(title, origin, size)) {
+  DWORD window_style = config.borderless
+                           ? (WS_POPUP | WS_CLIPCHILDREN)
+                           : (WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN);
+
+  if (!flutter_window->Create(title, origin, size, window_style)) {
     std::cerr << "Failed to create window." << std::endl;
     return "";
   }

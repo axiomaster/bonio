@@ -88,8 +88,23 @@ Future<void> main(List<String> args) async {
     final url = payload['url'] as String? ?? '';
     final title = payload['title'] as String? ?? '';
     final mainId = payload['mainWindowId']?.toString() ?? '';
+    final cdpText = payload['cdpText'] as String?;
+    final cdpTitle = payload['cdpTitle'] as String?;
+    final cdpUrl = payload['cdpUrl'] as String?;
+    final cdpHeadings = payload['cdpHeadings'] as List<dynamic>?;
+    final windowWidth = (payload['windowWidth'] as num?)?.toDouble() ?? 300;
+    final windowHeight = (payload['windowHeight'] as num?)?.toDouble() ?? 800;
     runApp(ReadingCompanionApp(
-        url: url, browserTitle: title, mainWindowId: mainId));
+      url: url,
+      browserTitle: title,
+      mainWindowId: mainId,
+      cdpText: cdpText,
+      cdpTitle: cdpTitle,
+      cdpUrl: cdpUrl,
+      cdpHeadings: cdpHeadings,
+      windowWidth: windowWidth,
+      windowHeight: windowHeight,
+    ));
     return;
   }
 

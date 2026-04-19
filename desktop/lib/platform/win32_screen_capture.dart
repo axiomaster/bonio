@@ -1,4 +1,5 @@
 import 'dart:ffi';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
@@ -291,6 +292,84 @@ class Win32ScreenCapture {
       return null;
     } catch (e) {
       debugPrint('Win32ScreenCapture.getBrowserUrl: failed: $e');
+      return null;
+    }
+  }
+
+  /// Extract the browser URL by simulating Ctrl+L (select address bar),
+  /// Ctrl+C (copy), then reading the clipboard. Works for Chrome, Edge,
+  /// Firefox, Opera, Vivaldi.
+  static Future<String?> getBrowserUrlViaKeyboard(int hwnd) async {
+    if (hwnd == 0) return null;
+    if (!Platform.isWindows) return null;
+    try {
+      final setFg = _user32.lookupFunction<Int32 Function(IntPtr), int Function(int)>(
+          'SetForegroundWindow');
+      final keybdEvent = _user32.lookupFunction<
+          Void Function(Uint8, Uint8, Uint32, IntPtr),
+          void Function(int, int, int, int)>('keybd_event');
+      final openClipboard =
+          _user32.lookupFunction<Int32 Function(IntPtr), int Function(int)>('OpenClipboard');
+      final closeClipboard =
+          _user32.lookupFunction<Int32 Function(), int Function()>('CloseClipboard');
+      final getClipboardData =
+          _user32.lookupFunction<IntPtr Function(Uint32), int Function(int)>('GetClipboardData');
+      final kernel32 = DynamicLibrary.open('kernel32.dll');
+      final globalLock =
+          kernel32.lookupFunction<IntPtr Function(IntPtr), int Function(int)>('GlobalLock');
+      final globalUnlock =
+          kernel32.lookupFunction<Int32 Function(IntPtr), int Function(int)>('GlobalUnlock');
+
+      const vkControl = 0x11;
+      const vkL = 0x4C;
+      const vkC = 0x43;
+      const vkEscape = 0x1B;
+      const keyeventfKeyup = 0x0002;
+      const cfUnicodeText = 13;
+
+      // Activate the browser window
+      setFg(hwnd);
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      // Ctrl+L — select address bar
+      keybdEvent(vkControl, 0, 0, 0);
+      keybdEvent(vkL, 0, 0, 0);
+      keybdEvent(vkL, 0, keyeventfKeyup, 0);
+      keybdEvent(vkControl, 0, keyeventfKeyup, 0);
+      await Future.delayed(const Duration(milliseconds: 80));
+
+      // Ctrl+C — copy URL
+      keybdEvent(vkControl, 0, 0, 0);
+      keybdEvent(vkC, 0, 0, 0);
+      keybdEvent(vkC, 0, keyeventfKeyup, 0);
+      keybdEvent(vkControl, 0, keyeventfKeyup, 0);
+      await Future.delayed(const Duration(milliseconds: 80));
+
+      // Escape — deselect address bar
+      keybdEvent(vkEscape, 0, 0, 0);
+      keybdEvent(vkEscape, 0, keyeventfKeyup, 0);
+
+      // Read clipboard via Win32 API
+      if (openClipboard(0) == 0) return null;
+      try {
+        final hData = getClipboardData(cfUnicodeText);
+        if (hData == 0) return null;
+        final ptr = globalLock(hData);
+        if (ptr == 0) return null;
+        try {
+          final text = Pointer<Utf16>.fromAddress(ptr).toDartString().trim();
+          if (text.startsWith('http://') || text.startsWith('https://')) {
+            return text;
+          }
+          return null;
+        } finally {
+          globalUnlock(hData);
+        }
+      } finally {
+        closeClipboard();
+      }
+    } catch (e) {
+      debugPrint('Win32ScreenCapture.getBrowserUrlViaKeyboard: $e');
       return null;
     }
   }

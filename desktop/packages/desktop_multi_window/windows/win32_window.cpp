@@ -133,7 +133,8 @@ Win32Window::~Win32Window() {
 
 bool Win32Window::Create(const std::wstring& title,
                          const Point& origin,
-                         const Size& size) {
+                         const Size& size,
+                         DWORD style) {
   if (window_handle_) {
     return false;
   }
@@ -147,11 +148,9 @@ bool Win32Window::Create(const std::wstring& title,
   UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
   double scale_factor = dpi / 96.0;
 
-  // WS_POPUP: no title-bar / borders so client-area == window-area (avoids
-  // non-uniform scaling when Flutter creates its surface from GetClientArea).
   HWND window = CreateWindowEx(
       WS_EX_APPWINDOW,
-      window_class, title.c_str(), WS_POPUP | WS_CLIPCHILDREN,
+      window_class, title.c_str(), style,
       Scale(origin.x, scale_factor), Scale(origin.y, scale_factor),
       Scale(size.width, scale_factor), Scale(size.height, scale_factor),
       nullptr, nullptr, GetModuleHandle(nullptr), this);
