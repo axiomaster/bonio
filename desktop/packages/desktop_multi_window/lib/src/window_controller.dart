@@ -120,6 +120,18 @@ class WindowController {
     );
   }
 
+  /// Get window position in raw physical pixel coordinates.
+  Future<Offset> getPositionPhysical() async {
+    final result = await _channel.invokeMethod<Map<dynamic, dynamic>>(
+      'window_getPositionPhysical',
+      {'windowId': windowId},
+    );
+    return Offset(
+      (result?['x'] as num?)?.toDouble() ?? 0,
+      (result?['y'] as num?)?.toDouble() ?? 0,
+    );
+  }
+
   /// Start native window drag using the current event.
   Future<void> startDragging() =>
       _callWindowMethod('window_startDragging', {});
