@@ -5,6 +5,7 @@ import '../../providers/app_state.dart';
 import 'chat_tab.dart';
 import 'marketplace_tab.dart';
 import 'memory_tab.dart';
+import 'plugin_tab.dart';
 import 'server_tab.dart';
 import 'settings_tab.dart';
 
@@ -43,6 +44,11 @@ class _MainScreenState extends State<MainScreen> {
         icon: Icon(Icons.store_outlined),
         selectedIcon: Icon(Icons.store),
         label: Text(S.current.tabMarket),
+      ),
+      NavigationRailDestination(
+        icon: Icon(Icons.extension_outlined),
+        selectedIcon: Icon(Icons.extension),
+        label: Text(S.current.marketPlugins),
       ),
       NavigationRailDestination(
         icon: Icon(Icons.settings_outlined),
@@ -112,6 +118,7 @@ class _MainScreenState extends State<MainScreen> {
                 ServerTab(),
                 MemoryTab(),
                 MarketplaceTab(),
+                PluginTab(),
                 SettingsTab(),
               ],
             ),

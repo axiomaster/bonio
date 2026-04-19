@@ -24,6 +24,8 @@ import 'camera_service.dart';
 import 'desktop_tts.dart';
 import 'note_service.dart';
 import '../l10n/app_strings.dart';
+import '../platform/gui_agent.dart';
+import '../plugins/plugin_manager.dart';
 
 /// On macOS, `localhost` often resolves to IPv6 (`::1`) while a local OpenClaw
 /// gateway may listen on IPv4 only (`127.0.0.1`), causing connection failures
@@ -54,6 +56,8 @@ class NodeRuntime extends ChangeNotifier {
   late final AvatarCommandExecutor avatarCommandExecutor;
   late final DesktopTts desktopTts;
   late final NoteService noteService;
+  late final GuiAgent guiAgent;
+  late final PluginManager pluginManager;
 
   WindowController? _avatarWindowController;
   WindowController? _readingWindowController;
@@ -124,6 +128,10 @@ class NodeRuntime extends ChangeNotifier {
       tts: desktopTts,
     );
     noteService = NoteService(session: operatorSession);
+    guiAgent = GuiAgent.create();
+    pluginManager = PluginManager();
+    pluginManager.addListener(pushPluginMenuToAvatar);
+    unawaited(pluginManager.initialize());
     // ChatController / AvatarController updates must bubble to AppState.
     chatController.addListener(_onChatControllerChanged);
     avatarController.addListener(_onAvatarControllerChanged);
@@ -215,6 +223,7 @@ class NodeRuntime extends ChangeNotifier {
       );
       await _avatarWindowController!.show();
       _pushAvatarSync();
+      pushPluginMenuToAvatar();
     } catch (e, st) {
       debugPrint('avatar floating window: $e\n$st');
     }
@@ -222,26 +231,38 @@ class NodeRuntime extends ChangeNotifier {
 
   Future<void> createReadingWindow(
       String url, String title,
-      double x, double y, double w, double h) async {
+      double physX, double physY,
+      double logicalW, double logicalH,
+      {PageContent? cdpContent}) async {
     await _closeReadingWindow();
     try {
       final main = await WindowController.fromCurrentEngine();
+      final args = <String, dynamic>{
+        'bojiWindow': 'reading_companion',
+        'url': url,
+        'title': title,
+        'mainWindowId': main.windowId,
+        'windowWidth': logicalW,
+        'windowHeight': logicalH,
+      };
+      if (cdpContent != null) {
+        args['cdpText'] = cdpContent.text;
+        args['cdpTitle'] = cdpContent.title;
+        args['cdpUrl'] = cdpContent.url;
+        args['cdpHeadings'] =
+            cdpContent.headings.map((h) => h.toJson()).toList();
+      }
       final wc = await WindowController.create(
         WindowConfiguration(
-          hiddenAtLaunch: false,
+          hiddenAtLaunch: true,
           borderless: false,
-          width: w,
-          height: h,
-          arguments: jsonEncode({
-            'bojiWindow': 'reading_companion',
-            'url': url,
-            'title': title,
-            'mainWindowId': main.windowId,
-          }),
+          width: logicalW,
+          height: logicalH,
+          arguments: jsonEncode(args),
         ),
       );
       _readingWindowController = wc;
-      await wc.setPosition(Offset(x, y));
+      await wc.setPositionPhysical(physX, physY);
     } catch (e, st) {
       debugPrint('createReadingWindow: $e\n$st');
     }
@@ -285,6 +306,23 @@ class NodeRuntime extends ChangeNotifier {
     final ctrl = _avatarWindowController;
     if (ctrl == null) return;
     unawaited(_invokeAvatarSync(ctrl));
+  }
+
+  /// Push the current plugin menu items to the avatar floating window.
+  void pushPluginMenuToAvatar() {
+    final ctrl = _avatarWindowController;
+    if (ctrl == null) return;
+    final items = pluginManager.getMenuItems();
+    // Attach pluginId for routing on the avatar side
+    final plugins = pluginManager.registry.enabledMenuPlugins;
+    final enriched = <Map<String, dynamic>>[];
+    for (var i = 0; i < items.length; i++) {
+      enriched.add({
+        ...items[i],
+        'pluginId': i < plugins.length ? plugins[i].id : '',
+      });
+    }
+    unawaited(ctrl.invokeMethod('syncPluginMenu', enriched));
   }
 
   Future<void> _invokeAvatarSync(WindowController ctrl) async {
@@ -588,6 +626,9 @@ class NodeRuntime extends ChangeNotifier {
     _nodeConnectTimer = null;
     unawaited(_closeAvatarWindow());
     unawaited(_closeReadingWindow());
+    guiAgent.dispose();
+    pluginManager.removeListener(pushPluginMenuToAvatar);
+    pluginManager.dispose();
     chatController.removeListener(_onChatControllerChanged);
     avatarController.removeListener(_onAvatarControllerChanged);
     operatorSession.dispose();

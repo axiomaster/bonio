@@ -251,6 +251,21 @@ abstract class S {
   String get statusConnected;
   String get statusConnectedNodeOffline;
   String statusGatewayError(String e);
+
+  // ── Plugins ──
+  String get pluginManageTitle;
+  String get pluginRefresh;
+  String get pluginEmptyHint;
+  String get pluginRemoveTitle;
+  String pluginRemoveConfirm(String name);
+  String get pluginCancel;
+  String get pluginRemove;
+  String get pluginBuiltinLabel;
+  String get pluginInstall;
+  String get pluginInstalled;
+  String get pluginUpdate;
+  String get marketPlugins;
+  String get marketPluginsPlaceholder;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -271,19 +286,19 @@ class _SZh extends S {
   @override String get menuTakeNote => '记一记';
   @override String get menuAiLens => '圈一圈';
   @override String get menuSearchSimilar => '搜同款';
-  @override String get menuStartReading => '伴读';
+  @override String get menuStartReading => '阅读搭子';
   @override String get menuSwitchWindow => '切换窗口';
 
-  @override String get readingTitle => '伴读';
+  @override String get readingTitle => '阅读搭子';
   @override String get readingConnecting => '正在连接页面...';
   @override String get readingExtracting => '正在提取内容...';
   @override String get readingAnalyzing => '正在整理摘要...';
   @override String get readingSave => '入库';
   @override String get readingSaveSuccess => '已存入记忆';
   @override String get readingTocTitle => '目录';
-  @override String get readingClose => '关闭伴读';
+  @override String get readingClose => '关闭';
   @override String get readingNoBrowserUrl => '未检测到浏览器URL';
-  @override String get readingPasteUrlHint => '请粘贴要伴读的网页链接';
+  @override String get readingPasteUrlHint => '请粘贴要阅读的网页链接';
   @override String get readingStartButton => '开始';
   @override String get readingEditorLoading => '编辑器加载中...';
   @override String get readingEditorHint => '在此编辑阅读笔记...';
@@ -460,6 +475,20 @@ class _SZh extends S {
   @override String get statusConnected => '已连接';
   @override String get statusConnectedNodeOffline => '已连接（node 离线）';
   @override String statusGatewayError(String e) => '网关错误: $e';
+
+  @override String get pluginManageTitle => '插件管理';
+  @override String get pluginRefresh => '刷新';
+  @override String get pluginEmptyHint => '暂无已安装的插件';
+  @override String get pluginRemoveTitle => '卸载插件';
+  @override String pluginRemoveConfirm(String name) => '确定要卸载「$name」吗？';
+  @override String get pluginCancel => '取消';
+  @override String get pluginRemove => '卸载';
+  @override String get pluginBuiltinLabel => '内置';
+  @override String get pluginInstall => '安装';
+  @override String get pluginInstalled => '已安装';
+  @override String get pluginUpdate => '更新';
+  @override String get marketPlugins => '插件';
+  @override String get marketPluginsPlaceholder => '插件市场即将上线';
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -669,4 +698,18 @@ class _SEn extends S {
   @override String get statusConnected => 'Connected';
   @override String get statusConnectedNodeOffline => 'Connected (node offline)';
   @override String statusGatewayError(String e) => 'Gateway error: $e';
+
+  @override String get pluginManageTitle => 'Plugin Manager';
+  @override String get pluginRefresh => 'Refresh';
+  @override String get pluginEmptyHint => 'No plugins installed';
+  @override String get pluginRemoveTitle => 'Uninstall Plugin';
+  @override String pluginRemoveConfirm(String name) => 'Uninstall "$name"?';
+  @override String get pluginCancel => 'Cancel';
+  @override String get pluginRemove => 'Uninstall';
+  @override String get pluginBuiltinLabel => 'Built-in';
+  @override String get pluginInstall => 'Install';
+  @override String get pluginInstalled => 'Installed';
+  @override String get pluginUpdate => 'Update';
+  @override String get marketPlugins => 'Plugins';
+  @override String get marketPluginsPlaceholder => 'Plugin marketplace coming soon';
 }

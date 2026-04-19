@@ -7,28 +7,34 @@
 struct WindowConfiguration {
   std::string arguments;
   bool hidden_at_launch = false;
-  
+  bool borderless = true;
+
   static WindowConfiguration FromEncodableMap(
       const flutter::EncodableMap* map) {
     WindowConfiguration config;
-    
+
     if (!map) return config;
-    
+
     try {
       auto it = map->find(flutter::EncodableValue("arguments"));
       if (it != map->end()) {
         config.arguments = std::get<std::string>(it->second);
       }
-      
+
       it = map->find(flutter::EncodableValue("hiddenAtLaunch"));
       if (it != map->end()) {
         config.hidden_at_launch = std::get<bool>(it->second);
       }
+
+      it = map->find(flutter::EncodableValue("borderless"));
+      if (it != map->end()) {
+        config.borderless = std::get<bool>(it->second);
+      }
     } catch (const std::exception& e) {
-      std::cerr << "Failed to parse WindowConfiguration: " << e.what() 
+      std::cerr << "Failed to parse WindowConfiguration: " << e.what()
                 << std::endl;
     }
-    
+
     return config;
   }
 };

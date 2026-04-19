@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../l10n/app_strings.dart';
 import '../../models/clawhub_models.dart';
 import '../../providers/app_state.dart';
+import '../../plugins/plugin_manifest.dart';
 import '../../services/clawhub_client.dart';
 
 class MarketplaceTab extends StatefulWidget {
@@ -24,7 +25,7 @@ class _MarketplaceTabState extends State<MarketplaceTab>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -51,6 +52,7 @@ class _MarketplaceTabState extends State<MarketplaceTab>
                 theme.colorScheme.onSurface.withOpacity(0.6),
             indicatorColor: theme.colorScheme.primary,
             tabs: [
+              Tab(text: S.current.marketPlugins),
               Tab(text: S.current.marketSkills),
               Tab(text: S.current.marketModels),
               Tab(text: S.current.marketThemes),
@@ -61,6 +63,7 @@ class _MarketplaceTabState extends State<MarketplaceTab>
           child: TabBarView(
             controller: _tabController,
             children: const [
+              _PluginMarketContent(),
               _SkillMarketplaceContent(),
               _ProviderMarketContent(),
               _ThemeMarketContent(),
@@ -784,5 +787,224 @@ class _MarketErrorView extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+// =============================================================================
+// Plugins marketplace
+// =============================================================================
+
+class _PluginMarketContent extends StatefulWidget {
+  const _PluginMarketContent();
+
+  @override
+  State<_PluginMarketContent> createState() => _PluginMarketContentState();
+}
+
+class _PluginMarketContentState extends State<_PluginMarketContent> {
+  List<Map<String, dynamic>>? _catalog;
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchCatalog();
+  }
+
+  Future<void> _fetchCatalog() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final client = HttpClient();
+      final req = await client.getUrl(
+          Uri.parse('https://axiomaster.github.io/boji-market/plugins.json'));
+      final resp = await req.close();
+      final body = await resp.transform(utf8.decoder).join();
+      client.close();
+      final json = jsonDecode(body) as Map<String, dynamic>;
+      final plugins = (json['plugins'] as List<dynamic>?)
+              ?.cast<Map<String, dynamic>>() ??
+          [];
+      if (mounted) setState(() => _catalog = plugins);
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final s = S.current;
+
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline, size: 48,
+                color: cs.error.withValues(alpha: 0.5)),
+            const SizedBox(height: 12),
+            Text(_error!, style: TextStyle(color: cs.error)),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: _fetchCatalog,
+              icon: const Icon(Icons.refresh, size: 18),
+              label: Text(s.pluginRefresh),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final plugins = _catalog;
+    if (plugins == null || plugins.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.extension_outlined, size: 64,
+                color: cs.onSurface.withValues(alpha: 0.2)),
+            const SizedBox(height: 16),
+            Text(s.marketPluginsPlaceholder,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                    color: cs.onSurface.withValues(alpha: 0.5))),
+          ],
+        ),
+      );
+    }
+
+    final appState = context.watch<AppState>();
+    final installed = appState.runtime.pluginManager.registry
+        .entries.map((e) => e.id).toSet();
+
+    return RefreshIndicator(
+      onRefresh: _fetchCatalog,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: plugins.length,
+        itemBuilder: (context, index) {
+          final p = plugins[index];
+          final id = p['id'] as String? ?? '';
+          final name = I18nString.fromJson(p['name']).current;
+          final desc = I18nString.fromJson(p['description']).current;
+          final version = p['version'] as String? ?? '';
+          final author = p['author'] as String? ?? '';
+          final isInstalled = installed.contains(id);
+
+          return Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            child: ListTile(
+              leading: const Icon(Icons.extension, size: 32),
+              title: Row(
+                children: [
+                  Expanded(
+                    child: Text(name,
+                        style: theme.textTheme.titleSmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
+                  ),
+                  if (version.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: Text('v$version',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                              color: cs.onSurface.withValues(alpha: 0.4))),
+                    ),
+                ],
+              ),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (desc.isNotEmpty)
+                    Text(desc,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                            color: cs.onSurface.withValues(alpha: 0.6))),
+                  if (author.isNotEmpty)
+                    Text(author,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                            color: cs.onSurface.withValues(alpha: 0.4),
+                            fontSize: 11)),
+                ],
+              ),
+              trailing: isInstalled
+                  ? Chip(
+                      label: Text(s.pluginInstalled,
+                          style: const TextStyle(fontSize: 12)),
+                      padding: EdgeInsets.zero,
+                      materialTapTargetSize:
+                          MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                    )
+                  : FilledButton.tonal(
+                      onPressed: () => _installPlugin(p),
+                      child: Text(s.pluginInstall),
+                    ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _installPlugin(Map<String, dynamic> pluginData) async {
+    final downloadUrls = pluginData['download_url'] as Map<String, dynamic>?;
+    if (downloadUrls == null) return;
+
+    final platform = Platform.isWindows ? 'windows' : 'macos';
+    final url = downloadUrls[platform] as String?;
+    if (url == null || url.isEmpty) return;
+
+    final s = S.current;
+    final messenger = ScaffoldMessenger.of(context);
+    final appState = context.read<AppState>();
+
+    messenger.showSnackBar(
+      SnackBar(content: Text('${s.pluginInstall}...')),
+    );
+
+    try {
+      final client = HttpClient();
+      final req = await client.getUrl(Uri.parse(url));
+      final resp = await req.close();
+      final tempDir = await Directory.systemTemp.createTemp('boji_plugin_');
+      final zipFile = File('${tempDir.path}${Platform.pathSeparator}plugin.zip');
+      final sink = zipFile.openWrite();
+      await resp.pipe(sink);
+      client.close();
+
+      await appState.runtime.pluginManager.installFromZip(zipFile.path);
+
+      try {
+        await tempDir.delete(recursive: true);
+      } catch (_) {}
+
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(s.pluginInstalled),
+            backgroundColor: Colors.green.shade700,
+          ),
+        );
+        setState(() {});
+      }
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('Install failed: $e')),
+        );
+      }
+    }
   }
 }

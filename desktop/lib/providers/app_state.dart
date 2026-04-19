@@ -11,7 +11,9 @@ import 'package:window_manager/window_manager.dart';
 
 import '../l10n/app_strings.dart';
 import '../models/agent_avatar_models.dart';
+import '../platform/gui_agent.dart';
 import '../platform/screen_capture.dart';
+import '../plugins/plugin_interface.dart';
 import '../models/chat_models.dart';
 import '../models/gateway_profile.dart';
 import '../models/note_models.dart';
@@ -131,6 +133,25 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  Future<void> _handlePluginMenuAction(Map<String, dynamic> data) async {
+    final pluginId = data['pluginId'] as String? ?? '';
+    if (pluginId.isEmpty) return;
+    final hwnd = (data['hwnd'] as num?)?.toInt() ?? 0;
+    final isBrowser = data['isBrowser'] as bool? ?? false;
+    final context = PluginMenuContext(
+      hwnd: hwnd,
+      windowTitle: hwnd != 0
+          ? runtime.guiAgent.window.getWindowTitle(hwnd)
+          : '',
+      windowClass: hwnd != 0
+          ? runtime.guiAgent.window.getWindowClassName(hwnd)
+          : '',
+      isBrowser: isBrowser,
+      screenDpi: hwnd != 0 ? runtime.guiAgent.screen.getDpiScale(hwnd) : 1.0,
+    );
+    await runtime.pluginManager.executeMenuAction(pluginId, context);
+  }
+
   Future<void> _handleSearchSimilar(Map<String, dynamic> data) async {
     final pngBase64 = data['pngBase64'] as String? ?? '';
     if (pngBase64.isEmpty) {
@@ -173,32 +194,50 @@ class AppState extends ChangeNotifier {
 
   Future<void> _handleStartReading(Map<String, dynamic> data) async {
     final hwnd = (data['hwnd'] as num?)?.toInt() ?? 0;
-    final url = data['url'] as String? ?? '';
+    var url = data['url'] as String? ?? '';
     final title = data['title'] as String? ?? '';
 
     final ctrl = runtime.avatarController;
-    ctrl.setBubble(text: S.current.readingExtracting);
+    ctrl.setBubble(text: S.current.readingConnecting);
     ctrl.showTemporaryState(AgentAvatarActivity.thinking);
 
-    final workArea = ScreenCapture.getMonitorWorkArea(hwnd);
-    if (workArea != null && hwnd != 0) {
-      final dpi = ScreenCapture.getDpiScaleForWindow(hwnd);
-      final monX = workArea[0];
-      final monY = workArea[1];
-      final monW = workArea[2];
-      final monH = workArea[3];
-      final browserW = (monW * 0.7).round();
-      // Win32 SetWindowPos works in physical pixels
-      ScreenCapture.resizeWindow(hwnd, monX, monY, browserW, monH);
-      // Flutter WindowController works in logical pixels
-      final companionX = (monX + browserW) / dpi;
-      final companionY = monY / dpi;
-      final companionW = (monW - browserW) / dpi;
-      final companionH = monH / dpi;
-      await runtime.createReadingWindow(
-          url, title, companionX, companionY, companionW, companionH);
+    // Try to get the real URL and page content via CDP
+    PageContent? cdpContent;
+    try {
+      final agent = runtime.guiAgent.browser;
+      final connected = await agent.tryConnectToExisting();
+      if (connected) {
+        ctrl.setBubble(text: S.current.readingExtracting);
+
+        cdpContent = await agent.extractPageContent();
+        if (cdpContent.url.isNotEmpty) url = cdpContent.url;
+        debugPrint('AppState: CDP extracted ${cdpContent.headings.length} '
+            'headings, ${cdpContent.text.length} chars from $url');
+      }
+    } catch (e) {
+      debugPrint('AppState: CDP extraction failed, falling back: $e');
+    }
+
+    final ga = runtime.guiAgent;
+    if (hwnd != 0) {
+      final browserRect = ga.window.getWindowRect(hwnd);
+      if (browserRect != Rect.zero) {
+        final dpi = ga.screen.getDpiScale(hwnd);
+        await runtime.createReadingWindow(
+          url, title,
+          browserRect.right,
+          browserRect.top,
+          500.0 / dpi,
+          browserRect.height / dpi,
+          cdpContent: cdpContent,
+        );
+      } else {
+        await runtime.createReadingWindow(url, title, 0, 0, 500, 800,
+            cdpContent: cdpContent);
+      }
     } else {
-      await runtime.createReadingWindow(url, title, 0, 0, 500, 800);
+      await runtime.createReadingWindow(url, title, 0, 0, 500, 800,
+          cdpContent: cdpContent);
     }
   }
 
@@ -408,6 +447,11 @@ class AppState extends ChangeNotifier {
             final data = call.arguments;
             if (data is Map) {
               _handleAvatarLensResult(Map<String, dynamic>.from(data));
+            }
+          case 'pluginMenuAction':
+            final data = call.arguments;
+            if (data is Map) {
+              _handlePluginMenuAction(Map<String, dynamic>.from(data));
             }
         }
         return null;

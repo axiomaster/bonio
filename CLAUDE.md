@@ -17,6 +17,14 @@ Clients maintain **dual WebSocket sessions**: `operatorSession` (user commands: 
 ### Server (C++17, CMake)
 
 ```bash
+# Windows x64
+cd server && scripts\build-win-x64.bat
+# Output: server/build/win-x64/hiclaw.exe
+
+# Linux amd64 (deps: apt install cmake ninja-build libssl-dev)
+cd server && scripts/build-linux-amd64.sh [--clean]
+# Output: server/build/linux-amd64/hiclaw
+
 # Android (requires ANDROID_NDK_HOME)
 cd server && scripts/build-android.sh
 # Output: server/build/android/arm64-v8a/hiclaw
@@ -24,13 +32,24 @@ cd server && scripts/build-android.sh
 # HarmonyOS (requires OHOS_NDK_HOME)
 cd server && scripts/build-ohos.sh
 # Output: server/build/ohos/hiclaw
-
-# Linux amd64
-cd server && scripts/build-linux-amd64.sh [--clean]
-# Output: server/build/linux-amd64/hiclaw
 ```
 
 Third-party deps are vendored in `server/third_party/` (CLI11, spdlog, nlohmann_json, libhv, mbedtls, websocketpp, asio, linenoise-ng). Must be cloned before building — see CMakeLists.txt error messages for clone URLs.
+
+### Running Tests
+
+```bash
+# Android
+cd android && ./gradlew test
+
+# Desktop (Flutter)
+cd desktop && flutter test
+
+# HarmonyOS
+cd harmonyos && hvigorw test
+```
+
+Server has no test suite.
 
 ### Android App
 
@@ -74,6 +93,29 @@ Requires Flutter SDK >=3.2.0. Cross-platform (Windows + macOS) via single Flutte
 - Uses **Sherpa-ONNX streaming paraformer** (bilingual zh-en), same engine as Android's `SherpaOnnxSpeechManager`. Architecture mirrors Android's `SpeechToTextManager` → `SherpaOnnxSpeechManager` with unified `SpeechToTextListener` callback interface (partial, final, error, ready, end).
 - Audio capture via [`record`](desktop/pubspec.yaml) package (PCM16, 16 kHz, mono) → `sherpa_onnx` FFI `OnlineRecognizer` with endpoint detection.
 - Model files (`encoder.int8.onnx`, `decoder.int8.onnx`, `tokens.txt`) must be placed next to the executable. Download with `powershell -ExecutionPolicy Bypass -File tool/download_model.ps1`.
+
+## Server CLI Reference
+
+| Command | Description |
+|---------|-------------|
+| `hiclaw run "prompt"` | Single-turn chat |
+| `hiclaw gateway [--port 18789]` | Start WebSocket gateway |
+| `hiclaw serve [port]` | HTTP service (POST `{"prompt":"..."}`) |
+| `hiclaw agent` | Interactive REPL mode |
+| `hiclaw config` | Interactive configuration |
+| `hiclaw model list` | List configured models |
+| `hiclaw --version` | Print version |
+
+Global options: `--config-dir <path>` (default `.hiclaw`), `--log-level`.
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `HICLAW_WORKSPACE` | If set, read config from `$HICLAW_WORKSPACE/hiclaw.json` |
+| `hiclaw_log` | Log level: off/error/warn/info/debug |
+| `hiclaw_default_model` | Override config's `default_model` |
+| API keys | Set per model via `api_key_env` field (e.g., `GLM_API_KEY`) |
 
 ## Architecture
 
@@ -195,3 +237,4 @@ Server config lives in `hiclaw.json` (workspace root). Uses **snake_case** field
 - **Dual session architecture**: Android, HarmonyOS, and Desktop all maintain separate operator and node WebSocket connections
 - **Handler interface pattern**: Feature handlers implement interfaces from `InvokeDispatcher` for testability
 - **Provider adapters**: New LLM providers implement the provider interface in `server/src/providers/`
+- **Reference implementations**: `reference/` contains original code used during porting — do not modify

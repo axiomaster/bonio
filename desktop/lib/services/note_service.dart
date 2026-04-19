@@ -250,7 +250,7 @@ class NoteService extends ChangeNotifier {
     return null;
   }
 
-  /// Save a reading companion note (Markdown text + URL) with #伴读 tag.
+  /// Save a reading companion note (Markdown text + URL) with #阅读搭子 tag.
   Future<BojiNote> saveReadingNote(String url, String markdown) async {
     await init();
     final id = const Uuid().v4();
@@ -262,11 +262,11 @@ class NoteService extends ChangeNotifier {
       id: id,
       createdAt: now,
       type: NoteType.text,
-      sourceApp: '伴读',
+      sourceApp: '阅读搭子',
       sourceUrl: url,
       rawText: markdown,
       fileName: fileName,
-      tags: ['伴读'],
+      tags: ['阅读搭子'],
       summary: markdown.length > 80 ? '${markdown.substring(0, 80)}...' : markdown,
       analyzed: true,
     );
