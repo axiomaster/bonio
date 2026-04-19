@@ -95,6 +95,20 @@ class FlutterWindowWrapper {
         pos[flutter::EncodableValue("y")] = flutter::EncodableValue(0.0);
       }
       result->Success(flutter::EncodableValue(pos));
+    } else if (method == "window_getPositionPhysical") {
+      flutter::EncodableMap pos;
+      if (hwnd_) {
+        RECT rect;
+        ::GetWindowRect(hwnd_, &rect);
+        pos[flutter::EncodableValue("x")] =
+            flutter::EncodableValue(static_cast<double>(rect.left));
+        pos[flutter::EncodableValue("y")] =
+            flutter::EncodableValue(static_cast<double>(rect.top));
+      } else {
+        pos[flutter::EncodableValue("x")] = flutter::EncodableValue(0.0);
+        pos[flutter::EncodableValue("y")] = flutter::EncodableValue(0.0);
+      }
+      result->Success(flutter::EncodableValue(pos));
     } else if (method == "window_showPopupMenu") {
       if (!hwnd_ || !arguments) {
         result->Success(flutter::EncodableValue(""));

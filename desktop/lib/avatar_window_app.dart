@@ -106,6 +106,17 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
   static const _walkSpeed = 0.04; // px per ms
   static final _rng = Random();
 
+  /// DPI scale of the avatar window (physical pixels per logical pixel).
+  double get _avatarDpiScale {
+    if (_avatarSelfHwnd != 0) {
+      return _getWinDpiScaleForWindow(_avatarSelfHwnd);
+    }
+    return _getWinDpiScaleSystem();
+  }
+
+  /// Convert a logical-pixel value to physical using the avatar's DPI.
+  double _toPhysical(double logical) => logical * _avatarDpiScale;
+
   Size get _windowSize => _snapshot.showInput
       ? AvatarSnapshot.kFloatingWindowSizeWithInput
       : AvatarSnapshot.kFloatingWindowSize;
@@ -274,8 +285,8 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
   static final double _anchorHeight = AvatarSnapshot.kFloatingWindowSize.height;
 
   double _dockTopYFor(double inset) =>
-      _screenHeight - _dockHeight - _anchorHeight +
-      AvatarSnapshot.kFloatingWindowPadding + inset;
+      _screenHeight - _dockHeight - _toPhysical(_anchorHeight) +
+      _toPhysical(AvatarSnapshot.kFloatingWindowPadding) + _toPhysical(inset);
 
   double get _dockTopY => _dockTopYFor(_currentBottomInset);
 
@@ -287,7 +298,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     if (wc == null) return;
 
     final minX = _dockLeft.clamp(0.0, double.infinity);
-    final maxX = (_dockRight - _windowSize.width).clamp(minX, double.infinity);
+    final maxX = (_dockRight - _toPhysical(_windowSize.width)).clamp(minX, double.infinity);
     final targetX = minX + _rng.nextDouble() * (maxX - minX);
     final target = Offset(targetX, _dockTopY);
 
@@ -295,7 +306,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
       await _animateWindowTo(target);
     } else {
       _programmaticMove = true;
-      await wc.setPosition(target);
+      await wc.setPositionPhysical(target.dx, target.dy);
       _currentX = target.dx;
       _currentY = target.dy;
       _programmaticMove = false;
@@ -314,13 +325,13 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
   /// anchor position is independent of whether the input field is visible.
   double _windowTopY(_WindowRectInfo info) {
     final inset = _currentBottomInset;
-    return info.top - _anchorHeight +
-        AvatarSnapshot.kFloatingWindowPadding + inset - _titleBarClearance;
+    return info.top - _toPhysical(_anchorHeight) +
+        _toPhysical(AvatarSnapshot.kFloatingWindowPadding + inset) - _toPhysical(_titleBarClearance);
   }
 
   /// Window top-center X for a given window rect (centered).
   double _windowCenterX(_WindowRectInfo info) {
-    return info.left + (info.width - _windowSize.width) / 2;
+    return info.left + (info.width - _toPhysical(_windowSize.width)) / 2;
   }
 
   // ---------------------------------------------------------------------------
@@ -334,7 +345,9 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     _moveAnimTimer?.cancel();
     _programmaticMove = true;
 
-    final startPos = await wc.getPosition();
+    final startPos = Platform.isWindows
+        ? await wc.getPositionPhysical()
+        : await wc.getPosition();
     final movingLeft = target.dx < startPos.dx;
     if (mounted) {
       setState(() {
@@ -368,7 +381,11 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
         startPos.dx + (target.dx - startPos.dx) * ease,
         startPos.dy + (target.dy - startPos.dy) * ease,
       );
-      wc.setPosition(pos);
+      if (Platform.isWindows) {
+        wc.setPositionPhysical(pos.dx, pos.dy);
+      } else {
+        wc.setPosition(pos);
+      }
 
       if (step >= steps) {
         t.cancel();
@@ -468,13 +485,13 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
 
   Offset? _pickDockTarget() {
     final minX = _dockLeft.clamp(0.0, double.infinity);
-    final maxX = (_dockRight - _windowSize.width).clamp(minX, double.infinity);
+    final maxX = (_dockRight - _toPhysical(_windowSize.width)).clamp(minX, double.infinity);
     final targetX = minX + _rng.nextDouble() * (maxX - minX);
     return Offset(targetX, _dockTopY);
   }
 
   Offset? _pickWindowTarget(_WindowRectInfo info) {
-    final avatarW = _windowSize.width;
+    final avatarW = _toPhysical(_windowSize.width);
     final minX = info.left;
     final maxX = (info.left + info.width - avatarW).clamp(minX, double.infinity);
     final targetX = minX + _rng.nextDouble() * (maxX - minX);
@@ -496,7 +513,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
       final info = _getWindowRect(_anchoredHwnd);
       if (info != null) {
         final centerX = _windowCenterX(info);
-        _wc?.getPosition().then((pos) {
+        _wc?.getPositionPhysical().then((pos) {
           _userOffsetX = pos.dx - centerX;
           debugPrint('AvatarDrag: user offset from center = $_userOffsetX');
         });
@@ -559,8 +576,8 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
 
     // Safety net: if selfHwnd wasn't resolved, check by remembering the HWND now
     if (_avatarSelfHwnd == 0 && fgInfo.isSelf) {
-      final avatarW = _windowSize.width;
-      final avatarH = _windowSize.height;
+      final avatarW = _toPhysical(_windowSize.width);
+      final avatarH = _toPhysical(_windowSize.height);
       if ((fgInfo.width - avatarW).abs() < 2 &&
           (fgInfo.height - avatarH).abs() < 2) {
         _avatarSelfHwnd = fgInfo.hwnd;
@@ -757,8 +774,8 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
   bool _isLikelyAvatarWindow(_ForegroundWindowInfo info) {
     if (info.hwnd == _avatarSelfHwnd && _avatarSelfHwnd != 0) return true;
     if (!info.isSelf) return false;
-    final aw = _windowSize.width;
-    final ah = _windowSize.height;
+    final aw = _toPhysical(_windowSize.width);
+    final ah = _toPhysical(_windowSize.height);
     return (info.width - aw).abs() < 2 && (info.height - ah).abs() < 2;
   }
 
@@ -785,10 +802,10 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
 
     final wc = _wc;
     if (wc == null) return;
-    final x = _screenWidth - _windowSize.width - 20;
-    const y = 8.0;
+    final x = _screenWidth - _toPhysical(_windowSize.width) - 20;
+    final y = _toPhysical(8.0);
     _programmaticMove = true;
-    wc.setPosition(Offset(x, y)).then((_) {
+    wc.setPositionPhysical(x, y).then((_) {
       _currentX = x;
       _currentY = y;
       _programmaticMove = false;
@@ -822,7 +839,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     final y = _windowTopY(rectInfo);
 
     _programmaticMove = true;
-    wc.setPosition(Offset(x, y)).then((_) {
+    wc.setPositionPhysical(x, y).then((_) {
       _currentX = x;
       _currentY = y;
       _targetX = x;
@@ -888,7 +905,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     double x;
     if (_placement == _PlacementState.userOffset) {
       x = _windowCenterX(info) + _userOffsetX;
-      final avatarW = _windowSize.width;
+      final avatarW = _toPhysical(_windowSize.width);
       x = x.clamp(info.left, info.left + info.width - avatarW);
     } else {
       x = _windowCenterX(info);
@@ -928,7 +945,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
       final wc = _wc;
       if (wc != null) {
         _programmaticMove = true;
-        wc.setPosition(Offset(_currentX, _currentY)).then((_) {
+        wc.setPositionPhysical(_currentX, _currentY).then((_) {
           _programmaticMove = false;
         });
       }
@@ -941,7 +958,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     final wc = _wc;
     if (wc != null) {
       _programmaticMove = true;
-      wc.setPosition(Offset(_currentX, _currentY)).then((_) {
+      wc.setPositionPhysical(_currentX, _currentY).then((_) {
         _programmaticMove = false;
       });
     }
@@ -1030,7 +1047,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     if (wc == null) return;
 
     _programmaticMove = true;
-    wc.getPosition().then((pos) async {
+    (Platform.isWindows ? wc.getPositionPhysical() : wc.getPosition()).then((pos) async {
       if (!mounted) return;
       double newY;
       if (_placement == _PlacementState.onDock) {
@@ -1038,12 +1055,12 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
       } else if (_placement == _PlacementState.anchoredWindow && _anchoredHwnd != 0) {
         final info = _getWindowRect(_anchoredHwnd);
         if (info == null) return;
-        newY = info.top - _anchorHeight +
-            AvatarSnapshot.kFloatingWindowPadding + newInset - _titleBarClearance;
+        newY = info.top - _toPhysical(_anchorHeight) +
+            _toPhysical(AvatarSnapshot.kFloatingWindowPadding + newInset) - _toPhysical(_titleBarClearance);
       } else {
         return;
       }
-      await wc.setPosition(Offset(pos.dx, newY));
+      await wc.setPositionPhysical(pos.dx, newY);
       _currentY = newY;
     }).whenComplete(() {
       _programmaticMove = false;
@@ -1356,12 +1373,12 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     final wc = _wc;
     if (wc == null) return;
 
-    // Expand avatar window to cover anchored window
+    // Expand avatar window to cover anchored window (physical pixels)
     final expandW = info.width;
     final expandH = info.height;
     _programmaticMove = true;
     await windowManager.setSize(Size(expandW, expandH));
-    await wc.setPosition(Offset(info.left, info.top));
+    await wc.setPositionPhysical(info.left, info.top);
     _currentX = info.left;
     _currentY = info.top;
     _programmaticMove = false;
@@ -1445,7 +1462,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     } else {
       await windowManager.setSize(_lensPreSize);
     }
-    await wc.setPosition(Offset(_lensPreX, _lensPreY));
+    await wc.setPositionPhysical(_lensPreX, _lensPreY);
     _currentX = _lensPreX;
     _currentY = _lensPreY;
     _programmaticMove = false;
@@ -1797,19 +1814,8 @@ _WinTaskbarInfo? _getWindowsTaskbarInfo() {
         .lookupFunction<_GetSystemMetricsNative, _GetSystemMetricsDart>(
             'GetSystemMetrics');
 
-    double scale = 1.0;
-    try {
-      final getDpiForSystem = user32
-          .lookupFunction<_GetDpiForSystemNative, _GetDpiForSystemDart>(
-              'GetDpiForSystem');
-      final dpi = getDpiForSystem();
-      if (dpi > 0) scale = dpi / 96.0;
-    } catch (_) {}
-
-    final screenWPhysical = getSystemMetrics(_SM_CXSCREEN);
-    final screenHPhysical = getSystemMetrics(_SM_CYSCREEN);
-    final screenW = screenWPhysical / scale;
-    final screenH = screenHPhysical / scale;
+    final screenW = getSystemMetrics(_SM_CXSCREEN).toDouble();
+    final screenH = getSystemMetrics(_SM_CYSCREEN).toDouble();
 
     final abd = calloc<_APPBARDATA>();
     abd.ref.cbSize = sizeOf<_APPBARDATA>();
@@ -1822,18 +1828,17 @@ _WinTaskbarInfo? _getWindowsTaskbarInfo() {
 
     final edge = abd.ref.uEdge;
     final rc = abd.ref.rc;
-    final tbLeft = rc.left / scale;
-    final tbTop = rc.top / scale;
-    final tbRight = rc.right / scale;
-    final tbBottom = rc.bottom / scale;
+    final tbLeft = rc.left.toDouble();
+    final tbTop = rc.top.toDouble();
+    final tbRight = rc.right.toDouble();
+    final tbBottom = rc.bottom.toDouble();
     calloc.free(abd);
 
     final atBottom = edge == _ABE_BOTTOM;
     final tbHeight = atBottom ? (tbBottom - tbTop) : 0.0;
 
     debugPrint('WinTaskbar: screen=${screenW}x$screenH, '
-        'edge=$edge, rect=($tbLeft,$tbTop)-($tbRight,$tbBottom), '
-        'scale=$scale');
+        'edge=$edge, rect=($tbLeft,$tbTop)-($tbRight,$tbBottom)');
 
     return _WinTaskbarInfo(
       screenWidth: screenW,
@@ -2084,32 +2089,28 @@ _WindowRectInfo? _getWinWindowRect(int hwnd, {int avatarHwnd = 0}) {
         .lookupFunction<_GetSystemMetricsNative, _GetSystemMetricsDart>(
             'GetSystemMetrics');
 
-    // Use the avatar window's DPI for coordinate conversion so the round-trip
-    // through setPosition (which also uses the avatar's DPI) is consistent.
-    // This ensures cross-monitor positioning works even when monitors have
-    // different DPI (e.g. primary 150% + external 1080p at 100%).
-    final effectiveAvatarHwnd = avatarHwnd != 0 ? avatarHwnd : _avatarSelfHwnd;
-    final scale = effectiveAvatarHwnd != 0
-        ? _getWinDpiScaleForWindow(effectiveAvatarHwnd)
-        : _getWinDpiScaleSystem();
-
+    // Return raw physical pixels — callers use setPositionPhysical to
+    // avoid DPI round-trip errors when the avatar crosses monitors with
+    // different DPI.
     final rect = calloc<_RECT>();
     final ok = getWindowRect(hwnd, rect);
     if (ok == 0) {
       calloc.free(rect);
       return null;
     }
-    final l = rect.ref.left / scale;
-    final t = rect.ref.top / scale;
-    final r = rect.ref.right / scale;
-    final b = rect.ref.bottom / scale;
+    final l = rect.ref.left.toDouble();
+    final t = rect.ref.top.toDouble();
+    final r = rect.ref.right.toDouble();
+    final b = rect.ref.bottom.toDouble();
     calloc.free(rect);
 
     final w = r - l;
     final h = b - t;
 
-    final screenW = getSystemMetrics(_SM_CXSCREEN) / scale;
-    final screenH = getSystemMetrics(_SM_CYSCREEN) / scale;
+    // Use physical screen metrics for fullscreen detection.
+    // SM_CXSCREEN/SM_CYSCREEN return primary monitor size in physical pixels.
+    final screenW = getSystemMetrics(_SM_CXSCREEN).toDouble();
+    final screenH = getSystemMetrics(_SM_CYSCREEN).toDouble();
     final isFullscreen = w >= screenW * 0.95 && h >= screenH * 0.95;
 
     return _WindowRectInfo(
