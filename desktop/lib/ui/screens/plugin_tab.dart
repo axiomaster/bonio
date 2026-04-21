@@ -254,22 +254,28 @@ class _TemplateSettingsPage extends StatefulWidget {
 }
 
 class _TemplateSettingsPageState extends State<_TemplateSettingsPage> {
-  Map<String, String> _templates = {};
+  TextEditingController? _controller;
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadTemplates();
+    _loadTemplate();
   }
 
-  Future<void> _loadTemplates() async {
-    final t = await ReadingTemplateStore.loadTemplates();
+  Future<void> _loadTemplate() async {
+    final t = await ReadingTemplateStore.loadTemplate();
     if (!mounted) return;
     setState(() {
-      _templates = t;
+      _controller = TextEditingController(text: t);
       _loading = false;
     });
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
   }
 
   @override
@@ -290,52 +296,34 @@ class _TemplateSettingsPageState extends State<_TemplateSettingsPage> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
+          : Padding(
               padding: const EdgeInsets.all(16),
-              itemCount: _templates.length,
-              itemBuilder: (context, index) {
-                final category = _templates.keys.elementAt(index);
-                final template = _templates[category]!;
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.label_outline, size: 18,
-                                color: theme.colorScheme.primary),
-                            const SizedBox(width: 8),
-                            Text(category,
-                                style: theme.textTheme.titleSmall),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          initialValue: template,
-                          maxLines: 8,
-                          decoration: InputDecoration(
-                            border: const OutlineInputBorder(),
-                            isDense: true,
-                            filled: true,
-                            fillColor: theme.colorScheme.surfaceContainerLow,
-                          ),
-                          style: TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 12,
-                            color: theme.colorScheme.onSurface,
-                          ),
-                          onChanged: (v) {
-                            _templates[category] = v;
-                          },
-                        ),
-                      ],
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('可用占位符: {{title}} {{url}} {{author_line}} {{summary}} {{paragraph_summaries}}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.5))),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      maxLines: null,
+                      expands: true,
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
+                        filled: true,
+                        fillColor: theme.colorScheme.surfaceContainerLow,
+                      ),
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 13,
+                        color: theme.colorScheme.onSurface,
+                      ),
                     ),
                   ),
-                );
-              },
+                ],
+              ),
             ),
       floatingActionButton: FloatingActionButton(
         onPressed: _save,
@@ -346,7 +334,7 @@ class _TemplateSettingsPageState extends State<_TemplateSettingsPage> {
   }
 
   Future<void> _save() async {
-    await ReadingTemplateStore.saveTemplates(_templates);
+    await ReadingTemplateStore.saveTemplate(_controller?.text ?? '');
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(S.current.pluginSettings)),
@@ -370,7 +358,7 @@ class _TemplateSettingsPageState extends State<_TemplateSettingsPage> {
             onPressed: () async {
               Navigator.pop(ctx);
               await ReadingTemplateStore.resetToDefaults();
-              await _loadTemplates();
+              await _loadTemplate();
             },
             child: Text(s.pluginSettingsReset),
           ),
