@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../l10n/app_strings.dart';
+import '../../platform/screen_capture.dart';
 import '../../services/reading_template_store.dart';
 
 // Minimal Win32 FFI for browser-follow tracking (child engine can't
@@ -268,6 +269,10 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
   int _companionHwnd = 0;
 
   void _startBrowserTracking() {
+    if (Platform.isMacOS && widget.browserHwnd != 0) {
+      _startMacOSBrowserTracking(widget.browserHwnd);
+      return;
+    }
     if (!Platform.isWindows || widget.browserHwnd == 0) return;
     final browserHwnd = widget.browserHwnd;
     _browserTrackTimer?.cancel();
@@ -300,6 +305,47 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
     final fgHwnd = _getForegroundWindow();
     if (fgHwnd == browserHwnd && _companionHwnd != 0) {
       _ffiBringToTop(_companionHwnd);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Browser window tracking (macOS)
+  // ---------------------------------------------------------------------------
+
+  void _startMacOSBrowserTracking(int browserHwnd) {
+    _browserTrackTimer?.cancel();
+    _browserTrackTimer = Timer.periodic(
+        const Duration(milliseconds: 200), (_) => _trackMacOSBrowser(browserHwnd));
+  }
+
+  void _trackMacOSBrowser(int browserHwnd) {
+    if (!mounted) return;
+    final windows = ScreenCapture.getWindowList();
+    if (windows == null) {
+      _browserTrackTimer?.cancel();
+      _closeWindow();
+      return;
+    }
+    final match =
+        windows.where((w) => w.windowID == browserHwnd).firstOrNull;
+    if (match == null || match.bounds == null) {
+      _browserTrackTimer?.cancel();
+      _closeWindow();
+      return;
+    }
+    final b = match.bounds!;
+    final rect = Rect.fromLTWH(
+      (b['X'] ?? 0).toDouble(),
+      (b['Y'] ?? 0).toDouble(),
+      (b['Width'] ?? 0).toDouble(),
+      (b['Height'] ?? 0).toDouble(),
+    );
+    if (rect != _lastBrowserRect) {
+      _lastBrowserRect = rect;
+      final wc = _wc;
+      if (wc != null) {
+        unawaited(wc.setPositionPhysical(rect.right, rect.top));
+      }
     }
   }
 
