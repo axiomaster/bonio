@@ -260,7 +260,7 @@ bool load(const std::string& config_dir, Config& out, std::string& err) {
   out.config_dir = dir;
   out.config_file = "hiclaw.json";
   std::string json_path = dir + path_sep() + "hiclaw.json";
-  out.default_model = "llama3.2";
+  out.default_model = "gemma4:e4b";
   if (loadFromJson(json_path, out, err)) {
     ensure_default_in_models(out);
     return true;
@@ -276,11 +276,18 @@ void ensure_default_in_models(Config& cfg) {
     if (e.id == cfg.default_model) return;
   ModelEntry e;
   e.id = cfg.default_model;
-  size_t hyphen = cfg.default_model.find('-');
-  e.provider = (hyphen != std::string::npos && hyphen > 0)
-                   ? cfg.default_model.substr(0, hyphen)
-                   : cfg.default_model;
   e.model_id = cfg.default_model;
+  size_t hyphen = cfg.default_model.find('-');
+  if (hyphen != std::string::npos && hyphen > 0) {
+    std::string candidate = cfg.default_model.substr(0, hyphen);
+    bool known = false;
+    for (std::size_t i = 0; i < kDefaultProvidersCount; ++i) {
+      if (candidate == kDefaultProviders[i].id) { known = true; break; }
+    }
+    e.provider = known ? candidate : "ollama";
+  } else {
+    e.provider = "ollama";
+  }
   cfg.models.push_back(e);
 }
 

@@ -24,6 +24,7 @@ import '../services/device_identity_store.dart';
 import '../services/device_auth_store.dart';
 import '../services/camera_service.dart';
 import '../services/speech_to_text_manager.dart';
+import '../services/hiclaw_process.dart';
 import '../services/reading_template_store.dart';
 
 class AppState extends ChangeNotifier {
@@ -46,6 +47,7 @@ class AppState extends ChangeNotifier {
   
 
   final SpeechToTextManager _sttManager = SpeechToTextManager();
+  final HiclawProcess hiclawProcess = HiclawProcess();
 
   String get host => _host;
   int get port => _port;
@@ -628,6 +630,10 @@ class AppState extends ChangeNotifier {
     S.setLocale(_locale);
     notifyListeners();
     unawaited(syncAvatarFloatingWindow());
+    // Auto-start local hiclaw and connect on first launch (no saved host)
+    if (_host.trim().isEmpty) {
+      unawaited(_autoStartAndConnect());
+    }
   }
 
   Future<void> setShowAvatarOverlay(bool value) async {
@@ -681,8 +687,13 @@ class AppState extends ChangeNotifier {
     await prefs.setBool('gateway.tls', _tls);
   }
 
-  void connectToGateway() {
-    if (_host.trim().isEmpty) return;
+  Future<void> connectToGateway() async {
+    if (_host.trim().isEmpty) {
+      if (!hiclawProcess.isRunning) {
+        await hiclawProcess.start(port: _port);
+      }
+      _host = '127.0.0.1';
+    }
     runtime.connect(
       profile: _gatewayProfile,
       host: _host.trim(),
@@ -692,12 +703,23 @@ class AppState extends ChangeNotifier {
     );
   }
 
-  void disconnectFromGateway() {
+  Future<void> disconnectFromGateway() async {
     runtime.disconnect();
+    await hiclawProcess.stop();
+  }
+
+  Future<void> _autoStartAndConnect() async {
+    if (!hiclawProcess.isRunning) {
+      await hiclawProcess.start(port: _port);
+    }
+    await Future.delayed(const Duration(milliseconds: 500));
+    _host = '127.0.0.1';
+    connectToGateway();
   }
 
   @override
   void dispose() {
+    hiclawProcess.dispose();
     _sttManager.destroy();
     runtime.removeListener(_onRuntimeChanged);
     cameraService.removeListener(_onCameraChanged);
