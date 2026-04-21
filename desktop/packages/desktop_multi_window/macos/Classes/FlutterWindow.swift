@@ -136,11 +136,29 @@ class FlutterWindow: NSObject {
             window.setFrameOrigin(NSPoint(x: x, y: cocoaY))
             result(nil)
 
+        case "window_setPositionPhysical":
+            // Raw physical pixel coordinates — set directly without DPI conversion.
+            let x = (args?["x"] as? NSNumber)?.doubleValue ?? 0
+            let y = (args?["y"] as? NSNumber)?.doubleValue ?? 0
+            let screen = window.screen ?? NSScreen.screens[0]
+            let scale = screen.backingScaleFactor
+            let cocoaY = screen.frame.height - CGFloat(y) / scale - window.frame.height
+            window.setFrameOrigin(NSPoint(x: CGFloat(x) / scale, y: cocoaY))
+            result(nil)
+
         case "window_getPosition":
             let screen = window.screen ?? NSScreen.screens[0]
             let f = window.frame
             let flutterY = screen.frame.height - f.origin.y - f.height
             result(["x": f.origin.x, "y": flutterY] as [String: Double])
+
+        case "window_getPositionPhysical":
+            let screen = window.screen ?? NSScreen.screens[0]
+            let scale = screen.backingScaleFactor
+            let f = window.frame
+            let physX = f.origin.x * scale
+            let physY = (screen.frame.height - f.origin.y - f.height) * scale
+            result(["x": physX, "y": physY] as [String: Double])
 
         case "window_startDragging":
             if let event = window.currentEvent ?? NSApp.currentEvent {
