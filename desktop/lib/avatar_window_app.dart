@@ -648,11 +648,13 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     for (final w in windows) {
       // Skip our own app's windows
       if (w.ownerName == 'boji_desktop') continue;
-      // Skip system/daemon windows
+      // Skip system/daemon windows (both English and localized names)
       final owner = w.ownerName.toLowerCase();
       if (owner.contains('window server') || owner.contains('systemuiserver') ||
-          owner.contains('dock') || owner.contains('controlcenter') ||
-          owner.contains('notification center')) continue;
+          owner.contains('dock') || owner.contains('程序坞') ||
+          owner.contains('controlcenter') || owner.contains('控制中心') ||
+          owner.contains('notification center') || owner.contains('通知中心') ||
+          owner.contains('loginwindow')) continue;
       // Skip windows without names
       if (w.windowName == null || w.windowName!.isEmpty) continue;
       // Skip tiny windows
