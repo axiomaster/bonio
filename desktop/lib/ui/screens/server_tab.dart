@@ -19,6 +19,8 @@ class _ServerTabState extends State<ServerTab> {
   late TextEditingController _tokenController;
   bool _showModelConfig = false;
 
+  bool _syncedFromPrefs = false;
+
   @override
   void initState() {
     super.initState();
@@ -26,10 +28,28 @@ class _ServerTabState extends State<ServerTab> {
     _hostController = TextEditingController(text: appState.host);
     _portController = TextEditingController(text: appState.port.toString());
     _tokenController = TextEditingController(text: appState.token);
+    // _loadPrefs() is async — field defaults above may be wrong until prefs
+    // load completes and notifyListeners fires. Sync controllers once.
+    appState.addListener(_onAppStateChange);
+  }
+
+  void _onAppStateChange() {
+    if (_syncedFromPrefs || !mounted) return;
+    final appState = context.read<AppState>();
+    _syncedFromPrefs = true;
+    appState.removeListener(_onAppStateChange);
+    setState(() {
+      _hostController.text = appState.host;
+      _portController.text = appState.port.toString();
+      _tokenController.text = appState.token;
+    });
   }
 
   @override
   void dispose() {
+    if (!_syncedFromPrefs) {
+      context.read<AppState>().removeListener(_onAppStateChange);
+    }
     _hostController.dispose();
     _portController.dispose();
     _tokenController.dispose();
