@@ -191,17 +191,9 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
         }
       } else if (Platform.isMacOS) {
         final fgWindow = _getMacForegroundWindow();
-        if (fgWindow != null) {
-          final bounds = fgWindow.bounds;
-          if (bounds != null && bounds['Width']! > 50 && bounds['Height']! > 50) {
-            if (_isMacWindowFullscreen(bounds)) {
-              _transitionToFullscreenCorner();
-            } else {
-              _transitionToAnchoredWindowMacOS(fgWindow);
-            }
-          } else {
-            _transitionToDock();
-          }
+        if (fgWindow != null && fgWindow.bounds != null &&
+            fgWindow.bounds!['Width']! > 50 && fgWindow.bounds!['Height']! > 50) {
+          _transitionToAnchoredWindowMacOS(fgWindow);
         } else {
           _transitionToDock();
         }
@@ -671,13 +663,10 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
   }
 
   /// Check if a macOS window bounds represent a fullscreen window.
-  /// Compares against logical screen size (points, not physical pixels).
+  /// On macOS, floating-level windows appear above fullscreen apps, so
+  /// fullscreen detection is not needed. Always returns false.
   bool _isMacWindowFullscreen(Map<String, int> bounds) {
-    // _screenWidth/_screenHeight are set from window_getDockInfo (screen.frame in points)
-    if (_screenWidth <= 0 || _screenHeight <= 0) return false;
-    return bounds['Width'] == _screenWidth.toInt() &&
-        bounds['Height'] == _screenHeight.toInt() &&
-        bounds['X'] == 0 && bounds['Y'] == 0;
+    return false;
   }
 
   void _pollForegroundMacOS() {
@@ -689,17 +678,11 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     // --- Health check for anchored window ---
     if ((_placement == _PlacementState.anchoredWindow ||
          _placement == _PlacementState.userOffset) && _anchoredHwnd != 0) {
-      // Check if anchored window still exists
       final anchored = _getMacWindowRect(_anchoredHwnd);
       if (anchored == null) {
         debugPrint('AvatarAnchor macOS: anchored window lost');
         _anchoredHwnd = 0;
         _handleAnchoredWindowLostMacOS();
-        return;
-      }
-      if (anchored.isFullscreen) {
-        debugPrint('AvatarAnchor macOS: anchored window went fullscreen');
-        _transitionToFullscreenCorner();
         return;
       }
     }
@@ -709,14 +692,6 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
 
     // USER_OFFSET on same window
     if (_placement == _PlacementState.userOffset && fgWindowId == _anchoredHwnd) return;
-
-    // Check for fullscreen
-    if (w.bounds != null && _isMacWindowFullscreen(w.bounds!)) {
-      if (_placement != _PlacementState.fullscreenCorner) {
-        _transitionToFullscreenCorner();
-      }
-      return;
-    }
 
     // New foreground window — anchor to it
     if (w.bounds == null || w.bounds!['Width']! < 100 || w.bounds!['Height']! < 100) return;
