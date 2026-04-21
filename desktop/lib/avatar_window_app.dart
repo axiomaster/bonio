@@ -1297,6 +1297,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     }
 
     final title = ScreenCapture.getWindowTitle(_anchoredHwnd);
+    debugPrint('StartReading: url=$url, title=$title, hwnd=$_anchoredHwnd');
     await _sendMenuActionToMainWithData('start_reading', {
       'hwnd': _anchoredHwnd,
       'url': url,
