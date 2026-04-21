@@ -124,14 +124,14 @@ class _ServerTabState extends State<ServerTab> {
                     SegmentedButton<GatewayProfile>(
                       segments: [
                         ButtonSegment<GatewayProfile>(
-                          value: GatewayProfile.openclaw,
-                          label: Text(S.current.serverOpenClaw),
-                          tooltip: S.current.serverOpenClawDesc,
-                        ),
-                        ButtonSegment<GatewayProfile>(
                           value: GatewayProfile.hiclaw,
                           label: Text(S.current.serverHiClaw),
                           tooltip: S.current.serverHiClawDesc,
+                        ),
+                        ButtonSegment<GatewayProfile>(
+                          value: GatewayProfile.openclaw,
+                          label: Text(S.current.serverOpenClaw),
+                          tooltip: S.current.serverOpenClawDesc,
                         ),
                       ],
                       emptySelectionAllowed: false,

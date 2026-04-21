@@ -465,6 +465,14 @@ class _NoteCard extends StatelessWidget {
                             .toList(),
                       ),
                     IconButton(
+                      icon: Icon(Icons.delete_outline,
+                          color: Theme.of(ctx).colorScheme.error),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _confirmDelete(context);
+                      },
+                    ),
+                    IconButton(
                       icon: const Icon(Icons.close),
                       onPressed: () => Navigator.pop(ctx),
                     ),

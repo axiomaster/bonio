@@ -23,12 +23,14 @@ class ReadingSummary {
   final String author;
   final String summary;
   final List<ParagraphSummary> paragraphSummaries;
+  final List<String> categories;
 
   const ReadingSummary({
     required this.title,
     this.author = '',
     required this.summary,
     this.paragraphSummaries = const [],
+    this.categories = const [],
   });
 
   factory ReadingSummary.fromJson(Map<String, dynamic> m) {
@@ -40,6 +42,7 @@ class ReadingSummary {
               ?.map((e) => ParagraphSummary.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
+      categories: (m['categories'] as List?)?.cast<String>() ?? [],
     );
   }
 
@@ -49,6 +52,7 @@ class ReadingSummary {
         'summary': summary,
         'paragraph_summaries':
             paragraphSummaries.map((e) => e.toJson()).toList(),
+        'categories': categories,
       };
 }
 
