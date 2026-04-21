@@ -202,20 +202,30 @@ class AppState extends ChangeNotifier {
     final url = data['url'] as String? ?? '';
     final title = data['title'] as String? ?? '';
     final windowId = data['windowId']?.toString() ?? '';
+    final categoryKey = data['category'] as String? ?? 'auto';
     if (text.isEmpty || windowId.isEmpty) return;
+
+    final category = ReadingCategory.fromKey(categoryKey);
 
     try {
       final resultJson =
-          await runtime.noteService.summarizeReading(text, url, title);
+          await runtime.noteService.summarizeReading(text, url, title, category: category);
       final json = jsonDecode(resultJson) as Map<String, dynamic>;
       final summary = ReadingSummary.fromJson(json);
-      final markdown = await _renderSummaryMarkdown(summary, url, text);
+
+      // Use detected category for rendering if auto was requested
+      final effectiveCategory = category == ReadingCategory.auto
+          ? runtime.noteService.lastDetectedCategory
+          : category;
+
+      final markdown = await _renderSummaryMarkdown(summary, url, text, category: effectiveCategory);
       final wc = WindowController.fromWindowId(windowId);
-      // Send both the rendered markdown and the title for UI update
+      // Send rendered markdown, title, author, and detected category for UI
       await wc.invokeMethod('readingSummaryResult', jsonEncode({
         'markdown': markdown,
         'title': summary.title,
-        'category': summary.category,
+        'author': summary.author,
+        'detectedCategory': effectiveCategory.key,
       }));
     } catch (e) {
       debugPrint('AppState: reading summarize error: $e');
@@ -227,60 +237,24 @@ class AppState extends ChangeNotifier {
   }
 
   Future<String> _renderSummaryMarkdown(
-      ReadingSummary summary, String url, String fullText) async {
-    final templates = await ReadingTemplateStore.loadTemplates();
-    var tmpl = templates[summary.category] ?? templates['其他']!;
+      ReadingSummary summary, String url, String fullText,
+      {ReadingCategory category = ReadingCategory.scienceTech}) async {
+    final tmpl = ReadingTemplateStore.getOutputTemplate(category);
 
-    String renderDetails(Map<String, dynamic> details) {
-      final buf = StringBuffer();
-      for (final entry in details.entries) {
-        final v = entry.value;
-        if (v is List) {
-          for (final item in v) {
-            if (item is Map) {
-              buf.writeln('- ${item.entries.map((e) => '${e.key}: ${e.value}').join(' | ')}');
-            } else {
-              buf.writeln('- $item');
-            }
-          }
-        } else if (v is String) {
-          buf.writeln(v);
-        } else {
-          buf.writeln('$v');
-        }
-      }
-      return buf.toString().trimRight();
-    }
+    final authorLine = summary.author.isNotEmpty
+        ? '作者：${summary.author}'
+        : '';
 
-    String renderKeyPoints(List<String> points) {
-      return points.map((p) => '- $p').join('\n');
-    }
+    final paragraphMd = summary.paragraphSummaries
+        .map((p) => '- **${p.subtitle}**：${p.content}')
+        .join('\n');
 
-    final details = summary.details;
-    tmpl = tmpl.replaceAll('{{title}}', summary.title);
-    tmpl = tmpl.replaceAll('{{url}}', url);
-    tmpl = tmpl.replaceAll('{{category}}', summary.category);
-    tmpl = tmpl.replaceAll('{{summary}}', summary.summary);
-    tmpl = tmpl.replaceAll('{{key_points}}', renderKeyPoints(summary.keyPoints));
-    tmpl = tmpl.replaceAll('{{highlights}}', renderKeyPoints(summary.keyPoints));
-    tmpl = tmpl.replaceAll('{{full_text}}', fullText);
-    // Category-specific placeholders
-    tmpl = tmpl.replaceAll('{{core_concepts}}',
-        (details['core_concepts'] as List?)?.map((e) => '- $e').join('\n') ?? '');
-    tmpl = tmpl.replaceAll('{{key_takeaways}}',
-        (details['key_takeaways'] as List?)?.map((e) => '- $e').join('\n') ?? '');
-    tmpl = tmpl.replaceAll('{{destinations}}',
-        (details['destinations'] as List?)?.map((e) => '- $e').join('\n') ?? '');
-    tmpl = tmpl.replaceAll('{{routes}}',
-        (details['routes'] as List?)?.map((e) => '- $e').join('\n') ?? '');
-    tmpl = tmpl.replaceAll('{{tips}}',
-        (details['tips'] as List?)?.map((e) => '- $e').join('\n') ?? '');
-    tmpl = tmpl.replaceAll('{{restaurants}}', renderDetails(
-        (details['restaurants'] is List) ? {'items': details['restaurants']} : {}));
-    tmpl = tmpl.replaceAll('{{items}}', renderDetails(
-        (details['items'] is List) ? {'items': details['items']} : {}));
-
-    return tmpl;
+    return tmpl
+        .replaceAll('{{title}}', summary.title)
+        .replaceAll('{{url}}', url)
+        .replaceAll('{{author_line}}', authorLine)
+        .replaceAll('{{summary}}', summary.summary)
+        .replaceAll('{{paragraph_summaries}}', paragraphMd);
   }
 
   Future<void> _handleStartReading(Map<String, dynamic> data) async {

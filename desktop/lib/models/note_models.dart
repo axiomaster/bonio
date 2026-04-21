@@ -1,37 +1,54 @@
 enum NoteType { screenshot, text, image, file }
 
+/// A single semantic paragraph summary with subtitle and content.
+class ParagraphSummary {
+  final String subtitle;
+  final String content;
+
+  const ParagraphSummary({required this.subtitle, required this.content});
+
+  factory ParagraphSummary.fromJson(Map<String, dynamic> m) {
+    return ParagraphSummary(
+      subtitle: m['subtitle'] as String? ?? '',
+      content: m['content'] as String? ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() => {'subtitle': subtitle, 'content': content};
+}
+
 /// Result of AI-powered reading companion summarization.
 class ReadingSummary {
-  final String category;
   final String title;
+  final String author;
   final String summary;
-  final List<String> keyPoints;
-  final Map<String, dynamic> details;
+  final List<ParagraphSummary> paragraphSummaries;
 
   const ReadingSummary({
-    required this.category,
     required this.title,
+    this.author = '',
     required this.summary,
-    this.keyPoints = const [],
-    this.details = const {},
+    this.paragraphSummaries = const [],
   });
 
   factory ReadingSummary.fromJson(Map<String, dynamic> m) {
     return ReadingSummary(
-      category: m['category'] as String? ?? '其他',
       title: m['title'] as String? ?? '',
+      author: m['author'] as String? ?? '',
       summary: m['summary'] as String? ?? '',
-      keyPoints: (m['key_points'] as List?)?.cast<String>() ?? [],
-      details: m['details'] as Map<String, dynamic>? ?? {},
+      paragraphSummaries: (m['paragraph_summaries'] as List?)
+              ?.map((e) => ParagraphSummary.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'category': category,
         'title': title,
+        'author': author,
         'summary': summary,
-        'key_points': keyPoints,
-        'details': details,
+        'paragraph_summaries':
+            paragraphSummaries.map((e) => e.toJson()).toList(),
       };
 }
 

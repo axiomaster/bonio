@@ -238,3 +238,24 @@ Server config lives in `hiclaw.json` (workspace root). Uses **snake_case** field
 - **Handler interface pattern**: Feature handlers implement interfaces from `InvokeDispatcher` for testability
 - **Provider adapters**: New LLM providers implement the provider interface in `server/src/providers/`
 - **Reference implementations**: `reference/` contains original code used during porting — do not modify
+- **Desktop platform abstraction**: Platform-specific code lives in `desktop/lib/platform/` with `win32_*.dart` / `macos_*.dart` implementations behind shared interfaces (e.g., `screen_capture.dart`, `microphone.dart`, `gui_agent.dart`). CDP (Chrome DevTools Protocol) agent is in `desktop/lib/platform/cdp/`.
+- **Plugin system**: Desktop supports dynamic plugins via `desktop/lib/plugins/` (`PluginManager`, `PluginHost`, `PluginBridge`). Built-in plugins defined in `builtin_plugins.dart`.
+
+## Additional Directories
+
+- **`design/`** — PRD documents and implementation plans for features (记一记, 阅读搭子, plugin system, avatar, voice input, etc.)
+- **`skills/phone-use-agent/`** — C++ native CLI for mobile screen automation (references Open-AutoGLM)
+- **`reference/`** — OpenClaw (Node.js) and ZeroClaw (Rust) reference implementations, used during porting — read-only
+- **`assets/`** — Shared Lottie animations for the avatar cat (various states: idle, happy, confused, etc.)
+
+## Linting & Formatting
+
+- **Desktop**: `desktop/analysis_options.yaml` — Flutter analyzer with relaxed rules (e.g., `prefer_const_constructors: false`)
+- **HarmonyOS**: `harmonyos/code-linter.json5` — security-focused rules (`@security/no-unsafe-*`), TypeScript/Performance recommended
+- **Android**: standard Kotlin conventions (no explicit ktlint/detekt config)
+- **Server**: no enforced style; follows C++17 conventions with snake_case
+
+## Git Notes
+
+- **Git LFS** is used for `.so` and `.onnx` binary files (see `.gitattributes`)
+- Sherpa-ONNX model files must be downloaded separately: `powershell -ExecutionPolicy Bypass -File desktop/tool/download_model.ps1`
