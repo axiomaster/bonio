@@ -137,13 +137,15 @@ class FlutterWindow: NSObject {
             result(nil)
 
         case "window_setPositionPhysical":
-            // Raw physical pixel coordinates — set directly without DPI conversion.
+            // On Windows the caller sends physical pixels, but on macOS the
+            // Dart-side _toPhysical is a no-op (scale=1.0), so the values are
+            // already in logical points.  Pass them directly with the same
+            // Y-flip as window_setPosition.
             let x = (args?["x"] as? NSNumber)?.doubleValue ?? 0
             let y = (args?["y"] as? NSNumber)?.doubleValue ?? 0
             let screen = window.screen ?? NSScreen.screens[0]
-            let scale = screen.backingScaleFactor
-            let cocoaY = screen.frame.height - CGFloat(y) / scale - window.frame.height
-            window.setFrameOrigin(NSPoint(x: CGFloat(x) / scale, y: cocoaY))
+            let cocoaY = screen.frame.height - CGFloat(y) - window.frame.height
+            window.setFrameOrigin(NSPoint(x: CGFloat(x), y: cocoaY))
             result(nil)
 
         case "window_getPosition":
@@ -153,12 +155,11 @@ class FlutterWindow: NSObject {
             result(["x": f.origin.x, "y": flutterY] as [String: Double])
 
         case "window_getPositionPhysical":
+            // Return logical-point coordinates to match setPositionPhysical.
             let screen = window.screen ?? NSScreen.screens[0]
-            let scale = screen.backingScaleFactor
             let f = window.frame
-            let physX = f.origin.x * scale
-            let physY = (screen.frame.height - f.origin.y - f.height) * scale
-            result(["x": physX, "y": physY] as [String: Double])
+            let flutterY = screen.frame.height - f.origin.y - f.height
+            result(["x": f.origin.x, "y": flutterY] as [String: Double])
 
         case "window_startDragging":
             if let event = window.currentEvent ?? NSApp.currentEvent {
