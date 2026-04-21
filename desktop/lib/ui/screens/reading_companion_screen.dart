@@ -168,6 +168,7 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
   bool _windowReady = false;
   String _fullText = '';
   String _aiTitle = '';
+  List<String> _categories = [];
   Timer? _browserTrackTimer;
   ReadingCategory _category = ReadingCategory.auto;
   Rect _lastBrowserRect = Rect.zero;
@@ -249,6 +250,7 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
       if (title.isNotEmpty) {
         _aiTitle = title;
       }
+      _categories = (json['categories'] as List?)?.cast<String>() ?? [];
       _summary = markdown;
       _editorController.text = _summary;
       setState(() {
@@ -585,6 +587,7 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
         'title': title,
         'windowId': wc.windowId,
         'category': _category.key,
+        'browserHwnd': widget.browserHwnd,
       });
     } catch (e) {
       debugPrint('ReadingCompanion: AI summary request failed: $e');
@@ -739,6 +742,8 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
         await main.invokeMethod('readingSave', {
           'url': _activeUrl,
           'markdown': content,
+          'title': _aiTitle,
+          'categories': _categories,
         });
       }
       if (mounted) {

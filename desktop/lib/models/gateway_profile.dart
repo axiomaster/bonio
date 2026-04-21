@@ -1,8 +1,8 @@
 /// Gateway product line: OpenClaw-compatible vs HiClaw server.
 /// Protocol frames follow OpenClaw v3; defaults differ by profile.
 enum GatewayProfile {
-  openclaw,
   hiclaw,
+  openclaw,
 }
 
 extension GatewayProfileX on GatewayProfile {

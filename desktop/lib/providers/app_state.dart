@@ -189,8 +189,14 @@ class AppState extends ChangeNotifier {
     final url = data['url'] as String? ?? '';
     final markdown = data['markdown'] as String? ?? '';
     if (markdown.isEmpty) return;
+    final title = data['title'] as String? ?? '';
+    final categories = (data['categories'] as List?)?.cast<String>() ?? [];
     try {
-      await runtime.noteService.saveReadingNote(url, markdown);
+      await runtime.noteService.saveReadingNote(
+        url, markdown,
+        title: title,
+        categories: categories,
+      );
       debugPrint('AppState: reading note saved');
     } catch (e) {
       debugPrint('AppState: reading save error: $e');
@@ -203,6 +209,7 @@ class AppState extends ChangeNotifier {
     final title = data['title'] as String? ?? '';
     final windowId = data['windowId']?.toString() ?? '';
     final categoryKey = data['category'] as String? ?? 'auto';
+    final browserHwnd = data['browserHwnd'] as int? ?? 0;
     if (text.isEmpty || windowId.isEmpty) return;
 
     final category = ReadingCategory.fromKey(categoryKey);
@@ -230,7 +237,28 @@ class AppState extends ChangeNotifier {
         'markdown': markdown,
         'title': summary.title,
         'author': summary.author,
+        'categories': summary.categories,
       }));
+
+      // Capture browser window as cover thumbnail
+      Uint8List? coverPng;
+      if (browserHwnd != 0) {
+        coverPng = await runtime.noteService.captureWindowThumbnail(browserHwnd);
+      }
+
+      // Auto-save the AI-generated summary to memory.
+      try {
+        await runtime.noteService.saveReadingNote(
+          url, markdown,
+          title: summary.title,
+          summaryText: summary.summary,
+          categories: summary.categories,
+          coverPng: coverPng,
+        );
+        debugPrint('AppState: reading note auto-saved');
+      } catch (e) {
+        debugPrint('AppState: reading auto-save error: $e');
+      }
     } catch (e) {
       debugPrint('AppState: reading summarize error: $e');
       try {

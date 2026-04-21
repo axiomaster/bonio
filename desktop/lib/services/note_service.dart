@@ -133,6 +133,22 @@ class NoteService extends ChangeNotifier {
   // Capture
   // ---------------------------------------------------------------------------
 
+  /// Capture a window and return thumbnail PNG bytes (200px wide), without
+  /// creating a note. Returns null on failure.
+  Future<Uint8List?> captureWindowThumbnail(int hwnd) async {
+    if (hwnd == 0) return null;
+    try {
+      final capture = ScreenCapture.captureWindow(hwnd);
+      if (capture == null) return null;
+      final png = await capture.toPng();
+      if (png == null) return null;
+      return _generateThumbnail(png, capture.width, capture.height);
+    } catch (e) {
+      debugPrint('NoteService: captureWindowThumbnail failed: $e');
+      return null;
+    }
+  }
+
   /// Capture the given window, save as a note, and return it.
   Future<BojiNote?> captureWindow(int hwnd) async {
     if (hwnd == 0) return null;
@@ -251,25 +267,47 @@ class NoteService extends ChangeNotifier {
     return null;
   }
 
-  /// Save a reading companion note (Markdown text + URL) with #阅读搭子 tag.
-  Future<BojiNote> saveReadingNote(String url, String markdown) async {
+  /// Save a reading companion note (Markdown text + URL).
+  /// [categories] from LLM response are added as tags alongside 阅读搭子.
+  /// [coverPng] optional thumbnail bytes (e.g. browser window screenshot).
+  Future<BojiNote> saveReadingNote(String url, String markdown,
+      {String title = '',
+      String summaryText = '',
+      List<String> categories = const [],
+      Uint8List? coverPng}) async {
     await init();
 
-    // Extract title from first markdown heading (# ...)
-    final titleMatch = RegExp(r'^#\s+(.+)$', multiLine: true).firstMatch(markdown);
-    final title = titleMatch?.group(1)?.trim() ?? '';
-    final summaryText = title.isNotEmpty
+    final displayTitle = title.isNotEmpty
         ? title
-        : (markdown.length > 80 ? '${markdown.substring(0, 80)}...' : markdown);
+        : (RegExp(r'^#\s+(.+)$', multiLine: true).firstMatch(markdown)?.group(1)?.trim() ?? '');
+    final displaySummary = summaryText.isNotEmpty
+        ? summaryText
+        : (displayTitle.isNotEmpty
+            ? displayTitle
+            : (markdown.length > 80 ? '${markdown.substring(0, 80)}...' : markdown));
+
+    final tags = ['阅读搭子', ...categories];
 
     // Deduplicate by URL: update existing note if one exists
     final existing = findByUrl(url);
     if (existing != null) {
       existing.rawText = markdown;
-      existing.summary = summaryText;
+      existing.summary = displaySummary;
+      existing.tags = tags;
       existing.analyzed = true;
+      if (coverPng != null) {
+        if (existing.thumbnail != null) {
+          await File('${_thumbDir.path}/${existing.thumbnail}')
+              .writeAsBytes(coverPng);
+        } else {
+          final thumbTs = '${existing.createdAt.year}${_p2(existing.createdAt.month)}${_p2(existing.createdAt.day)}_'
+              '${_p2(existing.createdAt.hour)}${_p2(existing.createdAt.minute)}${_p2(existing.createdAt.second)}';
+          final thumbName = '${thumbTs}_${existing.id.substring(0, 8)}_thumb.png';
+          await File('${_thumbDir.path}/$thumbName').writeAsBytes(coverPng);
+          existing.thumbnail = thumbName;
+        }
+      }
       await updateNote(existing);
-      // Update the attachment file
       final attachFile = File('${_attachDir.path}/${existing.fileName}');
       await attachFile.writeAsString(markdown);
       return existing;
@@ -280,6 +318,12 @@ class NoteService extends ChangeNotifier {
     final ts = '${now.year}${_p2(now.month)}${_p2(now.day)}_'
         '${_p2(now.hour)}${_p2(now.minute)}${_p2(now.second)}';
     final fileName = '${ts}_${id.substring(0, 8)}.md';
+    String? thumbName;
+    if (coverPng != null) {
+      thumbName = '${ts}_${id.substring(0, 8)}_thumb.png';
+      await File('${_thumbDir.path}/$thumbName').writeAsBytes(coverPng);
+    }
+
     final note = BojiNote(
       id: id,
       createdAt: now,
@@ -288,8 +332,9 @@ class NoteService extends ChangeNotifier {
       sourceUrl: url,
       rawText: markdown,
       fileName: fileName,
-      tags: ['阅读搭子'],
-      summary: summaryText,
+      thumbnail: thumbName,
+      tags: tags,
+      summary: displaySummary,
       analyzed: true,
     );
     return saveNote(note, attachment: Uint8List.fromList(utf8.encode(markdown)));
@@ -657,6 +702,7 @@ class NoteService extends ChangeNotifier {
     prompt.writeln('{');
     prompt.writeln('  "title": "准确的文章标题",');
     prompt.writeln('  "author": "作者姓名，没有则为空字符串",');
+    prompt.writeln('  "categories": ["分类标签1", "分类标签2", ...],');
     prompt.writeln('  "summary": "摘要内容",');
     prompt.writeln('  "paragraph_summaries": [');
     prompt.writeln('    {"subtitle": "语义小标题", "content": "深度总结"},');
@@ -664,6 +710,8 @@ class NoteService extends ChangeNotifier {
     prompt.writeln('    ...');
     prompt.writeln('  ]');
     prompt.writeln('}');
+    prompt.writeln('categories说明：给文章打上多个内容分类标签，包括但不限于文章所属领域（如科技、财经、文学等）、');
+    prompt.writeln('内容形式（如科普、教程、评论等）、主题关键词等。每个标签2-4个字。');
 
     final runId = const Uuid().v4();
     _pendingReading[runId] = StringBuffer();
