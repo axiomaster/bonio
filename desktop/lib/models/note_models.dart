@@ -60,7 +60,7 @@ class BojiNote {
   final String? sourceUrl;
   String? rawText;
   final String fileName;
-  final String? thumbnail;
+  String? thumbnail;
   List<String> tags;
   String? summary;
   bool analyzed;
