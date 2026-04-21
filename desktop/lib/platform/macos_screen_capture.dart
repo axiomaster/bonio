@@ -491,7 +491,10 @@ class MacosScreenCapture {
     try {
       final windowList = _cgWindowListCopyWindowInfo(
           _kCGWindowListOptionIncludingWindow, windowID);
-      if (windowList == nullptr) return '';
+      if (windowList == nullptr) {
+        debugPrint('getWindowTitle: CGWindowListCopyWindowInfo returned null for $windowID');
+        return '';
+      }
 
       String result = '';
 
@@ -571,14 +574,23 @@ class MacosScreenCapture {
     try {
       // Look up the window to find the owner (browser) name.
       final windows = getWindowList();
-      if (windows == null) return _browserUrlFallback(windowID);
+      if (windows == null) {
+        debugPrint('getBrowserUrl: getWindowList returned null');
+        return _browserUrlFallback(windowID);
+      }
 
       final match = windows.where((w) => w.windowID == windowID).firstOrNull;
-      if (match == null) return _browserUrlFallback(windowID);
+      if (match == null) {
+        debugPrint('getBrowserUrl: window $windowID not found in list (${windows.length} windows)');
+        return _browserUrlFallback(windowID);
+      }
 
       final ownerName = match.ownerName;
       final appName = _mapBrowserAppName(ownerName);
-      if (appName == null) return _browserUrlFallback(windowID);
+      if (appName == null) {
+        debugPrint('getBrowserUrl: owner=$ownerName not a browser');
+        return _browserUrlFallback(windowID);
+      }
 
       // Build AppleScript to retrieve the active tab URL.
       String script;
@@ -587,17 +599,17 @@ class MacosScreenCapture {
           script = 'tell application "Safari" to get URL of current tab of front window';
           break;
         case 'Firefox':
-          // Firefox does not expose URL via AppleScript reliably.
           return _browserUrlFallback(windowID);
         default:
-          // Chrome, Edge, Brave, Arc all use "active tab".
           script = 'tell application "$appName" to get URL of active tab of front window';
           break;
       }
 
+      debugPrint('getBrowserUrl: running osascript for $appName');
       final result = Process.runSync('osascript', ['-e', script]);
-      final url = result.stdout?.toString().trim();
-      if (result.exitCode == 0 && url != null && url.isNotEmpty && url != 'missing value') {
+      final url = result.stdout?.toString().trim() ?? '';
+      debugPrint('getBrowserUrl: exitCode=${result.exitCode} url=$url stderr=${result.stderr}');
+      if (result.exitCode == 0 && url.isNotEmpty && url != 'missing value') {
         return url;
       }
 
