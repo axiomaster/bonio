@@ -12,6 +12,7 @@ import '../models/note_models.dart';
 import '../models/chat_models.dart';
 import '../platform/screen_capture.dart';
 import 'gateway_session.dart';
+import 'reading_template_store.dart';
 
 class NoteService extends ChangeNotifier {
   static const _notesDirName = 'boji-notes';
@@ -578,6 +579,10 @@ class NoteService extends ChangeNotifier {
   final Map<String, StringBuffer> _pendingReading = {};
   final Map<String, Completer<String>> _readingCompleters = {};
 
+  /// Detected category from the most recent auto-detection call.
+  ReadingCategory _lastDetectedCategory = ReadingCategory.auto;
+  ReadingCategory get lastDetectedCategory => _lastDetectedCategory;
+
   /// Find an existing note by URL. Returns null if not found.
   BojiNote? findByUrl(String url) {
     if (url.isEmpty) return null;
@@ -590,46 +595,123 @@ class NoteService extends ChangeNotifier {
     }
   }
 
-  /// Send reading content to the LLM for AI-powered classification and
-  /// structured summarization. Returns the raw JSON string from the LLM.
-  Future<String> summarizeReading(
-      String text, String url, String title) async {
+  /// Auto-detect article category via a lightweight LLM call.
+  /// Returns the detected [ReadingCategory] (never [auto]).
+  Future<ReadingCategory> detectReadingCategory(
+      String text, String title) async {
     await init();
+
+    final excerpt = text.length > 500 ? text.substring(0, 500) : text;
+    final prompt = StringBuffer();
+    prompt.writeln('请判断以下文章属于哪个类别，只返回类别代码即可（不要返回其他内容）：');
+    prompt.writeln('- current_affairs: 时事新闻、政治、社会事件');
+    prompt.writeln('- fiction_story: 小说、故事、文学作品');
+    prompt.writeln('- finance_business: 金融、商业、经济、投资');
+    prompt.writeln('- methodology_tutorials: 教程、方法论、效率指南、操作步骤');
+    prompt.writeln('- science_tech: 科学、技术、科普、研究');
+    prompt.writeln();
+    if (title.isNotEmpty) prompt.writeln('标题: $title');
+    prompt.writeln('文章开头:');
+    prompt.writeln(excerpt);
+
+    final runId = const Uuid().v4();
+    _pendingReading[runId] = StringBuffer();
+    final completer = Completer<String>();
+    _readingCompleters[runId] = completer;
+
+    try {
+      final rpcRes = await _session.request(
+        'chat.send',
+        jsonEncode({
+          'sessionKey': _readingSessionKey,
+          'message': prompt.toString(),
+          'idempotencyKey': runId,
+        }),
+        timeoutMs: 30000,
+      );
+
+      try {
+        final resObj = jsonDecode(rpcRes) as Map<String, dynamic>?;
+        final serverRunId = resObj?['runId'] as String?;
+        if (serverRunId != null && serverRunId != runId) {
+          final buf = _pendingReading.remove(runId);
+          _readingCompleters.remove(runId);
+          if (buf != null) _pendingReading[serverRunId] = buf;
+          _readingCompleters[serverRunId] = completer;
+        }
+      } catch (_) {}
+
+      final result = await completer.future.timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          _pendingReading.remove(runId);
+          _readingCompleters.remove(runId);
+          return '';
+        },
+      );
+
+      if (result.isEmpty) return ReadingCategory.scienceTech;
+
+      // Parse the category key from the response
+      final trimmed = result.trim().toLowerCase();
+      for (final cat in ReadingCategory.values) {
+        if (cat != ReadingCategory.auto && trimmed.contains(cat.key)) {
+          _lastDetectedCategory = cat;
+          return cat;
+        }
+      }
+      return ReadingCategory.scienceTech;
+    } catch (e) {
+      debugPrint('NoteService: detectReadingCategory failed: $e');
+      _pendingReading.remove(runId);
+      _readingCompleters.remove(runId);
+      return ReadingCategory.scienceTech;
+    }
+  }
+
+  /// Send reading content to the LLM for AI-powered structured summarization.
+  /// [category] determines which prompt template to use. When [auto], the
+  /// category is auto-detected first. Returns the raw JSON string from the LLM.
+  Future<String> summarizeReading(
+      String text, String url, String title,
+      {ReadingCategory category = ReadingCategory.auto}) async {
+    await init();
+
+    // Auto-detect category if needed
+    if (category == ReadingCategory.auto) {
+      category = await detectReadingCategory(text, title);
+    }
 
     final truncated =
         text.length > 20000 ? text.substring(0, 20000) : text;
 
+    // Load and prepare the prompt template
+    final templateRaw = await ReadingTemplateStore.loadPromptTemplate(category);
+    final templatePrompt = ReadingTemplateStore.extractPromptPart(templateRaw);
+
     final prompt = StringBuffer();
-    prompt.writeln('[阅读搭子] 请分析以下网页内容。');
+    prompt.writeln(templatePrompt);
     prompt.writeln();
-    if (title.isNotEmpty) prompt.writeln('标题: $title');
+    prompt.writeln('# Additional Requirements');
+    prompt.writeln('1. 标题与作者姓名：必须准确提取');
+    prompt.writeln('2. 忽略原始文章中"一句话一段"的排版');
+    prompt.writeln();
+    if (title.isNotEmpty) prompt.writeln('文章标题: $title');
     if (url.isNotEmpty) prompt.writeln('URL: $url');
     prompt.writeln();
-    prompt.writeln('内容:');
+    prompt.writeln('文章内容:');
     prompt.writeln(truncated);
-    prompt.writeln();
-    prompt.writeln('请执行以下任务：');
-    prompt.writeln('1. 分类：判断文章属于以下哪种类型：'
-        '知识学习、出游攻略、美食探店、商品种草、新闻资讯、影视娱乐、生活感悟、其他');
-    prompt.writeln('2. 根据类型提取关键信息，生成结构化摘要');
-    prompt.writeln('3. 生成一个简洁的中文标题（不超过20字）');
-    prompt.writeln();
-    prompt.writeln('类型特定的提取规则：');
-    prompt.writeln('- 知识学习：提取核心概念、关键要点');
-    prompt.writeln('- 出游攻略：提取目的地、路线、出行建议');
-    prompt.writeln('- 美食探店：提取店名、地址、推荐菜品、人均消费');
-    prompt.writeln('- 商品种草：提取品牌、商品名、价格、优缺点');
-    prompt.writeln('- 新闻资讯：提取人物、事件、时间、地点、原因');
-    prompt.writeln('- 影视娱乐：提取作品名、类型、看点、评价');
-    prompt.writeln('- 生活感悟：提取核心观点、金句');
     prompt.writeln();
     prompt.writeln('严格只返回如下JSON（不要包含其他内容）：');
     prompt.writeln('{');
-    prompt.writeln('  "category": "类型",');
-    prompt.writeln('  "title": "简洁标题",');
-    prompt.writeln('  "summary": "一段话摘要（100字以内）",');
-    prompt.writeln('  "key_points": ["要点1", "要点2"],');
-    prompt.writeln('  "details": { /* 类型特定的结构化信息 */ }');
+    prompt.writeln('  "title": "准确的文章标题",');
+    prompt.writeln('  "author": "作者姓名，没有则为空字符串",');
+    prompt.writeln('  "summary": "摘要内容",');
+    prompt.writeln('  "paragraph_summaries": [');
+    prompt.writeln('    {"subtitle": "语义小标题", "content": "深度总结"},');
+    prompt.writeln('    {"subtitle": "语义小标题", "content": "深度总结"},');
+    prompt.writeln('    ...');
+    prompt.writeln('  ]');
     prompt.writeln('}');
 
     final runId = const Uuid().v4();

@@ -1,157 +1,158 @@
-import 'dart:convert';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Stores user-customizable summary templates for the reading companion.
+/// Article category for the reading companion. Each category maps to a
+/// different AI prompt template and output format.
+enum ReadingCategory {
+  auto('auto', '自动检测', ''),
+  scienceTech('science_tech', '科技科普', 'ScienceTech.md'),
+  currentAffairs('current_affairs', '时事新闻', 'CurrentAffairs.md'),
+  fictionStory('fiction_story', '文学故事', 'FictionStory.md'),
+  financeBusiness('finance_business', '金融商业', 'FinanceBusiness.md'),
+  methodologyTutorials('methodology_tutorials', '方法教程', 'MethodologyTutorials.md');
+
+  const ReadingCategory(this.key, this.label, this.assetFile);
+
+  /// Stable string key used in IPC messages (not the enum name).
+  final String key;
+
+  /// Human-readable label shown in the UI dropdown.
+  final String label;
+
+  /// Asset filename under `assets/reading/`. Empty for [auto].
+  final String assetFile;
+
+  /// Parse from [key] string. Falls back to [auto].
+  static ReadingCategory fromKey(String? key) {
+    if (key == null) return ReadingCategory.auto;
+    return ReadingCategory.values.firstWhere(
+      (c) => c.key == key,
+      orElse: () => ReadingCategory.auto,
+    );
+  }
+}
+
+/// Stores user-customizable summary template for the reading companion.
 class ReadingTemplateStore {
-  static const _key = 'reading_companion.templates';
+  static const _key = 'reading_companion.template';
 
-  static const defaultTemplates = <String, String>{
-    '知识学习': '''# {{title}}
-> 来源: {{url}}
-> 分类: {{category}}
+  // ---------- Prompt templates (loaded from bundled assets) ----------
 
-## 摘要
+  static final Map<ReadingCategory, String> _promptCache = {};
+
+  /// Load a prompt template from the bundled assets directory.
+  /// Returns the raw template text (Role + Task + Constraints + Format).
+  static Future<String> loadPromptTemplate(ReadingCategory category) async {
+    if (category == ReadingCategory.auto) {
+      category = ReadingCategory.scienceTech;
+    }
+    final cached = _promptCache[category];
+    if (cached != null) return cached;
+
+    final assetFile = category.assetFile;
+    if (assetFile.isEmpty) return '';
+    final text = await rootBundle.loadString('assets/reading/$assetFile');
+    _promptCache[category] = text;
+    return text;
+  }
+
+  /// Extract the prompt portion (Role + Task + Constraints) from a template,
+  /// stripping the `# Format` section which is only used for output rendering.
+  static String extractPromptPart(String template) {
+    final idx = template.indexOf('# Format:');
+    if (idx < 0) return template.trim();
+    return template.substring(0, idx).trim();
+  }
+
+  // ---------- Per-category output templates ----------
+
+  /// Markdown output templates keyed by category. These match the `# Format`
+  /// sections from each prompt template.
+  static const outputTemplates = <ReadingCategory, String>{
+    ReadingCategory.scienceTech: '''## {{title}}
+{{author_line}}
+
+## 内容摘要
 {{summary}}
 
-## 核心概念
-{{core_concepts}}
-
-## 要点
-{{key_points}}
-
-## 全文
-{{full_text}}
+## 深度语义总结
+{{paragraph_summaries}}
 
 ## 我的笔记
 ''',
-    '出游攻略': '''# {{title}}
-> 来源: {{url}}
-> 分类: {{category}}
+    ReadingCategory.currentAffairs: '''## {{title}}
+{{author_line}}
 
-## 摘要
+## 事件速递
 {{summary}}
 
-## 目的地
-{{destinations}}
-
-## 路线
-{{routes}}
-
-## 贴士
-{{tips}}
-
-## 全文
-{{full_text}}
+## 深度研判总结
+{{paragraph_summaries}}
 
 ## 我的笔记
 ''',
-    '美食探店': '''# {{title}}
-> 来源: {{url}}
-> 分类: {{category}}
+    ReadingCategory.fictionStory: '''## {{title}}
+{{author_line}}
 
-## 摘要
+## 故事梗概
 {{summary}}
 
-## 餐厅
-{{restaurants}}
-
-## 全文
-{{full_text}}
+## 情节深度拆解
+{{paragraph_summaries}}
 
 ## 我的笔记
 ''',
-    '商品种草': '''# {{title}}
-> 来源: {{url}}
-> 分类: {{category}}
+    ReadingCategory.financeBusiness: '''## {{title}}
+{{author_line}}
 
-## 摘要
+## 核心观点摘要
 {{summary}}
 
-## 商品
-{{items}}
-
-## 全文
-{{full_text}}
+## 商业逻辑总结
+{{paragraph_summaries}}
 
 ## 我的笔记
 ''',
-    '新闻资讯': '''# {{title}}
-> 来源: {{url}}
-> 分类: {{category}}
+    ReadingCategory.methodologyTutorials: '''## {{title}}
+{{author_line}}
 
-## 摘要
+## 方案核心摘要
 {{summary}}
 
-## 关键信息
-{{key_points}}
-
-## 全文
-{{full_text}}
-
-## 我的笔记
-''',
-    '影视娱乐': '''# {{title}}
-> 来源: {{url}}
-> 分类: {{category}}
-
-## 摘要
-{{summary}}
-
-## 亮点
-{{highlights}}
-
-## 全文
-{{full_text}}
-
-## 我的笔记
-''',
-    '生活感悟': '''# {{title}}
-> 来源: {{url}}
-> 分类: {{category}}
-
-## 摘要
-{{summary}}
-
-## 感悟
-{{key_points}}
-
-## 全文
-{{full_text}}
-
-## 我的笔记
-''',
-    '其他': '''# {{title}}
-> 来源: {{url}}
-> 分类: {{category}}
-
-## 摘要
-{{summary}}
-
-## 要点
-{{key_points}}
-
-## 全文
-{{full_text}}
+## 行动清单总结
+{{paragraph_summaries}}
 
 ## 我的笔记
 ''',
   };
 
-  static Future<Map<String, String>> loadTemplates() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_key);
-    if (raw == null) return Map.from(defaultTemplates);
-    try {
-      final decoded = jsonDecode(raw) as Map<String, dynamic>;
-      return decoded.map((k, v) => MapEntry(k, v as String));
-    } catch (_) {
-      return Map.from(defaultTemplates);
-    }
+  /// Get the output template for a category. Falls back to scienceTech.
+  static String getOutputTemplate(ReadingCategory category) {
+    return outputTemplates[category] ?? outputTemplates[ReadingCategory.scienceTech]!;
   }
 
-  static Future<void> saveTemplates(Map<String, String> templates) async {
+  // ---------- User-customizable template (legacy, kept for compat) ----------
+
+  static const defaultTemplate = '''## {{title}}
+{{author_line}}
+
+## 内容摘要
+{{summary}}
+
+## 深度语义总结
+{{paragraph_summaries}}
+
+## 我的笔记
+''';
+
+  static Future<String> loadTemplate() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key, jsonEncode(templates));
+    return prefs.getString(_key) ?? defaultTemplate;
+  }
+
+  static Future<void> saveTemplate(String template) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_key, template);
   }
 
   static Future<void> resetToDefaults() async {
