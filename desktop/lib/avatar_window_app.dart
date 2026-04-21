@@ -657,8 +657,12 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
       if (w.windowName == null || w.windowName!.isEmpty) continue;
       // Skip tiny windows
       if (w.bounds != null && (w.bounds!['Width']! < 100 || w.bounds!['Height']! < 100)) continue;
+      debugPrint('AvatarFG macOS: picked owner=${w.ownerName} '
+          'name=${w.windowName} id=${w.windowID} '
+          'bounds=${w.bounds}');
       return w;
     }
+    debugPrint('AvatarFG macOS: no suitable window found (total=${windows.length})');
     return null;
   }
 
@@ -674,6 +678,8 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     if (w == null) return;
 
     final fgWindowId = w.windowID;
+    debugPrint('AvatarPoll macOS: fg=$fgWindowId '
+        '${w.ownerName}/${w.windowName} placement=$_placement anchored=$_anchoredHwnd');
 
     // --- Health check for anchored window ---
     if ((_placement == _PlacementState.anchoredWindow ||
