@@ -323,13 +323,14 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
   /// Uses constant base height (not the dynamic _windowSize) so that the
   /// anchor position is independent of whether the input field is visible.
   /// On macOS, sits on the title bar instead of above it (menu bar blocks
-  /// placement above the window).
   double _windowTopY(_WindowRectInfo info) {
     final inset = _currentBottomInset;
     if (Platform.isMacOS) {
-      // macOS: sit on the title bar, overlapping slightly.
-      // The avatar bottom sits near the window top edge.
-      return info.top +
+      // macOS: avatar bottom sits at the window top edge.
+      // Avatar extends upward from the title bar (floating window is visible
+      // above the menu bar). Same formula as Windows but without title bar
+      // clearance since macOS windows don't have invisible shadow frames.
+      return info.top - _toPhysical(_anchorHeight) +
           _toPhysical(AvatarSnapshot.kFloatingWindowPadding + inset);
     }
     return info.top - _toPhysical(_anchorHeight) +
@@ -722,8 +723,8 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     }
     final b = w.bounds!;
     final centerX = b['X']! + b['Width']! / 2 - _windowSize.width / 2;
-    // macOS: sit on the title bar instead of above it (menu bar blocks).
-    final topY = b['Y']!.toDouble() +
+    // macOS: avatar bottom at window top edge, body extends upward.
+    final topY = b['Y']!.toDouble() - _anchorHeight +
         AvatarSnapshot.kFloatingWindowPadding + _currentBottomInset;
 
     debugPrint('AvatarAnchor macOS: anchoring to windowID=${w.windowID} '
