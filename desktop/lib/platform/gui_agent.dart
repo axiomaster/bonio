@@ -72,7 +72,8 @@ abstract class BrowserAgent {
 
   /// Try to connect to an already-running browser with remote debugging enabled.
   /// Returns true if connected. Does NOT launch a new browser instance.
-  Future<bool> tryConnectToExisting();
+  /// [urlHint] — if provided, prefer the tab matching this URL.
+  Future<bool> tryConnectToExisting({String? urlHint});
 
   Future<String> getCurrentUrl();
   Future<String> getPageTitle();

@@ -109,6 +109,9 @@ class FlutterWindowWrapper {
         pos[flutter::EncodableValue("y")] = flutter::EncodableValue(0.0);
       }
       result->Success(flutter::EncodableValue(pos));
+    } else if (method == "window_getHwnd") {
+      result->Success(flutter::EncodableValue(
+          static_cast<double>(reinterpret_cast<intptr_t>(hwnd_))));
     } else if (method == "window_showPopupMenu") {
       if (!hwnd_ || !arguments) {
         result->Success(flutter::EncodableValue(""));

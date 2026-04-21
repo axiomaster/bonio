@@ -5,6 +5,7 @@ import '../../l10n/app_strings.dart';
 import '../../plugins/plugin_manifest.dart';
 import '../../plugins/plugin_registry.dart';
 import '../../providers/app_state.dart';
+import '../../services/reading_template_store.dart';
 
 /// Plugin management page: view installed plugins, enable/disable, reorder.
 class PluginTab extends StatefulWidget {
@@ -89,6 +90,9 @@ class _PluginTabState extends State<PluginTab> {
                   onRemove: manifest?.type == PluginType.sidecar
                       ? () => _confirmRemove(entry.id, manifest!)
                       : null,
+                  onSettings: entry.id == 'builtin_reading_companion'
+                      ? () => _openTemplateSettings(context)
+                      : null,
                 );
               },
             ),
@@ -120,6 +124,13 @@ class _PluginTabState extends State<PluginTab> {
       ),
     );
   }
+
+  void _openTemplateSettings(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const _TemplateSettingsPage()),
+    );
+  }
 }
 
 class _PluginCard extends StatelessWidget {
@@ -127,6 +138,7 @@ class _PluginCard extends StatelessWidget {
   final PluginManifest? manifest;
   final ValueChanged<bool> onToggle;
   final VoidCallback? onRemove;
+  final VoidCallback? onSettings;
 
   const _PluginCard({
     super.key,
@@ -134,6 +146,7 @@ class _PluginCard extends StatelessWidget {
     this.manifest,
     required this.onToggle,
     this.onRemove,
+    this.onSettings,
   });
 
   @override
@@ -203,6 +216,12 @@ class _PluginCard extends StatelessWidget {
                 onPressed: onRemove,
                 tooltip: s.pluginRemove,
               ),
+            if (onSettings != null)
+              IconButton(
+                icon: const Icon(Icons.settings_outlined, size: 20),
+                onPressed: onSettings,
+                tooltip: s.pluginSettings,
+              ),
             const Icon(Icons.drag_handle, size: 20),
           ],
         ),
@@ -224,5 +243,139 @@ class _PluginCard extends StatelessWidget {
       default:
         return Icons.extension;
     }
+  }
+}
+
+class _TemplateSettingsPage extends StatefulWidget {
+  const _TemplateSettingsPage();
+
+  @override
+  State<_TemplateSettingsPage> createState() => _TemplateSettingsPageState();
+}
+
+class _TemplateSettingsPageState extends State<_TemplateSettingsPage> {
+  Map<String, String> _templates = {};
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTemplates();
+  }
+
+  Future<void> _loadTemplates() async {
+    final t = await ReadingTemplateStore.loadTemplates();
+    if (!mounted) return;
+    setState(() {
+      _templates = t;
+      _loading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = S.current;
+    final theme = Theme.of(context);
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(s.pluginSettings),
+        actions: [
+          TextButton.icon(
+            onPressed: _resetToDefaults,
+            icon: const Icon(Icons.restore, size: 18),
+            label: Text(s.pluginSettingsReset),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: _templates.length,
+              itemBuilder: (context, index) {
+                final category = _templates.keys.elementAt(index);
+                final template = _templates[category]!;
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.label_outline, size: 18,
+                                color: theme.colorScheme.primary),
+                            const SizedBox(width: 8),
+                            Text(category,
+                                style: theme.textTheme.titleSmall),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          initialValue: template,
+                          maxLines: 8,
+                          decoration: InputDecoration(
+                            border: const OutlineInputBorder(),
+                            isDense: true,
+                            filled: true,
+                            fillColor: theme.colorScheme.surfaceContainerLow,
+                          ),
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 12,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                          onChanged: (v) {
+                            _templates[category] = v;
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _save,
+        tooltip: s.pluginSettings,
+        child: const Icon(Icons.save),
+      ),
+    );
+  }
+
+  Future<void> _save() async {
+    await ReadingTemplateStore.saveTemplates(_templates);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(S.current.pluginSettings)),
+      );
+    }
+  }
+
+  void _resetToDefaults() {
+    final s = S.current;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(s.pluginSettingsReset),
+        content: Text(s.pluginSettingsResetConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(s.pluginCancel),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await ReadingTemplateStore.resetToDefaults();
+              await _loadTemplates();
+            },
+            child: Text(s.pluginSettingsReset),
+          ),
+        ],
+      ),
+    );
   }
 }
