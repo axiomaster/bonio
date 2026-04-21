@@ -332,8 +332,6 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
         'cdpText.length=${widget.cdpText?.length ?? 0}, '
         'cdpTitle=${widget.cdpTitle}, '
         'headings=${_headings.length}');
-    debugPrint('ReadingCompanion: CDP text (first 2000 chars): '
-        '${widget.cdpText?.substring(0, widget.cdpText!.length > 2000 ? 2000 : widget.cdpText!.length) ?? "<null>"}');
 
     setState(() => _phase = _LoadPhase.summarizing);
     _analyzeContent(widget.cdpText!, widget.cdpTitle ?? widget.browserTitle);
@@ -378,8 +376,6 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
 
       debugPrint('ReadingCompanion: HTTP path, '
           'html.length=${html.length}, url=$_activeUrl');
-      debugPrint('ReadingCompanion: HTTP HTML (first 3000 chars): '
-          '${html.substring(0, html.length > 3000 ? 3000 : html.length)}');
 
       if (!mounted) return;
       setState(() => _phase = _LoadPhase.extracting);
@@ -608,9 +604,8 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
   void _analyzeContentLocal(String text, String title) {
     final truncated = text.length > 15000 ? text.substring(0, 15000) : text;
 
-    debugPrint('ReadingCompanion: _analyzeContent, '
-        'text.length=${text.length}, truncated.length=${truncated.length}, '
-        'title=$title');
+    debugPrint('ReadingCompanion: local fallback analysis, '
+        'text.length=${truncated.length}, title=$title');
 
     final normalized = truncated.replaceAll(RegExp(r'\n{1,}'), '\n\n');
     final allParagraphs = normalized
