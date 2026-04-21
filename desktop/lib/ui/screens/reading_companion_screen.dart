@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../l10n/app_strings.dart';
+import '../../services/reading_template_store.dart';
 
 // Minimal Win32 FFI for browser-follow tracking (child engine can't
 // import main-engine code). Only used on Windows.
@@ -168,6 +169,8 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
   String _fullText = '';
   String _aiTitle = '';
   Timer? _browserTrackTimer;
+  ReadingCategory _category = ReadingCategory.auto;
+  ReadingCategory _detectedCategory = ReadingCategory.auto;
   Rect _lastBrowserRect = Rect.zero;
   WindowController? _wc;
 
@@ -240,12 +243,16 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
       final json = jsonDecode(jsonStr) as Map<String, dynamic>;
       final markdown = json['markdown'] as String? ?? '';
       final title = json['title'] as String? ?? '';
+      final detectedKey = json['detectedCategory'] as String?;
       if (markdown.isEmpty) {
         _analyzeContentLocal(_fullText, widget.browserTitle);
         return;
       }
       if (title.isNotEmpty) {
         _aiTitle = title;
+      }
+      if (detectedKey != null && _category == ReadingCategory.auto) {
+        _detectedCategory = ReadingCategory.fromKey(detectedKey);
       }
       _summary = markdown;
       _editorController.text = _summary;
@@ -586,10 +593,20 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
         'url': _activeUrl,
         'title': title,
         'windowId': wc.windowId,
+        'category': _category.key,
       });
     } catch (e) {
       debugPrint('ReadingCompanion: AI summary request failed: $e');
       _analyzeContentLocal(text, title);
+    }
+  }
+
+  void _onCategoryChanged(ReadingCategory newCategory) {
+    if (newCategory == _category) return;
+    setState(() => _category = newCategory);
+    // Re-request summary if we already have content and are in ready phase
+    if (_phase == _LoadPhase.ready && _fullText.isNotEmpty) {
+      _analyzeContent(_fullText, _aiTitle.isNotEmpty ? _aiTitle : widget.browserTitle);
     }
   }
 
@@ -808,6 +825,9 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
             ),
             child: Row(
               children: [
+                // Category selector
+                _buildCategoryDropdown(theme, cs),
+                const SizedBox(width: 4),
                 IconButton(
                   icon: const Icon(Icons.save_outlined, size: 18),
                   tooltip: S.current.readingSave,
@@ -835,6 +855,53 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
           Expanded(child: _buildBody(theme, cs)),
         ],
       ),
+    );
+  }
+
+  Widget _buildCategoryDropdown(ThemeData theme, ColorScheme cs) {
+    final effectiveCategory = _category == ReadingCategory.auto
+        ? _detectedCategory
+        : _category;
+    return PopupMenuButton<ReadingCategory>(
+      initialValue: null,
+      tooltip: '文章类别',
+      constraints: const BoxConstraints(minWidth: 140),
+      position: PopupMenuPosition.under,
+      onSelected: _onCategoryChanged,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.category_outlined, size: 14, color: cs.primary),
+          const SizedBox(width: 3),
+          Text(
+            _category == ReadingCategory.auto
+                ? effectiveCategory.label
+                : _category.label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: cs.primary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          Icon(Icons.arrow_drop_down, size: 14, color: cs.primary),
+        ],
+      ),
+      itemBuilder: (context) => [
+        const PopupMenuItem(
+          value: ReadingCategory.auto,
+          child: Row(children: [
+            Icon(Icons.auto_fix_high, size: 16),
+            SizedBox(width: 8),
+            Text('自动检测'),
+          ]),
+        ),
+        const PopupMenuDivider(),
+        ...ReadingCategory.values
+            .where((c) => c != ReadingCategory.auto)
+            .map((c) => PopupMenuItem(
+                  value: c,
+                  child: Text(c.label),
+                )),
+      ],
     );
   }
 
