@@ -579,10 +579,6 @@ class NoteService extends ChangeNotifier {
   final Map<String, StringBuffer> _pendingReading = {};
   final Map<String, Completer<String>> _readingCompleters = {};
 
-  /// Detected category from the most recent auto-detection call.
-  ReadingCategory _lastDetectedCategory = ReadingCategory.auto;
-  ReadingCategory get lastDetectedCategory => _lastDetectedCategory;
-
   /// Find an existing note by URL. Returns null if not found.
   BojiNote? findByUrl(String url) {
     if (url.isEmpty) return null;
@@ -595,106 +591,49 @@ class NoteService extends ChangeNotifier {
     }
   }
 
-  /// Auto-detect article category via a lightweight LLM call.
-  /// Returns the detected [ReadingCategory] (never [auto]).
-  Future<ReadingCategory> detectReadingCategory(
-      String text, String title) async {
-    await init();
-
-    final excerpt = text.length > 500 ? text.substring(0, 500) : text;
-    final prompt = StringBuffer();
-    prompt.writeln('请判断以下文章属于哪个类别，只返回类别代码即可（不要返回其他内容）：');
-    prompt.writeln('- current_affairs: 时事新闻、政治、社会事件');
-    prompt.writeln('- fiction_story: 小说、故事、文学作品');
-    prompt.writeln('- finance_business: 金融、商业、经济、投资');
-    prompt.writeln('- methodology_tutorials: 教程、方法论、效率指南、操作步骤');
-    prompt.writeln('- science_tech: 科学、技术、科普、研究');
-    prompt.writeln();
-    if (title.isNotEmpty) prompt.writeln('标题: $title');
-    prompt.writeln('文章开头:');
-    prompt.writeln(excerpt);
-
-    final runId = const Uuid().v4();
-    _pendingReading[runId] = StringBuffer();
-    final completer = Completer<String>();
-    _readingCompleters[runId] = completer;
-
-    try {
-      final rpcRes = await _session.request(
-        'chat.send',
-        jsonEncode({
-          'sessionKey': _readingSessionKey,
-          'message': prompt.toString(),
-          'idempotencyKey': runId,
-        }),
-        timeoutMs: 30000,
-      );
-
-      try {
-        final resObj = jsonDecode(rpcRes) as Map<String, dynamic>?;
-        final serverRunId = resObj?['runId'] as String?;
-        if (serverRunId != null && serverRunId != runId) {
-          final buf = _pendingReading.remove(runId);
-          _readingCompleters.remove(runId);
-          if (buf != null) _pendingReading[serverRunId] = buf;
-          _readingCompleters[serverRunId] = completer;
-        }
-      } catch (_) {}
-
-      final result = await completer.future.timeout(
-        const Duration(seconds: 15),
-        onTimeout: () {
-          _pendingReading.remove(runId);
-          _readingCompleters.remove(runId);
-          return '';
-        },
-      );
-
-      if (result.isEmpty) return ReadingCategory.scienceTech;
-
-      // Parse the category key from the response
-      final trimmed = result.trim().toLowerCase();
-      for (final cat in ReadingCategory.values) {
-        if (cat != ReadingCategory.auto && trimmed.contains(cat.key)) {
-          _lastDetectedCategory = cat;
-          return cat;
-        }
-      }
-      return ReadingCategory.scienceTech;
-    } catch (e) {
-      debugPrint('NoteService: detectReadingCategory failed: $e');
-      _pendingReading.remove(runId);
-      _readingCompleters.remove(runId);
-      return ReadingCategory.scienceTech;
-    }
-  }
-
   /// Send reading content to the LLM for AI-powered structured summarization.
-  /// [category] determines which prompt template to use. When [auto], the
-  /// category is auto-detected first. Returns the raw JSON string from the LLM.
+  /// [category] determines which prompt template to use. When [auto], all
+  /// templates are included and the AI auto-classifies. Returns the raw JSON
+  /// string from the LLM.
   Future<String> summarizeReading(
       String text, String url, String title,
       {ReadingCategory category = ReadingCategory.auto}) async {
     await init();
 
-    // Auto-detect category if needed
-    if (category == ReadingCategory.auto) {
-      category = await detectReadingCategory(text, title);
-    }
-
     final truncated =
         text.length > 20000 ? text.substring(0, 20000) : text;
 
-    // Load and prepare the prompt template
-    final templateRaw = await ReadingTemplateStore.loadPromptTemplate(category);
-    final templatePrompt = ReadingTemplateStore.extractPromptPart(templateRaw);
-
     final prompt = StringBuffer();
-    prompt.writeln(templatePrompt);
+
+    if (category == ReadingCategory.auto) {
+      // Auto mode: include all templates so the AI picks the right one
+      prompt.writeln('# Role');
+      prompt.writeln('你是一位全能文章分析专家，能根据文章内容自动选择最合适的分析视角进行摘要总结。');
+      prompt.writeln();
+      prompt.writeln('# Task');
+      prompt.writeln('请先判断文章类别，然后使用对应视角进行分析总结。');
+      prompt.writeln();
+      prompt.writeln('# 分析视角');
+      for (final cat in ReadingCategory.values) {
+        if (cat == ReadingCategory.auto || cat.assetFile.isEmpty) continue;
+        try {
+          final raw = await ReadingTemplateStore.loadPromptTemplate(cat);
+          prompt.writeln();
+          prompt.writeln('## ${cat.label} (${cat.key})');
+          prompt.writeln(ReadingTemplateStore.extractPromptPart(raw));
+        } catch (_) {}
+      }
+    } else {
+      // Specific category: use only the selected template
+      final templateRaw = await ReadingTemplateStore.loadPromptTemplate(category);
+      prompt.writeln(ReadingTemplateStore.extractPromptPart(templateRaw));
+    }
+
     prompt.writeln();
     prompt.writeln('# Additional Requirements');
     prompt.writeln('1. 标题与作者姓名：必须准确提取');
     prompt.writeln('2. 忽略原始文章中"一句话一段"的排版');
+    prompt.writeln('3. 分析内容的逻辑流，将描述同一主题的段落合并');
     prompt.writeln();
     if (title.isNotEmpty) prompt.writeln('文章标题: $title');
     if (url.isNotEmpty) prompt.writeln('URL: $url');

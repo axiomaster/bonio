@@ -170,7 +170,6 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
   String _aiTitle = '';
   Timer? _browserTrackTimer;
   ReadingCategory _category = ReadingCategory.auto;
-  ReadingCategory _detectedCategory = ReadingCategory.auto;
   Rect _lastBrowserRect = Rect.zero;
   WindowController? _wc;
 
@@ -243,16 +242,12 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
       final json = jsonDecode(jsonStr) as Map<String, dynamic>;
       final markdown = json['markdown'] as String? ?? '';
       final title = json['title'] as String? ?? '';
-      final detectedKey = json['detectedCategory'] as String?;
       if (markdown.isEmpty) {
         _analyzeContentLocal(_fullText, widget.browserTitle);
         return;
       }
       if (title.isNotEmpty) {
         _aiTitle = title;
-      }
-      if (detectedKey != null && _category == ReadingCategory.auto) {
-        _detectedCategory = ReadingCategory.fromKey(detectedKey);
       }
       _summary = markdown;
       _editorController.text = _summary;
@@ -859,9 +854,6 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
   }
 
   Widget _buildCategoryDropdown(ThemeData theme, ColorScheme cs) {
-    final effectiveCategory = _category == ReadingCategory.auto
-        ? _detectedCategory
-        : _category;
     return PopupMenuButton<ReadingCategory>(
       initialValue: null,
       tooltip: '文章类别',
@@ -874,9 +866,7 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
           Icon(Icons.category_outlined, size: 14, color: cs.primary),
           const SizedBox(width: 3),
           Text(
-            _category == ReadingCategory.auto
-                ? effectiveCategory.label
-                : _category.label,
+            _category.label,
             style: theme.textTheme.bodySmall?.copyWith(
               color: cs.primary,
               fontWeight: FontWeight.w500,
