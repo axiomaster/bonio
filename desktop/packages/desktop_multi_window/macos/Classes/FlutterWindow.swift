@@ -215,9 +215,11 @@ class FlutterWindow: NSObject {
                 }
             }
             // Show context menu at mouse location synchronously
-            let mouseLocation = NSEvent.mouseLocation
             let event = NSApplication.shared.currentEvent
-            NSMenu.popUpContextMenu(menu, with: event ?? NSEvent.mouseEvent(with: .leftMouseDown, location: mouseLocation, modifierFlags: 0, timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 1.0), for: window.contentView ?? NSView())
+                ?? NSEvent.mouseEvent(with: .leftMouseDown, location: NSEvent.mouseLocation,
+                    modifierFlags: .init(rawValue: 0), timestamp: 0, windowNumber: 0,
+                    context: nil, eventNumber: 0, clickCount: 1, pressure: 1.0)!
+            NSMenu.popUpContextMenu(menu, with: event, for: window.contentView ?? NSView())
             // After menu dismisses, check if a PopupMenuItem was selected
             if let clicked = PopupMenuItem.lastClickedAction {
                 selectedAction = clicked
