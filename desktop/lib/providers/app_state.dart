@@ -208,8 +208,15 @@ class AppState extends ChangeNotifier {
     final category = ReadingCategory.fromKey(categoryKey);
 
     try {
-      final resultJson =
+      var resultJson =
           await runtime.noteService.summarizeReading(text, url, title, category: category);
+      
+      // Extract JSON block in case LLM wraps it in markdown (e.g., ```json ... ```)
+      final start = resultJson.indexOf('{');
+      final end = resultJson.lastIndexOf('}');
+      if (start >= 0 && end > start) {
+        resultJson = resultJson.substring(start, end + 1);
+      }
       final json = jsonDecode(resultJson) as Map<String, dynamic>;
       final summary = ReadingSummary.fromJson(json);
 
