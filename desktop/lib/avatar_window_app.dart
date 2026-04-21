@@ -56,6 +56,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
   // Placement state machine
   _PlacementState _placement = _PlacementState.onDock;
   int _anchoredHwnd = 0;
+  String _anchoredOwnerName = '';
 
   // User-drag offset: relative X from window top-center (0 = centered)
   double _userOffsetX = 0;
@@ -735,6 +736,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     _stopSpring();
     _placement = _PlacementState.anchoredWindow;
     _anchoredHwnd = w.windowID;
+    _anchoredOwnerName = w.ownerName;
     _userOffsetX = 0;
 
     _lastAnchoredLeft = b['X']!.toDouble();
@@ -1267,8 +1269,19 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
       _scheduleNextWander();
       return;
     }
-    if (!ScreenCapture.isBrowserWindow(_anchoredHwnd)) {
-      debugPrint('StartReading: not a browser window');
+    // Check if anchored window is a browser
+    bool isBrowser;
+    if (Platform.isMacOS) {
+      final owner = _anchoredOwnerName.toLowerCase();
+      isBrowser = owner.contains('chrome') || owner.contains('safari') ||
+          owner.contains('firefox') || owner.contains('edge') ||
+          owner.contains('opera') || owner.contains('vivaldi') ||
+          owner.contains('brave') || owner.contains('arc');
+    } else {
+      isBrowser = ScreenCapture.isBrowserWindow(_anchoredHwnd);
+    }
+    if (!isBrowser) {
+      debugPrint('StartReading: not a browser window (owner=$_anchoredOwnerName)');
       _scheduleNextWander();
       return;
     }
