@@ -110,6 +110,11 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
 
   /// DPI scale of the avatar window (physical pixels per logical pixel).
   double get _avatarDpiScale {
+    if (Platform.isMacOS) {
+      // On macOS, CGWindowListCopyWindowInfo returns bounds in logical points.
+      // _toPhysical should be a no-op so we work entirely in points.
+      return 1.0;
+    }
     if (_avatarSelfHwnd != 0) {
       return _getWinDpiScaleForWindow(_avatarSelfHwnd);
     }
@@ -325,8 +330,16 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
   /// Window top-center Y for a given window rect.
   /// Uses constant base height (not the dynamic _windowSize) so that the
   /// anchor position is independent of whether the input field is visible.
+  /// On macOS, sits on the title bar instead of above it (menu bar blocks
+  /// placement above the window).
   double _windowTopY(_WindowRectInfo info) {
     final inset = _currentBottomInset;
+    if (Platform.isMacOS) {
+      // macOS: sit on the title bar, overlapping slightly.
+      // The avatar bottom sits near the window top edge.
+      return info.top +
+          _toPhysical(AvatarSnapshot.kFloatingWindowPadding + inset);
+    }
     return info.top - _toPhysical(_anchorHeight) +
         _toPhysical(AvatarSnapshot.kFloatingWindowPadding + inset) - _toPhysical(_titleBarClearance);
   }
@@ -658,12 +671,12 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
   }
 
   /// Check if a macOS window bounds represent a fullscreen window.
+  /// Compares against logical screen size (points, not physical pixels).
   bool _isMacWindowFullscreen(Map<String, int> bounds) {
-    final screenSize = MacosScreenCapture.getScreenSize();
-    if (screenSize == null) return false;
-    final screenW = screenSize[0];
-    final screenH = screenSize[1];
-    return bounds['Width'] == screenW && bounds['Height'] == screenH &&
+    // _screenWidth/_screenHeight are set from window_getDockInfo (screen.frame in points)
+    if (_screenWidth <= 0 || _screenHeight <= 0) return false;
+    return bounds['Width'] == _screenWidth.toInt() &&
+        bounds['Height'] == _screenHeight.toInt() &&
         bounds['X'] == 0 && bounds['Y'] == 0;
   }
 
@@ -729,8 +742,9 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     }
     final b = w.bounds!;
     final centerX = b['X']! + b['Width']! / 2 - _windowSize.width / 2;
-    final topY = b['Y']! - _anchorHeight +
-        AvatarSnapshot.kFloatingWindowPadding + _currentBottomInset - _titleBarClearance;
+    // macOS: sit on the title bar instead of above it (menu bar blocks).
+    final topY = b['Y']!.toDouble() +
+        AvatarSnapshot.kFloatingWindowPadding + _currentBottomInset;
 
     debugPrint('AvatarAnchor macOS: anchoring to windowID=${w.windowID} '
         'owner=${w.ownerName} (${b['X']},${b['Y']}) ${b['Width']}x${b['Height']}');
@@ -2200,9 +2214,10 @@ _WindowRectInfo? _getMacWindowRect(int windowID) {
       if (w.windowID == windowID && w.bounds != null) {
         final b = w.bounds!;
         bool isFullscreen = false;
-        final screenSize = MacosScreenCapture.getScreenSize();
+        final screenSize = ScreenCapture.getScreenSizePoints();
         if (screenSize != null) {
-          isFullscreen = b['Width'] == screenSize[0] && b['Height'] == screenSize[1] &&
+          isFullscreen = (b['Width']! - screenSize[0]).abs() < 2 &&
+              (b['Height']! - screenSize[1]).abs() < 2 &&
               b['X'] == 0 && b['Y'] == 0;
         }
         return _WindowRectInfo(
