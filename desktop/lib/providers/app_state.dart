@@ -206,11 +206,15 @@ class AppState extends ChangeNotifier {
     if (text.isEmpty || windowId.isEmpty) return;
 
     final category = ReadingCategory.fromKey(categoryKey);
+    debugPrint('AppState: _handleReadingSummarize, '
+        'text.length=${text.length}, category=$category, windowId=$windowId');
 
     try {
       var resultJson =
           await runtime.noteService.summarizeReading(text, url, title, category: category);
-      
+
+      debugPrint('AppState: summarizeReading returned, resultJson.length=${resultJson.length}');
+
       // Extract JSON block in case LLM wraps it in markdown (e.g., ```json ... ```)
       final start = resultJson.indexOf('{');
       final end = resultJson.lastIndexOf('}');

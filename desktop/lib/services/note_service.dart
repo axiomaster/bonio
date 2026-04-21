@@ -313,7 +313,7 @@ class NoteService extends ChangeNotifier {
     if (payload == null) return false;
 
     final sessionKey = payload['sessionKey'] as String?;
-    if (!_matchesNoteSession(sessionKey)) return false;
+    if (!_matchesAnalysisSession(sessionKey)) return false;
 
     if (event == 'agent') {
       final stream = payload['stream'] as String?;
@@ -362,6 +362,16 @@ class NoteService extends ChangeNotifier {
   /// `agent:boji-notes:main`. Match flexibly so streaming events are captured.
   static const _readingSessionKey = 'boji-reading';
 
+  /// Match only the note analysis session (not reading).
+  bool _matchesAnalysisSession(String? eventKey) {
+    if (eventKey == null || eventKey.trim().isEmpty) return false;
+    final k = eventKey.trim();
+    if (k == _analysisSessionKey) return true;
+    if (k.contains(_analysisSessionKey)) return true;
+    return false;
+  }
+
+  /// Match either note analysis or reading sessions.
   bool _matchesNoteSession(String? eventKey) {
     if (eventKey == null || eventKey.trim().isEmpty) return false;
     final k = eventKey.trim();
@@ -392,7 +402,7 @@ class NoteService extends ChangeNotifier {
     // Format 2: data.text or data.delta (used by agent events)
     final data = payload['data'] as Map<String, dynamic>?;
     if (data != null) {
-      final t = data['text'] as String? ?? data['delta'] as String?;
+      final t = data['delta'] as String? ?? data['text'] as String?;
       if (t != null && t.isNotEmpty) return t;
     }
     return '';
@@ -634,6 +644,8 @@ class NoteService extends ChangeNotifier {
     prompt.writeln('1. 标题与作者姓名：必须准确提取');
     prompt.writeln('2. 忽略原始文章中"一句话一段"的排版');
     prompt.writeln('3. 分析内容的逻辑流，将描述同一主题的段落合并');
+    prompt.writeln('4. 【禁止】不要尝试访问任何URL或使用web_fetch等工具获取网络内容，客户端已将完整文章内容附在下方');
+    prompt.writeln('5. 【禁止】不要添加任何无关上下文、额外知识或外部信息，仅基于提供的文章内容进行摘要');
     prompt.writeln();
     if (title.isNotEmpty) prompt.writeln('文章标题: $title');
     if (url.isNotEmpty) prompt.writeln('URL: $url');
@@ -658,22 +670,30 @@ class NoteService extends ChangeNotifier {
     final completer = Completer<String>();
     _readingCompleters[runId] = completer;
 
+    final promptStr = prompt.toString();
+    debugPrint('NoteService: summarizeReading sending to server, '
+        'category=$category, prompt.length=${promptStr.length}, '
+        'text.length=${truncated.length}, runId=$runId');
+
     try {
       final rpcRes = await _session.request(
         'chat.send',
         jsonEncode({
           'sessionKey': _readingSessionKey,
-          'message': prompt.toString(),
+          'message': promptStr,
           'idempotencyKey': runId,
         }),
         timeoutMs: 60000,
       );
+
+      debugPrint('NoteService: summarizeReading rpcRes=$rpcRes');
 
       // Update runId if server assigned a different one
       try {
         final resObj = jsonDecode(rpcRes) as Map<String, dynamic>?;
         final serverRunId = resObj?['runId'] as String?;
         if (serverRunId != null && serverRunId != runId) {
+          debugPrint('NoteService: remapping runId $runId → $serverRunId');
           final buf = _pendingReading.remove(runId);
           _readingCompleters.remove(runId);
           if (buf != null) _pendingReading[serverRunId] = buf;
@@ -691,7 +711,14 @@ class NoteService extends ChangeNotifier {
         },
       );
 
-      return result;
+      debugPrint('NoteService: summarizeReading result.length=${result.length}, '
+          'first 500 chars: ${result.length > 500 ? result.substring(0, 500) : result}');
+
+      // Strip ALL control characters (0x00-0x1F). LLM streaming may inject
+      // literal newlines/tabs inside JSON string values, which is invalid JSON.
+      final sanitized = result.replaceAll(RegExp(r'[\x00-\x1f]'), '');
+
+      return sanitized;
     } catch (e) {
       debugPrint('NoteService: summarizeReading failed: $e');
       _pendingReading.remove(runId);
@@ -713,23 +740,28 @@ class NoteService extends ChangeNotifier {
     if (payload == null) return false;
 
     final sessionKey = payload['sessionKey'] as String?;
-    if (sessionKey != _readingSessionKey) return false;
+    if (!sessionKey.toString().contains(_readingSessionKey)) return false;
 
     final serverRunId = payload['runId'] as String?;
 
     if (event == 'agent') {
-      final delta = payload['delta'] as String?;
-      if (delta != null && serverRunId != null) {
-        _pendingReading[serverRunId]?.write(delta);
+      final text = _extractDeltaText(payload);
+      if (text.isNotEmpty && serverRunId != null) {
+        _pendingReading[serverRunId]?.write(text);
       }
       return true;
     }
 
     if (event == 'chat') {
       final state = payload['state'] as String?;
+      // Only use chat events for completion detection — content comes from
+      // agent events above.  Accumulating chat.delta too would duplicate
+      // content when the server sends both event types (e.g. OpenClaw).
       if (state == 'final' || state == 'aborted' || state == 'error') {
         if (serverRunId != null) {
           final text = _pendingReading.remove(serverRunId)?.toString() ?? '';
+          debugPrint('NoteService: handleReadingEvent chat.$state, '
+              'runId=$serverRunId, result.length=${text.length}');
           _readingCompleters.remove(serverRunId)?.complete(text);
         }
       }
