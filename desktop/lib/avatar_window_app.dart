@@ -655,13 +655,14 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
           owner.contains('controlcenter') || owner.contains('控制中心') ||
           owner.contains('notification center') || owner.contains('通知中心') ||
           owner.contains('loginwindow')) continue;
+      debugPrint('AvatarFG macOS: candidate owner=${w.ownerName} '
+          'name=${w.windowName} id=${w.windowID} bounds=${w.bounds}');
       // Skip windows without names
       if (w.windowName == null || w.windowName!.isEmpty) continue;
       // Skip tiny windows
       if (w.bounds != null && (w.bounds!['Width']! < 100 || w.bounds!['Height']! < 100)) continue;
-      debugPrint('AvatarFG macOS: picked owner=${w.ownerName} '
-          'name=${w.windowName} id=${w.windowID} '
-          'bounds=${w.bounds}');
+      debugPrint('AvatarFG macOS: PICKED owner=${w.ownerName} '
+          'name=${w.windowName} id=${w.windowID} bounds=${w.bounds}');
       return w;
     }
     debugPrint('AvatarFG macOS: no suitable window found (total=${windows.length})');
