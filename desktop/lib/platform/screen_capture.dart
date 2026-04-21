@@ -61,4 +61,9 @@ class ScreenCapture {
     if (Platform.isMacOS) return mac.MacosScreenCapture.getWindowList();
     return null;
   }
+
+  static List<double>? getScreenSizePoints() {
+    if (Platform.isMacOS) return mac.MacosScreenCapture.getScreenSizePoints();
+    return null;
+  }
 }
