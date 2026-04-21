@@ -13,6 +13,8 @@ import '../l10n/app_strings.dart';
 import '../models/agent_avatar_models.dart';
 import '../platform/gui_agent.dart';
 import '../platform/screen_capture.dart';
+import '../platform/screen_capture_types.dart';
+import '../platform/win32_screen_capture.dart';
 import '../plugins/plugin_interface.dart';
 import '../models/chat_models.dart';
 import '../models/gateway_profile.dart';
@@ -22,6 +24,7 @@ import '../services/device_identity_store.dart';
 import '../services/device_auth_store.dart';
 import '../services/camera_service.dart';
 import '../services/speech_to_text_manager.dart';
+import '../services/reading_template_store.dart';
 
 class AppState extends ChangeNotifier {
   late final NodeRuntime runtime;
@@ -192,6 +195,92 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  Future<void> _handleReadingSummarize(Map<String, dynamic> data) async {
+    final text = data['text'] as String? ?? '';
+    final url = data['url'] as String? ?? '';
+    final title = data['title'] as String? ?? '';
+    final windowId = data['windowId']?.toString() ?? '';
+    if (text.isEmpty || windowId.isEmpty) return;
+
+    try {
+      final resultJson =
+          await runtime.noteService.summarizeReading(text, url, title);
+      final json = jsonDecode(resultJson) as Map<String, dynamic>;
+      final summary = ReadingSummary.fromJson(json);
+      final markdown = await _renderSummaryMarkdown(summary, url, text);
+      final wc = WindowController.fromWindowId(windowId);
+      // Send both the rendered markdown and the title for UI update
+      await wc.invokeMethod('readingSummaryResult', jsonEncode({
+        'markdown': markdown,
+        'title': summary.title,
+        'category': summary.category,
+      }));
+    } catch (e) {
+      debugPrint('AppState: reading summarize error: $e');
+      try {
+        final wc = WindowController.fromWindowId(windowId);
+        await wc.invokeMethod('readingSummaryResult', '');
+      } catch (_) {}
+    }
+  }
+
+  Future<String> _renderSummaryMarkdown(
+      ReadingSummary summary, String url, String fullText) async {
+    final templates = await ReadingTemplateStore.loadTemplates();
+    var tmpl = templates[summary.category] ?? templates['其他']!;
+
+    String renderDetails(Map<String, dynamic> details) {
+      final buf = StringBuffer();
+      for (final entry in details.entries) {
+        final v = entry.value;
+        if (v is List) {
+          for (final item in v) {
+            if (item is Map) {
+              buf.writeln('- ${item.entries.map((e) => '${e.key}: ${e.value}').join(' | ')}');
+            } else {
+              buf.writeln('- $item');
+            }
+          }
+        } else if (v is String) {
+          buf.writeln(v);
+        } else {
+          buf.writeln('$v');
+        }
+      }
+      return buf.toString().trimRight();
+    }
+
+    String renderKeyPoints(List<String> points) {
+      return points.map((p) => '- $p').join('\n');
+    }
+
+    final details = summary.details;
+    tmpl = tmpl.replaceAll('{{title}}', summary.title);
+    tmpl = tmpl.replaceAll('{{url}}', url);
+    tmpl = tmpl.replaceAll('{{category}}', summary.category);
+    tmpl = tmpl.replaceAll('{{summary}}', summary.summary);
+    tmpl = tmpl.replaceAll('{{key_points}}', renderKeyPoints(summary.keyPoints));
+    tmpl = tmpl.replaceAll('{{highlights}}', renderKeyPoints(summary.keyPoints));
+    tmpl = tmpl.replaceAll('{{full_text}}', fullText);
+    // Category-specific placeholders
+    tmpl = tmpl.replaceAll('{{core_concepts}}',
+        (details['core_concepts'] as List?)?.map((e) => '- $e').join('\n') ?? '');
+    tmpl = tmpl.replaceAll('{{key_takeaways}}',
+        (details['key_takeaways'] as List?)?.map((e) => '- $e').join('\n') ?? '');
+    tmpl = tmpl.replaceAll('{{destinations}}',
+        (details['destinations'] as List?)?.map((e) => '- $e').join('\n') ?? '');
+    tmpl = tmpl.replaceAll('{{routes}}',
+        (details['routes'] as List?)?.map((e) => '- $e').join('\n') ?? '');
+    tmpl = tmpl.replaceAll('{{tips}}',
+        (details['tips'] as List?)?.map((e) => '- $e').join('\n') ?? '');
+    tmpl = tmpl.replaceAll('{{restaurants}}', renderDetails(
+        (details['restaurants'] is List) ? {'items': details['restaurants']} : {}));
+    tmpl = tmpl.replaceAll('{{items}}', renderDetails(
+        (details['items'] is List) ? {'items': details['items']} : {}));
+
+    return tmpl;
+  }
+
   Future<void> _handleStartReading(Map<String, dynamic> data) async {
     final hwnd = (data['hwnd'] as num?)?.toInt() ?? 0;
     var url = data['url'] as String? ?? '';
@@ -205,7 +294,7 @@ class AppState extends ChangeNotifier {
     PageContent? cdpContent;
     try {
       final agent = runtime.guiAgent.browser;
-      final connected = await agent.tryConnectToExisting();
+      final connected = await agent.tryConnectToExisting(urlHint: url);
       if (connected) {
         ctrl.setBubble(text: S.current.readingExtracting);
 
@@ -213,9 +302,57 @@ class AppState extends ChangeNotifier {
         if (cdpContent.url.isNotEmpty) url = cdpContent.url;
         debugPrint('AppState: CDP extracted ${cdpContent.headings.length} '
             'headings, ${cdpContent.text.length} chars from $url');
+      } else {
+        debugPrint('AppState: CDP not connected');
       }
     } catch (e) {
-      debugPrint('AppState: CDP extraction failed, falling back: $e');
+      debugPrint('AppState: CDP extraction failed: $e');
+    }
+
+    // If CDP failed, try UI Automation extraction (non-intrusive, Windows only)
+    if (cdpContent == null && hwnd != 0 && Platform.isWindows) {
+      try {
+        ctrl.setBubble(text: S.current.readingExtracting);
+        final pageText =
+            await Win32ScreenCapture.getBrowserPageTextViaUIA(hwnd);
+        if (pageText != null && pageText.length > 50) {
+          debugPrint('AppState: UIA extracted ${pageText.length} chars');
+          cdpContent = PageContent(
+            title: title,
+            url: url,
+            text: pageText,
+            headings: [],
+          );
+        } else {
+          debugPrint('AppState: UIA text too short or empty '
+              '(${pageText?.length ?? 0} chars)');
+        }
+      } catch (e) {
+        debugPrint('AppState: UIA extraction failed: $e');
+      }
+    }
+
+    // If CDP and UIA failed, try clipboard-based extraction (Ctrl+A, Ctrl+C on browser)
+    if (cdpContent == null && hwnd != 0 && Platform.isWindows) {
+      try {
+        ctrl.setBubble(text: S.current.readingExtracting);
+        final pageText =
+            await Win32ScreenCapture.getBrowserPageText(hwnd);
+        if (pageText != null && pageText.length > 50) {
+          debugPrint('AppState: clipboard extracted ${pageText.length} chars');
+          cdpContent = PageContent(
+            title: title,
+            url: url,
+            text: pageText,
+            headings: [],
+          );
+        } else {
+          debugPrint('AppState: clipboard text too short or empty '
+              '(${pageText?.length ?? 0} chars)');
+        }
+      } catch (e) {
+        debugPrint('AppState: clipboard extraction failed: $e');
+      }
     }
 
     final ga = runtime.guiAgent;
@@ -230,10 +367,11 @@ class AppState extends ChangeNotifier {
           500.0 / dpi,
           browserRect.height / dpi,
           cdpContent: cdpContent,
+          browserHwnd: hwnd,
         );
       } else {
         await runtime.createReadingWindow(url, title, 0, 0, 500, 800,
-            cdpContent: cdpContent);
+            cdpContent: cdpContent, browserHwnd: hwnd);
       }
     } else {
       await runtime.createReadingWindow(url, title, 0, 0, 500, 800,
@@ -440,6 +578,11 @@ class AppState extends ChangeNotifier {
             final data = call.arguments;
             if (data is Map) {
               _handleReadingSave(Map<String, dynamic>.from(data));
+            }
+          case 'readingSummarize':
+            final data = call.arguments;
+            if (data is Map) {
+              _handleReadingSummarize(Map<String, dynamic>.from(data));
             }
           case 'avatarInputDismiss':
             runtime.avatarController.hideInput();

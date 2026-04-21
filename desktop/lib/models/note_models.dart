@@ -1,12 +1,47 @@
 enum NoteType { screenshot, text, image, file }
 
+/// Result of AI-powered reading companion summarization.
+class ReadingSummary {
+  final String category;
+  final String title;
+  final String summary;
+  final List<String> keyPoints;
+  final Map<String, dynamic> details;
+
+  const ReadingSummary({
+    required this.category,
+    required this.title,
+    required this.summary,
+    this.keyPoints = const [],
+    this.details = const {},
+  });
+
+  factory ReadingSummary.fromJson(Map<String, dynamic> m) {
+    return ReadingSummary(
+      category: m['category'] as String? ?? '其他',
+      title: m['title'] as String? ?? '',
+      summary: m['summary'] as String? ?? '',
+      keyPoints: (m['key_points'] as List?)?.cast<String>() ?? [],
+      details: m['details'] as Map<String, dynamic>? ?? {},
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'category': category,
+        'title': title,
+        'summary': summary,
+        'key_points': keyPoints,
+        'details': details,
+      };
+}
+
 class BojiNote {
   final String id;
   final DateTime createdAt;
   final NoteType type;
   final String sourceApp;
   final String? sourceUrl;
-  final String? rawText;
+  String? rawText;
   final String fileName;
   final String? thumbnail;
   List<String> tags;

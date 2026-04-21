@@ -25,6 +25,7 @@ import 'desktop_tts.dart';
 import 'note_service.dart';
 import '../l10n/app_strings.dart';
 import '../platform/gui_agent.dart';
+import '../plugins/builtin_plugins.dart';
 import '../plugins/plugin_manager.dart';
 
 /// On macOS, `localhost` often resolves to IPv6 (`::1`) while a local OpenClaw
@@ -61,6 +62,7 @@ class NodeRuntime extends ChangeNotifier {
 
   WindowController? _avatarWindowController;
   WindowController? _readingWindowController;
+  int _readingCompanionHwnd = 0;
 
   /// When true, read assistant replies aloud after each completed turn.
   bool speakAssistantReplies = true;
@@ -130,6 +132,10 @@ class NodeRuntime extends ChangeNotifier {
     noteService = NoteService(session: operatorSession);
     guiAgent = GuiAgent.create();
     pluginManager = PluginManager();
+    pluginManager.registerBuiltin(NoteCapturePlugin());
+    pluginManager.registerBuiltin(AiLensPlugin());
+    pluginManager.registerBuiltin(SearchSimilarPlugin());
+    pluginManager.registerBuiltin(ReadingCompanionPlugin());
     pluginManager.addListener(pushPluginMenuToAvatar);
     unawaited(pluginManager.initialize());
     // ChatController / AvatarController updates must bubble to AppState.
@@ -233,7 +239,7 @@ class NodeRuntime extends ChangeNotifier {
       String url, String title,
       double physX, double physY,
       double logicalW, double logicalH,
-      {PageContent? cdpContent}) async {
+      {PageContent? cdpContent, int browserHwnd = 0}) async {
     await _closeReadingWindow();
     try {
       final main = await WindowController.fromCurrentEngine();
@@ -244,6 +250,7 @@ class NodeRuntime extends ChangeNotifier {
         'mainWindowId': main.windowId,
         'windowWidth': logicalW,
         'windowHeight': logicalH,
+        'browserHwnd': browserHwnd,
       };
       if (cdpContent != null) {
         args['cdpText'] = cdpContent.text;
@@ -263,6 +270,16 @@ class NodeRuntime extends ChangeNotifier {
       );
       _readingWindowController = wc;
       await wc.setPositionPhysical(physX, physY);
+      // Store the reading companion's native HWND so the avatar can skip it.
+      try {
+        _readingCompanionHwnd = await wc.getHwnd();
+      } catch (_) {}
+      try {
+        if (_avatarWindowController != null && _readingCompanionHwnd != 0) {
+          await _avatarWindowController!.invokeMethod(
+              'syncReadingHwnd', _readingCompanionHwnd);
+        }
+      } catch (_) {}
     } catch (e, st) {
       debugPrint('createReadingWindow: $e\n$st');
     }
@@ -271,6 +288,7 @@ class NodeRuntime extends ChangeNotifier {
   Future<void> _closeReadingWindow() async {
     final ctrl = _readingWindowController;
     _readingWindowController = null;
+    _readingCompanionHwnd = 0;
     if (ctrl == null) return;
     try {
       await ctrl.invokeMethod('window_close');
@@ -322,7 +340,11 @@ class NodeRuntime extends ChangeNotifier {
         'pluginId': i < plugins.length ? plugins[i].id : '',
       });
     }
-    unawaited(ctrl.invokeMethod('syncPluginMenu', enriched));
+    unawaited(() async {
+      try {
+        await ctrl.invokeMethod('syncPluginMenu', enriched);
+      } catch (_) {}
+    }());
   }
 
   Future<void> _invokeAvatarSync(WindowController ctrl) async {
@@ -519,10 +541,11 @@ class NodeRuntime extends ChangeNotifier {
     if (event == 'avatar.command') {
       avatarCommandExecutor.execute(payloadJson);
     }
-    // Let NoteService intercept events for the boji-notes session first.
-    // If consumed, don't forward to ChatController (avoids confusion).
+    // Let NoteService intercept events for its sessions first.
     if (!noteService.handleGatewayEvent(event, payloadJson)) {
-      chatController.handleGatewayEvent(event, payloadJson);
+      if (!noteService.handleReadingEvent(event, payloadJson)) {
+        chatController.handleGatewayEvent(event, payloadJson);
+      }
     }
   }
 

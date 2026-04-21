@@ -94,6 +94,7 @@ Future<void> main(List<String> args) async {
     final cdpHeadings = payload['cdpHeadings'] as List<dynamic>?;
     final windowWidth = (payload['windowWidth'] as num?)?.toDouble() ?? 300;
     final windowHeight = (payload['windowHeight'] as num?)?.toDouble() ?? 800;
+    final browserHwnd = (payload['browserHwnd'] as num?)?.toInt() ?? 0;
     runApp(ReadingCompanionApp(
       url: url,
       browserTitle: title,
@@ -104,6 +105,7 @@ Future<void> main(List<String> args) async {
       cdpHeadings: cdpHeadings,
       windowWidth: windowWidth,
       windowHeight: windowHeight,
+      browserHwnd: browserHwnd,
     ));
     return;
   }

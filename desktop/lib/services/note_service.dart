@@ -253,6 +253,27 @@ class NoteService extends ChangeNotifier {
   /// Save a reading companion note (Markdown text + URL) with #阅读搭子 tag.
   Future<BojiNote> saveReadingNote(String url, String markdown) async {
     await init();
+
+    // Extract title from first markdown heading (# ...)
+    final titleMatch = RegExp(r'^#\s+(.+)$', multiLine: true).firstMatch(markdown);
+    final title = titleMatch?.group(1)?.trim() ?? '';
+    final summaryText = title.isNotEmpty
+        ? title
+        : (markdown.length > 80 ? '${markdown.substring(0, 80)}...' : markdown);
+
+    // Deduplicate by URL: update existing note if one exists
+    final existing = findByUrl(url);
+    if (existing != null) {
+      existing.rawText = markdown;
+      existing.summary = summaryText;
+      existing.analyzed = true;
+      await updateNote(existing);
+      // Update the attachment file
+      final attachFile = File('${_attachDir.path}/${existing.fileName}');
+      await attachFile.writeAsString(markdown);
+      return existing;
+    }
+
     final id = const Uuid().v4();
     final now = DateTime.now();
     final ts = '${now.year}${_p2(now.month)}${_p2(now.day)}_'
@@ -267,7 +288,7 @@ class NoteService extends ChangeNotifier {
       rawText: markdown,
       fileName: fileName,
       tags: ['阅读搭子'],
-      summary: markdown.length > 80 ? '${markdown.substring(0, 80)}...' : markdown,
+      summary: summaryText,
       analyzed: true,
     );
     return saveNote(note, attachment: Uint8List.fromList(utf8.encode(markdown)));
@@ -547,6 +568,154 @@ class NoteService extends ChangeNotifier {
     note.summary = note.sourceApp.isNotEmpty ? note.sourceApp : '内容已保存';
     note.analyzed = true;
     unawaited(updateNote(note));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Reading companion AI summarization
+  // ---------------------------------------------------------------------------
+
+  /// Pending reading summaries: runId → accumulated text.
+  final Map<String, StringBuffer> _pendingReading = {};
+  final Map<String, Completer<String>> _readingCompleters = {};
+
+  /// Find an existing note by URL. Returns null if not found.
+  BojiNote? findByUrl(String url) {
+    if (url.isEmpty) return null;
+    try {
+      return _notes.firstWhere(
+        (n) => n.sourceUrl == url,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Send reading content to the LLM for AI-powered classification and
+  /// structured summarization. Returns the raw JSON string from the LLM.
+  Future<String> summarizeReading(
+      String text, String url, String title) async {
+    await init();
+
+    final truncated =
+        text.length > 20000 ? text.substring(0, 20000) : text;
+
+    final prompt = StringBuffer();
+    prompt.writeln('[阅读搭子] 请分析以下网页内容。');
+    prompt.writeln();
+    if (title.isNotEmpty) prompt.writeln('标题: $title');
+    if (url.isNotEmpty) prompt.writeln('URL: $url');
+    prompt.writeln();
+    prompt.writeln('内容:');
+    prompt.writeln(truncated);
+    prompt.writeln();
+    prompt.writeln('请执行以下任务：');
+    prompt.writeln('1. 分类：判断文章属于以下哪种类型：'
+        '知识学习、出游攻略、美食探店、商品种草、新闻资讯、影视娱乐、生活感悟、其他');
+    prompt.writeln('2. 根据类型提取关键信息，生成结构化摘要');
+    prompt.writeln('3. 生成一个简洁的中文标题（不超过20字）');
+    prompt.writeln();
+    prompt.writeln('类型特定的提取规则：');
+    prompt.writeln('- 知识学习：提取核心概念、关键要点');
+    prompt.writeln('- 出游攻略：提取目的地、路线、出行建议');
+    prompt.writeln('- 美食探店：提取店名、地址、推荐菜品、人均消费');
+    prompt.writeln('- 商品种草：提取品牌、商品名、价格、优缺点');
+    prompt.writeln('- 新闻资讯：提取人物、事件、时间、地点、原因');
+    prompt.writeln('- 影视娱乐：提取作品名、类型、看点、评价');
+    prompt.writeln('- 生活感悟：提取核心观点、金句');
+    prompt.writeln();
+    prompt.writeln('严格只返回如下JSON（不要包含其他内容）：');
+    prompt.writeln('{');
+    prompt.writeln('  "category": "类型",');
+    prompt.writeln('  "title": "简洁标题",');
+    prompt.writeln('  "summary": "一段话摘要（100字以内）",');
+    prompt.writeln('  "key_points": ["要点1", "要点2"],');
+    prompt.writeln('  "details": { /* 类型特定的结构化信息 */ }');
+    prompt.writeln('}');
+
+    final runId = const Uuid().v4();
+    _pendingReading[runId] = StringBuffer();
+    final completer = Completer<String>();
+    _readingCompleters[runId] = completer;
+
+    try {
+      final rpcRes = await _session.request(
+        'chat.send',
+        jsonEncode({
+          'sessionKey': _readingSessionKey,
+          'message': prompt.toString(),
+          'idempotencyKey': runId,
+        }),
+        timeoutMs: 60000,
+      );
+
+      // Update runId if server assigned a different one
+      try {
+        final resObj = jsonDecode(rpcRes) as Map<String, dynamic>?;
+        final serverRunId = resObj?['runId'] as String?;
+        if (serverRunId != null && serverRunId != runId) {
+          final buf = _pendingReading.remove(runId);
+          _readingCompleters.remove(runId);
+          if (buf != null) _pendingReading[serverRunId] = buf;
+          _readingCompleters[serverRunId] = completer;
+        }
+      } catch (_) {}
+
+      final result = await completer.future.timeout(
+        const Duration(seconds: 90),
+        onTimeout: () {
+          debugPrint('NoteService: reading summary timed out');
+          _pendingReading.remove(runId);
+          _readingCompleters.remove(runId);
+          return '';
+        },
+      );
+
+      return result;
+    } catch (e) {
+      debugPrint('NoteService: summarizeReading failed: $e');
+      _pendingReading.remove(runId);
+      _readingCompleters.remove(runId);
+      return '';
+    }
+  }
+
+  /// Handle gateway events for reading summarization. Returns true if consumed.
+  bool handleReadingEvent(String event, String? payloadJson) {
+    if (payloadJson == null || _pendingReading.isEmpty) return false;
+
+    Map<String, dynamic>? payload;
+    try {
+      payload = jsonDecode(payloadJson) as Map<String, dynamic>?;
+    } catch (_) {
+      return false;
+    }
+    if (payload == null) return false;
+
+    final sessionKey = payload['sessionKey'] as String?;
+    if (sessionKey != _readingSessionKey) return false;
+
+    final serverRunId = payload['runId'] as String?;
+
+    if (event == 'agent') {
+      final delta = payload['delta'] as String?;
+      if (delta != null && serverRunId != null) {
+        _pendingReading[serverRunId]?.write(delta);
+      }
+      return true;
+    }
+
+    if (event == 'chat') {
+      final state = payload['state'] as String?;
+      if (state == 'final' || state == 'aborted' || state == 'error') {
+        if (serverRunId != null) {
+          final text = _pendingReading.remove(serverRunId)?.toString() ?? '';
+          _readingCompleters.remove(serverRunId)?.complete(text);
+        }
+      }
+      return true;
+    }
+
+    return false;
   }
 
   // ---------------------------------------------------------------------------

@@ -30,7 +30,7 @@ class CdpBrowserAgent implements BrowserAgent {
   }
 
   @override
-  Future<bool> tryConnectToExisting() async {
+  Future<bool> tryConnectToExisting({String? urlHint}) async {
     if (isConnected) return true;
 
     // Strategy 1: Read DevToolsActivePort from default user data dir
@@ -45,7 +45,7 @@ class CdpBrowserAgent implements BrowserAgent {
             final port = int.tryParse(lines.first.trim());
             if (port != null) {
               try {
-                await _connectToPort(port);
+                await _connectToPort(port, urlHint: urlHint);
                 debugPrint(
                     'CdpBrowserAgent: connected to existing browser on port $port');
                 return true;
@@ -64,7 +64,7 @@ class CdpBrowserAgent implements BrowserAgent {
       final resp = await req.close();
       client.close();
       if (resp.statusCode == 200) {
-        await _connectToPort(9222);
+        await _connectToPort(9222, urlHint: urlHint);
         debugPrint(
             'CdpBrowserAgent: connected to existing browser on port 9222');
         return true;
@@ -115,7 +115,7 @@ class CdpBrowserAgent implements BrowserAgent {
     await _connectToPort(port);
   }
 
-  Future<void> _connectToPort(int port) async {
+  Future<void> _connectToPort(int port, {String? urlHint}) async {
     // GET /json to list targets
     final client = HttpClient();
     try {
@@ -126,11 +126,19 @@ class CdpBrowserAgent implements BrowserAgent {
       final targets = (jsonDecode(body) as List)
           .cast<Map<String, dynamic>>();
 
-      // Find a page target (prefer the first visible page)
-      final page = targets.firstWhere(
-        (t) => t['type'] == 'page',
-        orElse: () => targets.first,
-      );
+      // Find the best page target
+      final pages = targets.where((t) => t['type'] == 'page').toList();
+      Map<String, dynamic>? page;
+
+      if (urlHint != null && urlHint.isNotEmpty) {
+        // Prefer the tab whose URL matches the hint
+        page = pages.cast<Map<String, dynamic>?>().firstWhere(
+          (t) => t?['url'] != null &&
+              t!['url'].toString().contains(urlHint),
+          orElse: () => null,
+        );
+      }
+      page ??= pages.isNotEmpty ? pages.first : targets.first;
 
       final wsUrl = page['webSocketDebuggerUrl'] as String?;
       if (wsUrl == null || wsUrl.isEmpty) {

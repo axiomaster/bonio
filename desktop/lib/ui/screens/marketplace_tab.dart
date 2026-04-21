@@ -119,7 +119,7 @@ class _SkillMarketplaceContentState extends State<_SkillMarketplaceContent> {
       final results = await _client.search(query);
       if (mounted) setState(() => _results = results);
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = _friendlyError(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -549,7 +549,7 @@ class _ProviderMarketContentState extends State<_ProviderMarketContent> {
         });
       }
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+      if (mounted) setState(() { _error = _friendlyError(e); _loading = false; });
     }
   }
 
@@ -665,7 +665,7 @@ class _ThemeMarketContentState extends State<_ThemeMarketContent> {
         });
       }
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+      if (mounted) setState(() { _error = _friendlyError(e); _loading = false; });
     }
   }
 
@@ -754,6 +754,17 @@ Future<Map<String, dynamic>> _fetchJson(String url) async {
   }
 }
 
+String _friendlyError(Object e) {
+  if (e is FormatException) return S.current.marketNetworkError;
+  if (e is SocketException) return S.current.marketNetworkError;
+  if (e is HttpException) return S.current.marketNetworkError;
+  final s = e.toString();
+  if (s.startsWith('FormatException') || s.contains('Unexpected')) {
+    return S.current.marketNetworkError;
+  }
+  return s;
+}
+
 class _MarketErrorView extends StatelessWidget {
   final IconData icon;
   final String error;
@@ -830,7 +841,7 @@ class _PluginMarketContentState extends State<_PluginMarketContent> {
           [];
       if (mounted) setState(() => _catalog = plugins);
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = _friendlyError(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }

@@ -64,6 +64,12 @@ abstract class S {
   String get readingStartButton;
   String get readingEditorLoading;
   String get readingEditorHint;
+  String get readingCdpHint;
+  String get readingSummaryTitle;
+  String get readingKeyPoints;
+  String get readingDetails;
+  String get readingFullText;
+  String get readingMyNotes;
 
   // ── Chat ──
   String get chatConnectToStart;
@@ -260,12 +266,16 @@ abstract class S {
   String pluginRemoveConfirm(String name);
   String get pluginCancel;
   String get pluginRemove;
+  String get pluginSettings;
+  String get pluginSettingsReset;
+  String get pluginSettingsResetConfirm;
   String get pluginBuiltinLabel;
   String get pluginInstall;
   String get pluginInstalled;
   String get pluginUpdate;
   String get marketPlugins;
   String get marketPluginsPlaceholder;
+  String get marketNetworkError;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -278,7 +288,7 @@ class _SZh extends S {
   @override String get avatarWindowTitle => '波妞 Avatar';
 
   @override String get tabChat => '聊天';
-  @override String get tabServer => '服务';
+  @override String get tabServer => '服务端';
   @override String get tabMemory => '记忆';
   @override String get tabMarket => '市场';
   @override String get tabSettings => '设置';
@@ -302,6 +312,12 @@ class _SZh extends S {
   @override String get readingStartButton => '开始';
   @override String get readingEditorLoading => '编辑器加载中...';
   @override String get readingEditorHint => '在此编辑阅读笔记...';
+  @override String get readingCdpHint => '内容提取不完整。如需获取完整内容，请以调试模式启动浏览器：\nChrome: chrome --remote-debugging-port=9222\nEdge: msedge --remote-debugging-port=9222';
+  @override String get readingSummaryTitle => '摘要';
+  @override String get readingKeyPoints => '关键信息';
+  @override String get readingDetails => '详细信息';
+  @override String get readingFullText => '全文';
+  @override String get readingMyNotes => '我的笔记';
 
   @override String get chatConnectToStart => '连接网关开始聊天';
   @override String get chatDisconnected => '已断开';
@@ -324,7 +340,7 @@ class _SZh extends S {
   @override String get composerStop => '停止';
   @override String get composerSend => '发送';
 
-  @override String get serverTitle => '服务';
+  @override String get serverTitle => '服务端';
   @override String get serverGatewayConnection => '网关连接';
   @override String get serverGateway => '网关';
   @override String get serverOpenClaw => 'OpenClaw';
@@ -483,12 +499,16 @@ class _SZh extends S {
   @override String pluginRemoveConfirm(String name) => '确定要卸载「$name」吗？';
   @override String get pluginCancel => '取消';
   @override String get pluginRemove => '卸载';
+  @override String get pluginSettings => '设置';
+  @override String get pluginSettingsReset => '重置';
+  @override String get pluginSettingsResetConfirm => '确定重置为默认模板？';
   @override String get pluginBuiltinLabel => '内置';
   @override String get pluginInstall => '安装';
   @override String get pluginInstalled => '已安装';
   @override String get pluginUpdate => '更新';
   @override String get marketPlugins => '插件';
   @override String get marketPluginsPlaceholder => '插件市场即将上线';
+  @override String get marketNetworkError => '无法连接到插件服务器';
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -525,6 +545,12 @@ class _SEn extends S {
   @override String get readingStartButton => 'Start';
   @override String get readingEditorLoading => 'Loading editor...';
   @override String get readingEditorHint => 'Edit your reading notes here...';
+  @override String get readingCdpHint => 'Content extraction was incomplete. For better results, launch your browser with:\nChrome: chrome --remote-debugging-port=9222\nEdge: msedge --remote-debugging-port=9222';
+  @override String get readingSummaryTitle => 'Summary';
+  @override String get readingKeyPoints => 'Key Points';
+  @override String get readingDetails => 'Details';
+  @override String get readingFullText => 'Full Text';
+  @override String get readingMyNotes => 'My Notes';
 
   @override String get chatConnectToStart => 'Connect to a gateway to start chatting';
   @override String get chatDisconnected => 'Disconnected';
@@ -706,10 +732,14 @@ class _SEn extends S {
   @override String pluginRemoveConfirm(String name) => 'Uninstall "$name"?';
   @override String get pluginCancel => 'Cancel';
   @override String get pluginRemove => 'Uninstall';
+  @override String get pluginSettings => 'Settings';
+  @override String get pluginSettingsReset => 'Reset';
+  @override String get pluginSettingsResetConfirm => 'Reset to default templates?';
   @override String get pluginBuiltinLabel => 'Built-in';
   @override String get pluginInstall => 'Install';
   @override String get pluginInstalled => 'Installed';
   @override String get pluginUpdate => 'Update';
   @override String get marketPlugins => 'Plugins';
   @override String get marketPluginsPlaceholder => 'Plugin marketplace coming soon';
+  @override String get marketNetworkError => 'Unable to connect to marketplace server';
 }

@@ -71,6 +71,8 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
   Timer? _anchorTrackTimer;
   Timer? _springTimer;
 
+  int _readingCompanionHwnd = 0;
+
   // Elastic spring tracking
   double _targetX = 0;
   double _targetY = 0;
@@ -574,6 +576,9 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     // Skip the avatar window itself (but NOT the main BoJi window)
     if (fgInfo.hwnd == _avatarSelfHwnd) return;
 
+    // Skip the reading companion window — avatar stays on the browser
+    if (fgInfo.hwnd == _readingCompanionHwnd) return;
+
     // Safety net: if selfHwnd wasn't resolved, check by remembering the HWND now
     if (_avatarSelfHwnd == 0 && fgInfo.isSelf) {
       final avatarW = _toPhysical(_windowSize.width);
@@ -1016,6 +1021,10 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
           if (raw is List) {
             _pluginMenuItems = raw.cast<Map<String, dynamic>>();
           }
+          return null;
+        case 'syncReadingHwnd':
+          _readingCompanionHwnd = (call.arguments as num?)?.toInt() ?? 0;
+          debugPrint('AvatarPlacement: readingCompanionHwnd=$_readingCompanionHwnd');
           return null;
         case 'window_close':
           _wanderTimer?.cancel();

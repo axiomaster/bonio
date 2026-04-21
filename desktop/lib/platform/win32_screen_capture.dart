@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 import 'dart:typed_data';
@@ -370,6 +371,279 @@ class Win32ScreenCapture {
       }
     } catch (e) {
       debugPrint('Win32ScreenCapture.getBrowserUrlViaKeyboard: $e');
+      return null;
+    }
+  }
+
+  /// Gets the visible page text from a browser window via Ctrl+A, Ctrl+C.
+  /// Saves and restores the clipboard. Retries up to 3 times with increasing
+  /// delays. Returns the clipboard text (rendered page content) or null.
+  static Future<String?> getBrowserPageText(int hwnd) async {
+    if (hwnd == 0) return null;
+    if (!Platform.isWindows) return null;
+    try {
+      final setFg = _user32.lookupFunction<Int32 Function(IntPtr), int Function(int)>(
+          'SetForegroundWindow');
+      final keybdEvent = _user32.lookupFunction<
+          Void Function(Uint8, Uint8, Uint32, IntPtr),
+          void Function(int, int, int, int)>('keybd_event');
+
+      const vkControl = 0x11;
+      const vkA = 0x41;
+      const vkC = 0x43;
+      const vkEscape = 0x1B;
+      const keyeventfKeyup = 0x0002;
+
+      // Save and clear clipboard
+      final saved = _readClipboardText();
+      _emptyClipboard();
+
+      try {
+        // Activate the browser window
+        setFg(hwnd);
+        await Future.delayed(const Duration(milliseconds: 200));
+
+        for (var attempt = 0; attempt < 3; attempt++) {
+          // Ctrl+A — select all page content
+          keybdEvent(vkControl, 0, 0, 0);
+          keybdEvent(vkA, 0, 0, 0);
+          keybdEvent(vkA, 0, keyeventfKeyup, 0);
+          keybdEvent(vkControl, 0, keyeventfKeyup, 0);
+          await Future.delayed(const Duration(milliseconds: 150));
+
+          // Ctrl+C — copy selected text
+          keybdEvent(vkControl, 0, 0, 0);
+          keybdEvent(vkC, 0, 0, 0);
+          keybdEvent(vkC, 0, keyeventfKeyup, 0);
+          keybdEvent(vkControl, 0, keyeventfKeyup, 0);
+
+          // Poll clipboard for new content (up to 1 second)
+          for (var poll = 0; poll < 10; poll++) {
+            await Future.delayed(const Duration(milliseconds: 100));
+            final text = _readClipboardText();
+            if (text != null && text != saved && text.length > 50) {
+              debugPrint('Win32ScreenCapture: clipboard extracted '
+                  '${text.length} chars (attempt ${attempt + 1})');
+              return text;
+            }
+          }
+
+          // Deselect before retry
+          if (attempt < 2) {
+            keybdEvent(vkEscape, 0, 0, 0);
+            keybdEvent(vkEscape, 0, keyeventfKeyup, 0);
+            await Future.delayed(
+                Duration(milliseconds: 200 * (attempt + 1)));
+          }
+        }
+        return null;
+      } finally {
+        // Restore original clipboard
+        _writeClipboardText(saved);
+      }
+    } catch (e) {
+      debugPrint('Win32ScreenCapture.getBrowserPageText: $e');
+      return null;
+    }
+  }
+
+  static String? _readClipboardText() {
+    final openClipboard =
+        _user32.lookupFunction<Int32 Function(IntPtr), int Function(int)>('OpenClipboard');
+    final closeClipboard =
+        _user32.lookupFunction<Int32 Function(), int Function()>('CloseClipboard');
+    final getClipboardData =
+        _user32.lookupFunction<IntPtr Function(Uint32), int Function(int)>('GetClipboardData');
+    final kernel32 = DynamicLibrary.open('kernel32.dll');
+    final globalLock =
+        kernel32.lookupFunction<IntPtr Function(IntPtr), int Function(int)>('GlobalLock');
+    final globalUnlock =
+        kernel32.lookupFunction<Int32 Function(IntPtr), int Function(int)>('GlobalUnlock');
+
+    const cfUnicodeText = 13;
+    if (openClipboard(0) == 0) return null;
+    try {
+      final hData = getClipboardData(cfUnicodeText);
+      if (hData == 0) return null;
+      final ptr = globalLock(hData);
+      if (ptr == 0) return null;
+      try {
+        return Pointer<Utf16>.fromAddress(ptr).toDartString();
+      } finally {
+        globalUnlock(hData);
+      }
+    } finally {
+      closeClipboard();
+    }
+  }
+
+  static void _emptyClipboard() {
+    final openClipboard =
+        _user32.lookupFunction<Int32 Function(IntPtr), int Function(int)>('OpenClipboard');
+    final emptyClipboard =
+        _user32.lookupFunction<Int32 Function(), int Function()>('EmptyClipboard');
+    final closeClipboard =
+        _user32.lookupFunction<Int32 Function(), int Function()>('CloseClipboard');
+    if (openClipboard(0) != 0) {
+      emptyClipboard();
+      closeClipboard();
+    }
+  }
+
+  static void _writeClipboardText(String? text) {
+    final openClipboard =
+        _user32.lookupFunction<Int32 Function(IntPtr), int Function(int)>('OpenClipboard');
+    final emptyClipboard =
+        _user32.lookupFunction<Int32 Function(), int Function()>('EmptyClipboard');
+    final closeClipboard =
+        _user32.lookupFunction<Int32 Function(), int Function()>('CloseClipboard');
+    final setClipboardData =
+        _user32.lookupFunction<IntPtr Function(Uint32, IntPtr), int Function(int, int)>(
+            'SetClipboardData');
+    final kernel32 = DynamicLibrary.open('kernel32.dll');
+    final globalAlloc =
+        kernel32.lookupFunction<IntPtr Function(Uint32, IntPtr), int Function(int, int)>(
+            'GlobalAlloc');
+    final globalFree =
+        kernel32.lookupFunction<IntPtr Function(IntPtr), int Function(int)>('GlobalFree');
+    final globalLock =
+        kernel32.lookupFunction<IntPtr Function(IntPtr), int Function(int)>('GlobalLock');
+    final globalUnlock =
+        kernel32.lookupFunction<Int32 Function(IntPtr), int Function(int)>('GlobalUnlock');
+
+    const gmemMoveable = 0x0002;
+    const cfUnicodeText = 13;
+
+    if (openClipboard(0) == 0) return;
+    try {
+      emptyClipboard();
+      if (text != null && text.isNotEmpty) {
+        final units = text.codeUnits;
+        // +1 for null terminator (Utf16)
+        final byteCount = (units.length + 1) * 2;
+        final hMem = globalAlloc(gmemMoveable, byteCount);
+        if (hMem != 0) {
+          final ptr = globalLock(hMem);
+          if (ptr != 0) {
+            final buf = Pointer<Uint16>.fromAddress(ptr);
+            for (var i = 0; i < units.length; i++) {
+              buf[i] = units[i];
+            }
+            buf[units.length] = 0; // null terminator
+            globalUnlock(hMem);
+            setClipboardData(cfUnicodeText, hMem);
+            // System owns the memory now; don't free it
+          } else {
+            globalFree(hMem);
+          }
+        }
+      }
+    } finally {
+      closeClipboard();
+    }
+  }
+
+  /// Extracts rendered page text from a browser via Windows UI Automation.
+  /// Non-intrusive: no keyboard simulation, reads the accessibility tree.
+  /// Returns the page text or null on failure.
+  static Future<String?> getBrowserPageTextViaUIA(int hwnd) async {
+    if (hwnd == 0) return null;
+    if (!Platform.isWindows) return null;
+    try {
+      final dir = await Directory.systemTemp.createTemp('boji_uia_');
+      final ps1 = File('${dir.path}${Platform.pathSeparator}extract.ps1');
+      final script = '''
+Add-Type -AssemblyName UIAutomationClient
+\$hwnd = [IntPtr]([int]\$args[0])
+\$element = [System.Windows.Automation.AutomationElement]::FromHandle(\$hwnd)
+\$treeScope = [System.Windows.Automation.TreeScope]::Descendants
+\$docCond = New-Object System.Windows.Automation.PropertyCondition(
+    [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+    [System.Windows.Automation.ControlType]::Document)
+\$doc = \$element.FindFirst(\$treeScope, \$docCond)
+if (\$doc) {
+    try {
+        \$tp = \$doc.GetCurrentPattern([System.Windows.Automation.TextPattern]::Pattern)
+        if (\$tp) {
+            \$text = \$tp.DocumentRange.GetText(-1)
+            if (\$text) {
+                \$bytes = [System.Text.Encoding]::UTF8.GetBytes(\$text)
+                [Convert]::ToBase64String(\$bytes)
+                return
+            }
+        }
+    } catch {}
+}
+# Fallback: walk accessibility tree collecting text from all elements
+\$walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
+\$buf = New-Object System.Text.StringBuilder
+function CollectText([System.Windows.Automation.AutomationElement]\$el) {
+    try {
+        \$ct = \$el.Current.ControlType
+        if (\$ct -eq [System.Windows.Automation.ControlType]::Text -or
+            \$ct -eq [System.Windows.Automation.ControlType]::Edit -or
+            \$ct -eq [System.Windows.Automation.ControlType]::Document -or
+            \$ct -eq [System.Windows.Automation.ControlType]::Hyperlink -or
+            \$ct -eq [System.Windows.Automation.ControlType]::ListItem -or
+            \$ct -eq [System.Windows.Automation.ControlType]::DataItem -or
+            \$ct -eq [System.Windows.Automation.ControlType]::Header -or
+            \$ct -eq [System.Windows.Automation.ControlType]::HeaderItem -or
+            \$ct -eq [System.Windows.Automation.ControlType]::Paragraph) {
+            \$name = \$el.Current.Name
+            if (\$name -and \$name.Length -gt 0) {
+                [void]\$buf.AppendLine(\$name)
+            }
+        }
+    } catch {}
+    try {
+        \$child = \$walker.GetFirstChild(\$el)
+        while (\$child) {
+            CollectText \$child
+            \$child = \$walker.GetNextSibling(\$child)
+        }
+    } catch {}
+}
+CollectText \$element
+\$result = \$buf.ToString()
+if (\$result) {
+    \$bytes = [System.Text.Encoding]::UTF8.GetBytes(\$result)
+    [Convert]::ToBase64String(\$bytes)
+}
+''';
+      final body = utf8.encode(script);
+      await ps1.writeAsBytes([0xEF, 0xBB, 0xBF, ...body]);
+
+      try {
+        final result = await Process.run(
+          'powershell',
+          [
+            '-NoProfile',
+            '-NonInteractive',
+            '-ExecutionPolicy',
+            'Bypass',
+            '-File',
+            ps1.path,
+            hwnd.toString(),
+          ],
+        ).timeout(const Duration(seconds: 15));
+
+        if (result.exitCode != 0) {
+          debugPrint('Win32ScreenCapture: UIA exit code ${result.exitCode}');
+          return null;
+        }
+        final b64 = (result.stdout as String).trim();
+        if (b64.isEmpty) return null;
+        final text = utf8.decode(base64Decode(b64));
+        debugPrint('Win32ScreenCapture: UIA extracted ${text.length} chars');
+        return text.length > 50 ? text : null;
+      } finally {
+        try {
+          if (await ps1.exists()) await ps1.delete();
+          await dir.delete();
+        } catch (_) {}
+      }
+    } catch (e) {
+      debugPrint('Win32ScreenCapture.getBrowserPageTextViaUIA: $e');
       return null;
     }
   }

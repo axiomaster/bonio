@@ -60,67 +60,71 @@ class _MainScreenState extends State<MainScreen> {
     return Scaffold(
       body: Row(
         children: [
-          NavigationRail(
-            selectedIndex: _selectedIndex,
-            onDestinationSelected: (index) {
-              setState(() => _selectedIndex = index);
-            },
-            labelType: NavigationRailLabelType.all,
-            leading: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Column(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .primary
-                          .withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(10),
+          FocusTraversalGroup(
+            child: NavigationRail(
+              selectedIndex: _selectedIndex,
+              onDestinationSelected: (index) {
+                setState(() => _selectedIndex = index);
+              },
+              labelType: NavigationRailLabelType.all,
+              leading: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        Icons.smart_toy,
+                        color: Theme.of(context).colorScheme.primary,
+                        size: 24,
+                      ),
                     ),
-                    child: Icon(
-                      Icons.smart_toy,
-                      color: Theme.of(context).colorScheme.primary,
-                      size: 24,
+                    const SizedBox(height: 4),
+                    Text(
+                      S.current.appNameShort,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    S.current.appNameShort,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            trailing: Expanded(
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: _ConnectionIndicator(isConnected: isConnected),
+                  ],
                 ),
               ),
+              trailing: Expanded(
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: _ConnectionIndicator(isConnected: isConnected),
+                  ),
+                ),
+              ),
+              destinations: destinations,
             ),
-            destinations: destinations,
           ),
           const VerticalDivider(thickness: 1, width: 1),
           Expanded(
-            child: IndexedStack(
-              index: _selectedIndex,
-              children: const [
-                ChatTab(),
-                ServerTab(),
-                MemoryTab(),
-                MarketplaceTab(),
-                PluginTab(),
-                SettingsTab(),
-              ],
+            child: FocusTraversalGroup(
+              child: IndexedStack(
+                index: _selectedIndex,
+                children: const [
+                  ChatTab(),
+                  ServerTab(),
+                  MemoryTab(),
+                  MarketplaceTab(),
+                  PluginTab(),
+                  SettingsTab(),
+                ],
+              ),
             ),
           ),
         ],

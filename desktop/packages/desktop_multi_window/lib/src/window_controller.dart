@@ -132,6 +132,15 @@ class WindowController {
     );
   }
 
+  /// Get the native window handle (HWND on Windows).
+  Future<int> getHwnd() async {
+    final result = await _channel.invokeMethod<double>(
+      'window_getHwnd',
+      {'windowId': windowId},
+    );
+    return result?.toInt() ?? 0;
+  }
+
   /// Start native window drag using the current event.
   Future<void> startDragging() =>
       _callWindowMethod('window_startDragging', {});
