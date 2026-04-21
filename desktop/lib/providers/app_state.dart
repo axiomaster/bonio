@@ -266,6 +266,7 @@ class AppState extends ChangeNotifier {
     final hwnd = (data['hwnd'] as num?)?.toInt() ?? 0;
     var url = data['url'] as String? ?? '';
     final title = data['title'] as String? ?? '';
+    debugPrint('AppState: _handleStartReading hwnd=$hwnd url=$url title=$title');
 
     final ctrl = runtime.avatarController;
     ctrl.setBubble(text: S.current.readingConnecting);
@@ -361,6 +362,8 @@ class AppState extends ChangeNotifier {
     final ga = runtime.guiAgent;
     if (hwnd != 0) {
       final browserRect = ga.window.getWindowRect(hwnd);
+      debugPrint('AppState: browserRect=$browserRect, dpi=${ga.screen.getDpiScale(hwnd)}, '
+          'url=$url, cdpContent=${cdpContent != null ? "${cdpContent.text.length}chars" : "null"}');
       if (browserRect != Rect.zero) {
         final dpi = ga.screen.getDpiScale(hwnd);
         await runtime.createReadingWindow(
