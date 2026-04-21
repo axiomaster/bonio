@@ -213,19 +213,12 @@ class AppState extends ChangeNotifier {
       final json = jsonDecode(resultJson) as Map<String, dynamic>;
       final summary = ReadingSummary.fromJson(json);
 
-      // Use detected category for rendering if auto was requested
-      final effectiveCategory = category == ReadingCategory.auto
-          ? runtime.noteService.lastDetectedCategory
-          : category;
-
-      final markdown = await _renderSummaryMarkdown(summary, url, text, category: effectiveCategory);
+      final markdown = await _renderSummaryMarkdown(summary, url, text, category: category);
       final wc = WindowController.fromWindowId(windowId);
-      // Send rendered markdown, title, author, and detected category for UI
       await wc.invokeMethod('readingSummaryResult', jsonEncode({
         'markdown': markdown,
         'title': summary.title,
         'author': summary.author,
-        'detectedCategory': effectiveCategory.key,
       }));
     } catch (e) {
       debugPrint('AppState: reading summarize error: $e');
