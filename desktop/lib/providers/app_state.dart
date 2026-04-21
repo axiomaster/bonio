@@ -12,6 +12,7 @@ import 'package:window_manager/window_manager.dart';
 import '../l10n/app_strings.dart';
 import '../models/agent_avatar_models.dart';
 import '../platform/gui_agent.dart';
+import '../platform/macos_screen_capture.dart';
 import '../platform/screen_capture.dart';
 import '../platform/screen_capture_types.dart';
 import '../platform/win32_screen_capture.dart';
@@ -332,6 +333,28 @@ class AppState extends ChangeNotifier {
         }
       } catch (e) {
         debugPrint('AppState: clipboard extraction failed: $e');
+      }
+    }
+
+    // macOS: extract page text via AppleScript JavaScript execution
+    if (cdpContent == null && hwnd != 0 && Platform.isMacOS) {
+      try {
+        ctrl.setBubble(text: S.current.readingExtracting);
+        final pageText = MacosScreenCapture.getBrowserPageText(hwnd);
+        if (pageText != null && pageText.length > 50) {
+          debugPrint('AppState: macOS AppleScript extracted ${pageText.length} chars');
+          cdpContent = PageContent(
+            title: title,
+            url: url,
+            text: pageText,
+            headings: [],
+          );
+        } else {
+          debugPrint('AppState: macOS AppleScript text too short or empty '
+              '(${pageText?.length ?? 0} chars)');
+        }
+      } catch (e) {
+        debugPrint('AppState: macOS AppleScript extraction failed: $e');
       }
     }
 
