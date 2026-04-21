@@ -630,6 +630,41 @@ class MacosScreenCapture {
     return urlMatch?.group(0);
   }
 
+  /// Extract visible page text from a browser tab via AppleScript JavaScript.
+  /// Returns null if extraction fails or the window is not a browser.
+  static String? getBrowserPageText(int windowID) {
+    if (windowID == 0) return null;
+    try {
+      final windows = getWindowList();
+      if (windows == null) return null;
+      final match = windows.where((w) => w.windowID == windowID).firstOrNull;
+      if (match == null) return null;
+      final appName = _mapBrowserAppName(match.ownerName);
+      if (appName == null) return null;
+
+      String script;
+      if (appName == 'Safari') {
+        script = 'tell application "Safari" to do JavaScript '
+            '"document.body.innerText" in current tab of front window';
+      } else if (appName == 'Firefox') {
+        return null; // Firefox doesn't support JS via AppleScript
+      } else {
+        // Chrome, Edge, Brave, Arc
+        script = 'tell application "$appName" to execute front window\'s '
+            'active tab javascript "document.body.innerText"';
+      }
+
+      final result = Process.runSync('osascript', ['-e', script],
+          runInShell: true);
+      if (result.exitCode != 0) return null;
+      final text = result.stdout?.toString().trim() ?? '';
+      return text.isNotEmpty ? text : null;
+    } catch (e) {
+      debugPrint('MacosScreenCapture.getBrowserPageText: $e');
+      return null;
+    }
+  }
+
   /// Returns the DPI scale factor.
   /// On macOS Retina, Flutter already handles scaling, so this returns 2.0
   /// to reflect that CGImage pixels are in physical (Retina) resolution
