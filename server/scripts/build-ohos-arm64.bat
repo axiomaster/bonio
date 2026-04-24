@@ -16,7 +16,7 @@ if "%OHOS_NDK_HOME%"=="" (
 set "TOOLCHAIN=%OHOS_NDK_HOME%\build\cmake\ohos.toolchain.cmake"
 set "SCRIPT_DIR=%~dp0"
 set "PROJECT_ROOT=%SCRIPT_DIR%.."
-set "BUILD_DIR=%PROJECT_ROOT%\build\ohos"
+set "BUILD_DIR=%PROJECT_ROOT%\build\ohos-arm64"
 
 if not exist "%OHOS_NDK_HOME%" (
   echo Error: OHOS NDK not found at %OHOS_NDK_HOME%
@@ -73,4 +73,11 @@ echo ============================================
 echo Build OK!
 echo Binary: %BUILD_DIR%\hiclaw
 echo ============================================
+
+REM Copy to bin/
+set "BIN_DIR=%PROJECT_ROOT%\bin"
+if not exist "%BIN_DIR%" mkdir "%BIN_DIR%"
+copy /y "%BUILD_DIR%\hiclaw" "%BIN_DIR%\hiclaw" >nul
+echo Copied to %BIN_DIR%\hiclaw
+
 exit /b 0

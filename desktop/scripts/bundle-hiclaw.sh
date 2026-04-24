@@ -10,7 +10,7 @@ RESOURCES="$BUNDLE/Contents/Resources"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-HICLAW_BIN="$PROJECT_ROOT/server/build/mac/hiclaw"
+HICLAW_BIN="$PROJECT_ROOT/server/bin/hiclaw"
 
 if [[ ! -f "$HICLAW_BIN" ]]; then
   echo "Error: hiclaw binary not found at $HICLAW_BIN"

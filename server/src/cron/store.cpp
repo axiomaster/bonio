@@ -47,7 +47,7 @@ std::time_t iso_to_time(const std::string& s) {
 }
 
 std::string cron_dir(const std::string& config_dir) {
-  std::string base = config_dir.empty() ? ".hiclaw" : config_dir;
+  std::string base = config_dir.empty() ? ".bonio" : config_dir;
   return (std::filesystem::path(base) / "cron").string();
 }
 

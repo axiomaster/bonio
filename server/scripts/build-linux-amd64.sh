@@ -83,7 +83,10 @@ echo ""
 echo "============================================"
 echo "Build OK!"
 echo "Binary: $BUILD_DIR/hiclaw"
-echo ""
-echo "To install system-wide (requires sudo):"
-echo "  sudo cp '$BUILD_DIR/hiclaw' /usr/local/bin/"
 echo "============================================"
+
+# Copy to bin/
+BIN_DIR="${PROJECT_ROOT}/bin"
+mkdir -p "$BIN_DIR"
+cp "$BUILD_DIR/hiclaw" "$BIN_DIR/hiclaw"
+echo "Copied to $BIN_DIR/hiclaw"

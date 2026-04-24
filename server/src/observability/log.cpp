@@ -3,6 +3,7 @@
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/stdout_sinks.h>
 #include <filesystem>
+#include <iostream>
 #include <memory>
 #include <mutex>
 
@@ -49,17 +50,21 @@ std::shared_ptr<spdlog::logger> make_hiclaw_logger() {
     std::string log_dir = g_log_dir + "/logs";
     std::error_code ec;
     std::filesystem::create_directories(log_dir, ec);
-    if (!ec) {
-      std::string path = log_dir + "/hiclaw.log";
-      try {
-        auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(path, false);
-        sinks.push_back(std::move(file_sink));
-      } catch (...) {}
+    if (ec) {
+      std::cerr << "hiclaw: failed to create log dir " << log_dir << ": " << ec.message() << "\n";
+    }
+    std::string path = log_dir + "/hiclaw.log";
+    try {
+      auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(path, false);
+      sinks.push_back(std::move(file_sink));
+    } catch (const std::exception& e) {
+      std::cerr << "hiclaw: failed to open log file " << path << ": " << e.what() << "\n";
     }
   }
   auto logger = std::make_shared<spdlog::logger>("hiclaw", sinks.begin(), sinks.end());
   logger->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%l] %v");
   logger->set_level(g_level);
+  logger->flush_on(spdlog::level::warn);
   return logger;
 }
 

@@ -2,7 +2,7 @@
 # Build hiclaw for macOS (arm64 or x86_64)
 #
 # Usage: scripts/build-macos.sh [--clean]
-# Output: server/build/mac/hiclaw
+# Output: build/macos-arm64/hiclaw
 #
 # Requirements:
 #   - CMake
@@ -13,7 +13,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-BUILD_DIR="${PROJECT_ROOT}/build/mac"
+BUILD_DIR="${PROJECT_ROOT}/build/macos-arm64"
 BUILD_TYPE="${HICLAW_BUILD_TYPE:-Release}"
 
 CLEAN_BUILD=false
@@ -59,3 +59,9 @@ echo "============================================"
 echo "Build OK!"
 echo "Binary: $BUILD_DIR/hiclaw"
 echo "============================================"
+
+# Copy to bin/
+BIN_DIR="${PROJECT_ROOT}/bin"
+mkdir -p "$BIN_DIR"
+cp "$BUILD_DIR/hiclaw" "$BIN_DIR/hiclaw"
+echo "Copied to $BIN_DIR/hiclaw"

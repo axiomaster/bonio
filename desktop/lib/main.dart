@@ -9,6 +9,7 @@ import 'package:window_manager/window_manager.dart';
 import 'avatar_window_app.dart';
 import 'l10n/app_strings.dart';
 import 'providers/app_state.dart';
+import 'services/app_logger.dart';
 import 'services/tray_service.dart';
 import 'ui/screens/main_screen.dart';
 import 'ui/screens/reading_companion_screen.dart';
@@ -65,6 +66,7 @@ Future<void> main(List<String> args) async {
   if (payload == null) {
     if (candidates.isEmpty || candidates.every((c) => c.trim().isEmpty)) {
       await _initMainWindow();
+      await AppLogger.instance.init();
       runApp(const BoJiDesktopApp());
       return;
     }
@@ -185,6 +187,9 @@ class _BoJiDesktopAppState extends State<BoJiDesktopApp> with WindowListener {
   Future<void> _realExit() async {
     if (_exiting) return;
     _exiting = true;
+    try {
+      await _appState.hiclawProcess.stop();
+    } catch (_) {}
     try {
       await _appState.runtime.desktopTts.stop();
     } catch (_) {}

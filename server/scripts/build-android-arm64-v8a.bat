@@ -33,7 +33,7 @@ if "%HICLAW_BUILD_TYPE%"=="" set "HICLAW_BUILD_TYPE=Release"
 set "TOOLCHAIN=%ANDROID_NDK_HOME%\build\cmake\android.toolchain.cmake"
 set "SCRIPT_DIR=%~dp0"
 set "PROJECT_ROOT=%SCRIPT_DIR%.."
-set "BUILD_DIR=%PROJECT_ROOT%\build\android\%ANDROID_ABI%"
+set "BUILD_DIR=%PROJECT_ROOT%\build\android-%ANDROID_ABI%"
 
 if not exist "%ANDROID_NDK_HOME%" (
   echo Error: Android NDK not found at %ANDROID_NDK_HOME%
@@ -121,10 +121,12 @@ echo.
 echo ============================================
 echo Build OK!
 echo Binary: %BUILD_DIR%\hiclaw
-echo.
-echo To push to device:
-echo   adb push "%BUILD_DIR%\hiclaw" /data/local/tmp/
-echo   adb shell chmod +x /data/local/tmp/hiclaw
-echo   adb shell /data/local/tmp/hiclaw --version
 echo ============================================
+
+REM Copy to bin/
+set "BIN_DIR=%PROJECT_ROOT%\bin"
+if not exist "%BIN_DIR%" mkdir "%BIN_DIR%"
+copy /y "%BUILD_DIR%\hiclaw" "%BIN_DIR%\hiclaw" >nul
+echo Copied to %BIN_DIR%\hiclaw
+
 exit /b 0

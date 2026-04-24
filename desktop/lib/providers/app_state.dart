@@ -13,6 +13,7 @@ import '../l10n/app_strings.dart';
 import '../models/agent_avatar_models.dart';
 import '../platform/gui_agent.dart';
 import '../platform/screen_capture.dart';
+import '../services/app_logger.dart';
 import '../platform/screen_capture_types.dart';
 import '../platform/win32_screen_capture.dart';
 import '../plugins/plugin_interface.dart';
@@ -102,7 +103,7 @@ class AppState extends ChangeNotifier {
         }
       },
       error: (code) {
-        debugPrint('STT error: $code');
+        log.error('STT error: $code');
         runtime.avatarController.clearBubble();
         runtime.avatarController.setActivity(AgentAvatarActivity.idle);
       },
@@ -160,13 +161,13 @@ class AppState extends ChangeNotifier {
   Future<void> _handleSearchSimilar(Map<String, dynamic> data) async {
     final pngBase64 = data['pngBase64'] as String? ?? '';
     if (pngBase64.isEmpty) {
-      debugPrint('AppState: search_similar has no image data');
+      log.warn('AppState: search_similar has no image data');
       return;
     }
     final avatarX = (data['avatarX'] as num?)?.toDouble() ?? 200;
     final avatarY = (data['avatarY'] as num?)?.toDouble() ?? 200;
 
-    debugPrint('AppState: search_similar received, '
+    log.info('AppState: search_similar received, '
         'base64Len=${pngBase64.length}, avatar=($avatarX,$avatarY)');
 
     final ctrl = runtime.avatarController;
@@ -178,10 +179,10 @@ class AppState extends ChangeNotifier {
       final path = '${tempDir.path}${Platform.pathSeparator}'
           'boji_search_${DateTime.now().millisecondsSinceEpoch}.png';
       await File(path).writeAsBytes(base64Decode(pngBase64));
-      debugPrint('AppState: search image saved to $path');
+      log.info('AppState: search image saved to $path');
       await runtime.createSearchWindow(path, avatarX, avatarY);
     } catch (e) {
-      debugPrint('AppState: search_similar error: $e');
+      log.error('AppState: search_similar error: $e');
     }
   }
 
@@ -197,9 +198,9 @@ class AppState extends ChangeNotifier {
         title: title,
         categories: categories,
       );
-      debugPrint('AppState: reading note saved');
+      log.info('AppState: reading note saved');
     } catch (e) {
-      debugPrint('AppState: reading save error: $e');
+      log.error('AppState: reading save error: $e');
     }
   }
 
@@ -213,14 +214,14 @@ class AppState extends ChangeNotifier {
     if (text.isEmpty || windowId.isEmpty) return;
 
     final category = ReadingCategory.fromKey(categoryKey);
-    debugPrint('AppState: _handleReadingSummarize, '
+    log.info('AppState: _handleReadingSummarize, '
         'text.length=${text.length}, category=$category, windowId=$windowId');
 
     try {
       var resultJson =
           await runtime.noteService.summarizeReading(text, url, title, category: category);
 
-      debugPrint('AppState: summarizeReading returned, resultJson.length=${resultJson.length}');
+      log.info('AppState: summarizeReading returned, resultJson.length=${resultJson.length}');
 
       // Extract JSON block in case LLM wraps it in markdown (e.g., ```json ... ```)
       final start = resultJson.indexOf('{');
@@ -255,12 +256,12 @@ class AppState extends ChangeNotifier {
           categories: summary.categories,
           coverPng: coverPng,
         );
-        debugPrint('AppState: reading note auto-saved');
+        log.info('AppState: reading note auto-saved');
       } catch (e) {
-        debugPrint('AppState: reading auto-save error: $e');
+      log.error('AppState: reading auto-save error: $e');
       }
     } catch (e) {
-      debugPrint('AppState: reading summarize error: $e');
+      log.error('AppState: reading summarize error: $e');
       try {
         final wc = WindowController.fromWindowId(windowId);
         await wc.invokeMethod('readingSummaryResult', '');
@@ -308,13 +309,13 @@ class AppState extends ChangeNotifier {
 
         cdpContent = await agent.extractPageContent();
         if (cdpContent.url.isNotEmpty) url = cdpContent.url;
-        debugPrint('AppState: CDP extracted ${cdpContent.headings.length} '
+        log.info('AppState: CDP extracted ${cdpContent.headings.length} '
             'headings, ${cdpContent.text.length} chars from $url');
       } else {
-        debugPrint('AppState: CDP not connected');
+        log.warn('AppState: CDP not connected');
       }
     } catch (e) {
-      debugPrint('AppState: CDP extraction failed: $e');
+      log.error('AppState: CDP extraction failed: $e');
     }
 
     // If CDP failed, try UI Automation extraction (non-intrusive, Windows only)
@@ -324,7 +325,7 @@ class AppState extends ChangeNotifier {
         final pageText =
             await Win32ScreenCapture.getBrowserPageTextViaUIA(hwnd);
         if (pageText != null && pageText.length > 50) {
-          debugPrint('AppState: UIA extracted ${pageText.length} chars');
+          log.info('AppState: UIA extracted ${pageText.length} chars');
           cdpContent = PageContent(
             title: title,
             url: url,
@@ -332,11 +333,11 @@ class AppState extends ChangeNotifier {
             headings: [],
           );
         } else {
-          debugPrint('AppState: UIA text too short or empty '
+          log.warn('AppState: UIA text too short or empty '
               '(${pageText?.length ?? 0} chars)');
         }
       } catch (e) {
-        debugPrint('AppState: UIA extraction failed: $e');
+        log.error('AppState: UIA extraction failed: $e');
       }
     }
 
@@ -347,7 +348,7 @@ class AppState extends ChangeNotifier {
         final pageText =
             await Win32ScreenCapture.getBrowserPageText(hwnd);
         if (pageText != null && pageText.length > 50) {
-          debugPrint('AppState: clipboard extracted ${pageText.length} chars');
+          log.info('AppState: clipboard extracted ${pageText.length} chars');
           cdpContent = PageContent(
             title: title,
             url: url,
@@ -355,11 +356,11 @@ class AppState extends ChangeNotifier {
             headings: [],
           );
         } else {
-          debugPrint('AppState: clipboard text too short or empty '
+          log.warn('AppState: clipboard text too short or empty '
               '(${pageText?.length ?? 0} chars)');
         }
       } catch (e) {
-        debugPrint('AppState: clipboard extraction failed: $e');
+        log.error('AppState: clipboard extraction failed: $e');
       }
     }
 
@@ -440,7 +441,7 @@ class AppState extends ChangeNotifier {
   }
 
   void _handleAvatarLensResult(Map<String, dynamic> data) {
-    debugPrint('AppState: received avatarLensResult, keys=${data.keys.toList()}');
+    log.info('AppState: received avatarLensResult, keys=${data.keys.toList()}');
     final windowTitle = data['windowTitle'] as String? ?? '';
     final rects = (data['rects'] as List?)
             ?.map((r) => Map<String, dynamic>.from(r as Map))
@@ -448,11 +449,11 @@ class AppState extends ChangeNotifier {
         [];
     final pngBase64 = data['pngBase64'] as String? ?? '';
 
-    debugPrint('AppState: lens title="$windowTitle", rects=${rects.length}, '
+    log.info('AppState: lens title="$windowTitle", rects=${rects.length}, '
         'base64Len=${pngBase64.length}');
 
     if (pngBase64.isEmpty) {
-      debugPrint('AppState: lens result has no screenshot');
+      log.warn('AppState: lens result has no screenshot');
       return;
     }
 
@@ -472,7 +473,7 @@ class AppState extends ChangeNotifier {
       buf.writeln('用户未标注任何区域，请分析整个窗口截图的内容。');
     }
 
-    debugPrint('AppState: sending lens result via chat.send...');
+    log.info('AppState: sending lens result via chat.send...');
     runtime.chatController.sendMessage(
       buf.toString(),
       attachments: [
@@ -484,7 +485,7 @@ class AppState extends ChangeNotifier {
         ),
       ],
     );
-    debugPrint('AppState: lens chat.send dispatched');
+    log.info('AppState: lens chat.send dispatched');
   }
 
   Future<void> _handleAvatarDrop(Map<String, dynamic> data) async {
@@ -534,7 +535,7 @@ class AppState extends ChangeNotifier {
         ctrl.setBubble(text: S.current.bubbleCantEat);
       }
     } catch (e) {
-      debugPrint('AppState: drop handling error: $e');
+      log.error('AppState: drop handling error: $e');
       ctrl.setBubble(text: S.current.bubbleCantDigest);
     }
   }
@@ -636,8 +637,8 @@ class AppState extends ChangeNotifier {
     S.setLocale(_locale);
     notifyListeners();
     unawaited(syncAvatarFloatingWindow());
-    // Auto-start local hiclaw and connect on first launch (no saved host)
-    if (_host.trim().isEmpty) {
+    // Auto-start local hiclaw and connect when profile is hiclaw.
+    if (_gatewayProfile == GatewayProfile.hiclaw) {
       unawaited(_autoStartAndConnect());
     }
   }
@@ -678,6 +679,10 @@ class AppState extends ChangeNotifier {
       if (_host.trim().isEmpty && _gatewayProfile.defaultHost.isNotEmpty) {
         _host = _gatewayProfile.defaultHost;
       }
+      // Stop local hiclaw when switching to openclaw.
+      if (gatewayProfile == GatewayProfile.openclaw && hiclawProcess.isRunning) {
+        await hiclawProcess.stop();
+      }
     }
     if (host != null) _host = host;
     if (port != null) _port = port;
@@ -717,6 +722,10 @@ class AppState extends ChangeNotifier {
   Future<void> _autoStartAndConnect() async {
     if (!hiclawProcess.isRunning) {
       await hiclawProcess.start(port: _port);
+    }
+    if (hiclawProcess.error != null || !hiclawProcess.isRunning) {
+      log.error('AppState: hiclaw auto-start failed (${hiclawProcess.error}), skipping connect');
+      return;
     }
     await Future.delayed(const Duration(milliseconds: 500));
     _host = '127.0.0.1';

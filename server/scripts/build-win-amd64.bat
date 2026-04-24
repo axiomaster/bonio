@@ -4,11 +4,11 @@ REM Build HiClaw for Windows x64 using standard CMake toolchain (Ninja + compile
 REM Requires: CMake, Ninja, and a C++17 compiler. If using MSVC, we set up x64 env so cl.exe is 64-bit.
 REM
 REM Usage: scripts\build-win-x64.bat
-REM Output: build\win-x64\hiclaw.exe
+REM Output: build\win-amd64\hiclaw.exe
 
 set "SCRIPT_DIR=%~dp0"
 set "PROJECT_ROOT=%SCRIPT_DIR%.."
-set "BUILD_DIR=%PROJECT_ROOT%\build\win-x64"
+set "BUILD_DIR=%PROJECT_ROOT%\build\win-amd64"
 
 REM vcpkg integration (optional but recommended for mbedTLS)
 REM Install: vcpkg install mbedtls:x64-windows
@@ -48,7 +48,7 @@ if defined VCVARS if exist "CMakeCache.txt" del "CMakeCache.txt"
 set "CMAKE_EXTRA="
 if not "%NINJA_EXE%"=="ninja" set "CMAKE_EXTRA=-DCMAKE_MAKE_PROGRAM=^"%NINJA_EXE%^""
 
-cmake -G Ninja %CMAKE_EXTRA% %VCPKG_TOOLCHAIN% -DCMAKE_BUILD_TYPE=Release "%PROJECT_ROOT%"
+cmake -G Ninja %CMAKE_EXTRA% %VCPKG_TOOLCHAIN% -DCMAKE_BUILD_TYPE=Release -DHICLAW_GATEWAY_BACKEND=websocketpp "%PROJECT_ROOT%"
 if errorlevel 1 exit /b 1
 
 "%NINJA_EXE%"
@@ -59,4 +59,11 @@ echo ============================================
 echo Build OK!
 echo Binary: %BUILD_DIR%\hiclaw.exe
 echo ============================================
+
+REM Copy to bin/
+set "BIN_DIR=%PROJECT_ROOT%\bin"
+if not exist "%BIN_DIR%" mkdir "%BIN_DIR%"
+copy /y "%BUILD_DIR%\hiclaw.exe" "%BIN_DIR%\hiclaw.exe" >nul
+echo Copied to %BIN_DIR%\hiclaw.exe
+
 exit /b 0

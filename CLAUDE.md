@@ -18,23 +18,59 @@ Clients maintain **dual WebSocket sessions**: `operatorSession` (user commands: 
 
 ```bash
 # Windows x64
-cd server && scripts\build-win-x64.bat
-# Output: server/build/win-x64/hiclaw.exe
+cd server && scripts\build-win-amd64.bat
+# Output: server/build/win-amd64/hiclaw.exe
 
 # Linux amd64 (deps: apt install cmake ninja-build libssl-dev)
 cd server && scripts/build-linux-amd64.sh [--clean]
 # Output: server/build/linux-amd64/hiclaw
 
 # Android (requires ANDROID_NDK_HOME)
-cd server && scripts/build-android.sh
-# Output: server/build/android/arm64-v8a/hiclaw
+cd server && scripts/build-android-arm64-v8a.sh
+# Output: server/build/android-arm64-v8a/hiclaw
 
 # HarmonyOS (requires OHOS_NDK_HOME)
-cd server && scripts/build-ohos.sh
-# Output: server/build/ohos/hiclaw
+cd server && scripts/build-ohos-arm64.sh
+# Output: server/build/ohos-arm64/hiclaw
 ```
 
 Third-party deps are vendored in `server/third_party/` (CLI11, spdlog, nlohmann_json, libhv, mbedtls, websocketpp, asio, linenoise-ng). Must be cloned before building — see CMakeLists.txt error messages for clone URLs.
+
+### Unified Build Scripts (root `scripts/`)
+
+One-click build, bundle, and launch scripts at the project root:
+
+```bash
+# Windows — build server + desktop, bundle hiclaw, and launch
+scripts\build-and-run.bat
+
+# macOS / Linux
+scripts/build-and-run.sh
+
+# Options (all scripts):
+#   --skip-server   Skip hiclaw compilation
+#   --skip-desktop  Skip Flutter compilation
+#   --clean         Clean build directories first
+```
+
+Individual steps:
+
+```bash
+# Build hiclaw only → server/bin/hiclaw(.exe)
+scripts\build-server.bat          # Windows
+scripts/build-server.sh           # macOS / Linux
+
+# Build Flutter desktop + bundle hiclaw (requires server built first)
+scripts\build-desktop.bat --run   # Windows, --run to launch after build
+scripts/build-desktop.sh --run    # macOS / Linux
+
+# Platform-specific server builds (called by build-server scripts):
+cd server && scripts\build-win-amd64.bat       # → build/win-amd64/ + bin/
+cd server && scripts/build-linux-amd64.sh       # → build/linux-amd64/ + bin/
+cd server && scripts/build-macos-arm64.sh       # → build/macos-arm64/ + bin/
+cd server && scripts/build-android-arm64-v8a.sh  # → build/android-arm64-v8a/ + bin/
+cd server && scripts/build-ohos-arm64.sh        # → build/ohos-arm64/ + bin/
+```
 
 ### Running Tests
 
@@ -78,6 +114,9 @@ cd desktop && flutter pub get && flutter run -d macos
 # Build release:
 cd desktop && flutter build windows
 cd desktop && flutter build macos
+# Bundle hiclaw into build output (after server build):
+cd desktop && powershell -File scripts\bundle-hiclaw.ps1     # Windows
+cd desktop && ./scripts/bundle-hiclaw.sh <app_bundle_path>   # macOS
 ```
 
 Requires Flutter SDK >=3.2.0. Cross-platform (Windows + macOS) via single Flutter codebase.
@@ -106,7 +145,7 @@ Requires Flutter SDK >=3.2.0. Cross-platform (Windows + macOS) via single Flutte
 | `hiclaw model list` | List configured models |
 | `hiclaw --version` | Print version |
 
-Global options: `--config-dir <path>` (default `.hiclaw`), `--log-level`.
+Global options: `--config-dir <path>` (default `~/.bonio`), `--log-level`.
 
 ## Environment Variables
 
@@ -219,7 +258,7 @@ WebSocket protocol version 3. Frame types: `req` (request), `res` (response), `e
 
 ## Configuration
 
-Server config lives in `hiclaw.json` (workspace root). Uses **snake_case** field names throughout:
+Server config lives in `hiclaw.json` (workspace root, default: `~/.bonio/hiclaw.json`). Uses **snake_case** field names throughout:
 
 ```json
 {

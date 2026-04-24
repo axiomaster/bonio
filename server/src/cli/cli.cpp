@@ -16,7 +16,7 @@ void print_help(const char* version) {
             << "  model   List supported providers or show configured models (list, status)\n"
             << "  skill   Manage skill packages (list, install, remove, enable, disable)\n\n"
             << "Options:\n"
-            << "      --config-dir <path>    Config directory (default: ~/.hiclaw, Windows: %%USERPROFILE%%\\.hiclaw)\n"
+            << "      --config-dir <path>    Config directory (default: ~/.bonio, Windows: %%USERPROFILE%%\\.bonio)\n"
             << "      --log-level <level>    off|error|warn|info|debug|trace\n"
             << "  -h, --help                 Print this message\n"
             << "  -V, --version              Print version\n";
@@ -35,7 +35,7 @@ void print_models_help() {
 static void build_app(CLI::App& app, Options& out) {
   app.description("HiClaw - HarmonyOS AI assistant.");
   app.add_flag("--version,-V", out.show_version, "Print version");
-  app.add_option("--config-dir", out.config_dir, "Config directory (default: ~/.hiclaw)");
+  app.add_option("--config-dir", out.config_dir, "Config directory (default: ~/.bonio)");
   app.add_option("--log-level", out.log_level, "off|error|warn|info|debug|trace");
 
   auto* cron_cmd = app.add_subcommand("cron", "Configure and run scheduled tasks (list, add, run)");

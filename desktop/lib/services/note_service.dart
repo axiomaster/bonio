@@ -8,6 +8,8 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
+import 'app_logger.dart';
+
 import '../models/note_models.dart';
 import '../models/chat_models.dart';
 import '../platform/screen_capture.dart';
@@ -56,6 +58,7 @@ class NoteService extends ChangeNotifier {
 
     await _loadIndex();
     _initialized = true;
+    notifyListeners();
   }
 
   // ---------------------------------------------------------------------------
@@ -75,7 +78,7 @@ class NoteService extends ChangeNotifier {
           .toList();
       _notes.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     } catch (e) {
-      debugPrint('NoteService: failed to load index: $e');
+      log.error('NoteService: failed to load index: $e');
       _notes = [];
     }
   }
@@ -144,7 +147,7 @@ class NoteService extends ChangeNotifier {
       if (png == null) return null;
       return _generateThumbnail(png, capture.width, capture.height);
     } catch (e) {
-      debugPrint('NoteService: captureWindowThumbnail failed: $e');
+      log.error('NoteService: captureWindowThumbnail failed: $e');
       return null;
     }
   }
@@ -154,10 +157,10 @@ class NoteService extends ChangeNotifier {
     if (hwnd == 0) return null;
     await init();
 
-    debugPrint('NoteService: capturing window hwnd=$hwnd');
+    log.info('NoteService: capturing window hwnd=$hwnd');
     final capture = ScreenCapture.captureWindow(hwnd);
     if (capture == null) {
-      debugPrint('NoteService: capture failed');
+      log.error('NoteService: capture failed');
       return null;
     }
 
@@ -165,7 +168,7 @@ class NoteService extends ChangeNotifier {
     final browserUrl = ScreenCapture.getBrowserUrl(hwnd);
     final png = await capture.toPng();
     if (png == null) {
-      debugPrint('NoteService: PNG encode failed');
+      log.error('NoteService: PNG encode failed');
       return null;
     }
 
@@ -182,7 +185,7 @@ class NoteService extends ChangeNotifier {
       await thumbFile.writeAsBytes(thumb);
     }
 
-    debugPrint('NoteService: captured "$title", url=$browserUrl');
+    log.info('NoteService: captured "$title", url=$browserUrl');
 
     final note = BojiNote(
       id: id,
@@ -516,7 +519,7 @@ class NoteService extends ChangeNotifier {
         ];
       }
 
-      debugPrint('NoteService: sending analysis for ${note.id}, runId=$runId');
+      log.info('NoteService: sending analysis for ${note.id}, runId=$runId');
 
       // Send the RPC (returns {runId} immediately, actual response via events)
       final rpcRes = await _session.request(
@@ -524,14 +527,14 @@ class NoteService extends ChangeNotifier {
         jsonEncode(params),
         timeoutMs: 60000,
       );
-      debugPrint('NoteService: chat.send RPC returned: ${rpcRes.length > 200 ? rpcRes.substring(0, 200) : rpcRes}');
+      log.info('NoteService: chat.send RPC returned: ${rpcRes.length > 200 ? rpcRes.substring(0, 200) : rpcRes}');
 
       // The server may assign a different runId — update our tracking
       try {
         final resObj = jsonDecode(rpcRes) as Map<String, dynamic>?;
         final serverRunId = resObj?['runId'] as String?;
         if (serverRunId != null && serverRunId != runId) {
-          debugPrint('NoteService: server assigned runId=$serverRunId (was $runId)');
+          log.info('NoteService: server assigned runId=$serverRunId (was $runId)');
           final buf = _pendingAnalysis.remove(runId);
           _analysisCompleters.remove(runId);
           if (buf != null) _pendingAnalysis[serverRunId] = buf;
@@ -543,19 +546,19 @@ class NoteService extends ChangeNotifier {
       final assistantText = await completer.future.timeout(
         const Duration(seconds: 90),
         onTimeout: () {
-          debugPrint('NoteService: analysis timed out for ${note.id}');
+          log.warn('NoteService: analysis timed out for ${note.id}');
           _pendingAnalysis.remove(runId);
           _analysisCompleters.remove(runId);
           return '';
         },
       );
 
-      debugPrint('NoteService: analysis response (${assistantText.length} chars): '
+      log.info('NoteService: analysis response (${assistantText.length} chars): '
           '${assistantText.length > 200 ? assistantText.substring(0, 200) : assistantText}');
 
       _parseAnalysisResponse(note, assistantText);
     } catch (e) {
-      debugPrint('NoteService: analysis failed: $e');
+      log.error('NoteService: analysis failed: $e');
       note.tags = ['#未分类'];
       note.summary = note.sourceApp.isNotEmpty ? note.sourceApp : '内容已保存';
       note.analyzed = true;
@@ -580,7 +583,7 @@ class NoteService extends ChangeNotifier {
         note.summary = parsed['summary'] as String? ?? '';
         note.analyzed = true;
         unawaited(updateNote(note));
-        debugPrint('NoteService: parsed tags=${note.tags}, summary=${note.summary}');
+        log.info('NoteService: parsed tags=${note.tags}, summary=${note.summary}');
         return;
       }
 
@@ -598,7 +601,7 @@ class NoteService extends ChangeNotifier {
       note.analyzed = true;
       unawaited(updateNote(note));
     } catch (e) {
-      debugPrint('NoteService: parse failed: $e');
+      log.error('NoteService: parse failed: $e');
       _fallbackClassify(note);
     }
   }
@@ -660,37 +663,9 @@ class NoteService extends ChangeNotifier {
 
     final prompt = StringBuffer();
 
-    if (category == ReadingCategory.auto) {
-      // Auto mode: include all templates so the AI picks the right one
-      prompt.writeln('# Role');
-      prompt.writeln('你是一位全能文章分析专家，能根据文章内容自动选择最合适的分析视角进行摘要总结。');
-      prompt.writeln();
-      prompt.writeln('# Task');
-      prompt.writeln('请先判断文章类别，然后使用对应视角进行分析总结。');
-      prompt.writeln();
-      prompt.writeln('# 分析视角');
-      for (final cat in ReadingCategory.values) {
-        if (cat == ReadingCategory.auto || cat.assetFile.isEmpty) continue;
-        try {
-          final raw = await ReadingTemplateStore.loadPromptTemplate(cat);
-          prompt.writeln();
-          prompt.writeln('## ${cat.label} (${cat.key})');
-          prompt.writeln(ReadingTemplateStore.extractPromptPart(raw));
-        } catch (_) {}
-      }
-    } else {
-      // Specific category: use only the selected template
-      final templateRaw = await ReadingTemplateStore.loadPromptTemplate(category);
-      prompt.writeln(ReadingTemplateStore.extractPromptPart(templateRaw));
-    }
-
-    prompt.writeln();
-    prompt.writeln('# Additional Requirements');
-    prompt.writeln('1. 标题与作者姓名：必须准确提取');
-    prompt.writeln('2. 忽略原始文章中"一句话一段"的排版');
-    prompt.writeln('3. 分析内容的逻辑流，将描述同一主题的段落合并');
-    prompt.writeln('4. 【禁止】不要尝试访问任何URL或使用web_fetch等工具获取网络内容，客户端已将完整文章内容附在下方');
-    prompt.writeln('5. 【禁止】不要添加任何无关上下文、额外知识或外部信息，仅基于提供的文章内容进行摘要');
+    prompt.writeln('你是文章分析专家。阅读下面的文章，按要求返回JSON。');
+    prompt.writeln('要求：提取标题和作者，给出2-4字分类标签，写200字摘要，将内容按主题分段深度总结。');
+    prompt.writeln('仅基于文章内容，不添加外部知识。不使用任何工具。');
     prompt.writeln();
     if (title.isNotEmpty) prompt.writeln('文章标题: $title');
     if (url.isNotEmpty) prompt.writeln('URL: $url');
@@ -698,20 +673,8 @@ class NoteService extends ChangeNotifier {
     prompt.writeln('文章内容:');
     prompt.writeln(truncated);
     prompt.writeln();
-    prompt.writeln('严格只返回如下JSON（不要包含其他内容）：');
-    prompt.writeln('{');
-    prompt.writeln('  "title": "准确的文章标题",');
-    prompt.writeln('  "author": "作者姓名，没有则为空字符串",');
-    prompt.writeln('  "categories": ["分类标签1", "分类标签2", ...],');
-    prompt.writeln('  "summary": "摘要内容",');
-    prompt.writeln('  "paragraph_summaries": [');
-    prompt.writeln('    {"subtitle": "语义小标题", "content": "深度总结"},');
-    prompt.writeln('    {"subtitle": "语义小标题", "content": "深度总结"},');
-    prompt.writeln('    ...');
-    prompt.writeln('  ]');
-    prompt.writeln('}');
-    prompt.writeln('categories说明：给文章打上多个内容分类标签，包括但不限于文章所属领域（如科技、财经、文学等）、');
-    prompt.writeln('内容形式（如科普、教程、评论等）、主题关键词等。每个标签2-4个字。');
+    prompt.writeln('请严格只返回如下JSON格式，不要返回其他内容：');
+    prompt.writeln('{"title":"文章标题","author":"作者","categories":["标签1","标签2"],"summary":"200字摘要","paragraph_summaries":[{"subtitle":"小标题","content":"深度总结"}]}');
 
     final runId = const Uuid().v4();
     _pendingReading[runId] = StringBuffer();
@@ -719,7 +682,7 @@ class NoteService extends ChangeNotifier {
     _readingCompleters[runId] = completer;
 
     final promptStr = prompt.toString();
-    debugPrint('NoteService: summarizeReading sending to server, '
+    log.info('NoteService: summarizeReading sending to server, '
         'category=$category, prompt.length=${promptStr.length}, '
         'text.length=${truncated.length}, runId=$runId');
 
@@ -734,14 +697,14 @@ class NoteService extends ChangeNotifier {
         timeoutMs: 60000,
       );
 
-      debugPrint('NoteService: summarizeReading rpcRes=$rpcRes');
+      log.info('NoteService: summarizeReading rpcRes=$rpcRes');
 
       // Update runId if server assigned a different one
       try {
         final resObj = jsonDecode(rpcRes) as Map<String, dynamic>?;
         final serverRunId = resObj?['runId'] as String?;
         if (serverRunId != null && serverRunId != runId) {
-          debugPrint('NoteService: remapping runId $runId → $serverRunId');
+          log.info('NoteService: remapping runId $runId → $serverRunId');
           final buf = _pendingReading.remove(runId);
           _readingCompleters.remove(runId);
           if (buf != null) _pendingReading[serverRunId] = buf;
@@ -752,14 +715,14 @@ class NoteService extends ChangeNotifier {
       final result = await completer.future.timeout(
         const Duration(seconds: 90),
         onTimeout: () {
-          debugPrint('NoteService: reading summary timed out');
+          log.warn('NoteService: reading summary timed out');
           _pendingReading.remove(runId);
           _readingCompleters.remove(runId);
           return '';
         },
       );
 
-      debugPrint('NoteService: summarizeReading result.length=${result.length}, '
+      log.info('NoteService: summarizeReading result.length=${result.length}, '
           'first 500 chars: ${result.length > 500 ? result.substring(0, 500) : result}');
 
       // Strip ALL control characters (0x00-0x1F). LLM streaming may inject
@@ -768,7 +731,7 @@ class NoteService extends ChangeNotifier {
 
       return sanitized;
     } catch (e) {
-      debugPrint('NoteService: summarizeReading failed: $e');
+      log.error('NoteService: summarizeReading failed: $e');
       _pendingReading.remove(runId);
       _readingCompleters.remove(runId);
       return '';
@@ -807,8 +770,12 @@ class NoteService extends ChangeNotifier {
       // content when the server sends both event types (e.g. OpenClaw).
       if (state == 'final' || state == 'aborted' || state == 'error') {
         if (serverRunId != null) {
-          final text = _pendingReading.remove(serverRunId)?.toString() ?? '';
-          debugPrint('NoteService: handleReadingEvent chat.$state, '
+          var text = _pendingReading.remove(serverRunId)?.toString() ?? '';
+          // Fallback: if no agent streaming was received, use chat message.
+          if (text.isEmpty) {
+            text = payload['message'] as String? ?? '';
+          }
+          log.info('NoteService: handleReadingEvent chat.$state, '
               'runId=$serverRunId, result.length=${text.length}');
           _readingCompleters.remove(serverRunId)?.complete(text);
         }
@@ -844,7 +811,7 @@ class NoteService extends ChangeNotifier {
       codec.dispose();
       return byteData?.buffer.asUint8List();
     } catch (e) {
-      debugPrint('NoteService: thumbnail generation failed: $e');
+      log.error('NoteService: thumbnail generation failed: $e');
       return null;
     }
   }
@@ -859,7 +826,7 @@ class NoteService extends ChangeNotifier {
       codec.dispose();
       return _generateThumbnail(pngBytes, srcWidth, srcHeight);
     } catch (e) {
-      debugPrint('NoteService: thumbnail from PNG failed: $e');
+      log.error('NoteService: thumbnail from PNG failed: $e');
       return null;
     }
   }
