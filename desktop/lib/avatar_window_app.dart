@@ -56,6 +56,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
   // Placement state machine
   _PlacementState _placement = _PlacementState.onDock;
   int _anchoredHwnd = 0;
+  String _anchoredOwnerName = '';
 
   // User-drag offset: relative X from window top-center (0 = centered)
   double _userOffsetX = 0;
@@ -323,13 +324,14 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
   /// Uses constant base height (not the dynamic _windowSize) so that the
   /// anchor position is independent of whether the input field is visible.
   /// On macOS, sits on the title bar instead of above it (menu bar blocks
-  /// placement above the window).
   double _windowTopY(_WindowRectInfo info) {
     final inset = _currentBottomInset;
     if (Platform.isMacOS) {
-      // macOS: sit on the title bar, overlapping slightly.
-      // The avatar bottom sits near the window top edge.
-      return info.top +
+      // macOS: avatar bottom sits at the window top edge.
+      // Avatar extends upward from the title bar (floating window is visible
+      // above the menu bar). Same formula as Windows but without title bar
+      // clearance since macOS windows don't have invisible shadow frames.
+      return info.top - _toPhysical(_anchorHeight) +
           _toPhysical(AvatarSnapshot.kFloatingWindowPadding + inset);
     }
     return info.top - _toPhysical(_anchorHeight) +
@@ -648,17 +650,20 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     for (final w in windows) {
       // Skip our own app's windows
       if (w.ownerName == 'boji_desktop') continue;
-      // Skip system/daemon windows
+      // Skip system/daemon windows (both English and localized names)
       final owner = w.ownerName.toLowerCase();
       if (owner.contains('window server') || owner.contains('systemuiserver') ||
-          owner.contains('dock') || owner.contains('controlcenter') ||
-          owner.contains('notification center')) continue;
-      // Skip windows without names
-      if (w.windowName == null || w.windowName!.isEmpty) continue;
+          owner.contains('dock') || owner.contains('程序坞') ||
+          owner.contains('controlcenter') || owner.contains('控制中心') ||
+          owner.contains('notification center') || owner.contains('通知中心') ||
+          owner.contains('loginwindow') || owner.contains('访达')) continue;
       // Skip tiny windows
       if (w.bounds != null && (w.bounds!['Width']! < 100 || w.bounds!['Height']! < 100)) continue;
+      debugPrint('AvatarFG macOS: PICKED owner=${w.ownerName} '
+          'name=${w.windowName} id=${w.windowID} bounds=${w.bounds}');
       return w;
     }
+    debugPrint('AvatarFG macOS: no suitable window found (total=${windows.length})');
     return null;
   }
 
@@ -674,6 +679,8 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     if (w == null) return;
 
     final fgWindowId = w.windowID;
+    debugPrint('AvatarPoll macOS: fg=$fgWindowId '
+        '${w.ownerName}/${w.windowName} placement=$_placement anchored=$_anchoredHwnd');
 
     // --- Health check for anchored window ---
     if ((_placement == _PlacementState.anchoredWindow ||
@@ -717,8 +724,8 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     }
     final b = w.bounds!;
     final centerX = b['X']! + b['Width']! / 2 - _windowSize.width / 2;
-    // macOS: sit on the title bar instead of above it (menu bar blocks).
-    final topY = b['Y']!.toDouble() +
+    // macOS: avatar bottom at window top edge, body extends upward.
+    final topY = b['Y']!.toDouble() - _anchorHeight +
         AvatarSnapshot.kFloatingWindowPadding + _currentBottomInset;
 
     debugPrint('AvatarAnchor macOS: anchoring to windowID=${w.windowID} '
@@ -729,6 +736,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     _stopSpring();
     _placement = _PlacementState.anchoredWindow;
     _anchoredHwnd = w.windowID;
+    _anchoredOwnerName = w.ownerName;
     _userOffsetX = 0;
 
     _lastAnchoredLeft = b['X']!.toDouble();
@@ -1261,8 +1269,19 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
       _scheduleNextWander();
       return;
     }
-    if (!ScreenCapture.isBrowserWindow(_anchoredHwnd)) {
-      debugPrint('StartReading: not a browser window');
+    // Check if anchored window is a browser
+    bool isBrowser;
+    if (Platform.isMacOS) {
+      final owner = _anchoredOwnerName.toLowerCase();
+      isBrowser = owner.contains('chrome') || owner.contains('safari') ||
+          owner.contains('firefox') || owner.contains('edge') ||
+          owner.contains('opera') || owner.contains('vivaldi') ||
+          owner.contains('brave') || owner.contains('arc');
+    } else {
+      isBrowser = ScreenCapture.isBrowserWindow(_anchoredHwnd);
+    }
+    if (!isBrowser) {
+      debugPrint('StartReading: not a browser window (owner=$_anchoredOwnerName)');
       _scheduleNextWander();
       return;
     }
@@ -1278,6 +1297,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     }
 
     final title = ScreenCapture.getWindowTitle(_anchoredHwnd);
+    debugPrint('StartReading: url=$url, title=$title, hwnd=$_anchoredHwnd');
     await _sendMenuActionToMainWithData('start_reading', {
       'hwnd': _anchoredHwnd,
       'url': url,

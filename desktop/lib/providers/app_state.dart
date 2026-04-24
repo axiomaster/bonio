@@ -12,6 +12,7 @@ import 'package:window_manager/window_manager.dart';
 import '../l10n/app_strings.dart';
 import '../models/agent_avatar_models.dart';
 import '../platform/gui_agent.dart';
+import '../platform/macos_screen_capture.dart';
 import '../platform/screen_capture.dart';
 import '../services/app_logger.dart';
 import '../platform/screen_capture_types.dart';
@@ -294,6 +295,7 @@ class AppState extends ChangeNotifier {
     final hwnd = (data['hwnd'] as num?)?.toInt() ?? 0;
     var url = data['url'] as String? ?? '';
     final title = data['title'] as String? ?? '';
+    debugPrint('AppState: _handleStartReading hwnd=$hwnd url=$url title=$title');
 
     final ctrl = runtime.avatarController;
     ctrl.setBubble(text: S.current.readingConnecting);
@@ -364,9 +366,33 @@ class AppState extends ChangeNotifier {
       }
     }
 
+    // macOS: extract page text via AppleScript JavaScript execution
+    if (cdpContent == null && hwnd != 0 && Platform.isMacOS) {
+      try {
+        ctrl.setBubble(text: S.current.readingExtracting);
+        final pageText = MacosScreenCapture.getBrowserPageText(hwnd);
+        if (pageText != null && pageText.length > 50) {
+          debugPrint('AppState: macOS AppleScript extracted ${pageText.length} chars');
+          cdpContent = PageContent(
+            title: title,
+            url: url,
+            text: pageText,
+            headings: [],
+          );
+        } else {
+          debugPrint('AppState: macOS AppleScript text too short or empty '
+              '(${pageText?.length ?? 0} chars)');
+        }
+      } catch (e) {
+        debugPrint('AppState: macOS AppleScript extraction failed: $e');
+      }
+    }
+
     final ga = runtime.guiAgent;
     if (hwnd != 0) {
       final browserRect = ga.window.getWindowRect(hwnd);
+      debugPrint('AppState: browserRect=$browserRect, dpi=${ga.screen.getDpiScale(hwnd)}, '
+          'url=$url, cdpContent=${cdpContent != null ? "${cdpContent.text.length}chars" : "null"}');
       if (browserRect != Rect.zero) {
         final dpi = ga.screen.getDpiScale(hwnd);
         await runtime.createReadingWindow(

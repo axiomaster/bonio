@@ -12,5 +12,7 @@ class MacScreenAgent implements ScreenAgent {
   ScreenCaptureResult? captureWindow(int windowHandle) => null;
 
   @override
-  double getDpiScale(int windowHandle) => 2.0; // Retina default
+  // CG window bounds are in logical points, so no DPI scaling needed.
+  @override
+  double getDpiScale(int windowHandle) => 1.0;
 }
