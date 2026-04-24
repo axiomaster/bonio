@@ -2,6 +2,15 @@ import Cocoa
 import FlutterMacOS
 import Foundation
 
+/// NSMenuItem subclass that records the action string of the clicked item.
+class PopupMenuItem: NSMenuItem {
+    static var lastClickedAction: String?
+
+    @objc func itemClicked() {
+        PopupMenuItem.lastClickedAction = representedObject as? String ?? ""
+    }
+}
+
 typealias WindowId = String
 
 extension WindowId {
@@ -183,6 +192,40 @@ class FlutterWindow: NSObject {
                 "dockHeight": dockHeight,
                 "menuBarHeight": menuBarHeight,
             ] as [String: Any])
+
+        case "window_showPopupMenu":
+            let items = args?["items"] as? [[String: Any]] ?? []
+            let actions = args?["actions"] as? [Int: String] ?? [:]
+            let menu = NSMenu()
+            menu.autoenablesItems = false
+            var selectedAction = ""
+            for item in items {
+                let id = item["id"] as? Int ?? 0
+                let label = item["label"] as? String ?? ""
+                let enabled = item["enabled"] as? Bool ?? true
+                if id == 0 {
+                    menu.addItem(NSMenuItem.separator())
+                } else {
+                    let menuItem = PopupMenuItem(title: label, action: #selector(PopupMenuItem.itemClicked), keyEquivalent: "")
+                    menuItem.tag = id
+                    menuItem.isEnabled = enabled
+                    menuItem.target = menuItem
+                    menuItem.representedObject = actions[id] ?? ""
+                    menu.addItem(menuItem)
+                }
+            }
+            // Show context menu at mouse location synchronously
+            let event = NSApplication.shared.currentEvent
+                ?? NSEvent.mouseEvent(with: .leftMouseDown, location: NSEvent.mouseLocation,
+                    modifierFlags: .init(rawValue: 0), timestamp: 0, windowNumber: 0,
+                    context: nil, eventNumber: 0, clickCount: 1, pressure: 1.0)!
+            NSMenu.popUpContextMenu(menu, with: event, for: window.contentView ?? NSView())
+            // After menu dismisses, check if a PopupMenuItem was selected
+            if let clicked = PopupMenuItem.lastClickedAction {
+                selectedAction = clicked
+                PopupMenuItem.lastClickedAction = nil
+            }
+            result(selectedAction)
 
         default:
             result(FlutterError(code: "-1", message: "unknown method \(method)", details: nil))

@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+请你永远永远记住，
+1. 每次修改完成代码后都编译一下，确保代码可以正常编译通过；
+2. 每次开发完一个功能，都git提交一下，确保不会丢失；
+
 ## Project Overview
 
 BoJi (HiClaw) is an AI agent gateway system with four components:
