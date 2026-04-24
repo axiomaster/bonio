@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
+
+import 'app_logger.dart';
 
 class HiclawProcess extends ChangeNotifier {
   Process? _process;
@@ -44,10 +47,16 @@ class HiclawProcess extends ChangeNotifier {
   }
 
   Future<String> _workspaceDir() async {
-    final supportDir = await getApplicationSupportDirectory();
-    final dir = Directory('${supportDir.path}/boji/hiclaw');
+    final home = Platform.environment['HOME'] ??
+        Platform.environment['USERPROFILE'] ??
+        (await getApplicationSupportDirectory()).path;
+    final dir = Directory('$home/.bonio');
     if (!await dir.exists()) {
       await dir.create(recursive: true);
+    }
+    final logsDir = Directory('${dir.path}/logs');
+    if (!await logsDir.exists()) {
+      await logsDir.create(recursive: true);
     }
     return dir.path;
   }
@@ -70,11 +79,13 @@ class HiclawProcess extends ChangeNotifier {
       _isRunning = true;
       notifyListeners();
 
+      // Hiclaw stdout/stderr: console only, not written to desktop.log.
+      // Hiclaw writes its own log file via spdlog at ~/.bonio/logs/hiclaw.log.
       result.stdout
-          .transform(const SystemEncoding().decoder)
+          .transform(utf8.decoder)
           .listen((data) => debugPrint('[hiclaw] $data'));
       result.stderr
-          .transform(const SystemEncoding().decoder)
+          .transform(utf8.decoder)
           .listen((data) => debugPrint('[hiclaw:err] $data'));
 
       result.exitCode.then((code) {
@@ -87,7 +98,7 @@ class HiclawProcess extends ChangeNotifier {
       });
     } catch (e) {
       _error = e.toString();
-      debugPrint('[hiclaw] Failed to start: $e');
+      log.error('[hiclaw] Failed to start: $e');
     }
   }
 

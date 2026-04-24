@@ -69,13 +69,13 @@ bool resolve_model(const Config& config,
 std::string get_workspace();
 
 /**
- * Default workspace when HICLAW_WORKSPACE is not set: ~/.hiclaw (Windows: %USERPROFILE%\.hiclaw).
+ * Default workspace when HICLAW_WORKSPACE is not set: ~/.bonio (Windows: %USERPROFILE%\.bonio).
  * Config file is always workspace/hiclaw.json.
  */
 std::string get_default_workspace();
 
 /**
- * Load config from workspace/hiclaw.json. Workspace = HICLAW_WORKSPACE (if set), else --config-dir (if set), else default (~/.hiclaw).
+ * Load config from workspace/hiclaw.json. Workspace = HICLAW_WORKSPACE (if set), else --config-dir (if set), else default (~/.bonio).
  */
 bool load(const std::string& config_dir, Config& out, std::string& err);
 

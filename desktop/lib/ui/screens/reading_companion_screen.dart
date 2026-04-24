@@ -8,6 +8,7 @@ import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:ffi/ffi.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../l10n/app_strings.dart';
@@ -169,6 +170,7 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
   String _fullText = '';
   String _aiTitle = '';
   List<String> _categories = [];
+  bool _isPreview = false;
   Timer? _browserTrackTimer;
   ReadingCategory _category = ReadingCategory.auto;
   Rect _lastBrowserRect = Rect.zero;
@@ -233,15 +235,54 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
     } catch (_) {}
   }
 
+  /// Try to extract a JSON map from model output that may be wrapped in
+  /// markdown code blocks or have extra text before/after the JSON.
+  Map<String, dynamic>? _extractJson(String raw) {
+    // 1. Direct parse
+    try {
+      final v = jsonDecode(raw);
+      if (v is Map<String, dynamic>) return v;
+    } catch (_) {}
+
+    // 2. Extract ```json ... ``` code block
+    final codeBlock = RegExp(r'```(?:json)?\s*\n?([\s\S]*?)\n?\s*```');
+    final codeMatch = codeBlock.firstMatch(raw);
+    if (codeMatch != null) {
+      try {
+        final v = jsonDecode(codeMatch.group(1)!.trim());
+        if (v is Map<String, dynamic>) return v;
+      } catch (_) {}
+    }
+
+    // 3. Extract first { to last }
+    final firstBrace = raw.indexOf('{');
+    final lastBrace = raw.lastIndexOf('}');
+    if (firstBrace != -1 && lastBrace > firstBrace) {
+      try {
+        final v = jsonDecode(raw.substring(firstBrace, lastBrace + 1));
+        if (v is Map<String, dynamic>) return v;
+      } catch (_) {}
+    }
+
+    return null;
+  }
+
   void _onSummaryResult(String jsonStr) {
     if (!mounted) return;
     if (jsonStr.isEmpty) {
       _analyzeContentLocal(_fullText, widget.browserTitle);
       return;
     }
+    final json = _extractJson(jsonStr);
+    if (json == null) {
+      debugPrint('ReadingCompanion: could not extract JSON from summary');
+      _analyzeContentLocal(_fullText, widget.browserTitle);
+      return;
+    }
     try {
-      final json = jsonDecode(jsonStr) as Map<String, dynamic>;
-      final markdown = json['markdown'] as String? ?? '';
+      // Normalize: accept both "summary" (from server prompt) and "markdown" (legacy)
+      final markdown = (json['markdown'] as String?) ??
+          (json['summary'] as String?) ?? '';
       final title = json['title'] as String? ?? '';
       if (markdown.isEmpty) {
         _analyzeContentLocal(_fullText, widget.browserTitle);
@@ -251,6 +292,18 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
         _aiTitle = title;
       }
       _categories = (json['categories'] as List?)?.cast<String>() ?? [];
+      // If user selected auto, map the first matching LLM category back
+      if (_category == ReadingCategory.auto && _categories.isNotEmpty) {
+        final detected = ReadingCategory.values
+            .where((c) => c != ReadingCategory.auto)
+            .firstWhere(
+              (c) => _categories.any((cat) => cat.contains(c.label) || c.label.contains(cat)),
+              orElse: () => ReadingCategory.auto,
+            );
+        if (detected != ReadingCategory.auto) {
+          _category = detected;
+        }
+      }
       _summary = markdown;
       _editorController.text = _summary;
       setState(() {
@@ -258,7 +311,7 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
         _errorText = null;
       });
     } catch (e) {
-      debugPrint('ReadingCompanion: failed to parse AI summary: $e');
+      debugPrint('ReadingCompanion: failed to parse AI summary fields: $e');
       _analyzeContentLocal(_fullText, widget.browserTitle);
     }
   }
@@ -820,15 +873,15 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
             ),
             child: Row(
               children: [
-                // Category selector
-                _buildCategoryDropdown(theme, cs),
-                const SizedBox(width: 4),
+                // Save button
                 IconButton(
                   icon: const Icon(Icons.save_outlined, size: 18),
                   tooltip: S.current.readingSave,
                   onPressed: _phase == _LoadPhase.ready ? _saveToMemory : null,
                   visualDensity: VisualDensity.compact,
                 ),
+                // Category selector
+                _buildCategoryDropdown(theme, cs),
                 if (_isLoading) ...[
                   const SizedBox(width: 4),
                   SizedBox(
@@ -844,9 +897,40 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
                       style: theme.textTheme.bodySmall?.copyWith(
                           color: cs.onSurface.withValues(alpha: 0.6))),
                 ],
+                const Spacer(),
+                if (_phase == _LoadPhase.ready)
+                  IconButton(
+                    icon: Icon(
+                        _isPreview ? Icons.edit_outlined : Icons.visibility_outlined,
+                        size: 18),
+                    tooltip: _isPreview ? '编辑' : '预览',
+                    onPressed: () => setState(() => _isPreview = !_isPreview),
+                    visualDensity: VisualDensity.compact,
+                  ),
               ],
             ),
           ),
+          // Tag chips
+          if (_categories.isNotEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerLow,
+                border: Border(bottom: BorderSide(color: cs.outlineVariant)),
+              ),
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: _categories.map((tag) => Chip(
+                  label: Text(tag, style: theme.textTheme.bodySmall),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                  deleteIcon: const Icon(Icons.close, size: 14),
+                  onDeleted: () => setState(() => _categories.remove(tag)),
+                )).toList(),
+              ),
+            ),
           Expanded(child: _buildBody(theme, cs)),
         ],
       ),
@@ -941,7 +1025,7 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
           ),
         Expanded(
           child: _phase == _LoadPhase.ready
-              ? _buildEditor(cs)
+              ? (_isPreview ? _buildPreview(theme, cs) : _buildEditor(cs))
               : _buildLoadingIndicator(theme, cs),
         ),
       ],
@@ -963,6 +1047,40 @@ class _ReadingCompanionPageState extends State<_ReadingCompanionPage> {
             const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       ),
       style: TextStyle(fontSize: 13, height: 1.5, color: cs.onSurface),
+    );
+  }
+
+  Widget _buildPreview(ThemeData theme, ColorScheme cs) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: MarkdownBody(
+        data: _editorController.text,
+        selectable: true,
+        styleSheet: MarkdownStyleSheet(
+          p: TextStyle(fontSize: 14, height: 1.6, color: cs.onSurface),
+          h2: TextStyle(
+              fontSize: 18, fontWeight: FontWeight.bold, color: cs.onSurface),
+          h3: TextStyle(
+              fontSize: 15, fontWeight: FontWeight.w600, color: cs.onSurface),
+          listBullet: TextStyle(color: cs.primary),
+          code: TextStyle(
+            fontFamily: 'Consolas',
+            fontSize: 13,
+            color: cs.onSurface,
+            backgroundColor: cs.surfaceContainerHighest,
+          ),
+          codeblockDecoration: BoxDecoration(
+            color: const Color(0xFF1E1E2E),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          codeblockPadding: const EdgeInsets.all(12),
+          blockquote: TextStyle(color: cs.onSurface.withValues(alpha: 0.7)),
+          blockquoteDecoration: BoxDecoration(
+            color: cs.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+      ),
     );
   }
 

@@ -267,7 +267,7 @@ void AsyncAgentManager::run_task(std::shared_ptr<AsyncTask> task) {
       const std::string* user_override =
           task->user_message_json_override.empty() ? nullptr : &task->user_message_json_override;
       result = agent::run_streaming_with_history(
-          config_, history, task->message, 0.7,
+          config_, history, task->message, 0.3,
           stream_callback, tool_callback, &task->aborted, 5, remote_executor, user_override);
     }
 

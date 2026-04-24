@@ -17,7 +17,7 @@ fi
 TOOLCHAIN="${OHOS_NDK_HOME}/build/cmake/ohos.toolchain.cmake"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-BUILD_DIR="${PROJECT_ROOT}/build/ohos"
+BUILD_DIR="${PROJECT_ROOT}/build/ohos-arm64"
 
 if [[ ! -d "$OHOS_NDK_HOME" ]]; then
   echo "Error: OHOS NDK not found at $OHOS_NDK_HOME"
@@ -47,3 +47,9 @@ echo "============================================"
 echo "Build OK!"
 echo "Binary: $BUILD_DIR/hiclaw"
 echo "============================================"
+
+# Copy to bin/
+BIN_DIR="${PROJECT_ROOT}/bin"
+mkdir -p "$BIN_DIR"
+cp "$BUILD_DIR/hiclaw" "$BIN_DIR/hiclaw"
+echo "Copied to $BIN_DIR/hiclaw"

@@ -115,9 +115,9 @@ std::string get_workspace() {
   return expand_tilde(v);
 }
 
-/** Default workspace: ~/.hiclaw (Windows: %USERPROFILE%\.hiclaw). */
+/** Default workspace: ~/.bonio (Windows: %USERPROFILE%\.bonio). */
 std::string get_default_workspace() {
-  return expand_tilde("~/.hiclaw");
+  return expand_tilde("~/.bonio");
 }
 
 /** Fallback defaults when provider not in built-in registry. */

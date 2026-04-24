@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../l10n/app_strings.dart';
 import '../models/chat_models.dart';
+import 'app_logger.dart';
 import 'gateway_session.dart';
 
 class ChatController extends ChangeNotifier {
@@ -131,7 +132,7 @@ class ChatController extends ChangeNotifier {
     final runId = _uuid.v4();
     // Guard: skip if another send is already in flight with the same text
     if (_inflightClientRunIds.isNotEmpty) {
-      debugPrint('ChatController: send skipped — another send is in flight');
+      log.warn('ChatController: send skipped — another send is in flight');
       return;
     }
     _inflightClientRunIds.add(runId);
@@ -220,7 +221,7 @@ class ChatController extends ChangeNotifier {
 
           if (_completedRunIds.remove(actualRunId)) {
             // The final event already arrived — run is done.
-            debugPrint('ChatController: runId $actualRunId already completed');
+            log.warn('ChatController: runId $actualRunId already completed');
             _pendingRunCount = _pendingRuns.length;
           } else {
             _armPendingRunTimeout(actualRunId);
@@ -435,7 +436,7 @@ class ChatController extends ChangeNotifier {
             // Record the runId so the RPC response handler won't re-add it.
             // Do NOT call _clearPendingRuns() — that destroys _completedRunIds.
             _completedRunIds.add(runId);
-            debugPrint('ChatController: early final for runId $runId, '
+            log.warn('ChatController: early final for runId $runId, '
                 'inflight=${_inflightClientRunIds.length}');
             // If no RPC is in flight, the client-side runId is already in
             // _pendingRuns; clear it since the server is done.
@@ -545,7 +546,7 @@ class ChatController extends ChangeNotifier {
       notifyListeners();
       _maybeSpeakAssistantAfterMerge();
     } catch (e) {
-      debugPrint('ChatController: _fetchHistoryAndMerge failed: $e');
+      log.error('ChatController: _fetchHistoryAndMerge failed: $e');
       // Still attempt TTS with whatever streaming text we captured.
       if (streamingText != null && streamingText.isNotEmpty) {
         _messages = [
@@ -566,21 +567,21 @@ class ChatController extends ChangeNotifier {
 
   void _maybeSpeakAssistantAfterMerge() {
     if (!_ttsAfterChatFinal) {
-      debugPrint('ChatController: TTS skipped (_ttsAfterChatFinal=false)');
+      log.debug('ChatController: TTS skipped (_ttsAfterChatFinal=false)');
       return;
     }
     _ttsAfterChatFinal = false;
     final text = _lastAssistantPlainText();
     if (text.isEmpty) {
-      debugPrint('ChatController: TTS skipped (empty assistant text)');
+      log.debug('ChatController: TTS skipped (empty assistant text)');
       return;
     }
     if (text == _lastAssistantTtsDigest) {
-      debugPrint('ChatController: TTS skipped (duplicate digest)');
+      log.debug('ChatController: TTS skipped (duplicate digest)');
       return;
     }
     _lastAssistantTtsDigest = text;
-    debugPrint('ChatController: triggering TTS (${text.length} chars)');
+    log.info('ChatController: triggering TTS (${text.length} chars)');
     onAssistantReplyForTts?.call(text);
   }
 

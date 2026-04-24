@@ -15,7 +15,7 @@ namespace {
 using json = nlohmann::json;
 
 std::string& base_path_storage() {
-  static std::string path = ".hiclaw";
+  static std::string path = ".bonio";
   return path;
 }
 
@@ -33,7 +33,7 @@ std::string sanitize_key(const std::string& key) {
 
 std::string memory_dir() {
   std::string base = base_path_storage();
-  if (base.empty()) base = ".hiclaw";
+  if (base.empty()) base = ".bonio";
   return (std::filesystem::path(base) / "memory").string();
 }
 
@@ -64,7 +64,7 @@ std::string now_iso() {
 }  // namespace
 
 void set_base_path(const std::string& path) {
-  base_path_storage() = path.empty() ? ".hiclaw" : path;
+  base_path_storage() = path.empty() ? ".bonio" : path;
 }
 
 std::string get_base_path() {

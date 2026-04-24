@@ -15,7 +15,7 @@ struct MemoryEntry {
   std::string timestamp;
 };
 
-/// Set base directory for memory storage (e.g. config_dir or ".hiclaw"). Called by agent before run.
+/// Set base directory for memory storage (e.g. config_dir or ".bonio"). Called by agent before run.
 void set_base_path(const std::string& path);
 std::string get_base_path();
 

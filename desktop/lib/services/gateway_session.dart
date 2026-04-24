@@ -9,6 +9,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import '../l10n/app_strings.dart';
 import '../models/gateway_models.dart';
 import '../models/device_identity.dart';
+import 'app_logger.dart';
 import 'device_identity_store.dart';
 import 'device_auth_store.dart';
 
@@ -222,7 +223,7 @@ class GatewaySession {
       (data) {
         final text = _decodeWsFrameText(data);
         if (text == null) {
-          debugPrint('gateway: dropped non-text WebSocket frame (${data.runtimeType})');
+          log.warn('gateway: dropped non-text WebSocket frame (${data.runtimeType})');
           return;
         }
         _handleMessage(text, target, completer);
@@ -275,11 +276,11 @@ class GatewaySession {
           break;
       }
     } catch (e, st) {
-      debugPrint('gateway: frame decode error: $e');
-      debugPrint('$st');
+      log.error('gateway: frame decode error: $e');
+      log.debug('$st');
       final preview =
           text.length > 200 ? '${text.substring(0, 200)}...' : text;
-      debugPrint('gateway: frame preview: $preview');
+      log.debug('gateway: frame preview: $preview');
     }
   }
 

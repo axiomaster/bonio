@@ -35,7 +35,7 @@ fi
 TOOLCHAIN="${ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-BUILD_DIR="${PROJECT_ROOT}/build/android/${ANDROID_ABI}"
+BUILD_DIR="${PROJECT_ROOT}/build/android-${ANDROID_ABI}"
 
 if [[ ! -d "$ANDROID_NDK_HOME" ]]; then
   echo "Error: Android NDK not found at $ANDROID_NDK_HOME"
@@ -103,9 +103,10 @@ echo ""
 echo "============================================"
 echo "Build OK!"
 echo "Binary: $BUILD_DIR/hiclaw"
-echo ""
-echo "To push to device:"
-echo "  adb push '$BUILD_DIR/hiclaw' /data/local/tmp/"
-echo "  adb shell chmod +x /data/local/tmp/hiclaw"
-echo "  adb shell /data/local/tmp/hiclaw --version"
 echo "============================================"
+
+# Copy to bin/
+BIN_DIR="${PROJECT_ROOT}/bin"
+mkdir -p "$BIN_DIR"
+cp "$BUILD_DIR/hiclaw" "$BIN_DIR/hiclaw"
+echo "Copied to $BIN_DIR/hiclaw"
