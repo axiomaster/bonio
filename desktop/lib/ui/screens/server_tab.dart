@@ -1,3 +1,7 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../l10n/app_strings.dart';
@@ -310,6 +314,10 @@ class _ServerTabState extends State<ServerTab> {
             ),
             const SizedBox(height: 16),
 
+            // Channel card
+            _ChannelCard(isConnected: isConnected),
+            const SizedBox(height: 16),
+
             // Server info card
             if (isConnected && runtime.serverName != null)
               Card(
@@ -422,6 +430,252 @@ class _InfoRow extends StatelessWidget {
       ],
     );
   }
+}
+
+// ════════════════════════════════════════════════════════════════
+//  Channel Card (WeChat binding & QR code)
+// ════════════════════════════════════════════════════════════════
+
+class _ChannelCard extends StatefulWidget {
+  final bool isConnected;
+  const _ChannelCard({required this.isConnected});
+
+  @override
+  State<_ChannelCard> createState() => _ChannelCardState();
+}
+
+class _ChannelCardState extends State<_ChannelCard> {
+  bool _loading = false;
+  String? _error;
+  String? _qrImgData; // base64 data URI
+  String? _qrKey;
+  String _scanStatus = ''; // '' | 'waiting' | 'scaned' | 'confirmed'
+  Timer? _pollTimer;
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _startBinding() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+      _qrImgData = null;
+      _qrKey = null;
+      _scanStatus = '';
+    });
+    _pollTimer?.cancel();
+
+    try {
+      final appState = context.read<AppState>();
+      final result = await appState.runtime.channelRepository.getQrCode();
+      final qrcodeKey = result['qrcode_key'] as String? ?? '';
+      final qrcodeImg = result['qrcode_img'] as String? ?? '';
+
+      if (!mounted) return;
+      setState(() {
+        _qrKey = qrcodeKey;
+        _qrImgData = qrcodeImg;
+        _scanStatus = 'waiting';
+        _loading = false;
+      });
+
+      _startPolling();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
+      if (_qrKey == null || _scanStatus == 'confirmed') {
+        _pollTimer?.cancel();
+        return;
+      }
+      try {
+        final appState = context.read<AppState>();
+        final result =
+            await appState.runtime.channelRepository.getStatus(_qrKey!);
+        final status = result['status'] as String? ?? 'wait';
+        if (!mounted) return;
+
+        if (status == 'confirmed') {
+          _pollTimer?.cancel();
+          final token = result['bot_token'] as String? ?? '';
+          final baseUrl = result['baseurl'] as String? ?? '';
+          if (token.isNotEmpty) {
+            await appState.runtime.channelRepository.setup(
+              token,
+              baseUrl: baseUrl,
+            );
+            await appState.runtime.refreshChannel();
+          }
+          if (!mounted) return;
+          setState(() {
+            _scanStatus = 'confirmed';
+            _qrImgData = null;
+          });
+        } else if (status == 'scaned') {
+          setState(() => _scanStatus = 'scaned');
+        } else if (status == 'expired') {
+          _pollTimer?.cancel();
+          setState(() {
+            _scanStatus = '';
+            _error = 'QR code expired, please try again';
+          });
+        }
+      } catch (_) {}
+    });
+  }
+
+  Future<void> _disable() async {
+    try {
+      final appState = context.read<AppState>();
+      await appState.runtime.channelRepository.disable();
+      await appState.runtime.refreshChannel();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final appState = context.watch<AppState>();
+    final channel = appState.runtime.channelConfig;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.qr_code_scanner,
+                    size: 20, color: colorScheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(S.current.channelTitle,
+                      style: theme.textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w600)),
+                ),
+                if (channel != null && channel.enabled)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      S.current.channelConnected,
+                      style: TextStyle(
+                          color: Colors.green.shade700,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Error display
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(_error!,
+                    style: TextStyle(color: colorScheme.error, fontSize: 13)),
+              ),
+
+            // Already bound
+            if (channel != null && channel.enabled && _scanStatus != 'waiting' && _scanStatus != 'scaned') ...[
+              _InfoRow(
+                label: S.current.channelMode,
+                value: channel.isWeixin
+                    ? S.current.channelWeixin
+                    : channel.isWecom
+                        ? 'WeCom'
+                        : channel.mode ?? '-',
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: OutlinedButton(
+                  onPressed: widget.isConnected ? _disable : null,
+                  style: OutlinedButton.styleFrom(foregroundColor: colorScheme.error),
+                  child: Text(S.current.channelUnbind),
+                ),
+              ),
+            ],
+
+            // QR code scanning flow
+            if (channel == null || !channel.enabled || _scanStatus == 'waiting' || _scanStatus == 'scaned') ...[
+              if (_qrImgData != null && _qrImgData!.isNotEmpty)
+                Center(
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 8),
+                      if (_qrImgData!.startsWith('http'))
+                        Image.network(_qrImgData!, width: 200, height: 200)
+                      else
+                        Image.memory(
+                          _base64Decode(_qrImgData!),
+                          width: 200,
+                          height: 200,
+                        ),
+                      const SizedBox(height: 12),
+                      Text(
+                        _scanStatus == 'scaned'
+                            ? S.current.channelScanned
+                            : S.current.channelWaitingScan,
+                        style: TextStyle(
+                          color: colorScheme.primary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else if (_scanStatus.isEmpty)
+                Center(
+                  child: _loading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : FilledButton.icon(
+                          onPressed: widget.isConnected ? _startBinding : null,
+                          icon: const Icon(Icons.qr_code_scanner, size: 18),
+                          label: Text(S.current.channelBindWechat),
+                        ),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+Uint8List _base64Decode(String dataUri) {
+  // Handle data:image/png;base64,xxx or data:image/jpeg;base64,xxx
+  final comma = dataUri.indexOf(',');
+  final b64 = comma >= 0 ? dataUri.substring(comma + 1) : dataUri;
+  return base64Decode(b64);
 }
 
 // ════════════════════════════════════════════════════════════════

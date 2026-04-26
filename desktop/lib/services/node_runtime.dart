@@ -11,11 +11,13 @@ import '../models/avatar_snapshot.dart';
 import '../models/gateway_models.dart';
 import '../models/gateway_profile.dart';
 import '../models/server_config.dart';
+import '../models/channel_config.dart';
 import '../models/skill_models.dart';
 import 'gateway_session.dart';
 import 'device_identity_store.dart';
 import 'device_auth_store.dart';
 import 'config_repository.dart';
+import 'channel_repository.dart';
 import 'skill_repository.dart';
 import 'avatar_command_executor.dart';
 import 'avatar_controller.dart';
@@ -51,6 +53,7 @@ class NodeRuntime extends ChangeNotifier {
   late final GatewaySession operatorSession;
   late final GatewaySession nodeSession;
   late final ConfigRepository configRepository;
+  late final ChannelRepository channelRepository;
   late final SkillRepository skillRepository;
   late final ChatController chatController;
   late final AvatarController avatarController;
@@ -81,9 +84,12 @@ class NodeRuntime extends ChangeNotifier {
   bool _skillsLoading = false;
   String? _skillsError;
 
+  ChannelConfig? _channelConfig;
+
   List<SkillInfo> get skills => _skills;
   bool get skillsLoading => _skillsLoading;
   String? get skillsError => _skillsError;
+  ChannelConfig? get channelConfig => _channelConfig;
 
   /// Stagger second WebSocket so OpenClaw completes operator handshake first.
   Timer? _nodeConnectTimer;
@@ -118,6 +124,7 @@ class NodeRuntime extends ChangeNotifier {
     );
 
     configRepository = ConfigRepository(session: operatorSession);
+    channelRepository = ChannelRepository(operatorSession);
     skillRepository = SkillRepository(operatorSession);
     desktopTts = DesktopTts();
     chatController = ChatController(
@@ -456,6 +463,13 @@ class NodeRuntime extends ChangeNotifier {
     }
   }
 
+  Future<void> refreshChannel() async {
+    try {
+      _channelConfig = await channelRepository.getConfig();
+      notifyListeners();
+    } catch (_) {}
+  }
+
   Future<void> toggleSkill(String id, bool enable) async {
     try {
       if (enable) {
@@ -526,6 +540,7 @@ class NodeRuntime extends ChangeNotifier {
     }
     refreshServerConfig();
     refreshSkills();
+    refreshChannel();
   }
 
   void _onOperatorDisconnected(String message) {
@@ -533,6 +548,7 @@ class NodeRuntime extends ChangeNotifier {
     _connectionStatus = message;
     _skills = [];
     _skillsError = null;
+    _channelConfig = null;
     chatController.onDisconnected(message);
     notifyListeners();
   }

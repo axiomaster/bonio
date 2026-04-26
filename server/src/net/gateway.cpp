@@ -12,6 +12,7 @@
 #include "hiclaw/observability/log.hpp"
 #include "hiclaw/session/store.hpp"
 #include "hiclaw/skills/skill_manager.hpp"
+#include <hv/HttpClient.h>
 
 #ifdef _WIN32
 #undef min
@@ -1233,6 +1234,193 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
         res["error"] = {{"code", "NOT_FOUND"}, {"message", "skill not found in installed skills"}};
       }
       try { server.send(hdl, res.dump(), websocketpp::frame::opcode::text); } catch (...) {}
+      return;
+    }
+
+    // ==================== Channel management RPCs ====================
+
+    if (method == "channel.config") {
+      if (!it->second.connected) {
+        nlohmann::json r; r["type"]="res"; r["id"]=id; r["ok"]=false;
+        r["error"]={{"code","UNAUTHORIZED"},{"message","connect first"}};
+        try { server.send(hdl, r.dump(), websocketpp::frame::opcode::text); } catch (...) {}
+        return;
+      }
+      nlohmann::json r; r["type"]="res"; r["id"]=id; r["ok"]=true;
+      r["payload"] = {
+        {"enabled", config.wechat.enabled},
+        {"mode", config.wechat.mode},
+        {"wecom_bot_id", config.wechat.wecom.bot_id}
+      };
+      try { server.send(hdl, r.dump(), websocketpp::frame::opcode::text); } catch (...) {}
+      return;
+    }
+
+    if (method == "channel.wechat.qrcode") {
+      if (!it->second.connected) {
+        nlohmann::json r; r["type"]="res"; r["id"]=id; r["ok"]=false;
+        r["error"]={{"code","UNAUTHORIZED"},{"message","connect first"}};
+        try { server.send(hdl, r.dump(), websocketpp::frame::opcode::text); } catch (...) {}
+        return;
+      }
+      // Fetch QR code from ilink API
+      hv::HttpClient cli;
+      cli.setTimeout(15);
+      ::HttpRequest req;
+      req.method = HTTP_GET;
+      req.url = "https://ilinkai.weixin.qq.com/ilink/bot/get_bot_qrcode?bot_type=3";
+      req.timeout = 15;
+      ::HttpResponse resp;
+      int ret = cli.send(&req, &resp);
+
+      nlohmann::json r; r["type"]="res"; r["id"]=id;
+      if (ret != 0 || resp.status_code != 200) {
+        r["ok"] = false;
+        r["error"] = {{"code","NETWORK_ERROR"},{"message","failed to fetch QR code from ilink"}};
+      } else {
+        try {
+          auto j = nlohmann::json::parse(resp.body);
+          r["ok"] = true;
+          r["payload"] = {
+            {"qrcode_key", j.value("qrcode", "")},
+            {"qrcode_img", j.value("qrcode_img_content", "")}
+          };
+        } catch (...) {
+          r["ok"] = false;
+          r["error"] = {{"code","PARSE_ERROR"},{"message","failed to parse QR code response"}};
+        }
+      }
+      try { server.send(hdl, r.dump(), websocketpp::frame::opcode::text); } catch (...) {}
+      return;
+    }
+
+    if (method == "channel.wechat.status") {
+      if (!it->second.connected) {
+        nlohmann::json r; r["type"]="res"; r["id"]=id; r["ok"]=false;
+        r["error"]={{"code","UNAUTHORIZED"},{"message","connect first"}};
+        try { server.send(hdl, r.dump(), websocketpp::frame::opcode::text); } catch (...) {}
+        return;
+      }
+      std::string qrcode_key;
+      try {
+        auto j = nlohmann::json::parse(payload);
+        if (j.contains("params") && j["params"].is_object()) {
+          qrcode_key = wspp_get_string(j["params"], "qrcode_key");
+        }
+      } catch (...) {}
+      if (qrcode_key.empty()) {
+        nlohmann::json r; r["type"]="res"; r["id"]=id; r["ok"]=false;
+        r["error"]={{"code","BAD_REQUEST"},{"message","missing qrcode_key"}};
+        try { server.send(hdl, r.dump(), websocketpp::frame::opcode::text); } catch (...) {}
+        return;
+      }
+
+      hv::HttpClient cli;
+      cli.setTimeout(15);
+      ::HttpRequest req;
+      req.method = HTTP_GET;
+      req.url = "https://ilinkai.weixin.qq.com/ilink/bot/get_qrcode_status?qrcode=" + qrcode_key;
+      req.headers["iLink-App-ClientVersion"] = "1";
+      req.timeout = 10;
+      ::HttpResponse resp;
+      int ret = cli.send(&req, &resp);
+
+      nlohmann::json r; r["type"]="res"; r["id"]=id;
+      if (ret != 0 || resp.status_code != 200) {
+        r["ok"] = false;
+        r["error"] = {{"code","NETWORK_ERROR"},{"message","failed to poll QR status"}};
+      } else {
+        try {
+          auto j = nlohmann::json::parse(resp.body);
+          r["ok"] = true;
+          r["payload"] = {
+            {"status", j.value("status", "wait")},
+            {"bot_token", j.value("bot_token", "")},
+            {"ilink_user_id", j.value("ilink_user_id", "")},
+            {"baseurl", j.value("baseurl", "")}
+          };
+        } catch (...) {
+          r["ok"] = false;
+          r["error"] = {{"code","PARSE_ERROR"},{"message","failed to parse status response"}};
+        }
+      }
+      try { server.send(hdl, r.dump(), websocketpp::frame::opcode::text); } catch (...) {}
+      return;
+    }
+
+    if (method == "channel.wechat.setup") {
+      if (!it->second.connected) {
+        nlohmann::json r; r["type"]="res"; r["id"]=id; r["ok"]=false;
+        r["error"]={{"code","UNAUTHORIZED"},{"message","connect first"}};
+        try { server.send(hdl, r.dump(), websocketpp::frame::opcode::text); } catch (...) {}
+        return;
+      }
+      std::string token, base_url;
+      std::vector<std::string> allow_from;
+      try {
+        auto j = nlohmann::json::parse(payload);
+        if (j.contains("params") && j["params"].is_object()) {
+          auto& p = j["params"];
+          token = wspp_get_string(p, "token");
+          base_url = wspp_get_string(p, "base_url");
+          if (p.contains("allow_from") && p["allow_from"].is_array()) {
+            for (auto& u : p["allow_from"]) {
+              allow_from.push_back(u.get<std::string>());
+            }
+          }
+        }
+      } catch (...) {}
+
+      if (token.empty()) {
+        nlohmann::json r; r["type"]="res"; r["id"]=id; r["ok"]=false;
+        r["error"]={{"code","BAD_REQUEST"},{"message","missing token"}};
+        try { server.send(hdl, r.dump(), websocketpp::frame::opcode::text); } catch (...) {}
+        return;
+      }
+
+      // Update config (non-const access needed)
+      auto& cfg = const_cast<config::Config&>(config);
+      cfg.wechat.enabled = true;
+      cfg.wechat.mode = "weixin";
+      cfg.wechat.weixin.token = token;
+      if (!base_url.empty()) cfg.wechat.weixin.base_url = base_url;
+      cfg.wechat.allow_from = allow_from;
+
+      std::string save_err;
+      bool saved = config::save(cfg.config_dir, cfg, save_err);
+
+      nlohmann::json r; r["type"]="res"; r["id"]=id;
+      if (saved) {
+        r["ok"] = true;
+        r["payload"] = {{"saved", true}};
+      } else {
+        r["ok"] = false;
+        r["error"] = {{"code","SAVE_ERROR"},{"message", save_err}};
+      }
+      try { server.send(hdl, r.dump(), websocketpp::frame::opcode::text); } catch (...) {}
+      return;
+    }
+
+    if (method == "channel.wechat.disable") {
+      if (!it->second.connected) {
+        nlohmann::json r; r["type"]="res"; r["id"]=id; r["ok"]=false;
+        r["error"]={{"code","UNAUTHORIZED"},{"message","connect first"}};
+        try { server.send(hdl, r.dump(), websocketpp::frame::opcode::text); } catch (...) {}
+        return;
+      }
+      auto& cfg = const_cast<config::Config&>(config);
+      cfg.wechat.enabled = false;
+      cfg.wechat.mode = "";
+      cfg.wechat.weixin.token = "";
+      cfg.wechat.allow_from.clear();
+
+      std::string save_err;
+      bool saved = config::save(cfg.config_dir, cfg, save_err);
+
+      nlohmann::json r; r["type"]="res"; r["id"]=id;
+      r["ok"] = saved;
+      if (!saved) r["error"] = {{"code","SAVE_ERROR"},{"message", save_err}};
+      try { server.send(hdl, r.dump(), websocketpp::frame::opcode::text); } catch (...) {}
       return;
     }
 
