@@ -465,7 +465,8 @@ struct WsppSession {
   std::shared_ptr<session::SessionStore> session_store;
 };
 
-void run_wspp_server(int port, config::Config& config, const std::string& pairing_code) {
+void run_wspp_server(int port, config::Config& config, const std::string& pairing_code,
+                     GatewayBroadcastRef broadcast) {
   ws_server_t server;
   server.set_reuse_addr(true);
   server.init_asio();
@@ -1591,13 +1592,39 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
   heartbeat_timer->expires_after(std::chrono::seconds(30));
   heartbeat_timer->async_wait(heartbeat_loop);
 
+  // Broadcast function: push events to all connected operator sessions.
+  if (broadcast) {
+    *broadcast = [&server, &sessions](const std::string& event_name,
+                                       const std::string& payload_json) {
+      nlohmann::json ev;
+      ev["type"] = "event";
+      ev["event"] = event_name;
+      try {
+        ev["payload"] = nlohmann::json::parse(payload_json);
+      } catch (...) {
+        ev["payload"] = payload_json;
+      }
+      std::string msg = ev.dump();
+      server.get_io_service().post([&server, &sessions, msg = std::move(msg)]() {
+        for (auto& kv : sessions) {
+          if (kv.second.connected) {
+            try {
+              server.send(kv.first, msg, websocketpp::frame::opcode::text);
+            } catch (...) {}
+          }
+        }
+      });
+    };
+  }
+
   server.run();
 }
 
 }  // namespace
 
-void gateway_run(int port, config::Config& config, const std::string& pairing_code) {
-  run_wspp_server(port, config, pairing_code);
+void gateway_run(int port, config::Config& config, const std::string& pairing_code,
+                 GatewayBroadcastRef broadcast) {
+  run_wspp_server(port, config, pairing_code, broadcast);
 }
 
 // -----------------------------------------------------------------------------

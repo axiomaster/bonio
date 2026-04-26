@@ -3,6 +3,7 @@
 
 #include "hiclaw/config/config.hpp"
 #include "hiclaw/net/async_agent.hpp"
+#include "hiclaw/net/gateway.hpp"
 #include "hiclaw/net/ilink_http_client.hpp"
 #include "hiclaw/session/store.hpp"
 #include <atomic>
@@ -19,7 +20,8 @@ namespace net {
 /// the agent, and sends responses back.
 class WeChatAdapter {
 public:
-  explicit WeChatAdapter(const config::Config& config);
+  explicit WeChatAdapter(const config::Config& config,
+                         GatewayBroadcastRef broadcast = nullptr);
   ~WeChatAdapter();
 
   WeChatAdapter(const WeChatAdapter&) = delete;
@@ -47,6 +49,7 @@ private:
   std::string get_state_dir() const;
 
   const config::Config& config_;
+  GatewayBroadcastRef broadcast_;
   std::atomic<bool> running_{false};
 
   std::shared_ptr<session::SessionStore> session_store_;
