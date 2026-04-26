@@ -31,6 +31,7 @@ dependencies:
   archive: ^4.0.9
   file_picker: ^11.0.2
   webview_windows: ^0.4.0
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:

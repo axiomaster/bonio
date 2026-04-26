@@ -1,9 +1,8 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../../l10n/app_strings.dart';
 import '../../models/gateway_profile.dart';
 import '../../models/skill_models.dart';
@@ -628,14 +627,20 @@ class _ChannelCardState extends State<_ChannelCard> {
                   child: Column(
                     children: [
                       const SizedBox(height: 8),
-                      if (_qrImgData!.startsWith('http'))
-                        Image.network(_qrImgData!, width: 200, height: 200)
-                      else
-                        Image.memory(
-                          _base64Decode(_qrImgData!),
-                          width: 200,
-                          height: 200,
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey.shade300),
                         ),
+                        child: QrImageView(
+                          data: _qrImgData!,
+                          version: QrVersions.auto,
+                          size: 200,
+                          backgroundColor: Colors.white,
+                        ),
+                      ),
                       const SizedBox(height: 12),
                       Text(
                         _scanStatus == 'scaned'
@@ -669,13 +674,6 @@ class _ChannelCardState extends State<_ChannelCard> {
       ),
     );
   }
-}
-
-Uint8List _base64Decode(String dataUri) {
-  // Handle data:image/png;base64,xxx or data:image/jpeg;base64,xxx
-  final comma = dataUri.indexOf(',');
-  final b64 = comma >= 0 ? dataUri.substring(comma + 1) : dataUri;
-  return base64Decode(b64);
 }
 
 // ════════════════════════════════════════════════════════════════
