@@ -14,7 +14,8 @@ void print_help(const char* version) {
             << "  agent   Run or serve the AI agent (agent | agent run <prompt>)\n"
             << "  config  Interactive configuration (add/edit models, etc.)\n"
             << "  model   List supported providers or show configured models (list, status)\n"
-            << "  skill   Manage skill packages (list, install, remove, enable, disable)\n\n"
+            << "  skill   Manage skill packages (list, install, remove, enable, disable)\n"
+            << "  wechat  WeChat integration (setup)\n\n"
             << "Options:\n"
             << "      --config-dir <path>    Config directory (default: ~/.bonio, Windows: %%USERPROFILE%%\\.bonio)\n"
             << "      --log-level <level>    off|error|warn|info|debug|trace\n"
@@ -71,6 +72,9 @@ static void build_app(CLI::App& app, Options& out) {
   skill_enable->add_option("id", out.skill_id, "Skill id to enable")->required();
   auto* skill_disable = skill_cmd->add_subcommand("disable", "Disable a skill");
   skill_disable->add_option("id", out.skill_id, "Skill id to disable")->required();
+
+  auto* wechat_cmd = app.add_subcommand("wechat", "WeChat integration (setup)");
+  wechat_cmd->add_subcommand("setup", "Print WeChat setup instructions");
 }
 
 static void fill_options_from_parsed(CLI::App& app, Options& out) {
@@ -106,6 +110,10 @@ static void fill_options_from_parsed(CLI::App& app, Options& out) {
     else if (auto* s = skill->get_subcommand("remove"); s && s->parsed()) out.skill_sub = "remove";
     else if (auto* s = skill->get_subcommand("enable"); s && s->parsed()) out.skill_sub = "enable";
     else if (auto* s = skill->get_subcommand("disable"); s && s->parsed()) out.skill_sub = "disable";
+  }
+  if (auto* c = app.get_subcommand("wechat"); c && c->parsed()) {
+    out.subcommand = "wechat";
+    if (auto* s = c->get_subcommand("setup"); s && s->parsed()) out.wechat_sub = "setup";
   }
 }
 

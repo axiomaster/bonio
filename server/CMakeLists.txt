@@ -159,8 +159,11 @@ set(HICLAW_SOURCES
   src/net/intent_router.cpp
   src/net/notification_handler.cpp
   src/net/http_client.cpp
+  src/net/ilink_http_client.cpp
   src/net/serve.cpp
   src/net/tool_router.cpp
+  src/net/wecom_ws_client.cpp
+  src/net/wechat_adapter.cpp
   src/observability/log.cpp
   src/providers/ollama.cpp
   src/providers/openai_compatible.cpp

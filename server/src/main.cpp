@@ -10,13 +10,24 @@
 #include "hiclaw/observability/log.hpp"
 #include "hiclaw/net/serve.hpp"
 #include "hiclaw/net/gateway.hpp"
+#include "hiclaw/net/wechat_adapter.hpp"
+#include <hv/HttpClient.h>
 #include "hiclaw/skills/skill_manager.hpp"
+#include <nlohmann/json.hpp>
 #include <cstdlib>
 #include <chrono>
 #include <ctime>
+#include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <cstdio>
+#include <thread>
+#include <vector>
+#if defined(_WIN32)
+#include <windows.h>
+#include <io.h>
+#endif
 #if defined(HICLAW_USE_LINENOISE)
 #include <linenoise.h>
 #if defined(_WIN32)
@@ -91,6 +102,11 @@ void print_config_debug(const hiclaw::config::Config& cfg, const std::string& lo
 }
 
 int main(int argc, char* argv[]) {
+#if defined(_WIN32)
+  SetConsoleOutputCP(CP_UTF8);
+  SetConsoleCP(CP_UTF8);
+#endif
+
   hiclaw::cli::Options opts;
   if (!hiclaw::cli::parse(argc, argv, opts)) {
     return opts.show_help ? 0 : 1;
@@ -199,7 +215,23 @@ int main(int argc, char* argv[]) {
       pairing_code = cfg.gateway.pairing_code;
     }
     std::cout << "HiClaw gateway on port " << gateway_port << " (host: " << cfg.gateway.host << ")\n";
+
+    // Start WeChat adapter in a background thread if configured
+    std::unique_ptr<hiclaw::net::WeChatAdapter> wechat_adapter;
+    if (cfg.wechat.enabled) {
+      wechat_adapter = std::make_unique<hiclaw::net::WeChatAdapter>(cfg);
+      // WeChatAdapter::start() blocks, so run in a detached thread
+      std::thread([&wechat_adapter]() {
+        wechat_adapter->start();
+      }).detach();
+      std::cout << "WeChat adapter enabled (mode: " << cfg.wechat.mode << ")\n";
+    }
+
     hiclaw::net::gateway_run(gateway_port, cfg, pairing_code);
+
+    if (wechat_adapter) {
+      wechat_adapter->stop();
+    }
     return 0;
   }
 
@@ -388,6 +420,240 @@ int main(int argc, char* argv[]) {
 
     std::cerr << "HiClaw model: use list | status.\n";
     return 1;
+  }
+
+  if (opts.subcommand == "wechat") {
+    if (opts.wechat_sub == "setup") {
+      std::string dir = hiclaw::config::get_default_workspace();
+      hiclaw::config::Config cfg;
+      std::string err;
+      hiclaw::config::load(opts.config_dir, cfg, err);
+      hiclaw::log::set_log_dir(cfg.config_dir);
+
+      std::cout << "\n=== 微信对接配置 ===\n\n"
+                << "[1] 个人微信（推荐，扫码即可）\n"
+                << "[2] 企业微信（需要 BotID + Secret）\n\n";
+
+      std::string mode_choice;
+      if (!read_line("请选择模式 [1/2]: ", mode_choice)) return 0;
+
+      if (mode_choice == "1") {
+        // === ilink QR code login ===
+        std::cout << "\n正在获取登录二维码...\n";
+
+        hv::HttpClient cli;
+        cli.setTimeout(30);
+
+        // Step 1: Get QR code
+        ::HttpRequest qr_req;
+        qr_req.method = HTTP_GET;
+        qr_req.url = "https://ilinkai.weixin.qq.com/ilink/bot/get_bot_qrcode?bot_type=3";
+        qr_req.timeout = 15;
+
+        ::HttpResponse qr_resp;
+        int qr_ret = cli.send(&qr_req, &qr_resp);
+        if (qr_ret != 0 || qr_resp.status_code != 200) {
+          std::cerr << "获取二维码失败，请检查网络连接\n";
+          return 1;
+        }
+
+        std::string qrcode_key, qrcode_img;
+        try {
+          auto j = nlohmann::json::parse(qr_resp.body);
+          qrcode_key = j.value("qrcode", "");
+          qrcode_img = j.value("qrcode_img_content", "");
+        } catch (...) {
+          std::cerr << "解析二维码响应失败\n";
+          return 1;
+        }
+
+        if (qrcode_key.empty()) {
+          std::cerr << "二维码数据为空\n";
+          return 1;
+        }
+
+        // Show QR code image URL or data
+        if (!qrcode_img.empty()) {
+          if (qrcode_img.find("http") == 0) {
+            std::cout << "请用微信扫描此二维码图片:\n" << qrcode_img << "\n\n";
+          } else {
+            // data:image/png;base64,... — save to file and try to open
+            std::string img_path = cfg.config_dir + "/ilink_qr.png";
+            // Extract base64 data after comma
+            size_t comma = qrcode_img.find(',');
+            if (comma != std::string::npos) {
+              std::string b64 = qrcode_img.substr(comma + 1);
+              // Decode base64 and write
+              static const std::string kChars =
+                  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+              std::string decoded;
+              std::vector<int> T(256, -1);
+              for (int i = 0; i < 64; i++) T[kChars[i]] = i;
+              int val = 0, valb = -8;
+              for (unsigned char c : b64) {
+                if (T[c] == -1) break;
+                val = (val << 6) + T[c];
+                valb += 6;
+                if (valb >= 0) {
+                  decoded.push_back(char((val >> valb) & 0xFF));
+                  valb -= 8;
+                }
+              }
+              std::ofstream f(img_path, std::ios::binary);
+              if (f.is_open()) {
+                f.write(decoded.data(), decoded.size());
+                f.close();
+                std::cout << "二维码已保存到: " << img_path << "\n";
+                // Try to open it
+#if defined(_WIN32)
+                std::string cmd = "start \"\" \"" + img_path + "\"";
+                std::system(cmd.c_str());
+#endif
+              }
+            }
+            std::cout << "请用微信扫描二维码登录\n\n";
+          }
+        }
+
+        // Step 2: Poll QR status
+        std::cout << "等待扫码中...\n";
+        std::string bot_token, ilink_user_id, custom_base_url;
+        bool qr_ok = false;
+        int qr_expired_count = 0;
+
+        for (int poll = 0; poll < 120; ++poll) {
+          std::this_thread::sleep_for(std::chrono::seconds(2));
+
+          ::HttpRequest st_req;
+          st_req.method = HTTP_GET;
+          st_req.url = "https://ilinkai.weixin.qq.com/ilink/bot/get_qrcode_status?qrcode=" + qrcode_key;
+          st_req.headers["iLink-App-ClientVersion"] = "1";
+          st_req.timeout = 10;
+
+          ::HttpResponse st_resp;
+          int st_ret = cli.send(&st_req, &st_resp);
+          if (st_ret != 0) continue;
+
+          try {
+            auto j = nlohmann::json::parse(st_resp.body);
+            std::string status = j.value("status", "");
+
+            if (status == "confirmed") {
+              bot_token = j.value("bot_token", "");
+              ilink_user_id = j.value("ilink_user_id", "");
+              custom_base_url = j.value("baseurl", "");
+              qr_ok = true;
+              break;
+            } else if (status == "scaned") {
+              std::cout << "已扫码，等待确认...\n";
+            } else if (status == "expired") {
+              qr_expired_count++;
+              if (qr_expired_count >= 3) {
+                std::cerr << "二维码已过期3次，请重新执行 setup\n";
+                return 1;
+              }
+              std::cout << "二维码已过期，正在刷新...\n";
+              // Re-fetch QR code
+              ::HttpRequest qr2_req;
+              qr2_req.method = HTTP_GET;
+              qr2_req.url = "https://ilinkai.weixin.qq.com/ilink/bot/get_bot_qrcode?bot_type=3";
+              qr2_req.timeout = 15;
+              ::HttpResponse qr2_resp;
+              if (cli.send(&qr2_req, &qr2_resp) == 0) {
+                try {
+                  auto j2 = nlohmann::json::parse(qr2_resp.body);
+                  qrcode_key = j2.value("qrcode", "");
+                } catch (...) {}
+              }
+            }
+            // "wait" — continue polling
+          } catch (...) {}
+        }
+
+        if (!qr_ok) {
+          std::cerr << "扫码超时，请重新执行 setup\n";
+          return 1;
+        }
+
+        std::cout << "登录成功！\n";
+
+        // Save config
+        cfg.wechat.enabled = true;
+        cfg.wechat.mode = "weixin";
+        cfg.wechat.weixin.token = bot_token;
+        if (!custom_base_url.empty()) {
+          cfg.wechat.weixin.base_url = custom_base_url;
+        }
+
+        std::string allow_from_str;
+        if (!read_line("允许的用户ID（逗号分隔，回车允许所有）: ", allow_from_str)) return 0;
+        cfg.wechat.allow_from.clear();
+        if (!allow_from_str.empty()) {
+          std::istringstream iss(allow_from_str);
+          std::string tok;
+          while (std::getline(iss, tok, ',')) {
+            while (!tok.empty() && tok.front() == ' ') tok.erase(0, 1);
+            while (!tok.empty() && tok.back() == ' ') tok.pop_back();
+            if (!tok.empty()) cfg.wechat.allow_from.push_back(tok);
+          }
+        }
+
+        if (!hiclaw::config::save(cfg.config_dir, cfg, err)) {
+          std::cerr << "保存配置失败: " << err << "\n";
+          return 1;
+        }
+
+        std::cout << "\n配置已保存到 " << cfg.config_dir << "/hiclaw.json\n"
+                  << "ilink 用户ID: " << ilink_user_id << "\n"
+                  << "运行 hiclaw gateway 即可自动连接个人微信\n";
+
+      } else if (mode_choice == "2") {
+        // === WeCom manual config ===
+        std::cout << "\n=== 企业微信（WeCom）智能机器人配置 ===\n\n"
+                  << "1. 登录企业微信管理后台: https://work.weixin.qq.com/wework_admin/frame\n"
+                  << "2. 进入「应用管理」→「智能机器人」→「创建智能机器人」\n"
+                  << "3. 记录 BotID 和 Secret（Secret 只显示一次！）\n\n";
+
+        std::string bot_id, bot_secret, allow_from_str;
+        if (!read_line("请输入 BotID: ", bot_id)) return 0;
+        if (bot_id.empty()) { std::cerr << "BotID 不能为空\n"; return 1; }
+        if (!read_line("请输入 Secret: ", bot_secret)) return 0;
+        if (bot_secret.empty()) { std::cerr << "Secret 不能为空\n"; return 1; }
+        if (!read_line("允许的用户ID（逗号分隔，回车允许所有）: ", allow_from_str)) return 0;
+
+        cfg.wechat.enabled = true;
+        cfg.wechat.mode = "wecom";
+        cfg.wechat.wecom.bot_id = bot_id;
+        cfg.wechat.wecom.bot_secret = bot_secret;
+        cfg.wechat.allow_from.clear();
+        if (!allow_from_str.empty()) {
+          std::istringstream iss(allow_from_str);
+          std::string tok;
+          while (std::getline(iss, tok, ',')) {
+            while (!tok.empty() && tok.front() == ' ') tok.erase(0, 1);
+            while (!tok.empty() && tok.back() == ' ') tok.pop_back();
+            if (!tok.empty()) cfg.wechat.allow_from.push_back(tok);
+          }
+        }
+
+        if (!hiclaw::config::save(cfg.config_dir, cfg, err)) {
+          std::cerr << "保存配置失败: " << err << "\n";
+          return 1;
+        }
+
+        std::cout << "\n配置已保存到 " << cfg.config_dir << "/hiclaw.json\n"
+                  << "运行 hiclaw gateway 即可自动连接企业微信\n";
+      } else {
+        std::cerr << "无效选择\n";
+        return 1;
+      }
+    } else {
+      std::cout << "HiClaw wechat - WeChat integration.\n\n"
+                << "Usage: hiclaw wechat [SUBCOMMAND]\n\n"
+                << "Subcommands:\n"
+                << "  setup   Interactive WeChat setup wizard\n";
+    }
+    return 0;
   }
 
   if (opts.subcommand == "skill") {

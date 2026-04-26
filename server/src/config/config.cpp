@@ -48,6 +48,36 @@ bool loadFromJson(const std::string& path, Config& out, std::string& err) {
       if (gw.contains("pairing_code") && gw["pairing_code"].is_string())
         out.gateway.pairing_code = gw["pairing_code"].get<std::string>();
     }
+    // WeChat configuration
+    if (j.contains("wechat") && j["wechat"].is_object()) {
+      const json& wc = j["wechat"];
+      if (wc.contains("enabled") && wc["enabled"].is_boolean())
+        out.wechat.enabled = wc["enabled"].get<bool>();
+      if (wc.contains("mode") && wc["mode"].is_string())
+        out.wechat.mode = wc["mode"].get<std::string>();
+      if (wc.contains("wecom") && wc["wecom"].is_object()) {
+        const json& wecom = wc["wecom"];
+        if (wecom.contains("bot_id") && wecom["bot_id"].is_string())
+          out.wechat.wecom.bot_id = wecom["bot_id"].get<std::string>();
+        if (wecom.contains("bot_secret") && wecom["bot_secret"].is_string())
+          out.wechat.wecom.bot_secret = wecom["bot_secret"].get<std::string>();
+      }
+      if (wc.contains("weixin") && wc["weixin"].is_object()) {
+        const json& weixin = wc["weixin"];
+        if (weixin.contains("token") && weixin["token"].is_string())
+          out.wechat.weixin.token = weixin["token"].get<std::string>();
+        if (weixin.contains("base_url") && weixin["base_url"].is_string())
+          out.wechat.weixin.base_url = weixin["base_url"].get<std::string>();
+        if (weixin.contains("cdn_base_url") && weixin["cdn_base_url"].is_string())
+          out.wechat.weixin.cdn_base_url = weixin["cdn_base_url"].get<std::string>();
+      }
+      if (wc.contains("allow_from") && wc["allow_from"].is_array()) {
+        out.wechat.allow_from.clear();
+        for (const auto& el : wc["allow_from"]) {
+          if (el.is_string()) out.wechat.allow_from.push_back(el.get<std::string>());
+        }
+      }
+    }
     if (j.contains("models") && j["models"].is_array()) {
       out.models.clear();
       for (const json& el : j["models"]) {
@@ -322,6 +352,31 @@ bool save(const std::string& config_dir, const Config& cfg, std::string& err) {
     gw["enabled"] = cfg.gateway.enabled;
     if (!cfg.gateway.pairing_code.empty()) gw["pairing_code"] = cfg.gateway.pairing_code;
     j["gateway"] = gw;
+    // WeChat configuration
+    if (cfg.wechat.enabled) {
+      json wc;
+      wc["enabled"] = cfg.wechat.enabled;
+      if (!cfg.wechat.mode.empty()) wc["mode"] = cfg.wechat.mode;
+      if (!cfg.wechat.wecom.bot_id.empty() || !cfg.wechat.wecom.bot_secret.empty()) {
+        json wecom;
+        if (!cfg.wechat.wecom.bot_id.empty()) wecom["bot_id"] = cfg.wechat.wecom.bot_id;
+        if (!cfg.wechat.wecom.bot_secret.empty()) wecom["bot_secret"] = cfg.wechat.wecom.bot_secret;
+        wc["wecom"] = wecom;
+      }
+      if (!cfg.wechat.weixin.token.empty()) {
+        json weixin;
+        weixin["token"] = cfg.wechat.weixin.token;
+        if (cfg.wechat.weixin.base_url != "https://ilinkai.weixin.qq.com")
+          weixin["base_url"] = cfg.wechat.weixin.base_url;
+        if (cfg.wechat.weixin.cdn_base_url != "https://novac2c.cdn.weixin.qq.com/c2c")
+          weixin["cdn_base_url"] = cfg.wechat.weixin.cdn_base_url;
+        wc["weixin"] = weixin;
+      }
+      if (!cfg.wechat.allow_from.empty()) {
+        wc["allow_from"] = cfg.wechat.allow_from;
+      }
+      j["wechat"] = wc;
+    }
     std::ofstream f(json_path);
     if (!f) {
       err = "cannot write " + json_path;

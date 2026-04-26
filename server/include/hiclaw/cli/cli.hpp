@@ -29,6 +29,8 @@ struct Options {
   std::string skill_sub;
   std::string skill_path;   // for install: source directory
   std::string skill_id;     // for remove: skill id
+  // wechat (sub: setup)
+  std::string wechat_sub;
 };
 
 /**

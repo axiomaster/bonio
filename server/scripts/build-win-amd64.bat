@@ -8,15 +8,12 @@ REM Output: build\win-amd64\hiclaw.exe
 
 set "SCRIPT_DIR=%~dp0"
 set "PROJECT_ROOT=%SCRIPT_DIR%.."
+
+REM Resolve to absolute paths (avoid issues with relative paths in nested call)
+for %%I in ("%PROJECT_ROOT%") do set "PROJECT_ROOT=%%~fI"
 set "BUILD_DIR=%PROJECT_ROOT%\build\win-amd64"
 
-REM vcpkg integration (optional but recommended for mbedTLS)
-REM Install: vcpkg install mbedtls:x64-windows
-set "VCPKG_ROOT=D:\tools\vcpkg-2026.02.27"
 set "VCPKG_TOOLCHAIN="
-if exist "%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake" (
-  set "VCPKG_TOOLCHAIN=-DCMAKE_TOOLCHAIN_FILE=%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake"
-)
 
 REM Use MSVC x64 environment so cl.exe is 64-bit and standard headers (e.g. <string>) are found.
 set "VCVARS="
@@ -46,9 +43,9 @@ REM If we just set up x64 env, reconfig so CMake uses 64-bit cl (avoids "string:
 if defined VCVARS if exist "CMakeCache.txt" del "CMakeCache.txt"
 
 set "CMAKE_EXTRA="
-if not "%NINJA_EXE%"=="ninja" set "CMAKE_EXTRA=-DCMAKE_MAKE_PROGRAM=^"%NINJA_EXE%^""
+if not "%NINJA_EXE%"=="ninja" set "CMAKE_EXTRA=-DCMAKE_MAKE_PROGRAM=%NINJA_EXE%"
 
-cmake -G Ninja %CMAKE_EXTRA% %VCPKG_TOOLCHAIN% -DCMAKE_BUILD_TYPE=Release -DHICLAW_GATEWAY_BACKEND=websocketpp "%PROJECT_ROOT%"
+cmake -G Ninja %CMAKE_EXTRA% -DCMAKE_BUILD_TYPE=Release -DHICLAW_GATEWAY_BACKEND=websocketpp "%PROJECT_ROOT%"
 if errorlevel 1 exit /b 1
 
 "%NINJA_EXE%"
