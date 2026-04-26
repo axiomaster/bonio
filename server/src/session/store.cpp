@@ -12,6 +12,22 @@ namespace session {
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 
+/// Sanitize a session key for use as a filename (replace chars illegal on Windows).
+static std::string sanitize_filename(const std::string& key) {
+  std::string out;
+  out.reserve(key.size());
+  for (char c : key) {
+    switch (c) {
+      case ':': out += "__"; break;
+      case '/': case '\\': out += '_'; break;
+      case '<': case '>': case '"': case '|': case '?': case '*':
+        out += '_'; break;
+      default: out += c; break;
+    }
+  }
+  return out;
+}
+
 static std::string sanitize_utf8(const std::string& input) {
   std::string out;
   out.reserve(input.size());
@@ -67,7 +83,7 @@ void SessionStore::ensure_session_dir() {
 }
 
 std::string SessionStore::session_file_path(const std::string& key) const {
-  return (fs::path(sessions_dir_) / (key + ".json")).string();
+  return (fs::path(sessions_dir_) / (sanitize_filename(key) + ".json")).string();
 }
 
 void SessionStore::load() {
@@ -134,19 +150,18 @@ void SessionStore::scan_new_sessions() {
       std::string path = entry.path().string();
       if (path.size() < 5 || path.substr(path.size() - 5) != ".json") continue;
 
-      // Derive key from filename: sessions_dir/key.json
-      std::string filename = entry.path().filename().string();
-      std::string key = filename.substr(0, filename.size() - 5);
-      if (known.count(key)) continue;
-
       try {
         std::ifstream f(path);
         if (!f.is_open()) continue;
         json j;
         f >> j;
 
+        // Use the actual session key from JSON content (filename is sanitized)
+        std::string key = j.value("key", "");
+        if (key.empty() || known.count(key)) continue;
+
         Session s;
-        s.key = j.value("key", key);
+        s.key = key;
         s.display_name = j.value("displayName", s.key);
         s.created_at = j.value("createdAt", int64_t(0));
         s.updated_at = j.value("updatedAt", int64_t(0));
@@ -164,9 +179,7 @@ void SessionStore::scan_new_sessions() {
           }
         }
 
-        if (!s.key.empty()) {
-          sessions_.push_back(std::move(s));
-        }
+        sessions_.push_back(std::move(s));
       } catch (const std::exception& e) {
         log::warn("SessionStore: failed to scan session from " + path + std::string(": ") + e.what());
       }
