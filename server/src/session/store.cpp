@@ -4,6 +4,7 @@
 #include <chrono>
 #include <fstream>
 #include <filesystem>
+#include <unordered_set>
 
 namespace hiclaw {
 namespace session {
@@ -117,6 +118,64 @@ void SessionStore::load() {
   }
 }
 
+void SessionStore::scan_new_sessions() {
+  // Must be called with mutex_ held.
+  try {
+    if (!fs::exists(sessions_dir_)) return;
+
+    // Build set of known keys
+    std::unordered_set<std::string> known;
+    for (const auto& s : sessions_) {
+      known.insert(s.key);
+    }
+
+    for (const auto& entry : fs::directory_iterator(sessions_dir_)) {
+      if (!entry.is_regular_file()) continue;
+      std::string path = entry.path().string();
+      if (path.size() < 5 || path.substr(path.size() - 5) != ".json") continue;
+
+      // Derive key from filename: sessions_dir/key.json
+      std::string filename = entry.path().filename().string();
+      std::string key = filename.substr(0, filename.size() - 5);
+      if (known.count(key)) continue;
+
+      try {
+        std::ifstream f(path);
+        if (!f.is_open()) continue;
+        json j;
+        f >> j;
+
+        Session s;
+        s.key = j.value("key", key);
+        s.display_name = j.value("displayName", s.key);
+        s.created_at = j.value("createdAt", int64_t(0));
+        s.updated_at = j.value("updatedAt", int64_t(0));
+
+        if (j.contains("messages") && j["messages"].is_array()) {
+          for (const auto& mj : j["messages"]) {
+            Message m;
+            m.role = mj.value("role", "");
+            m.content = mj.value("content", "");
+            m.timestamp = mj.value("timestamp", int64_t(0));
+            m.run_id = mj.value("runId", "");
+            m.tool_call_id = mj.value("toolCallId", "");
+            m.tool_name = mj.value("toolName", "");
+            s.messages.push_back(std::move(m));
+          }
+        }
+
+        if (!s.key.empty()) {
+          sessions_.push_back(std::move(s));
+        }
+      } catch (const std::exception& e) {
+        log::warn("SessionStore: failed to scan session from " + path + std::string(": ") + e.what());
+      }
+    }
+  } catch (const std::exception& e) {
+    log::error(std::string("SessionStore: failed to scan new sessions: ") + e.what());
+  }
+}
+
 Session SessionStore::get_or_create(const std::string& key) {
   std::lock_guard<std::mutex> lock(mutex_);
   for (auto& s : sessions_) {
@@ -162,6 +221,7 @@ void SessionStore::add_message(const std::string& key, const Message& msg) {
 
 std::vector<Session> SessionStore::list_sessions() {
   std::lock_guard<std::mutex> lock(mutex_);
+  scan_new_sessions();
   std::vector<Session> result;
   for (const auto& s : sessions_) {
     Session meta;

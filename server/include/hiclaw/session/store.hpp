@@ -56,6 +56,7 @@ public:
 
   /**
    * List all sessions (metadata only, no messages).
+   * Scans disk for new session files before returning.
    */
   std::vector<Session> list_sessions();
 
@@ -86,6 +87,7 @@ public:
 
 private:
   void load();
+  void scan_new_sessions();
   void ensure_session_dir();
   std::string session_file_path(const std::string& key) const;
 
