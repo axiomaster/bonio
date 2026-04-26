@@ -61,7 +61,7 @@ class DesktopTts {
       ..writeln(
           r'$s = New-Object System.Speech.Synthesis.SpeechSynthesizer')
       ..writeln(r'$s.Speak($t)');
-    final dir = await Directory.systemTemp.createTemp('boji_tts_');
+    final dir = await Directory.systemTemp.createTemp('bonio_tts_');
     final ps1 = File('${dir.path}${Platform.pathSeparator}speak.ps1');
     final body = utf8.encode(script.toString());
     await ps1.writeAsBytes(<int>[0xEF, 0xBB, 0xBF, ...body]);
@@ -92,7 +92,7 @@ class DesktopTts {
 
   Future<void> _speakMacOS(String text) async {
     debugPrint('DesktopTts: macOS say starting (${text.length} chars)');
-    final dir = await Directory.systemTemp.createTemp('boji_tts_');
+    final dir = await Directory.systemTemp.createTemp('bonio_tts_');
     final txt = File('${dir.path}${Platform.pathSeparator}say.txt');
     await txt.writeAsString(text, encoding: utf8);
     try {

@@ -81,9 +81,9 @@ REM ========== Step 4: Launch ==========
 set "RELEASE_DIR=%DESKTOP_DIR%\build\windows\x64\runner\Release"
 echo.
 echo ============================================
-echo Launching boji_desktop...
+echo Launching bonio_desktop...
 echo ============================================
 cd /d "%RELEASE_DIR%"
-start boji_desktop.exe
+start bonio_desktop.exe
 echo Done.
 exit /b 0

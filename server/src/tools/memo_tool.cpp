@@ -29,7 +29,7 @@ std::string get_memo_dir() {
     home = std::getenv("HOME");
 #endif
     if (!home) home = "/tmp";
-    memo_dir_cache_ = (fs::path(home) / ".boji" / "memos").string();
+    memo_dir_cache_ = (fs::path(home) / ".bonio" / "memos").string();
   }
   std::error_code ec;
   fs::create_directories(memo_dir_cache_, ec);

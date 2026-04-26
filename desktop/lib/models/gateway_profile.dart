@@ -61,7 +61,7 @@ extension GatewayProfileX on GatewayProfile {
   /// Use the same id as the official macOS app so `connect` passes schema validation.
   String get clientId => switch (this) {
         GatewayProfile.openclaw => 'openclaw-macos',
-        GatewayProfile.hiclaw => 'boji-desktop',
+        GatewayProfile.hiclaw => 'bonio-desktop',
       };
 
   /// Operator UI uses `ui`; node session must use `node` (matches OpenClaw MacNodeModeCoordinator).

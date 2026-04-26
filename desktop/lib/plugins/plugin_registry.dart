@@ -91,7 +91,7 @@ class PluginRegistry extends ChangeNotifier {
     }
   }
 
-  /// Scan `~/.boji/plugins/*/plugin.json` for installed plugins.
+  /// Scan `~/.bonio/plugins/*/plugin.json` for installed plugins.
   Future<void> _scanPluginDirs() async {
     final root = Directory(pluginsRootDir);
     if (!await root.exists()) {

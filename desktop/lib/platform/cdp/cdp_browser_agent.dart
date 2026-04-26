@@ -82,7 +82,7 @@ class CdpBrowserAgent implements BrowserAgent {
       throw StateError('No Chrome or Edge browser found');
     }
 
-    final tempDir = await Directory.systemTemp.createTemp('boji_cdp_');
+    final tempDir = await Directory.systemTemp.createTemp('bonio_cdp_');
     final portFile = File('${tempDir.path}${Platform.pathSeparator}DevToolsActivePort');
 
     // Port 0 = OS picks a free port; Chrome writes the actual port to

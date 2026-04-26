@@ -102,7 +102,7 @@ class DesktopAvatarView extends StatefulWidget {
   /// Called when the input field should be dismissed (Esc, focus loss).
   final VoidCallback? onInputDismiss;
 
-  /// Programmatically add attachments (e.g. from BoJi Lens capture).
+  /// Programmatically add attachments (e.g. from Bonio Lens capture).
   final List<OutgoingAttachment>? initialAttachments;
 
   /// Programmatically set initial text (e.g. lens prompt).
@@ -167,7 +167,7 @@ class _DesktopAvatarViewState extends State<DesktopAvatarView> {
   void initState() {
     super.initState();
     _initTheme();
-    // Process initial data (e.g. from BoJi Lens) — only runs when the
+    // Process initial data (e.g. from Bonio Lens) — only runs when the
     // widget is first created (LensAnnotationOverlay → DesktopAvatarView).
     final incoming = widget.initialAttachments;
     if (incoming != null && incoming.isNotEmpty) {
@@ -778,10 +778,10 @@ class _DesktopAvatarViewState extends State<DesktopAvatarView> {
 }
 
 // ---------------------------------------------------------------------------
-// BoJi Lens Annotation Overlay
+// Bonio Lens Annotation Overlay
 // ---------------------------------------------------------------------------
 
-/// Full-window overlay for the BoJi Lens "圈一圈" annotation mode.
+/// Full-window overlay for the Bonio Lens "圈一圈" annotation mode.
 /// Rendered in place of the normal avatar view when lens mode is active.
 class LensAnnotationOverlay extends StatefulWidget {
   final ScreenCaptureResult? capture;

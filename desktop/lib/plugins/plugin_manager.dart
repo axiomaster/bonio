@@ -18,7 +18,7 @@ import 'plugin_registry.dart';
 /// for both built-in and sidecar plugins.
 class PluginManager extends ChangeNotifier {
   late final PluginRegistry registry;
-  final Map<String, BojiPlugin> _builtins = {};
+  final Map<String, BonioPlugin> _builtins = {};
   final Map<String, PluginHost> _hosts = {};
 
   /// Callback that handles capability requests from sidecar plugins.
@@ -52,7 +52,7 @@ class PluginManager extends ChangeNotifier {
   }
 
   /// Register a built-in (in-process) plugin.
-  void registerBuiltin(BojiPlugin plugin) {
+  void registerBuiltin(BonioPlugin plugin) {
     _builtins[plugin.manifest.id] = plugin;
     if (_initialized) {
       registry.registerBuiltin(plugin.manifest);

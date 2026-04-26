@@ -178,7 +178,7 @@ class AppState extends ChangeNotifier {
     try {
       final tempDir = await getTemporaryDirectory();
       final path = '${tempDir.path}${Platform.pathSeparator}'
-          'boji_search_${DateTime.now().millisecondsSinceEpoch}.png';
+          'bonio_search_${DateTime.now().millisecondsSinceEpoch}.png';
       await File(path).writeAsBytes(base64Decode(pngBase64));
       log.info('AppState: search image saved to $path');
       await runtime.createSearchWindow(path, avatarX, avatarY);
@@ -485,7 +485,7 @@ class AppState extends ChangeNotifier {
 
     // Build structured prompt
     final buf = StringBuffer();
-    buf.writeln('[BoJi Lens] 用户在应用窗口 "$windowTitle" 上进行了圈选标注。');
+    buf.writeln('[Bonio Lens] 用户在应用窗口 "$windowTitle" 上进行了圈选标注。');
     buf.writeln();
     if (rects.isNotEmpty) {
       buf.writeln('标注区域（像素坐标，相对于窗口左上角）：');
@@ -506,7 +506,7 @@ class AppState extends ChangeNotifier {
         OutgoingAttachment(
           type: 'image',
           mimeType: 'image/png',
-          fileName: 'boji_lens_capture.png',
+          fileName: 'bonio_lens_capture.png',
           base64: pngBase64,
         ),
       ],
@@ -522,7 +522,7 @@ class AppState extends ChangeNotifier {
     ctrl.setBubble(text: S.current.bubbleReceived);
 
     try {
-      BojiNote? note;
+      BonioNote? note;
       if (dropType == 'file') {
         final paths = (data['paths'] as List?)?.cast<String>() ?? [];
         for (final path in paths) {

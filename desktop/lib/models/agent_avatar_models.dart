@@ -1,4 +1,4 @@
-/// Mirrors [ai.axiomaster.boji.ai.AgentState] for server-driven `setState`.
+/// Mirrors [ai.axiomaster.bonio.ai.AgentState] for server-driven `setState`.
 enum AgentAvatarActivity {
   idle,
   bored,
@@ -42,7 +42,7 @@ AgentAvatarActivity? parseAgentAvatarActivity(String name) {
   }
 }
 
-/// Mirrors [ai.axiomaster.boji.avatar.AvatarAction] for `performAction`.
+/// Mirrors [ai.axiomaster.bonio.avatar.AvatarAction] for `performAction`.
 enum DesktopAvatarGesture {
   none,
   tapping,

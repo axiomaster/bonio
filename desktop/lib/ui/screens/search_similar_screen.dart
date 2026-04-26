@@ -158,7 +158,7 @@ class _SearchSimilarPageState extends State<_SearchSimilarPage> {
   try {
     var resp = await fetch('data:image/png;base64,$base64');
     var blob = await resp.blob();
-    var file = new File([blob], 'boji_search.png', {type: 'image/png'});
+    var file = new File([blob], 'bonio_search.png', {type: 'image/png'});
 
     // Strategy 1: find any visible file input
     var inputs = document.querySelectorAll('input[type="file"]');

@@ -56,7 +56,7 @@ class ReadingSummary {
       };
 }
 
-class BojiNote {
+class BonioNote {
   final String id;
   final DateTime createdAt;
   final NoteType type;
@@ -69,7 +69,7 @@ class BojiNote {
   String? summary;
   bool analyzed;
 
-  BojiNote({
+  BonioNote({
     required this.id,
     required this.createdAt,
     required this.type,
@@ -97,8 +97,8 @@ class BojiNote {
         'analyzed': analyzed,
       };
 
-  factory BojiNote.fromJson(Map<String, dynamic> m) {
-    return BojiNote(
+  factory BonioNote.fromJson(Map<String, dynamic> m) {
+    return BonioNote(
       id: m['id'] as String,
       createdAt: DateTime.parse(m['createdAt'] as String),
       type: NoteType.values.firstWhere(

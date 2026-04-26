@@ -122,7 +122,7 @@ class PluginManifest {
   final PluginMenuConfig? menu;
   final List<String> capabilitiesRequired;
   final PluginSessionConfig? sessionConfig;
-  final String? minBojiVersion;
+  final String? minBonioVersion;
   final List<String> platforms;
 
   /// Filesystem path to the directory containing this manifest.
@@ -140,7 +140,7 @@ class PluginManifest {
     this.menu,
     this.capabilitiesRequired = const [],
     this.sessionConfig,
-    this.minBojiVersion,
+    this.minBonioVersion,
     this.platforms = const ['windows', 'macos'],
     this.directoryPath,
   });
@@ -168,7 +168,7 @@ class PluginManifest {
           ? PluginSessionConfig.fromJson(
               json['session_config'] as Map<String, dynamic>)
           : null,
-      minBojiVersion: json['min_boji_version'] as String?,
+      minBonioVersion: json['min_bonio_version'] as String?,
       platforms: (json['platforms'] as List<dynamic>?)?.cast<String>() ??
           const ['windows', 'macos'],
       directoryPath: directoryPath,
@@ -216,7 +216,7 @@ class PluginManifest {
         if (capabilitiesRequired.isNotEmpty)
           'capabilities_required': capabilitiesRequired,
         if (sessionConfig != null) 'session_config': sessionConfig!.toJson(),
-        if (minBojiVersion != null) 'min_boji_version': minBojiVersion,
+        if (minBonioVersion != null) 'min_bonio_version': minBonioVersion,
         'platforms': platforms,
       };
 

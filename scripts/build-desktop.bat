@@ -37,8 +37,8 @@ if errorlevel 1 exit /b 1
 
 REM Optionally launch
 if "%RUN%"=="true" (
-  echo Launching boji_desktop...
-  start "" "%DESKTOP_DIR%\build\windows\x64\runner\Release\boji_desktop.exe"
+  echo Launching bonio_desktop...
+  start "" "%DESKTOP_DIR%\build\windows\x64\runner\Release\bonio_desktop.exe"
 )
 
 exit /b 0
