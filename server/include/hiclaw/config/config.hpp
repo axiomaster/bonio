@@ -51,6 +51,25 @@ struct Config {
     std::string pairing_code;           // Optional static pairing code (empty = auto-generate)
   };
   GatewayConfig gateway;
+
+  // WeChat channel configuration
+  struct WeChatConfig {
+    bool enabled = false;
+    std::string mode;  // "wecom" or "weixin"
+
+    struct WeComConfig {
+      std::string bot_id;
+      std::string bot_secret;
+    } wecom;
+
+    struct WeiXinConfig {
+      std::string token;
+      std::string base_url = "https://ilinkai.weixin.qq.com";
+      std::string cdn_base_url = "https://novac2c.cdn.weixin.qq.com/c2c";
+    } weixin;
+
+    std::vector<std::string> allow_from;
+  } wechat;
 };
 
 /**

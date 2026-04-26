@@ -1,4 +1,10 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Windows batch scripts must use CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
 *.so filter=lfs diff=lfs merge=lfs -text
 *.onnx filter=lfs diff=lfs merge=lfs -text
