@@ -229,7 +229,7 @@ class NodeRuntime extends ChangeNotifier {
           width: AvatarSnapshot.kFloatingWindowSize.width,
           height: AvatarSnapshot.kFloatingWindowSize.height,
           arguments: jsonEncode({
-            'bojiWindow': 'avatar',
+            'bonioWindow': 'avatar',
             'mainWindowId': main.windowId,
           }),
         ),
@@ -251,7 +251,7 @@ class NodeRuntime extends ChangeNotifier {
     try {
       final main = await WindowController.fromCurrentEngine();
       final args = <String, dynamic>{
-        'bojiWindow': 'reading_companion',
+        'bonioWindow': 'reading_companion',
         'url': url,
         'title': title,
         'mainWindowId': main.windowId,
@@ -314,7 +314,7 @@ class NodeRuntime extends ChangeNotifier {
           width: w,
           height: h,
           arguments: jsonEncode({
-            'bojiWindow': 'search_similar',
+            'bonioWindow': 'search_similar',
             'imagePath': imagePath,
             'mainWindowId': main.windowId,
           }),

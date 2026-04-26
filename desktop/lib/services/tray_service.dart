@@ -6,7 +6,7 @@ import 'package:window_manager/window_manager.dart';
 
 import '../l10n/app_strings.dart';
 
-/// Manages the system tray icon and menu for the main BoJi window.
+/// Manages the system tray icon and menu for the main Bonio window.
 ///
 /// - Left-click on tray icon: show the main window.
 /// - Right-click on tray icon: pop up context menu (Show / Exit).

@@ -38,7 +38,7 @@ case "$OS" in
   Darwin)
     SERVER_BUILD_SCRIPT="$SERVER_DIR/scripts/build-macos-arm64.sh"
     FLUTTER_BUILD_CMD="flutter build macos"
-    RELEASE_DIR="$DESKTOP_DIR/build/macos/Build/Products/Release/boji_desktop.app"
+    RELEASE_DIR="$DESKTOP_DIR/build/macos/Build/Products/Release/bonio_desktop.app"
     ;;
   Linux)
     SERVER_BUILD_SCRIPT="$SERVER_DIR/scripts/build-linux-amd64.sh"
@@ -101,13 +101,13 @@ fi
 # ========== Step 4: Launch ==========
 echo ""
 echo "============================================"
-echo "Launching boji_desktop..."
+echo "Launching bonio_desktop..."
 echo "============================================"
 
 if [[ "$OS" == "Darwin" ]]; then
   open "$RELEASE_DIR"
 else
-  "$RELEASE_DIR/boji_desktop" &
+  "$RELEASE_DIR/bonio_desktop" &
 fi
 
 echo "Done."

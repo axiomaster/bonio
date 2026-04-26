@@ -21,7 +21,7 @@ import 'ui/widgets/desktop_avatar_overlay.dart';
 
 enum _PlacementState { anchoredWindow, fullscreenCorner, userOffset, onDock }
 
-/// Second engine: OS-level floating avatar (main BoJi window can be minimized).
+/// Second engine: OS-level floating avatar (main Bonio window can be minimized).
 class AvatarFloatingApp extends StatefulWidget {
   final String mainWindowId;
 
@@ -86,7 +86,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
   double _lastAnchoredTop = 0;
   double _lastAnchoredWidth = 0;
 
-  // BoJi Lens (圈一圈) annotation state
+  // Bonio Lens (圈一圈) annotation state
   bool _lensActive = false;
   bool _searchSimilarMode = false; // true when lens is used for 搜同款
   ScreenCaptureResult? _lensCapture;
@@ -163,7 +163,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
       }
 
       // Find our own HWND so we can distinguish the avatar window from
-      // other windows in the same process (e.g. the main BoJi window).
+      // other windows in the same process (e.g. the main Bonio window).
       if (Platform.isWindows) {
         _avatarSelfHwnd = _findWindowByTitle(S.current.avatarWindowTitle);
         if (_avatarSelfHwnd == 0) {
@@ -580,7 +580,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     final fgInfo = _getWinForegroundInfo();
     if (fgInfo == null || fgInfo.hwnd == 0) return;
 
-    // Skip the avatar window itself (but NOT the main BoJi window)
+    // Skip the avatar window itself (but NOT the main Bonio window)
     if (fgInfo.hwnd == _avatarSelfHwnd) return;
 
     // Skip the reading companion window — avatar stays on the browser
@@ -649,7 +649,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
 
     for (final w in windows) {
       // Skip our own app's windows
-      if (w.ownerName == 'boji_desktop') continue;
+      if (w.ownerName == 'bonio_desktop') continue;
       // Skip system/daemon windows (both English and localized names)
       final owner = w.ownerName.toLowerCase();
       if (owner.contains('window server') || owner.contains('systemuiserver') ||
@@ -977,7 +977,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
 
     // Listen for native OLE drag-and-drop events on the dedicated channel
     // created on this engine's messenger by the C++ side.
-    const dropChannel = MethodChannel('boji/avatar_drop');
+    const dropChannel = MethodChannel('bonio/avatar_drop');
     dropChannel.setMethodCallHandler((call) async {
       switch (call.method) {
         case 'avatarDragEnter':
@@ -1354,13 +1354,13 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
   }
 
   // ---------------------------------------------------------------------------
-  // BoJi Lens (圈一圈) — annotation mode
+  // Bonio Lens (圈一圈) — annotation mode
   // ---------------------------------------------------------------------------
 
   Future<void> _enterLensMode({bool searchSimilar = false}) async {
     if (_lensActive) return;
     if (_anchoredHwnd == 0) {
-      debugPrint('BoJiLens: no anchored window');
+      debugPrint('BonioLens: no anchored window');
       _scheduleNextWander();
       return;
     }
@@ -1369,7 +1369,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     // Capture anchored window screenshot before any UI changes
     final capture = ScreenCapture.captureWindow(_anchoredHwnd);
     if (capture == null) {
-      debugPrint('BoJiLens: capture failed');
+      debugPrint('BonioLens: capture failed');
       _scheduleNextWander();
       return;
     }
@@ -1378,7 +1378,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     // Get anchored window rect for expansion
     final info = _getWindowRect(_anchoredHwnd);
     if (info == null) {
-      debugPrint('BoJiLens: cannot get window rect');
+      debugPrint('BonioLens: cannot get window rect');
       _scheduleNextWander();
       return;
     }
@@ -1411,7 +1411,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
       _lensWindowTitle = title;
     });
 
-    debugPrint('BoJiLens: entered annotation mode for "$title" '
+    debugPrint('BonioLens: entered annotation mode for "$title" '
         '(${capture.width}x${capture.height}), '
         'searchSimilar=$searchSimilar');
   }
@@ -1423,7 +1423,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
   Future<void> _exitLensMode({bool submit = false}) async {
     if (!_lensActive) return;
     final isSearchSimilar = _searchSimilarMode;
-    debugPrint('BoJiLens: exiting annotation mode (submit=$submit, '
+    debugPrint('BonioLens: exiting annotation mode (submit=$submit, '
         'rects=${_lensRects.length}, hasCapture=${_lensCapture != null}, '
         'searchSimilar=$isSearchSimilar)');
 
@@ -1464,7 +1464,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     } else {
       _scheduleNextWander();
     }
-    debugPrint('BoJiLens: exited annotation mode');
+    debugPrint('BonioLens: exited annotation mode');
   }
 
   Future<void> _restoreLensWindow({
@@ -1526,18 +1526,18 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     final capture = _lensCapture;
     if (capture == null) return null;
 
-    debugPrint('BoJiLens: encoding PNG (${capture.width}x${capture.height})...');
+    debugPrint('BonioLens: encoding PNG (${capture.width}x${capture.height})...');
     final png = await capture.toPng();
     if (png == null) {
-      debugPrint('BoJiLens: PNG encoding failed');
+      debugPrint('BonioLens: PNG encoding failed');
       return null;
     }
-    debugPrint('BoJiLens: PNG encoded, ${png.length} bytes');
+    debugPrint('BonioLens: PNG encoded, ${png.length} bytes');
 
     final b64 = base64Encode(png);
 
     final buf = StringBuffer();
-    buf.writeln('[BoJi Lens capture] Window: "$_lensWindowTitle"');
+    buf.writeln('[Bonio Lens capture] Window: "$_lensWindowTitle"');
     if (_lensRects.isNotEmpty) {
       buf.writeln('Annotated regions:');
       for (var i = 0; i < _lensRects.length; i++) {
@@ -1554,7 +1554,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
       attachment: OutgoingAttachment(
         type: 'image',
         mimeType: 'image/png',
-        fileName: 'boji_lens_capture.png',
+        fileName: 'bonio_lens_capture.png',
         base64: b64,
       ),
       prompt: buf.toString(),
@@ -1605,17 +1605,17 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
   Future<void> _sendLensResultToMain() async {
     final capture = _lensCapture;
     if (capture == null) {
-      debugPrint('BoJiLens: no capture to send');
+      debugPrint('BonioLens: no capture to send');
       return;
     }
 
-    debugPrint('BoJiLens: encoding PNG (${capture.width}x${capture.height})...');
+    debugPrint('BonioLens: encoding PNG (${capture.width}x${capture.height})...');
     final png = await capture.toPng();
     if (png == null) {
-      debugPrint('BoJiLens: PNG encoding failed');
+      debugPrint('BonioLens: PNG encoding failed');
       return;
     }
-    debugPrint('BoJiLens: PNG encoded, ${png.length} bytes');
+    debugPrint('BonioLens: PNG encoded, ${png.length} bytes');
 
     final rectsJson = _lensRects.map((r) => {
       'x': (r.left * capture.dpiScale).round(),
@@ -1625,7 +1625,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     }).toList();
 
     final b64 = base64Encode(png);
-    debugPrint('BoJiLens: base64 length=${b64.length}, rects=${rectsJson.length}, '
+    debugPrint('BonioLens: base64 length=${b64.length}, rects=${rectsJson.length}, '
         'title=$_lensWindowTitle, sending to main...');
 
     try {
@@ -1635,9 +1635,9 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
         'rects': rectsJson,
         'pngBase64': b64,
       });
-      debugPrint('BoJiLens: result sent to main window');
+      debugPrint('BonioLens: result sent to main window');
     } catch (e) {
-      debugPrint('BoJiLens: send result failed: $e');
+      debugPrint('BonioLens: send result failed: $e');
     }
   }
 

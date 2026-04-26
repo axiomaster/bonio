@@ -53,7 +53,7 @@ class _MemoryTabState extends State<MemoryTab> {
     super.dispose();
   }
 
-  List<BojiNote> _filteredNotes(NoteService service) {
+  List<BonioNote> _filteredNotes(NoteService service) {
     var notes = service.notes;
     if (_selectedTag != null) {
       notes = notes.where((n) => n.tags.contains(_selectedTag)).toList();
@@ -235,7 +235,7 @@ class _MemoryTabState extends State<MemoryTab> {
 }
 
 class _NoteCard extends StatelessWidget {
-  final BojiNote note;
+  final BonioNote note;
   final NoteService service;
   final ValueChanged<String> onTagTap;
   const _NoteCard({

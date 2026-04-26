@@ -40,7 +40,7 @@ class PluginMenuContext {
 /// Each built-in plugin implements this interface and is registered directly
 /// with [PluginManager]. Sidecar plugins communicate via JSON-RPC instead
 /// of this interface, but the host translates to the same lifecycle.
-abstract class BojiPlugin {
+abstract class BonioPlugin {
   /// The plugin's manifest, declaring its id, name, menu config, etc.
   PluginManifest get manifest;
 

@@ -17,12 +17,12 @@ import 'gateway_session.dart';
 import 'reading_template_store.dart';
 
 class NoteService extends ChangeNotifier {
-  static const _notesDirName = 'boji-notes';
+  static const _notesDirName = 'bonio-notes';
   static const _indexFile = 'index.json';
   static const _attachmentsDir = 'attachments';
   static const _thumbnailsDir = 'thumbnails';
   static const _thumbnailWidth = 200;
-  static const _analysisSessionKey = 'boji-notes';
+  static const _analysisSessionKey = 'bonio-notes';
 
   final GatewaySession _session;
   late Directory _notesDir;
@@ -30,7 +30,7 @@ class NoteService extends ChangeNotifier {
   late Directory _thumbDir;
   late File _indexPath;
 
-  List<BojiNote> _notes = [];
+  List<BonioNote> _notes = [];
   bool _initialized = false;
 
   /// Pending analysis: runId → accumulated assistant text.
@@ -40,7 +40,7 @@ class NoteService extends ChangeNotifier {
   /// a `chat` event with `state: 'final'` for the corresponding runId.
   final Map<String, Completer<String>> _analysisCompleters = {};
 
-  List<BojiNote> get notes => List.unmodifiable(_notes);
+  List<BonioNote> get notes => List.unmodifiable(_notes);
 
   NoteService({required GatewaySession session}) : _session = session;
 
@@ -74,7 +74,7 @@ class NoteService extends ChangeNotifier {
       final raw = await _indexPath.readAsString();
       final list = jsonDecode(raw) as List;
       _notes = list
-          .map((e) => BojiNote.fromJson(Map<String, dynamic>.from(e as Map)))
+          .map((e) => BonioNote.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
       _notes.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     } catch (e) {
@@ -88,7 +88,7 @@ class NoteService extends ChangeNotifier {
     await _indexPath.writeAsString(json);
   }
 
-  Future<BojiNote> saveNote(BojiNote note, {Uint8List? attachment}) async {
+  Future<BonioNote> saveNote(BonioNote note, {Uint8List? attachment}) async {
     await init();
     if (attachment != null) {
       final attachFile = File('${_attachDir.path}/${note.fileName}');
@@ -100,7 +100,7 @@ class NoteService extends ChangeNotifier {
     return note;
   }
 
-  Future<void> updateNote(BojiNote updated) async {
+  Future<void> updateNote(BonioNote updated) async {
     final idx = _notes.indexWhere((n) => n.id == updated.id);
     if (idx < 0) return;
     _notes[idx] = updated;
@@ -153,7 +153,7 @@ class NoteService extends ChangeNotifier {
   }
 
   /// Capture the given window, save as a note, and return it.
-  Future<BojiNote?> captureWindow(int hwnd) async {
+  Future<BonioNote?> captureWindow(int hwnd) async {
     if (hwnd == 0) return null;
     await init();
 
@@ -187,7 +187,7 @@ class NoteService extends ChangeNotifier {
 
     log.info('NoteService: captured "$title", url=$browserUrl');
 
-    final note = BojiNote(
+    final note = BonioNote(
       id: id,
       createdAt: now,
       type: NoteType.screenshot,
@@ -201,7 +201,7 @@ class NoteService extends ChangeNotifier {
   }
 
   /// Save dropped content (text, image bytes, or file) as a note.
-  Future<BojiNote?> saveDroppedContent({
+  Future<BonioNote?> saveDroppedContent({
     required String dropType,
     String? text,
     Uint8List? imageBytes,
@@ -216,7 +216,7 @@ class NoteService extends ChangeNotifier {
 
     if (dropType == 'text' && text != null && text.isNotEmpty) {
       final fileName = '${ts}_${id.substring(0, 8)}.txt';
-      final note = BojiNote(
+      final note = BonioNote(
         id: id,
         createdAt: now,
         type: NoteType.text,
@@ -235,7 +235,7 @@ class NoteService extends ChangeNotifier {
       if (thumb != null) {
         await File('${_thumbDir.path}/$thumbName').writeAsBytes(thumb);
       }
-      final note = BojiNote(
+      final note = BonioNote(
         id: id,
         createdAt: now,
         type: NoteType.image,
@@ -257,7 +257,7 @@ class NoteService extends ChangeNotifier {
       final destFile = File('${_attachDir.path}/$fileName');
       await srcFile.copy(destFile.path);
 
-      final note = BojiNote(
+      final note = BonioNote(
         id: id,
         createdAt: now,
         type: NoteType.file,
@@ -273,7 +273,7 @@ class NoteService extends ChangeNotifier {
   /// Save a reading companion note (Markdown text + URL).
   /// [categories] from LLM response are added as tags alongside 阅读搭子.
   /// [coverPng] optional thumbnail bytes (e.g. browser window screenshot).
-  Future<BojiNote> saveReadingNote(String url, String markdown,
+  Future<BonioNote> saveReadingNote(String url, String markdown,
       {String title = '',
       String summaryText = '',
       List<String> categories = const [],
@@ -327,7 +327,7 @@ class NoteService extends ChangeNotifier {
       await File('${_thumbDir.path}/$thumbName').writeAsBytes(coverPng);
     }
 
-    final note = BojiNote(
+    final note = BonioNote(
       id: id,
       createdAt: now,
       type: NoteType.text,
@@ -348,7 +348,7 @@ class NoteService extends ChangeNotifier {
   // ---------------------------------------------------------------------------
 
   /// Called by NodeRuntime to forward gateway events. Returns true if this
-  /// event was consumed (belongs to the boji-notes session).
+  /// event was consumed (belongs to the bonio-notes session).
   bool handleGatewayEvent(String event, String? payloadJson) {
     if (payloadJson == null || _pendingAnalysis.isEmpty) return false;
 
@@ -406,9 +406,9 @@ class NoteService extends ChangeNotifier {
     return false;
   }
 
-  /// OpenClaw canonicalizes session keys, e.g. `boji-notes` may become
-  /// `agent:boji-notes:main`. Match flexibly so streaming events are captured.
-  static const _readingSessionKey = 'boji-reading';
+  /// OpenClaw canonicalizes session keys, e.g. `bonio-notes` may become
+  /// `agent:bonio-notes:main`. Match flexibly so streaming events are captured.
+  static const _readingSessionKey = 'bonio-reading';
 
   /// Match only the note analysis session (not reading).
   bool _matchesAnalysisSession(String? eventKey) {
@@ -460,7 +460,7 @@ class NoteService extends ChangeNotifier {
   // AI Analysis
   // ---------------------------------------------------------------------------
 
-  Future<void> analyzeNote(BojiNote note) async {
+  Future<void> analyzeNote(BonioNote note) async {
     try {
       final attachFile = File('${_attachDir.path}/${note.fileName}');
       if (!await attachFile.exists()) return;
@@ -566,7 +566,7 @@ class NoteService extends ChangeNotifier {
     }
   }
 
-  void _parseAnalysisResponse(BojiNote note, String assistantText) {
+  void _parseAnalysisResponse(BonioNote note, String assistantText) {
     try {
       if (assistantText.isEmpty) {
         _fallbackClassify(note);
@@ -622,7 +622,7 @@ class NoteService extends ChangeNotifier {
     return result.isEmpty ? ['未分类'] : result;
   }
 
-  void _fallbackClassify(BojiNote note) {
+  void _fallbackClassify(BonioNote note) {
     note.tags = ['未分类'];
     note.summary = note.sourceApp.isNotEmpty ? note.sourceApp : '内容已保存';
     note.analyzed = true;
@@ -638,7 +638,7 @@ class NoteService extends ChangeNotifier {
   final Map<String, Completer<String>> _readingCompleters = {};
 
   /// Find an existing note by URL. Returns null if not found.
-  BojiNote? findByUrl(String url) {
+  BonioNote? findByUrl(String url) {
     if (url.isEmpty) return null;
     try {
       return _notes.firstWhere(

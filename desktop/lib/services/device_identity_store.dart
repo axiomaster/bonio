@@ -12,7 +12,7 @@ class DeviceIdentityStore {
   Future<String> _getIdentityPath() async {
     if (_identityFilePath != null) return _identityFilePath!;
     final dir = await getApplicationSupportDirectory();
-    _identityFilePath = '${dir.path}/boji/identity/device.json';
+    _identityFilePath = '${dir.path}/bonio/identity/device.json';
     return _identityFilePath!;
   }
 

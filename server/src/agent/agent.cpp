@@ -181,7 +181,7 @@ RunResult run(const config::Config& config,
   std::string sys_prompt = config.system_prompt;
   if (sys_prompt.empty()) {
     sys_prompt =
-        "You are BoJi (啵唧), an AI assistant running on the user's Android device.\n\n"
+        "You are Bonio, an AI assistant.\n\n"
         "## Response Style\n"
         "- Keep responses SHORT and to the point. 1-3 sentences for simple questions.\n"
         "- Do NOT add excessive emoji, roleplay descriptions, or filler text.\n"
@@ -412,7 +412,7 @@ RunResult run_streaming(const config::Config& config,
   std::string sys_prompt = config.system_prompt;
   if (sys_prompt.empty()) {
     sys_prompt =
-        "You are BoJi (啵唧), an AI assistant running on the user's Android device.\n\n"
+        "You are Bonio, an AI assistant.\n\n"
         "## Response Style\n"
         "- Keep responses SHORT and to the point. 1-3 sentences for simple questions.\n"
         "- Do NOT add excessive emoji, roleplay descriptions, or filler text.\n"
@@ -610,7 +610,7 @@ RunResult run_streaming_with_history(
   std::string sys_prompt = config.system_prompt;
   if (sys_prompt.empty()) {
     sys_prompt =
-        "You are BoJi (啵唧), an AI assistant running on the user's Android device.\n\n"
+        "You are Bonio, an AI assistant.\n\n"
         "## Response Style\n"
         "- Keep responses SHORT and to the point. 1-3 sentences for simple questions.\n"
         "- Do NOT add excessive emoji, roleplay descriptions, or filler text.\n"

@@ -15,7 +15,7 @@ import 'ui/screens/main_screen.dart';
 import 'ui/screens/reading_companion_screen.dart';
 import 'ui/screens/search_similar_screen.dart';
 
-/// Resolves `bojiWindow: avatar` JSON from plugin + entrypoint args.
+/// Resolves `bonioWindow: avatar` JSON from plugin + entrypoint args.
 ///
 /// On Windows the child engine sometimes exposes a bad/non-JSON
 /// [WindowController.arguments] while [args] from
@@ -36,7 +36,7 @@ Map<String, dynamic>? _decodeWindowPayload(String raw) {
     final decoded = jsonDecode(t);
     if (decoded is! Map) return null;
     final m = Map<String, dynamic>.from(decoded);
-    if (m.containsKey('bojiWindow')) return m;
+    if (m.containsKey('bonioWindow')) return m;
   } catch (_) {}
   return null;
 }
@@ -67,18 +67,18 @@ Future<void> main(List<String> args) async {
     if (candidates.isEmpty || candidates.every((c) => c.trim().isEmpty)) {
       await _initMainWindow();
       await AppLogger.instance.init();
-      runApp(const BoJiDesktopApp());
+      runApp(const BonioDesktopApp());
       return;
     }
     debugPrint(
-      'sub-window engine: could not parse bojiWindow; '
+      'sub-window engine: could not parse bonioWindow; '
       'candidates=$candidates fullArgs=$args',
     );
     runApp(const _AvatarErrorApp(message: 'Invalid window arguments'));
     return;
   }
 
-  final windowType = payload['bojiWindow'] as String?;
+  final windowType = payload['bonioWindow'] as String?;
 
   if (windowType == 'search_similar') {
     final imagePath = payload['imagePath'] as String? ?? '';
@@ -146,14 +146,14 @@ Future<void> _initMainWindow() async {
   await windowManager.setTitle(S.current.appName);
 }
 
-class BoJiDesktopApp extends StatefulWidget {
-  const BoJiDesktopApp({super.key});
+class BonioDesktopApp extends StatefulWidget {
+  const BonioDesktopApp({super.key});
 
   @override
-  State<BoJiDesktopApp> createState() => _BoJiDesktopAppState();
+  State<BonioDesktopApp> createState() => _BonioDesktopAppState();
 }
 
-class _BoJiDesktopAppState extends State<BoJiDesktopApp> with WindowListener {
+class _BonioDesktopAppState extends State<BonioDesktopApp> with WindowListener {
   final TrayService _trayService = TrayService();
   late final AppState _appState;
 

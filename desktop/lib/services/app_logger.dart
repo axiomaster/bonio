@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
-/// Simple file logger for boji-desktop.
+/// Simple file logger for bonio-desktop.
 /// Writes timestamped log lines to `~/.bonio/logs/desktop.log`.
 class AppLogger {
   static AppLogger? _instance;

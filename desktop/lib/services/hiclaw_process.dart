@@ -30,7 +30,7 @@ class HiclawProcess extends ChangeNotifier {
       }
       // Fallback for development: check app support dir
       final supportDir = await getApplicationSupportDirectory();
-      final localBin = '${supportDir.path}/boji/hiclaw';
+      final localBin = '${supportDir.path}/bonio/hiclaw';
       if (await File(localBin).exists()) return localBin;
       throw FileSystemException('hiclaw binary not found');
     } else if (Platform.isWindows) {
@@ -39,7 +39,7 @@ class HiclawProcess extends ChangeNotifier {
       final bundled = '$exeDir\\hiclaw.exe';
       if (await File(bundled).exists()) return bundled;
       final supportDir = await getApplicationSupportDirectory();
-      final localBin = '${supportDir.path}\\boji\\hiclaw.exe';
+      final localBin = '${supportDir.path}\\bonio\\hiclaw.exe';
       if (await File(localBin).exists()) return localBin;
       throw FileSystemException('hiclaw binary not found');
     }

@@ -525,7 +525,7 @@ class _ProviderMarketContent extends StatefulWidget {
 
 class _ProviderMarketContentState extends State<_ProviderMarketContent> {
   static const _url =
-      'https://axiomaster.github.io/boji-market/releases/providers.json';
+      'https://axiomaster.github.io/bonio-market/releases/providers.json';
 
   List<Map<String, dynamic>> _providers = [];
   bool _loading = true;
@@ -641,7 +641,7 @@ class _ThemeMarketContent extends StatefulWidget {
 }
 
 class _ThemeMarketContentState extends State<_ThemeMarketContent> {
-  static const _url = 'https://axiomaster.github.io/boji-market/themes.json';
+  static const _url = 'https://axiomaster.github.io/bonio-market/themes.json';
 
   List<Map<String, dynamic>> _themes = [];
   bool _loading = true;
@@ -831,7 +831,7 @@ class _PluginMarketContentState extends State<_PluginMarketContent> {
     try {
       final client = HttpClient();
       final req = await client.getUrl(
-          Uri.parse('https://axiomaster.github.io/boji-market/plugins.json'));
+          Uri.parse('https://axiomaster.github.io/bonio-market/plugins.json'));
       final resp = await req.close();
       final body = await resp.transform(utf8.decoder).join();
       client.close();
@@ -989,7 +989,7 @@ class _PluginMarketContentState extends State<_PluginMarketContent> {
       final client = HttpClient();
       final req = await client.getUrl(Uri.parse(url));
       final resp = await req.close();
-      final tempDir = await Directory.systemTemp.createTemp('boji_plugin_');
+      final tempDir = await Directory.systemTemp.createTemp('bonio_plugin_');
       final zipFile = File('${tempDir.path}${Platform.pathSeparator}plugin.zip');
       final sink = zipFile.openWrite();
       await resp.pipe(sink);

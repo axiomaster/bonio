@@ -39,7 +39,7 @@ esac
 # Bundle hiclaw
 echo "Bundling hiclaw..."
 if [[ "$OS" == "Darwin" ]]; then
-  APP="$DESKTOP_DIR/build/macos/Build/Products/Release/boji_desktop.app"
+  APP="$DESKTOP_DIR/build/macos/Build/Products/Release/bonio_desktop.app"
   "$DESKTOP_DIR/scripts/bundle-hiclaw.sh" "$APP"
 else
   BUNDLE="$DESKTOP_DIR/build/linux/x64/release/bundle"
@@ -51,10 +51,10 @@ fi
 
 # Optionally launch
 if [[ "$RUN" == "true" ]]; then
-  echo "Launching boji_desktop..."
+  echo "Launching bonio_desktop..."
   if [[ "$OS" == "Darwin" ]]; then
     open "$APP"
   else
-    "$DESKTOP_DIR/build/linux/x64/release/bundle/boji_desktop" &
+    "$DESKTOP_DIR/build/linux/x64/release/bundle/bonio_desktop" &
   fi
 fi

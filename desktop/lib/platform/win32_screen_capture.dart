@@ -550,7 +550,7 @@ class Win32ScreenCapture {
     if (hwnd == 0) return null;
     if (!Platform.isWindows) return null;
     try {
-      final dir = await Directory.systemTemp.createTemp('boji_uia_');
+      final dir = await Directory.systemTemp.createTemp('bonio_uia_');
       final ps1 = File('${dir.path}${Platform.pathSeparator}extract.ps1');
       final script = '''
 Add-Type -AssemblyName UIAutomationClient
