@@ -24,13 +24,22 @@ static const int kDedupTtlSeconds = 300;  // 5 minutes
 
 }  // namespace
 
-WeChatAdapter::WeChatAdapter(const config::Config& config)
-    : config_(config) {
+WeChatAdapter::WeChatAdapter(const config::Config& config,
+                             GatewayBroadcastRef broadcast)
+    : config_(config), broadcast_(broadcast) {
   session_store_ = std::make_shared<session::SessionStore>(config.config_dir);
 
-  // Event callback: captures final response and sends to WeChat
+  // Event callback: captures final response and sends to WeChat, plus
+  // forwards all agent/chat events to connected gateway clients.
   auto event_callback = [this](const std::string& event_name,
                                const std::string& payload_json) {
+    // Forward all agent/chat events to gateway operator sessions
+    if (broadcast_ && *broadcast_) {
+      if (event_name == "agent" || event_name == "chat") {
+        (*broadcast_)(event_name, payload_json);
+      }
+    }
+
     if (event_name != "chat") return;
     try {
       auto j = json::parse(payload_json);

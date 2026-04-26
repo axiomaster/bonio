@@ -401,7 +401,11 @@ class ChatController extends ChangeNotifier {
     final payload = _tryParseJson(payloadJson);
     if (payload == null) return;
     final sessionKey = payload['sessionKey'] as String?;
-    if (!_sessionKeyMatchesEvent(sessionKey)) return;
+    if (!_sessionKeyMatchesEvent(sessionKey)) {
+      // Event from another session (e.g. WeChat) — refresh session list
+      _fetchSessions();
+      return;
+    }
 
     final runId = payload['runId'] as String?;
     final state = payload['state'] as String?;
@@ -460,7 +464,11 @@ class ChatController extends ChangeNotifier {
     final payload = _tryParseJson(payloadJson);
     if (payload == null) return;
     final sessionKey = payload['sessionKey'] as String?;
-    if (!_sessionKeyMatchesEvent(sessionKey)) return;
+    if (!_sessionKeyMatchesEvent(sessionKey)) {
+      // Event from another session (e.g. WeChat) — refresh session list
+      _fetchSessions();
+      return;
+    }
 
     final stream = payload['stream'] as String?;
     final data = payload['data'] as Map<String, dynamic>?;
