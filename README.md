@@ -1,175 +1,158 @@
-# Bonio (BoJi / HiClaw)
+# 🐱 Bonio — 你的桌面 AI 搭子
 
-Bonio 是一个跨平台 AI 桌面伴侣系统，由一个悬浮动画猫咪角色（BoJi）和 C++ WebSocket 网关服务器（HiClaw）组成，提供智能对话、语音交互、桌面效率工具等能力。
+> 它不是一个聊天窗口，而是一个坐在你窗口边缘的、有灵魂的小家伙。
 
-## 核心功能
+**Bonio（波妞）** 是一个运行在 Windows / macOS 桌面上的 AI 伴随智能体。它是一只浮动在你当前窗口边缘的虚拟宠物，**看得见你的屏幕，听得见你的声音，记得住你喂给它的东西**——在你需要时默默帮忙，在你无聊时逗你开心。
 
-### 桌面宠物（Avatar）
+---
 
-- 基于 Lottie 动画的悬浮猫咪角色，作为系统级置顶窗口常驻桌面
-- 自动锚定到当前活跃窗口顶部，跟随窗口移动（弹性弹簧物理效果）
-- 丰富的动画状态：11 种活动状态、3 种运动状态、7 种动作手势
-- 空闲时沿窗口边缘自主漫步
-- 支持服务端远程控制动画、位置、气泡文字、TTS 等
-- 交互方式：单击（随机动画）、双击（文字输入）、长按（语音输入）、右键（功能菜单）、拖拽（调整位置）
+## 它跟别的 AI 工具有什么不一样？
 
-### 智能对话
+| 传统 AI 助手 | Bonio |
+|-------------|-------|
+| 藏在聊天窗口里，等你去叫它 | 一直浮在窗口边缘，**主动陪伴** |
+| 只知道你打的字 | 知道你当前在用哪个应用、浏览器里在看什么 |
+| 只能聊天 | 能截图、调窗口布局、控制浏览器、执行脚本 |
+| 记不住东西 | 有**记忆系统**，截图/文件/文本拖给它就能自动分类存档 |
+| 功能固定 | **插件系统**，任意语言开发，右键菜单无限扩展 |
 
-- 多轮对话，持久化会话历史
-- 流式响应（WebSocket 逐 token 推送）
-- 流式模式下支持工具执行（shell、文件读写、网页抓取、Memory 操作等）
-- 系统提示词支持，可定义 BoJi 人设
-- 可配置多种模型提供商（Ollama、OpenAI、Anthropic、GLM、MiniMax、Qwen、Kimi、Gemini 及自定义兼容端点）
-- 思考深度（Thinking Level）可调
+---
 
-### 语音交互
+## 怎么玩？
 
-- 客户端语音识别：Android SpeechRecognizer / macOS `say` / 桌面端 Sherpa-ONNX 离线 ASR（中英双语）
-- 语音合成：Windows PowerShell SAPI / macOS `say` / Linux `spd-say` / Android TTS
-- 长按宠物进行语音输入，实时显示部分识别结果
-- 端到端语音对话延迟目标 1-3 秒
+### 🐱 跟它互动
 
-### 伴读（Reading Companion）
+| 动作 | 干什么 |
+|------|--------|
+| **单击** 猫咪 | 随机动作 + 情绪气泡（打哈欠、伸懒腰、甩尾巴） |
+| **双击** 猫咪 | 弹出输入框，跟 AI 聊天 |
+| **长按** 猫咪 | 按住说话，松开发送（语音输入） |
+| **拖拽** 猫咪 | 手动挪开它 |
+| **右键** 猫咪 | 打开功能工具箱 |
 
-- 70/30 分屏布局：浏览器占 70%，伴读窗口占 30%
-- 自动提取文章标题结构，生成可导航的目录
-- AI 生成文章摘要，预填充到 Markdown 编辑器
-- 支持用户内联编辑摘要内容
-- 保存到 Memory，带原文 URL 和 `#伴读` 标签
+### 🖱️ 右键工具箱
 
-### 记一记（Smart Capture）
+- **记一记** — 截图当前窗口 → AI 自动打标签、写摘要 → 存入记忆
+- **圈一圈** — 在窗口上画红框标注 → AI 聚焦分析你圈的区域
+- **搜同款** — 圈选商品图片 → 自动淘宝以图搜图
+- **伴读** — 浏览器里看长文 → 自动 70/30 分屏，提取目录 + 摘要 + 笔记编辑器
 
-- 右键「记一记」一键截取当前窗口，AI 自动分类打标签并保存
-- 拖拽「投喂」：将文件、文本、图片拖到宠物身上，触发吃食动画后自动保存和分析
-- AI 自动分类通过专用 `boji-notes` 会话完成
-- 文件化存储：`index.json` + `attachments/` + `thumbnails/`
-- 可浏览的 Memory UI：搜索、标签筛选、卡片网格、详情查看
+### 🎤 语音 + 📱 微信
 
-### 搜同款（Visual Search）
+- **按住说话**：长按 Avatar 开始录音，松开发送，本地离线识别
+- **微信远程指挥**：通勤路上给 Bonio 发条微信，它会帮你操作电脑
 
-- 右键触发十字光标，在屏幕上框选区域
-- 自动截图裁剪选中区域，跳转淘宝以图搜货结果页面
+### 🧿 记忆系统
 
-### AI Lens（屏幕标注）
+看到想"记住"的东西，**右键一下**，或者**直接拖到猫咪身上**。AI 自动分析、分类、打标签。以后问它："帮我把 #购物 的笔记找出来"——它都能找到。
 
-- 全屏截图叠加层，用户绘制标注矩形
-- 截图 + 标注发送给 AI 进行分析
+---
 
-### 会议转录 & 双语字幕
+## 架构
 
-- 系统音频环路采集（WASAPI），实时流式转写
-- 模板化摘要生成（会议/赛事/课堂），保存到 Memory
-- 实时双语字幕浮层，原文 + 翻译，延迟 < 500ms，静默时自动隐藏
-
-## 系统架构
+Bonio 由四个组件构成，通过统一的 **WebSocket 协议 v3** 通信：
 
 ```
-┌─────────────────────────────────────────────────┐
-│                   HiClaw Server (C++)            │
-│         WebSocket Gateway / Agent Loop           │
-│    ┌──────────┐ ┌──────────┐ ┌───────────────┐  │
-│    │  Chat     │ │  Agent   │ │  Tool Router  │  │
-│    │ Handler   │ │  Loop    │ │ (node.invoke) │  │
-│    └──────────┘ └──────────┘ └───────────────┘  │
-└──────────────────┬──────────────────────────────┘
-                   │ WebSocket (Protocol v3)
-       ┌───────────┼───────────────┐
-       ▼           ▼               ▼
-┌──────────┐ ┌──────────┐  ┌──────────────┐
-│ Android  │ │HarmonyOS │  │   Desktop    │
-│ (Kotlin) │ │ (ArkTS)  │  │  (Flutter)   │
-└──────────┘ └──────────┘  └──────────────┘
+┌────────────────────────────────────────────┐
+│         Desktop (Flutter)                  │
+│  Windows / macOS                           │
+│  Avatar · 聊天 · 插件 · 语音 · 记忆         │
+└──────────────┬─────────────────────────────┘
+               │ WebSocket v3
+     ┌─────────┴─────────┐
+     ▼                   ▼
+┌──────────┐      ┌──────────────┐
+│  HiClaw  │      │   OpenClaw   │
+│ C++ 自研  │      │ Node.js 社区  │
+│ 零依赖部署 │      │ 公共网关      │
+└──────────┘      └──────────────┘
+     │
+     ▼
+┌──────────┐  ┌──────────┐
+│ Android  │  │HarmonyOS │
+│ 手机伴侣   │  │ 手机伴侣   │
+└──────────┘  └──────────┘
 ```
 
 所有客户端维护**双 WebSocket 会话**：
-- **operatorSession**：用户命令（聊天、配置）
-- **nodeSession**：服务端发起的工具调用（摄像头、截屏、定位等）
+- **operatorSession**：用户命令（聊天、配置、会话管理）
+- **nodeSession**：服务端工具调用（截图、相机、设备控制等）
 
-## 项目结构
-
-| 目录 | 说明 |
-|------|------|
-| `server/` | C++ WebSocket 网关服务器（CMake, C++17） |
-| `android/` | Kotlin / Jetpack Compose 安卓客户端 |
-| `harmonyos/` | ArkTS / HarmonyOS 客户端 |
-| `desktop/` | Flutter 桌面客户端（Windows + macOS） |
-| `design/` | 功能设计文档（PRD） |
+---
 
 ## 快速开始
 
-### 服务器构建
+### 桌面端（推荐）
 
 ```bash
-# Windows x64
-cd server && scripts\build-win-x64.bat
+# 编译服务端 + 桌面端 + 启动（Windows）
+scripts\build-and-run.bat --ninja
 
-# Linux amd64
-cd server && scripts/build-linux-amd64.sh
+# macOS / Linux
+scripts/build-and-run.sh
 
-# Android (需要 ANDROID_NDK_HOME)
-cd server && scripts/build-android.sh
-
-# HarmonyOS (需要 OHOS_NDK_HOME)
-cd server && scripts/build-ohos.sh
+# 只编译桌面端（跳过服务端）
+scripts\build-desktop.bat --ninja --run
 ```
 
-### 桌面客户端
+### 前置条件
 
-```bash
-cd desktop && flutter pub get && flutter run -d windows
-# 或 macOS:
-cd desktop && flutter pub get && flutter run -d macos
-```
-
-### 安卓客户端
-
-```bash
-cd android && ./gradlew assembleDebug
-```
-
-## 服务器命令参考
-
-| 命令 | 说明 |
+| 平台 | 需要 |
 |------|------|
-| `hiclaw run "prompt"` | 单轮对话 |
-| `hiclaw gateway [--port 18789]` | 启动 WebSocket 网关 |
-| `hiclaw serve [port]` | HTTP 服务（POST `{"prompt":"..."}`) |
-| `hiclaw agent` | 交互式 REPL 模式 |
-| `hiclaw config` | 交互式配置 |
-| `hiclaw model list` | 列出已配置模型 |
+| **Windows** | Visual Studio Build Tools 2022（命令行工具，非 IDE）+ Ninja |
+| **macOS** | Xcode Command Line Tools |
+| **Linux** | build-essential + cmake + ninja + libssl-dev |
 
-## 网关协议
+详见 [CLAUDE.md](CLAUDE.md) 中的完整构建文档。
 
-WebSocket 协议版本 3，帧类型：`req`（请求）、`res`（响应）、`event`（事件）。
+### 连接后端
 
-主要 RPC 方法：
+打开主窗口 → Server 标签页 → 填入网关地址。支持两种后端：
 
-| 方法 | 方向 | 说明 |
-|------|------|------|
-| `connect` | 客户端→服务器 | 认证握手（Ed25519 签名） |
-| `config.get/set` | 客户端→服务器 | 获取/更新配置 |
-| `chat.send` | 客户端→服务器 | 发送消息，返回 runId（异步流式） |
-| `chat.abort` | 客户端→服务器 | 取消进行中的请求 |
-| `sessions.list/delete/reset/patch` | 客户端→服务器 | 会话管理 |
-| `node.invoke.result` | 客户端→服务器 | 返回工具调用结果 |
-
-主要事件：
-
-| 事件 | 说明 |
+| 后端 | 特点 |
 |------|------|
-| `agent` | LLM 流式 delta（助手文本/工具调用） |
-| `chat` | 聊天状态更新 |
-| `node.invoke.request` | 服务端请求客户端执行工具 |
-| `tick` | 心跳（每 30s） |
+| **HiClaw**（自托管） | `./hiclaw gateway` 一键启动，零配置，单文件部署 |
+| **OpenClaw**（公共网关） | 连接社区服务，开箱即用 |
 
-## 环境变量
+---
 
-| 变量 | 说明 |
-|------|------|
-| `HICLAW_WORKSPACE` | 从指定目录读取 `hiclaw.json` 配置 |
-| `hiclaw_log` | 日志级别：off/error/warn/info/debug |
-| `hiclaw_default_model` | 覆盖配置中的 `default_model` |
+## 项目结构
+
+| 目录 | 技术栈 | 说明 |
+|------|--------|------|
+| `desktop/` | Flutter / Dart | Windows & macOS 桌面客户端 |
+| `server/` | C++17 / CMake | HiClaw 网关服务器 |
+| `android/` | Kotlin / Jetpack Compose | Android 手机伴侣 |
+| `harmonyos/` | ArkTS | HarmonyOS 手机伴侣 |
+| `docs/blog/` | — | 技术博客系列（中英双语） |
+| `docs/design/` | — | 产品需求文档（PRD） |
+| `docs/plans/` | — | 实现计划 |
+
+---
+
+## 了解更多
+
+完整的技术博客系列（10 篇），深入介绍每个子系统：
+
+| # | 文章 |
+|---|------|
+| 1 | [Bonio 总览：桌面 AI 伴侣的新范式](docs/blog/cn/01-bonio-overview.md) |
+| 2 | [Avatar 系统：一个有灵魂的桌面宠物](docs/blog/cn/02-avatar-system.md) |
+| 3 | [后端架构：HiClaw 与 OpenClaw 双引擎](docs/blog/cn/03-backend-architecture.md) |
+| 4 | [插件系统：Bonio 的无限扩展能力](docs/blog/cn/04-plugin-system-overview.md) |
+| 5 | [记一记：碎片化信息的一键收集](docs/blog/cn/05-note-capture.md) |
+| 6 | [搜同款：一键比价的购物搭子](docs/blog/cn/06-search-similar.md) |
+| 7 | [伴读：把浏览器变成深度学习工具](docs/blog/cn/07-reading-companion.md) |
+| 8 | [记忆系统：你的外挂大脑](docs/blog/cn/08-memory-system.md) |
+| 9 | [语音交互：从听到说到理解](docs/blog/cn/09-voice-interaction.md) |
+| 10 | [微信集成：用手机指挥桌面 AI](docs/blog/cn/10-wechat-integration.md) |
+
+---
 
 ## 许可证
 
-私有项目，未公开授权。
+MIT
+
+---
+
+*桌面 AI 的终极形态不是 Copilot 式的侧边栏，而是一个有存在感、有记忆、能动手的"数字搭子"。*

@@ -573,37 +573,95 @@ class NoteService extends ChangeNotifier {
         return;
       }
 
-      final jsonMatch =
-          RegExp(r'\{[^{}]*"tags"[^{}]*\}').firstMatch(assistantText);
-      if (jsonMatch != null) {
-        final parsed =
-            jsonDecode(jsonMatch.group(0)!) as Map<String, dynamic>;
-        final rawTags = (parsed['tags'] as List?)?.cast<String>() ?? [];
-        note.tags = _normalizeTags(rawTags);
-        note.summary = parsed['summary'] as String? ?? '';
-        note.analyzed = true;
-        unawaited(updateNote(note));
-        log.info('NoteService: parsed tags=${note.tags}, summary=${note.summary}');
-        return;
+      // 1. Strip markdown code fences first (LLMs often wrap JSON in ```json ... ```)
+      final jsonStr = _extractJsonBlock(assistantText);
+      if (jsonStr != null) {
+        try {
+          final parsed = jsonDecode(jsonStr) as Map<String, dynamic>;
+          final rawTags = (parsed['tags'] as List?)?.cast<String>() ?? [];
+          note.tags = _normalizeTags(rawTags);
+          note.summary = parsed['summary'] as String? ?? '';
+          note.analyzed = true;
+          unawaited(updateNote(note));
+          log.info('NoteService: parsed tags=${note.tags}, summary=${note.summary}');
+          return;
+        } on FormatException {
+          // JSON parse failed, try fallback below
+        }
       }
 
-      // Fallback: extract #tags from text
+      // 2. Fallback: extract #tags from text
       final tagMatches = RegExp(r'#\S+').allMatches(assistantText);
       if (tagMatches.isNotEmpty) {
         note.tags = _normalizeTags(
             tagMatches.map((m) => m.group(0)!).toList());
+        // Use a short excerpt from the text as summary (first non-tag line)
+        final lines = assistantText
+            .split(RegExp(r'[\r\n]+'))
+            .where((l) => l.trim().isNotEmpty && !l.trim().startsWith('#'))
+            .toList();
+        note.summary = lines.isNotEmpty
+            ? (lines.first.length > 80 ? '${lines.first.substring(0, 80)}...' : lines.first)
+            : (note.sourceApp.isNotEmpty ? note.sourceApp : '内容已保存');
       } else {
         note.tags = ['未分类'];
+        note.summary = note.sourceApp.isNotEmpty ? note.sourceApp : '内容已保存';
       }
-      note.summary = assistantText.length > 80
-          ? '${assistantText.substring(0, 80)}...'
-          : assistantText;
       note.analyzed = true;
       unawaited(updateNote(note));
     } catch (e) {
       log.error('NoteService: parse failed: $e');
       _fallbackClassify(note);
     }
+  }
+
+  /// Extract a JSON object containing "tags" key from text.
+  /// Handles markdown code fences and nested braces in string values.
+  static String? _extractJsonBlock(String text) {
+    // Strip markdown code fences: ```json ... ``` or ``` ... ```
+    final fence = RegExp(r'```(?:json)?\s*\n?([\s\S]*?)\n?```');
+    final fenceMatch = fence.firstMatch(text);
+    final inner = fenceMatch != null ? fenceMatch.group(1)!.trim() : text;
+
+    // Find the JSON object that contains "tags" using brace-depth tracking.
+    // This correctly handles { } inside JSON string values.
+    final tagsKey = '"tags"';
+    final tagsPos = inner.indexOf(tagsKey);
+    if (tagsPos < 0) return null;
+
+    // Scan backward from "tags" to find the opening {
+    var depth = 0;
+    var start = -1;
+    for (var i = tagsPos; i >= 0; i--) {
+      final ch = inner[i];
+      if (ch == '}') { depth++; continue; }
+      if (ch == '{') {
+        if (depth == 0) { start = i; break; }
+        depth--;
+      }
+    }
+    if (start < 0) return null;
+
+    // Scan forward from start+1 to find the matching closing }
+    depth = 0;
+    var end = -1;
+    var inString = false;
+    var escaped = false;
+    for (var i = start + 1; i < inner.length; i++) {
+      final ch = inner[i];
+      if (escaped) { escaped = false; continue; }
+      if (ch == '\\') { escaped = true; continue; }
+      if (ch == '"') { inString = !inString; continue; }
+      if (inString) continue;
+      if (ch == '{') { depth++; continue; }
+      if (ch == '}') {
+        if (depth == 0) { end = i + 1; break; }
+        depth--;
+      }
+    }
+    if (end <= start) return null;
+
+    return inner.substring(start, end);
   }
 
   /// Strip leading # and deduplicate, keeping original order.
