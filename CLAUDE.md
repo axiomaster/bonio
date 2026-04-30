@@ -166,21 +166,36 @@ Global options: `--config-dir <path>` (default `~/.bonio`), `--log-level`.
 
 ```
 server/
-├── src/main.cpp              # CLI entry point (subcommands: run, config, serve, etc.)
-├── src/net/gateway.cpp       # WebSocket gateway - handles all RPC methods
-├── src/net/async_agent.cpp   # Per-session agent manager (LLM streaming)
-├── src/net/http_client.cpp   # HTTP client for LLM provider APIs
-├── src/net/tool_router.cpp   # Routes tool calls to node sessions
-├── src/agent/agent.cpp       # Agent loop (LLM call → tool call → result → repeat)
-├── src/providers/            # LLM provider adapters (ollama, openai_compatible)
-├── src/config/config.cpp     # Config loading/saving (hiclaw.json)
-├── src/session/store.cpp     # Chat session persistence (file-based)
-├── src/tools/tool.cpp        # Tool definitions and execution
-├── src/skills/skill_manager.cpp  # Skill loading/management
-└── include/hiclaw/           # Headers mirror src/ structure
+├── src/main.cpp                   # CLI entry point (subcommands: run, config, serve, etc.)
+├── src/agent/agent.cpp            # Agent loop (LLM call → tool call → result → repeat)
+├── src/config/config.cpp          # Config loading/saving (hiclaw.json)
+├── src/cron/                      # Cron scheduler (5-field expr parser + persistent store)
+├── src/memory/file_memory.cpp     # Agent memory: store, recall, forget (file-based)
+├── src/net/
+│   ├── gateway.cpp                # WebSocket gateway - all RPC methods + event broadcast
+│   ├── async_agent.cpp            # Per-session agent manager (LLM streaming)
+│   ├── http_client.cpp            # HTTP client for LLM provider APIs
+│   ├── tool_router.cpp            # Routes tool calls to node sessions
+│   ├── intent_router.cpp          # Classifies voice STT results (chat/screenshot/summarize/call)
+│   ├── call_handler.cpp           # Incoming call flow: TTS, countdown, answer/reject, spam detect
+│   ├── idle_manager.cpp           # Pet avatar random wandering when device is idle
+│   ├── health_monitor.cpp         # Screen-time awareness: late-night usage nags
+│   ├── notification_handler.cpp   # Filters important notifications for avatar reactions
+│   ├── wechat_adapter.cpp         # WeChat channel bridge (WeCom + ilink → agent pipeline)
+│   ├── wecom_ws_client.cpp        # WeCom intelligent-bot WebSocket long-connection client
+│   └── ilink_http_client.cpp      # HTTP client for WeChat ilink bot API (personal WeChat)
+├── src/observability/log.cpp      # Structured logging (spdlog wrapper)
+├── src/providers/                 # LLM provider adapters (ollama, openai_compatible)
+├── src/security/path_guard.cpp    # Path traversal protection for file operations
+├── src/session/store.cpp          # Chat session persistence (file-based)
+├── src/skills/skill_manager.cpp   # Skill loading/management
+├── src/tools/
+│   ├── tool.cpp                   # Tool definitions and execution
+│   └── memo_tool.cpp              # memo_save / memo_list tools
+└── include/hiclaw/                # Headers mirror src/ structure
 ```
 
-Key design: `gateway.cpp` has a websocketpp message handler (non-const Config access, for `config.set`) and `gateway_handle_frame` (const Config, read-only methods like `config.get`, `chat.send`).
+Key design: `gateway.cpp` uses websocketpp. The gateway manages connected client sessions and broadcasts events (agent deltas, chat updates, avatar commands) to relevant clients. `WeChatAdapter` feeds external WeChat messages into the same agent pipeline as gateway chat messages.
 
 ### Android App
 
@@ -226,6 +241,51 @@ desktop/lib/
 ```
 
 Desktop shares the same gateway protocol and dual-session architecture as Android/HarmonyOS. Mobile-only capabilities (camera, location, SMS, etc.) respond with `UNSUPPORTED_COMMAND` on the node session.
+
+### WeChat Integration
+
+Server bridges WeChat into the agent pipeline via `WeChatAdapter`, which orchestrates two channel clients:
+
+- **WeCom** (`WecomWsClient`) — Enterprise WeChat intelligent-bot protocol over `wss://openws.work.weixin.qq.com`. Receives messages via WebSocket long-connection, replies via `aibot_respond_msg` (stream format). Requires `bot_id` + `bot_secret` in config.
+- **ilink** (`IlinkHttpClient`) — Personal WeChat bot API via HTTP long-polling. Receives messages with `get_updates()`, sends replies chunked to 3800 chars with retry on `ret=-2`. Requires `token` + `base_url` in config.
+
+Messages from either channel flow through the same `AsyncAgentManager` → `Agent` loop → tool calls → response pipeline as gateway chat messages. Reply context (callback_req_id for WeCom, user_id for ilink) is tracked per session. Message deduplication by msg_id prevents double-processing.
+
+### Avatar Command System
+
+Server sends `avatar.command` events to control the pet avatar on clients. Commands are built via `avatar_cmd` helpers in [`server/include/hiclaw/net/avatar_command.hpp`](server/include/hiclaw/net/avatar_command.hpp):
+
+| Command | Purpose |
+|---------|---------|
+| `setState(state, temporary?)` | Switch avatar animation state (idle, happy, confused, etc.) |
+| `moveTo(x, y, mode)` | Move avatar to position (mode: "walk", "jump", etc.) |
+| `setBubble(text, bgColor?, textColor?)` | Show speech/thought bubble |
+| `setBubbleCountdown(text, countdown)` | Show bubble with countdown timer |
+| `clearBubble()` | Hide bubble |
+| `tts(text)` / `stopTts()` | Text-to-speech |
+| `playSound(type)` | Play sound effect ("notification", etc.) |
+| `setColorFilter(color)` / `clearColorFilter()` | Tint the avatar |
+| `setPosition(x, y)` / `cancelMovement()` | Teleport or cancel movement |
+| `performAction(type)` | Trigger one-shot animation |
+| `sequence(steps[])` | Chain multiple commands with optional delays |
+
+### Server Subsystems
+
+All subsystems receive an `EventCallback` to push events to connected clients:
+
+- **IntentRouter** — Classifies voice STT final results server-side. Intents: `Chat` (send as chat message), `ScreenCapture`, `Summarize`, `CallAnswer`, `CallReject`. Uses keyword matching. Also provides `classify_call_command()` for during-call voice classification.
+- **CallHandler** — Manages incoming phone call flow: sends TTS announcement with caller info, runs countdown timer, performs spam detection (number lookup + contact name heuristics), and sends `call.action` events (answer/reject). Coordinates TTS/STT start/stop with the client.
+- **IdleManager** — Random pet avatar wandering when device is idle. Triggers `moveTo` commands at random intervals (8-20s) within a radius when the device screen is on and the avatar is in idle state.
+- **HealthMonitor** — Screen-time wellness. Accumulates screen-on time and during late-night hours (23:00-6:00), sends gentle then escalating nags via avatar TTS after 2 hours of continuous use, with 15-minute cooldown between nags.
+- **NotificationHandler** — Evaluates `notifications.changed` events. Filters important notifications (from messaging apps, calls, etc.) and triggers avatar reactions via `avatar.command`.
+
+### Cron System
+
+5-field cron expression parser (`minute hour day-of-month month day-of-week`) in [`cron/schedule.hpp`](server/include/hiclaw/cron/schedule.hpp). Supports `*`, `N`, `N-M`, and `*/M` (step) syntax. `cron::store` persists scheduled tasks in a JSON file under the config directory. Used for periodic tasks configured in `hiclaw.json`.
+
+### Memory System
+
+File-based agent memory in [`memory/memory.hpp`](server/include/hiclaw/memory/memory.hpp). Supports `store(key, content, category)`, `recall(query, limit)`, and `forget(key)`. Categories: `core` (always loaded), `daily`, `conversation`, or custom. Stores JSON files under `<config_dir>/memory/`. The agent uses memory to persist user preferences and facts across sessions.
 
 ## Gateway Protocol
 

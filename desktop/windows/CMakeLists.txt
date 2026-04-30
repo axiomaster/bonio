@@ -1,10 +1,10 @@
 # Project-level configuration.
 cmake_minimum_required(VERSION 3.14)
-project(boji_desktop LANGUAGES CXX)
+project(bonio_desktop LANGUAGES CXX)
 
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
-set(BINARY_NAME "boji_desktop")
+set(BINARY_NAME "bonio_desktop")
 
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent
 # versions of CMake.
@@ -39,12 +39,17 @@ add_definitions(-DUNICODE -D_UNICODE)
 # of modifying this function.
 function(APPLY_STANDARD_SETTINGS TARGET)
   target_compile_features(${TARGET} PUBLIC cxx_std_17)
-  # UTF-8 source interpretation (avoids C4819 with plugins whose sources are UTF-8, e.g. camera_desktop)
-  target_compile_options(${TARGET} PRIVATE /utf-8)
-  target_compile_options(${TARGET} PRIVATE /W4 /WX /wd"4100")
-  target_compile_options(${TARGET} PRIVATE /EHsc)
-  target_compile_definitions(${TARGET} PRIVATE "_HAS_EXCEPTIONS=0")
-  target_compile_definitions(${TARGET} PRIVATE "$<$<CONFIG:Debug>:_DEBUG>")
+  if(MSVC)
+    # UTF-8 source interpretation (avoids C4819 with plugins whose sources are UTF-8, e.g. camera_desktop)
+    target_compile_options(${TARGET} PRIVATE /utf-8)
+    target_compile_options(${TARGET} PRIVATE /W4 /WX /wd"4100")
+    target_compile_options(${TARGET} PRIVATE /EHsc)
+    target_compile_definitions(${TARGET} PRIVATE "_HAS_EXCEPTIONS=0")
+    target_compile_definitions(${TARGET} PRIVATE "$<$<CONFIG:Debug>:_DEBUG>")
+  else()
+    target_compile_options(${TARGET} PRIVATE -Wall -Wextra -Werror)
+    target_compile_definitions(${TARGET} PRIVATE "$<$<CONFIG:Debug>:DEBUG>")
+  endif()
 endfunction()
 
 # Flutter library and tool build rules.
@@ -65,8 +70,11 @@ include(flutter/generated_plugins.cmake)
 # run in place. This is done instead of making a separate bundle (as on Linux)
 # so that building and running from within Visual Studio will work.
 set(BUILD_BUNDLE_DIR "$<TARGET_FILE_DIR:${BINARY_NAME}>")
-# Make the "install" step default, as it's required to run.
-set(CMAKE_VS_INCLUDE_INSTALL_TO_DEFAULT_BUILD 1)
+# Make the "install" step default for Visual Studio generator, so that building
+# from within VS will work. Has no effect with Ninja or Makefile generators.
+if(CMAKE_GENERATOR MATCHES "Visual Studio")
+  set(CMAKE_VS_INCLUDE_INSTALL_TO_DEFAULT_BUILD 1)
+endif()
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   set(CMAKE_INSTALL_PREFIX "${BUILD_BUNDLE_DIR}" CACHE PATH "..." FORCE)
 endif()

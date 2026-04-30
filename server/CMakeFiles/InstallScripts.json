@@ -1,0 +1,20 @@
+{
+	"InstallScripts" : 
+	[
+		"D:/projects/bonio/server/cmake_install.cmake",
+		"D:/projects/bonio/server/_deps/CLI11_build/cmake_install.cmake",
+		"D:/projects/bonio/server/_deps/CLI11_build/src/cmake_install.cmake",
+		"D:/projects/bonio/server/_deps/spdlog_build/cmake_install.cmake",
+		"D:/projects/bonio/server/_deps/nlohmann_json_build/cmake_install.cmake",
+		"D:/projects/bonio/server/_deps/mbedtls_build/cmake_install.cmake",
+		"D:/projects/bonio/server/_deps/mbedtls_build/framework/cmake_install.cmake",
+		"D:/projects/bonio/server/_deps/mbedtls_build/include/cmake_install.cmake",
+		"D:/projects/bonio/server/_deps/mbedtls_build/3rdparty/cmake_install.cmake",
+		"D:/projects/bonio/server/_deps/mbedtls_build/3rdparty/everest/cmake_install.cmake",
+		"D:/projects/bonio/server/_deps/mbedtls_build/3rdparty/p256-m/cmake_install.cmake",
+		"D:/projects/bonio/server/_deps/mbedtls_build/library/cmake_install.cmake",
+		"D:/projects/bonio/server/_deps/mbedtls_build/pkgconfig/cmake_install.cmake",
+		"D:/projects/bonio/server/_deps/libhv_build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

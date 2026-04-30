@@ -15,12 +15,21 @@ if (-not (Test-Path $HiclawBin)) {
 }
 
 if ($BuildDir -eq "") {
-  $BuildDir = "$ProjectRoot\desktop\build\windows\x64\runner\Release"
-}
-
-if (-not (Test-Path $BuildDir)) {
-  Write-Error "Build directory not found: $BuildDir"
-  exit 1
+  # Try Ninja output path first (no config subdir), then VS path
+  $NinjaDir = "$ProjectRoot\desktop\build\windows\x64\runner"
+  $VsDir = "$ProjectRoot\desktop\build\windows\x64\runner\Release"
+  if (Test-Path "$NinjaDir\bonio_desktop.exe") {
+    $BuildDir = $NinjaDir
+  } elseif (Test-Path "$VsDir\bonio_desktop.exe") {
+    $BuildDir = $VsDir
+  } elseif (Test-Path $VsDir) {
+    $BuildDir = $VsDir
+  } elseif (Test-Path $NinjaDir) {
+    $BuildDir = $NinjaDir
+  } else {
+    Write-Error "Build directory not found. Tried: $NinjaDir, $VsDir"
+    exit 1
+  }
 }
 
 Copy-Item $HiclawBin "$BuildDir\hiclaw.exe" -Force

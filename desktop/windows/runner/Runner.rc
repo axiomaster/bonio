@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.axiomaster" "\0"
-            VALUE "FileDescription", "boji_desktop" "\0"
+            VALUE "FileDescription", "bonio_desktop" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "boji_desktop" "\0"
+            VALUE "InternalName", "bonio_desktop" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.axiomaster. All rights reserved." "\0"
-            VALUE "OriginalFilename", "boji_desktop.exe" "\0"
-            VALUE "ProductName", "boji_desktop" "\0"
+            VALUE "OriginalFilename", "bonio_desktop.exe" "\0"
+            VALUE "ProductName", "bonio_desktop" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
