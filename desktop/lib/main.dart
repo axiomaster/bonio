@@ -13,6 +13,7 @@ import 'services/app_logger.dart';
 import 'services/tray_service.dart';
 import 'ui/screens/main_screen.dart';
 import 'ui/screens/reading_companion_screen.dart';
+import 'ui/screens/ocr_result_window.dart';
 import 'ui/screens/search_similar_screen.dart';
 
 /// Resolves `bonioWindow: avatar` JSON from plugin + entrypoint args.
@@ -79,6 +80,13 @@ Future<void> main(List<String> args) async {
   }
 
   final windowType = payload['bonioWindow'] as String?;
+
+  if (windowType == 'ocr_result') {
+    final text = payload['text'] as String? ?? '';
+    final imageBase64 = payload['imageBase64'] as String?;
+    runApp(OcrResultWindow(initialText: text, imageBase64: imageBase64));
+    return;
+  }
 
   if (windowType == 'search_similar') {
     final imagePath = payload['imagePath'] as String? ?? '';
@@ -206,6 +214,7 @@ class _BonioDesktopAppState extends State<BonioDesktopApp> with WindowListener {
     return ChangeNotifierProvider.value(
       value: _appState,
       child: MaterialApp(
+        navigatorKey: AppState.navigatorKey,
         title: S.current.appName,
         debugShowCheckedModeBanner: false,
         theme: _buildTheme(Brightness.dark),

@@ -2,8 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:desktop_multi_window/desktop_multi_window.dart';
+import 'package:uuid/uuid.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -28,8 +30,12 @@ import '../services/camera_service.dart';
 import '../services/speech_to_text_manager.dart';
 import '../services/hiclaw_process.dart';
 import '../services/reading_template_store.dart';
+import '../ui/widgets/ocr_result_dialog.dart';
 
 class AppState extends ChangeNotifier {
+  /// Navigator key for showing dialogs from non-widget code (e.g. OCR results).
+  static final navigatorKey = GlobalKey<NavigatorState>();
+
   late final NodeRuntime runtime;
   final DeviceIdentityStore _identityStore = DeviceIdentityStore();
   final DeviceAuthStore _deviceAuthStore = DeviceAuthStore();
@@ -123,6 +129,8 @@ class AppState extends ChangeNotifier {
 
   void _handleAvatarClick() {
     runtime.avatarController.triggerClickReaction();
+    // Trigger context recognition asynchronously (do not block animation)
+    unawaited(runtime.recognizeContext());
   }
 
   void _handleAvatarDoubleClick() {
@@ -184,6 +192,122 @@ class AppState extends ChangeNotifier {
       await runtime.createSearchWindow(path, avatarX, avatarY);
     } catch (e) {
       log.error('AppState: search_similar error: $e');
+    }
+  }
+
+  Future<void> _handleOcrText(Map<String, dynamic> data) async {
+    final pngBase64 = data['pngBase64'] as String? ?? '';
+    if (pngBase64.isEmpty) {
+      log.warn('AppState: ocr_text has no image data');
+      return;
+    }
+    log.info('AppState: ocr_text received, base64Len=${pngBase64.length}');
+
+    final ctrl = runtime.avatarController;
+    ctrl.setBubble(text: S.current.ocrProcessing);
+
+    String? text;
+    try {
+      if (!runtime.paddleOcr.isInitialized) {
+        log.warn('AppState: PaddleOCR not initialized, will use AI fallback');
+      } else {
+        // Decode PNG to BGRA pixels for PaddleOCR
+        final pngBytes = base64Decode(pngBase64);
+        final bgra = await _pngToBgra(pngBytes);
+        if (bgra != null) {
+          text = runtime.paddleOcr.recognize(bgra.pixels, bgra.width, bgra.height);
+        }
+      }
+    } catch (e) {
+      log.warn('AppState: local OCR failed, trying AI fallback: $e');
+    }
+
+    // AI fallback if local OCR fails
+    if (text == null || text.isEmpty) {
+      text = await _ocrViaAi(pngBase64);
+    }
+
+    ctrl.clearBubble();
+    await runtime.createOcrResultWindow(
+      text.isNotEmpty ? text : S.current.ocrNoText,
+      imageBase64: pngBase64,
+    );
+  }
+
+  /// Convert PNG bytes to BGRA pixel data for PaddleOCR.
+  Future<_BgraImage?> _pngToBgra(Uint8List pngBytes) async {
+    try {
+      final codec = await ui.instantiateImageCodec(pngBytes);
+      final frame = await codec.getNextFrame();
+      final image = frame.image;
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+      image.dispose();
+      if (byteData == null) return null;
+      final rgba = byteData.buffer.asUint8List();
+      // Convert RGBA to BGRA
+      final bgra = Uint8List(rgba.length);
+      for (var i = 0; i < rgba.length; i += 4) {
+        bgra[i] = rgba[i + 2];     // B
+        bgra[i + 1] = rgba[i + 1]; // G
+        bgra[i + 2] = rgba[i];     // R
+        bgra[i + 3] = rgba[i + 3]; // A
+      }
+      return _BgraImage(bgra, image.width, image.height);
+    } catch (e) {
+      log.warn('_pngToBgra failed: $e');
+      return null;
+    }
+  }
+
+  /// Fallback: use AI backend for OCR.
+  Future<String> _ocrViaAi(String pngBase64) async {
+    const sessionKey = 'bonio-ocr';
+    final completer = Completer<String>();
+    final accumulated = StringBuffer();
+    final runId = const Uuid().v4();
+
+    runtime.tempEventListener = (String event, String? payloadJson) {
+      if (payloadJson == null) return;
+      try {
+        final obj = jsonDecode(payloadJson) as Map<String, dynamic>?;
+        if (obj == null) return;
+        if (obj['runId'] != runId) return;
+        if (event == 'agent' && obj['stream'] == 'assistant') {
+          accumulated.write(obj['text'] as String? ?? '');
+        } else if (event == 'chat' && obj['state'] == 'final') {
+          if (!completer.isCompleted) {
+            runtime.tempEventListener = null;
+            completer.complete(accumulated.toString());
+          }
+        }
+      } catch (_) {}
+    };
+
+    try {
+      await runtime.operatorSession.request('chat.send', jsonEncode({
+        'sessionKey': sessionKey,
+        'message': 'Extract all text from this image via OCR. '
+            'Return ONLY the plain text, no explanations.',
+        'idempotencyKey': runId,
+        'attachments': [{
+          'type': 'image', 'mimeType': 'image/png',
+          'fileName': 'ocr.png', 'content': pngBase64,
+        }],
+      }), timeoutMs: 60000);
+      final result = await completer.future.timeout(
+        const Duration(seconds: 30),
+        onTimeout: () => accumulated.toString(),
+      );
+      // Delete the temporary session so it doesn't appear in chat UI
+      try {
+        await runtime.operatorSession.request('sessions.delete',
+            jsonEncode({'sessionKey': sessionKey}), timeoutMs: 5000);
+      } catch (_) {}
+      return result;
+    } catch (_) {
+      return '';
+    } finally {
+      runtime.tempEventListener = null;
     }
   }
 
@@ -602,6 +726,8 @@ class AppState extends ChangeNotifier {
                 _handleSearchSimilar(m);
               } else if (action == 'start_reading') {
                 _handleStartReading(m);
+              } else if (action == 'ocr_text') {
+                _handleOcrText(m);
               }
             }
           case 'avatarDrop':
@@ -768,4 +894,12 @@ class AppState extends ChangeNotifier {
     cameraService.dispose();
     super.dispose();
   }
+}
+
+/// Helper: BGRA pixel buffer with dimensions for PaddleOCR.
+class _BgraImage {
+  final Uint8List pixels;
+  final int width;
+  final int height;
+  _BgraImage(this.pixels, this.width, this.height);
 }

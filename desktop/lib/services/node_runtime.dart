@@ -27,7 +27,12 @@ import 'desktop_tts.dart';
 import 'note_service.dart';
 import '../l10n/app_strings.dart';
 import '../platform/gui_agent.dart';
+import '../platform/gui_grounder.dart';
+import '../platform/cdp/cdp_browser_agent.dart';
 import '../plugins/builtin_plugins.dart';
+import '../plugins/plugin_manifest.dart';
+import '../platform/ocr/paddle_ocr_bridge.dart';
+import 'app_logger.dart';
 import '../plugins/plugin_manager.dart';
 
 /// On macOS, `localhost` often resolves to IPv6 (`::1`) while a local OpenClaw
@@ -62,6 +67,7 @@ class NodeRuntime extends ChangeNotifier {
   late final NoteService noteService;
   late final GuiAgent guiAgent;
   late final PluginManager pluginManager;
+  late final PaddleOcr paddleOcr;
 
   WindowController? _avatarWindowController;
   WindowController? _readingWindowController;
@@ -139,15 +145,34 @@ class NodeRuntime extends ChangeNotifier {
     noteService = NoteService(session: operatorSession);
     guiAgent = GuiAgent.create();
     pluginManager = PluginManager();
+    paddleOcr = PaddleOcr();
     pluginManager.registerBuiltin(NoteCapturePlugin());
     pluginManager.registerBuiltin(AiLensPlugin());
     pluginManager.registerBuiltin(SearchSimilarPlugin());
     pluginManager.registerBuiltin(ReadingCompanionPlugin());
     pluginManager.addListener(pushPluginMenuToAvatar);
     unawaited(pluginManager.initialize());
+    // Initialize PaddleOCR (local OCR engine)
+    unawaited(_initPaddleOcr());
     // ChatController / AvatarController updates must bubble to AppState.
     chatController.addListener(_onChatControllerChanged);
     avatarController.addListener(_onAvatarControllerChanged);
+  }
+
+  Future<void> _initPaddleOcr() async {
+    if (!Platform.isWindows) return; // macOS/Linux not yet supported
+    try {
+      final exeDir = Directory(Platform.resolvedExecutable).parent;
+      final modelDir = '${exeDir.path}${Platform.pathSeparator}assets${Platform.pathSeparator}ocr';
+      final ok = await paddleOcr.init(modelDir: modelDir);
+      if (ok) {
+        AppLogger.instance.info('PaddleOCR: initialized successfully');
+      } else {
+        AppLogger.instance.warn('PaddleOCR: init failed, will use AI fallback');
+      }
+    } catch (e) {
+      AppLogger.instance.warn('PaddleOCR: init error: $e');
+    }
   }
 
   void _onAssistantReplyForTts(String text) {
@@ -300,6 +325,117 @@ class NodeRuntime extends ChangeNotifier {
     try {
       await ctrl.invokeMethod('window_close');
     } catch (_) {}
+  }
+
+  /// Run the UI grounding → classify → menu boost pipeline for the current
+  /// foreground window. Called on avatar single-click.
+  ///
+  /// Only executes if at least 5 min have passed since the last recognition
+  /// for the same window (to avoid repeated server calls on rapid clicks).
+  Future<void> recognizeContext() async {
+    if (_contextRecognitionInProgress) return;
+    final hwnd = guiAgent.window.getForegroundWindow();
+    if (hwnd == 0) return;
+
+    final title = guiAgent.window.getWindowTitle(hwnd);
+    final cacheKey = '$hwnd:$title';
+    final now = DateTime.now();
+    if (_lastContextRecognition == cacheKey) {
+      final elapsed = now.difference(_lastRecognitionTime);
+      if (elapsed < const Duration(minutes: 5)) return;
+    }
+
+    _contextRecognitionInProgress = true;
+    _lastContextRecognition = cacheKey;
+    _lastRecognitionTime = now;
+
+    try {
+      // Step 1: UI Grounding
+      final grounder = GuiGrounder(
+        agent: guiAgent,
+        cdpAgent: guiAgent.browser as CdpBrowserAgent?,
+      );
+      final result = await grounder.ground(hwnd);
+      if (result == null) return;
+
+      // Step 2: Classify via server
+      final availableTags = pluginManager.getAvailableTags();
+      if (availableTags.isEmpty) return;
+
+      final res = await operatorSession.request(
+        'context.classify',
+        jsonEncode({
+          'uiStructure': result.structure.toJson(),
+          'availableTags': availableTags,
+        }),
+        timeoutMs: 15000,
+      );
+      final obj = jsonDecode(res) as Map<String, dynamic>?;
+      if (obj == null || obj['ok'] != true) return;
+      final tags = (obj['payload']?['tags'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      if (tags.isEmpty) return;
+
+      // Step 3: Boost menu
+      pluginManager.applyClassificationBoost(tags);
+
+      // Step 4: Suggest high-confidence plugins via avatar bubble
+      final highConf = <Map<String, dynamic>>[];
+      for (final t in tags) {
+        final conf = (t['confidence'] as num?)?.toDouble() ?? 0;
+        if (conf >= 0.7) highConf.add(t);
+      }
+      if (highConf.isNotEmpty) {
+        final tag = highConf.first['tag'] as String;
+        PluginManifest? matched;
+        for (final m in pluginManager.registry.enabledMenuPlugins) {
+          if (m.supportedContexts.any((c) => c.tag == tag)) {
+            matched = m;
+            break;
+          }
+        }
+        if (matched != null) {
+          final suggestion = '检测到${matched.name.current}相关内容，'
+              '要试试${matched.name.current}吗？';
+          avatarController.setBubble(text: suggestion);
+        }
+      }
+    } catch (e) {
+      AppLogger.instance.warn('recognizeContext failed: $e');
+    } finally {
+      _contextRecognitionInProgress = false;
+    }
+  }
+
+  bool _contextRecognitionInProgress = false;
+  String? _lastContextRecognition;
+  DateTime _lastRecognitionTime = DateTime(2000);
+
+  /// Create an independent OS window showing OCR recognition results.
+  Future<void> createOcrResultWindow(String text, {String? imageBase64}) async {
+    try {
+      final main = await WindowController.fromCurrentEngine();
+      const w = 480.0;
+      const h = 420.0;
+      final wc = await WindowController.create(
+        WindowConfiguration(
+          hiddenAtLaunch: true,
+          borderless: false,
+          width: w,
+          height: h,
+          arguments: jsonEncode({
+            'bonioWindow': 'ocr_result',
+            'text': text,
+            'imageBase64': imageBase64 ?? '',
+            'mainWindowId': main.windowId,
+          }),
+        ),
+      );
+      // Position near the center of the primary screen
+      await wc.setPosition(Offset(200, 120));
+      await wc.show();
+    } catch (e) {
+      AppLogger.instance.warn('createOcrResultWindow failed: $e');
+    }
   }
 
   Future<void> createSearchWindow(String imagePath, double x, double y) async {
@@ -553,11 +689,17 @@ class NodeRuntime extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Temporary event listener for one-shot operations (e.g. OCR).
+  /// Set before sending a request, cleared after receiving the response.
+  void Function(String event, String? payloadJson)? tempEventListener;
+
   void _onOperatorEvent(String event, String? payloadJson) {
     if (event == 'avatar.command') {
       avatarCommandExecutor.execute(payloadJson);
     }
-    // Let NoteService intercept events for its sessions first.
+    // Allow temporary listeners (OCR etc.) to intercept events first
+    tempEventListener?.call(event, payloadJson);
+    // Let NoteService intercept events for its sessions next.
     if (!noteService.handleGatewayEvent(event, payloadJson)) {
       if (!noteService.handleReadingEvent(event, payloadJson)) {
         chatController.handleGatewayEvent(event, payloadJson);

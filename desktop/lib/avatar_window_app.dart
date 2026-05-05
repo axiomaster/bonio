@@ -19,7 +19,7 @@ import 'platform/win32_screen_capture.dart';
 import 'services/desktop_avatar_theme.dart';
 import 'ui/widgets/desktop_avatar_overlay.dart';
 
-enum _PlacementState { anchoredWindow, fullscreenCorner, userOffset, onDock }
+enum _PlacementState { anchoredWindow, fullscreenBottom, userOffset, onDock }
 
 /// Second engine: OS-level floating avatar (main Bonio window can be minimized).
 class AvatarFloatingApp extends StatefulWidget {
@@ -89,6 +89,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
   // Bonio Lens (圈一圈) annotation state
   bool _lensActive = false;
   bool _searchSimilarMode = false; // true when lens is used for 搜同款
+  bool _ocrMode = false;            // true when lens is used for 识别文字 (OCR)
   ScreenCaptureResult? _lensCapture;
   List<Rect> _lensRects = [];
   Rect? _lensDrawingRect; // rect currently being drawn
@@ -186,7 +187,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
             fgInfo.hwnd != 0 && fgInfo.width > 50 && fgInfo.height > 50) {
           _anchorToWindow(fgInfo.hwnd, fgInfo);
         } else if (fgInfo != null && !isAvatar && !isDesktop && fgInfo.isFullscreen) {
-          _transitionToFullscreenCorner();
+          _transitionToFullscreenBottom(fgInfo.hwnd);
         } else {
           _transitionToDock();
         }
@@ -451,7 +452,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     _wanderTimer?.cancel();
     if (_interactionActive) return;
     if (_placement == _PlacementState.userOffset ||
-        _placement == _PlacementState.fullscreenCorner) return;
+        _placement == _PlacementState.fullscreenBottom) return;
 
     final delaySec =
         _idleMinSec + _rng.nextInt(_idleMaxSec - _idleMinSec);
@@ -461,13 +462,13 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
   Future<void> _wander() async {
     if (!mounted || _interactionActive) return;
     if (_placement == _PlacementState.userOffset ||
-        _placement == _PlacementState.fullscreenCorner) return;
+        _placement == _PlacementState.fullscreenBottom) return;
 
     final legs = 2 + _rng.nextInt(3);
     for (var i = 0; i < legs; i++) {
       if (!mounted || _interactionActive ||
           _placement == _PlacementState.userOffset ||
-          _placement == _PlacementState.fullscreenCorner) break;
+          _placement == _PlacementState.fullscreenBottom) break;
 
       final target = _pickStrollTarget();
       if (target == null) break;
@@ -533,9 +534,9 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     } else if (_placement == _PlacementState.onDock) {
       _placement = _PlacementState.userOffset;
       debugPrint('AvatarDrag: dragged off dock');
-    } else if (_placement == _PlacementState.fullscreenCorner) {
+    } else if (_placement == _PlacementState.fullscreenBottom) {
       _placement = _PlacementState.userOffset;
-      debugPrint('AvatarDrag: dragged off fullscreen corner');
+      debugPrint('AvatarDrag: dragged off fullscreen bottom');
     }
   }
 
@@ -571,7 +572,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
       final rect = _getWindowRect(_anchoredHwnd);
       if (rect != null && rect.isFullscreen) {
         debugPrint('AvatarAnchor: anchored window went fullscreen');
-        _transitionToFullscreenCorner();
+        _transitionToFullscreenBottom(_anchoredHwnd);
         return;
       }
     }
@@ -615,8 +616,8 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     final fgHwnd = fgInfo.hwnd;
 
     if (fgInfo.isFullscreen) {
-      if (_placement != _PlacementState.fullscreenCorner) {
-        _transitionToFullscreenCorner();
+      if (_placement != _PlacementState.fullscreenBottom) {
+        _transitionToFullscreenBottom(fgHwnd);
       }
       return;
     }
@@ -795,17 +796,51 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     _scheduleNextWander();
   }
 
-  void _transitionToFullscreenCorner() {
-    debugPrint('AvatarPlacement: -> FULLSCREEN_CORNER');
+  void _transitionToFullscreenBottom(int hwnd) {
+    debugPrint('AvatarPlacement: -> FULLSCREEN_BOTTOM (hwnd=$hwnd)');
     _cancelWalk();
-    _placement = _PlacementState.fullscreenCorner;
+    _placement = _PlacementState.fullscreenBottom;
     _stopAnchorTracking();
     _stopSpring();
 
     final wc = _wc;
     if (wc == null) return;
-    final x = _screenWidth - _toPhysical(_windowSize.width) - 20;
-    final y = _toPhysical(8.0);
+
+    final avatarW = _toPhysical(_windowSize.width);
+    final avatarH = _toPhysical(_windowSize.height);
+
+    double x, y;
+
+    if (Platform.isWindows) {
+      // Get the monitor that contains this fullscreen window
+      final mr = _getMonitorRects(hwnd);
+      if (mr != null) {
+        // Center horizontally on the monitor
+        x = mr['monitorLeft']! + (mr['monitorWidth']! - avatarW) / 2;
+
+        if (mr['hasBottomTaskbar']! == 1) {
+          // Taskbar at bottom: sit ON the taskbar (at the top of it)
+          y = mr['workHeight']! + mr['workTop']! - avatarH;
+        } else {
+          // No taskbar or auto-hidden: sit at the very bottom of the screen
+          y = mr['monitorTop']! + mr['monitorHeight']! - avatarH;
+        }
+        debugPrint('AvatarPlacement: fullscreen bottom — '
+            'monitor=${mr['monitorWidth']!.toInt()}x${mr['monitorHeight']!.toInt()}, '
+            'work=${mr['workWidth']!.toInt()}x${mr['workHeight']!.toInt()}, '
+            'hasBottomTaskbar=${mr['hasBottomTaskbar']}, '
+            'pos=(${x.toInt()}, ${y.toInt()})');
+      } else {
+        // Fallback: use primary monitor metrics
+        x = _screenWidth - avatarW - 20;
+        y = _screenHeight - avatarH - (_dockAtBottom ? _dockHeight : 0);
+      }
+    } else {
+      // macOS: use primary monitor metrics (fullscreen detection is disabled on macOS)
+      x = _screenWidth - avatarW - 20;
+      y = _screenHeight - avatarH - (_dockAtBottom ? _dockHeight : 0);
+    }
+
     _programmaticMove = true;
     wc.setPositionPhysical(x, y).then((_) {
       _currentX = x;
@@ -1190,6 +1225,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
         items = [
           {'id': 1, 'label': s.menuTakeNote, 'enabled': true},
           {'id': 4, 'label': s.menuAiLens, 'enabled': true},
+          {'id': 7, 'label': s.menuOcrText, 'enabled': true},
           {'id': 5, 'label': s.menuSearchSimilar, 'enabled': true},
           {'id': 6, 'label': s.menuStartReading, 'enabled': true},
           {'id': 0, 'label': '', 'enabled': false},
@@ -1197,7 +1233,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
           {'id': 3, 'label': s.menuSwitchWindow, 'enabled': false},
         ];
         actions = const {
-          1: 'note_capture', 4: 'ai_lens', 5: 'search_similar',
+          1: 'note_capture', 4: 'ai_lens', 7: 'ocr_text', 5: 'search_similar',
           6: 'start_reading', 2: 'show_main', 3: 'switch_window',
         };
       }
@@ -1218,6 +1254,11 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
 
       if (action == 'search_similar') {
         await _enterLensMode(searchSimilar: true);
+        return;
+      }
+
+      if (action == 'ocr_text') {
+        await _enterLensMode(ocr: true);
         return;
       }
 
@@ -1357,14 +1398,57 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
   // Bonio Lens (圈一圈) — annotation mode
   // ---------------------------------------------------------------------------
 
-  Future<void> _enterLensMode({bool searchSimilar = false}) async {
+  Future<void> _enterLensMode({bool searchSimilar = false, bool ocr = false}) async {
     if (_lensActive) return;
+    if (!Platform.isWindows && !Platform.isMacOS) return;
+
+    // Save current avatar position and size
+    _lensPreX = _currentX;
+    _lensPreY = _currentY;
+    _lensPreSize = _windowSize;
+
+    final wc = _wc;
+    if (wc == null) return;
+
+    if (ocr) {
+      // OCR mode: capture the entire screen so the user can select any area.
+      final capture = ScreenCapture.captureScreen();
+      if (capture == null) {
+        debugPrint('BonioLens: screen capture failed');
+        _scheduleNextWander();
+        return;
+      }
+
+      final expandW = capture.width.toDouble();
+      final expandH = capture.height.toDouble();
+      _programmaticMove = true;
+      await windowManager.setSize(Size(expandW / _avatarDpiScale, expandH / _avatarDpiScale));
+      await wc.setPositionPhysical(0, 0);
+      _currentX = 0;
+      _currentY = 0;
+      _programmaticMove = false;
+
+      if (!mounted) return;
+      setState(() {
+        _lensActive = true;
+        _searchSimilarMode = false;
+        _ocrMode = true;
+        _lensCapture = capture;
+        _lensRects = [];
+        _lensDrawingRect = null;
+        _lensWindowTitle = '';
+      });
+      debugPrint('BonioLens: entered OCR screen-capture mode '
+          '(${capture.width}x${capture.height})');
+      return;
+    }
+
+    // Non-OCR modes: require anchored window
     if (_anchoredHwnd == 0) {
       debugPrint('BonioLens: no anchored window');
       _scheduleNextWander();
       return;
     }
-    if (!Platform.isWindows && !Platform.isMacOS) return;
 
     // Capture anchored window screenshot before any UI changes
     final capture = ScreenCapture.captureWindow(_anchoredHwnd);
@@ -1383,19 +1467,12 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
       return;
     }
 
-    // Save current avatar position and size
-    _lensPreX = _currentX;
-    _lensPreY = _currentY;
-    _lensPreSize = _windowSize;
-
-    final wc = _wc;
-    if (wc == null) return;
-
-    // Expand avatar window to cover anchored window (physical pixels)
+    // Expand avatar window to cover anchored window.
+    // info.width/height are physical pixels; setSize expects logical pixels.
     final expandW = info.width;
     final expandH = info.height;
     _programmaticMove = true;
-    await windowManager.setSize(Size(expandW, expandH));
+    await windowManager.setSize(Size(expandW / _avatarDpiScale, expandH / _avatarDpiScale));
     await wc.setPositionPhysical(info.left, info.top);
     _currentX = info.left;
     _currentY = info.top;
@@ -1405,6 +1482,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     setState(() {
       _lensActive = true;
       _searchSimilarMode = searchSimilar;
+      _ocrMode = false;
       _lensCapture = capture;
       _lensRects = [];
       _lensDrawingRect = null;
@@ -1423,9 +1501,25 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
   Future<void> _exitLensMode({bool submit = false}) async {
     if (!_lensActive) return;
     final isSearchSimilar = _searchSimilarMode;
+    final isOcr = _ocrMode;
     debugPrint('BonioLens: exiting annotation mode (submit=$submit, '
         'rects=${_lensRects.length}, hasCapture=${_lensCapture != null}, '
-        'searchSimilar=$isSearchSimilar)');
+        'searchSimilar=$isSearchSimilar, ocr=$isOcr)');
+
+    // For OCR: crop the first rect → send to main window for text recognition
+    if (isOcr && submit && _lensCapture != null && _lensRects.isNotEmpty) {
+      final croppedBase64 = await _buildSearchSimilarCrop();
+      await _restoreLensWindow();
+      if (croppedBase64 != null) {
+        _sendMenuActionToMainWithData('ocr_text', {
+          'pngBase64': croppedBase64,
+          'windowTitle': _lensWindowTitle,
+        });
+      } else {
+        _scheduleNextWander();
+      }
+      return;
+    }
 
     // For search_similar: crop the first rect → send to main window
     if (isSearchSimilar && submit && _lensCapture != null && _lensRects.isNotEmpty) {
@@ -1489,6 +1583,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     setState(() {
       _lensActive = false;
       _searchSimilarMode = false;
+      _ocrMode = false;
       _lensCapture = null;
       _lensRects = [];
       _lensDrawingRect = null;
@@ -1806,6 +1901,26 @@ base class _APPBARDATA extends Struct {
 const int _ABM_GETTASKBARPOS = 5;
 const int _ABE_BOTTOM = 3;
 
+base class _MONITORINFO extends Struct {
+  @Uint32()
+  external int cbSize;
+  external _RECT rcMonitor;
+  external _RECT rcWork;
+  @Uint32()
+  external int dwFlags;
+}
+
+typedef _MonitorFromWindowNative = IntPtr Function(
+    IntPtr hWnd, Uint32 dwFlags);
+typedef _MonitorFromWindowDart = int Function(int hWnd, int dwFlags);
+
+typedef _GetMonitorInfoWNative = Int32 Function(
+    IntPtr hMonitor, Pointer<_MONITORINFO> lpmi);
+typedef _GetMonitorInfoWDart = int Function(
+    int hMonitor, Pointer<_MONITORINFO> lpmi);
+
+const int _MONITOR_DEFAULTTONEAREST = 2;
+
 typedef _SHAppBarMessageNative = IntPtr Function(
     Uint32 dwMessage, Pointer<_APPBARDATA> pData);
 typedef _SHAppBarMessageDart = int Function(
@@ -1871,6 +1986,54 @@ _WinTaskbarInfo? _getWindowsTaskbarInfo() {
     return null;
   }
 }
+
+/// File-level version of monitor-rect lookup so that `_getWinWindowRect` can
+/// call it without needing a class instance.
+Map<String, num>? getMonitorRects(int hwnd) {
+  try {
+    final user32 = DynamicLibrary.open('user32.dll');
+    final monitorFromWindow = user32.lookupFunction<
+        _MonitorFromWindowNative, _MonitorFromWindowDart>('MonitorFromWindow');
+    final getMonitorInfoW = user32.lookupFunction<
+        _GetMonitorInfoWNative, _GetMonitorInfoWDart>('GetMonitorInfoW');
+
+    final hMonitor = monitorFromWindow(hwnd, _MONITOR_DEFAULTTONEAREST);
+    if (hMonitor == 0) return null;
+
+    final mi = calloc<_MONITORINFO>();
+    mi.ref.cbSize = sizeOf<_MONITORINFO>();
+    final ok = getMonitorInfoW(hMonitor, mi);
+    if (ok == 0) {
+      calloc.free(mi);
+      return null;
+    }
+
+    final rm = mi.ref.rcMonitor;
+    final rw = mi.ref.rcWork;
+
+    final result = <String, double>{
+      'monitorLeft': rm.left.toDouble(),
+      'monitorTop': rm.top.toDouble(),
+      'monitorWidth': (rm.right - rm.left).toDouble(),
+      'monitorHeight': (rm.bottom - rm.top).toDouble(),
+      'workLeft': rw.left.toDouble(),
+      'workTop': rw.top.toDouble(),
+      'workWidth': (rw.right - rw.left).toDouble(),
+      'workHeight': (rw.bottom - rw.top).toDouble(),
+      // Threshold > 4 px to avoid false positives from minor system reservations
+      // on secondary monitors that have no taskbar.
+      'hasBottomTaskbar': (rm.bottom - rw.bottom) > 4 ? 1 : 0,
+    };
+    calloc.free(mi);
+    return result;
+  } catch (e) {
+    debugPrint('getMonitorRects failed: $e');
+    return null;
+  }
+}
+
+  /// Delegate to file-level [getMonitorRects].
+  Map<String, num>? _getMonitorRects(int hwnd) => getMonitorRects(hwnd);
 
 // ---------------------------------------------------------------------------
 // Foreground / window rect helpers (Windows)
@@ -2125,11 +2288,21 @@ _WindowRectInfo? _getWinWindowRect(int hwnd, {int avatarHwnd = 0}) {
     final w = r - l;
     final h = b - t;
 
-    // Use physical screen metrics for fullscreen detection.
-    // SM_CXSCREEN/SM_CYSCREEN return primary monitor size in physical pixels.
-    final screenW = getSystemMetrics(_SM_CXSCREEN).toDouble();
-    final screenH = getSystemMetrics(_SM_CYSCREEN).toDouble();
-    final isFullscreen = w >= screenW * 0.95 && h >= screenH * 0.95;
+    // Use per-monitor metrics for fullscreen detection.
+    // SM_CXSCREEN/SM_CYSCREEN only return the primary monitor size, which
+    // causes wrong classification for windows on secondary displays.
+    bool isFullscreen;
+    final monitorRects = getMonitorRects(hwnd);
+    if (monitorRects != null) {
+      final monW = monitorRects['monitorWidth']!.toDouble();
+      final monH = monitorRects['monitorHeight']!.toDouble();
+      isFullscreen = w >= monW * 0.95 && h >= monH * 0.95;
+    } else {
+      // Fallback to primary monitor metrics
+      final screenW = getSystemMetrics(_SM_CXSCREEN).toDouble();
+      final screenH = getSystemMetrics(_SM_CYSCREEN).toDouble();
+      isFullscreen = w >= screenW * 0.95 && h >= screenH * 0.95;
+    }
 
     return _WindowRectInfo(
       left: l,
