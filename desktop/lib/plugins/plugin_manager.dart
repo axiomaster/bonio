@@ -270,6 +270,71 @@ class PluginManager extends ChangeNotifier {
     _hosts.clear();
   }
 
+  /// Collect all unique supported context tags from all installed plugins.
+  /// These are sent to the server for context classification.
+  List<String> getAvailableTags() {
+    final tags = <String>{};
+    for (final entry in registry.entries) {
+      if (!entry.enabled) continue;
+      final manifest = _getManifest(entry.id);
+      if (manifest == null) continue;
+      for (final ctx in manifest.supportedContexts) {
+        if (ctx.tag.isNotEmpty) tags.add(ctx.tag);
+      }
+    }
+    return tags.toList();
+  }
+
+  /// Temporary menu reordering based on context classification results.
+  ///
+  /// Plugins whose [SupportedContext] tags match with confidence >= 0.3
+  /// are boosted to the top. This is NOT persisted to registry.json —
+  /// it only affects the current menu generation.
+  void applyClassificationBoost(List<Map<String, dynamic>> tagResults) {
+    // Build a priority map: pluginId → boost score
+    final boost = <String, double>{};
+    for (final tr in tagResults) {
+      final tag = tr['tag'] as String? ?? '';
+      final confidence = (tr['confidence'] as num?)?.toDouble() ?? 0;
+      if (confidence < 0.3 || tag.isEmpty) continue;
+
+      for (final entry in registry.entries) {
+        if (!entry.enabled) continue;
+        final manifest = _getManifest(entry.id);
+        if (manifest == null) continue;
+        final hasTag = manifest.supportedContexts
+            .any((ctx) => ctx.tag == tag);
+        if (hasTag) {
+          boost[entry.id] =
+              (boost[entry.id] ?? 0) > confidence
+                  ? boost[entry.id]!
+                  : confidence;
+        }
+      }
+    }
+
+    if (boost.isEmpty) return;
+
+    // Apply temporary reorder: boosted plugins get menuOrder 0-99
+    // (lower = higher priority), non-boosted keep their original.
+    final boostedIds = boost.keys.toList()
+      ..sort((a, b) => boost[b]!.compareTo(boost[a]!));
+
+    for (var i = 0; i < boostedIds.length; i++) {
+      registry.setMenuOrder(boostedIds[i], i * 5); // 0, 5, 10, ...
+    }
+    // Non-boosted plugins keep their existing order — no change needed.
+
+    notifyListeners();
+  }
+
+  PluginManifest? _getManifest(String pluginId) {
+    if (_builtins.containsKey(pluginId)) {
+      return _builtins[pluginId]!.manifest;
+    }
+    return registry.getManifest(pluginId);
+  }
+
   @override
   void dispose() {
     for (final host in _hosts.values) {

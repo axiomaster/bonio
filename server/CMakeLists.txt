@@ -164,6 +164,7 @@ set(HICLAW_SOURCES
   src/net/tool_router.cpp
   src/net/wecom_ws_client.cpp
   src/net/wechat_adapter.cpp
+  src/net/context_classifier.cpp
   src/observability/log.cpp
   src/providers/ollama.cpp
   src/providers/openai_compatible.cpp

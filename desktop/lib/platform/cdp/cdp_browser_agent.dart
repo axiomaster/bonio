@@ -326,6 +326,24 @@ class CdpBrowserAgent implements BrowserAgent {
     return content.headings;
   }
 
+  /// Returns the full accessibility tree of the current page via CDP.
+  ///
+  /// Uses `Accessibility.getFullAXTree` which returns a JSON representation
+  /// of the page's accessibility nodes including roles, names, bounds, and
+  /// properties. Returns raw JSON string for downstream parsing.
+  Future<String?> getAccessibilityTree() async {
+    try {
+      await _cdp.sendCommand('Accessibility.enable');
+      final result = await _cdp.sendCommand('Accessibility.getFullAXTree', {
+        'max_depth': 32,
+      });
+      return result.toString();
+    } catch (e) {
+      debugPrint('CDP: getAccessibilityTree failed: $e');
+      return null;
+    }
+  }
+
   @override
   Future<dynamic> executeScript(String js) async {
     final result = await _cdp.sendCommand('Runtime.evaluate', {

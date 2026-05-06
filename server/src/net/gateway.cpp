@@ -3,6 +3,7 @@
 #include "hiclaw/net/async_agent.hpp"
 #include "hiclaw/net/avatar_command.hpp"
 #include "hiclaw/net/call_handler.hpp"
+#include "hiclaw/net/context_classifier.hpp"
 #include "hiclaw/net/gateway.hpp"
 #include "hiclaw/net/health_monitor.hpp"
 #include "hiclaw/net/idle_manager.hpp"
@@ -386,6 +387,55 @@ std::string gateway_handle_frame(const std::string& frame,
     res["ok"] = true;
     res["payload"] = {{"received", true}};
     return res.dump();
+  }
+
+  if (method == "context.classify") {
+    try {
+      json j = json::parse(frame);
+      const auto& uiStructure = j["params"]["uiStructure"];
+      const auto& availableTags = j["params"]["availableTags"];
+
+      std::vector<std::string> tags;
+      if (availableTags.is_array()) {
+        for (const auto& t : availableTags) {
+          if (t.is_string()) tags.push_back(t.get<std::string>());
+        }
+      }
+
+      // Resolve the default model's base URL for Ollama
+      std::string ollama_url, model_id, api_key;
+      bool use_openai = false;
+      if (config::resolve_model(config, ollama_url, model_id, api_key, use_openai)) {
+        ContextClassifier classifier(ollama_url, model_id);
+        auto result = classifier.classify(uiStructure, tags);
+
+        json tags_arr = json::array();
+        for (const auto& tc : result) {
+          tags_arr.push_back({{"tag", tc.tag}, {"confidence", tc.confidence}});
+        }
+
+        json res;
+        res["type"] = "res";
+        res["id"] = id;
+        res["ok"] = true;
+        res["payload"] = {{"tags", tags_arr}};
+        return res.dump();
+      } else {
+        json res;
+        res["type"] = "res";
+        res["id"] = id;
+        res["ok"] = false;
+        res["error"] = {{"code", "NO_MODEL"}, {"message", "no default model configured"}};
+        return res.dump();
+      }
+    } catch (const std::exception& e) {
+      json res;
+      res["type"] = "res";
+      res["id"] = id;
+      res["ok"] = false;
+      res["error"] = {{"code", "INTERNAL_ERROR"}, {"message", e.what()}};
+      return res.dump();
+    }
   }
 
   json res;

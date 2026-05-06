@@ -106,6 +106,29 @@ class PluginSessionConfig {
       };
 }
 
+/// A classification tag that a plugin claims to support.
+///
+/// When the UI context classifier returns a tag with high confidence,
+/// plugins declaring that tag get menu priority and may be auto-suggested.
+class SupportedContext {
+  final String tag;
+  final I18nString label;
+
+  const SupportedContext({required this.tag, required this.label});
+
+  factory SupportedContext.fromJson(dynamic json) {
+    if (json is Map<String, dynamic>) {
+      return SupportedContext(
+        tag: json['tag'] as String? ?? '',
+        label: I18nString.fromJson(json['label']),
+      );
+    }
+    return SupportedContext(tag: '', label: const I18nString(zh: '', en: ''));
+  }
+
+  Map<String, dynamic> toJson() => {'tag': tag, 'label': label.toJson()};
+}
+
 /// Full plugin manifest parsed from `plugin.json`.
 class PluginManifest {
   final String id;
@@ -128,6 +151,10 @@ class PluginManifest {
   /// Filesystem path to the directory containing this manifest.
   final String? directoryPath;
 
+  /// Classification tags this plugin supports.
+  /// When the context classifier matches a tag, this plugin gets menu priority.
+  final List<SupportedContext> supportedContexts;
+
   const PluginManifest({
     required this.id,
     required this.name,
@@ -143,6 +170,7 @@ class PluginManifest {
     this.minBonioVersion,
     this.platforms = const ['windows', 'macos'],
     this.directoryPath,
+    this.supportedContexts = const [],
   });
 
   factory PluginManifest.fromJson(Map<String, dynamic> json,
@@ -172,6 +200,10 @@ class PluginManifest {
       platforms: (json['platforms'] as List<dynamic>?)?.cast<String>() ??
           const ['windows', 'macos'],
       directoryPath: directoryPath,
+      supportedContexts: (json['supportedContexts'] as List<dynamic>?)
+              ?.map((e) => SupportedContext.fromJson(e))
+              .toList() ??
+          const [],
     );
   }
 

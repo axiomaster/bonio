@@ -49,6 +49,7 @@ abstract class S {
   String get menuSearchSimilar;
   String get menuStartReading;
   String get menuSwitchWindow;
+  String get menuOcrText;
 
   // ── Reading companion ──
   String get readingTitle;
@@ -250,6 +251,14 @@ abstract class S {
   String get lensUndo;
   String get lensConfirm;
 
+  // ── OCR result ──
+  String get ocrResultTitle;
+  String get ocrCopy;
+  String get ocrCopied;
+  String get ocrClose;
+  String get ocrNoText;
+  String get ocrProcessing;
+
   // ── Avatar overlay ──
   String get avatarAskHint;
   String get avatarAddAttachment;
@@ -306,6 +315,7 @@ class _SZh extends S {
   @override String get menuSearchSimilar => '搜同款';
   @override String get menuStartReading => '阅读搭子';
   @override String get menuSwitchWindow => '切换窗口';
+  @override String get menuOcrText => '识别文字';
 
   @override String get readingTitle => '阅读搭子';
   @override String get readingConnecting => '正在连接页面...';
@@ -495,6 +505,13 @@ class _SZh extends S {
   @override String get lensUndo => '撤回';
   @override String get lensConfirm => '确认';
 
+  @override String get ocrResultTitle => '文字识别结果';
+  @override String get ocrCopy => '复制';
+  @override String get ocrCopied => '已复制';
+  @override String get ocrClose => '关闭';
+  @override String get ocrNoText => '未识别到文字';
+  @override String get ocrProcessing => '正在识别...';
+
   @override String get avatarAskHint => '问点什么...';
   @override String get avatarAddAttachment => '添加附件';
 
@@ -547,6 +564,7 @@ class _SEn extends S {
   @override String get menuSearchSimilar => 'Search Similar';
   @override String get menuStartReading => 'Reading';
   @override String get menuSwitchWindow => 'Switch Window';
+  @override String get menuOcrText => 'OCR Text';
 
   @override String get readingTitle => 'Reading Companion';
   @override String get readingConnecting => 'Connecting to page...';
@@ -735,6 +753,13 @@ class _SEn extends S {
   @override String get lensCancel => 'Cancel';
   @override String get lensUndo => 'Undo';
   @override String get lensConfirm => 'Confirm';
+
+  @override String get ocrResultTitle => 'OCR Result';
+  @override String get ocrCopy => 'Copy';
+  @override String get ocrCopied => 'Copied';
+  @override String get ocrClose => 'Close';
+  @override String get ocrNoText => 'No text recognized';
+  @override String get ocrProcessing => 'Recognizing...';
 
   @override String get avatarAskHint => 'Ask something...';
   @override String get avatarAddAttachment => 'Add attachment';

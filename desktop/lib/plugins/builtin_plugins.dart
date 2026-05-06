@@ -18,6 +18,14 @@ class NoteCapturePlugin implements BonioPlugin {
           order: 10,
           requiresContext: MenuContextRequirement.anyWindow,
         ),
+        supportedContexts: const [
+          SupportedContext(tag: 'shopping', label: I18nString(zh: '购物', en: 'Shopping')),
+          SupportedContext(tag: 'documentation', label: I18nString(zh: '文档', en: 'Documentation')),
+          SupportedContext(tag: 'social_media', label: I18nString(zh: '社交媒体', en: 'Social Media')),
+          SupportedContext(tag: 'chat', label: I18nString(zh: '聊天', en: 'Chat')),
+          SupportedContext(tag: 'news', label: I18nString(zh: '资讯', en: 'News')),
+          SupportedContext(tag: 'image_gallery', label: I18nString(zh: '图片', en: 'Images')),
+        ],
       );
 
   @override
@@ -45,6 +53,12 @@ class AiLensPlugin implements BonioPlugin {
           order: 20,
           requiresContext: MenuContextRequirement.anyWindow,
         ),
+        supportedContexts: const [
+          SupportedContext(tag: 'image_gallery', label: I18nString(zh: '图片', en: 'Images')),
+          SupportedContext(tag: 'shopping', label: I18nString(zh: '购物', en: 'Shopping')),
+          SupportedContext(tag: 'video', label: I18nString(zh: '视频', en: 'Video')),
+          SupportedContext(tag: 'documentation', label: I18nString(zh: '文档', en: 'Documentation')),
+        ],
       );
 
   @override
@@ -72,6 +86,10 @@ class SearchSimilarPlugin implements BonioPlugin {
           order: 30,
           requiresContext: MenuContextRequirement.anyWindow,
         ),
+        supportedContexts: const [
+          SupportedContext(tag: 'shopping', label: I18nString(zh: '购物', en: 'Shopping')),
+          SupportedContext(tag: 'product_detail', label: I18nString(zh: '商品详情', en: 'Product Detail')),
+        ],
       );
 
   @override
@@ -99,6 +117,12 @@ class ReadingCompanionPlugin implements BonioPlugin {
           order: 40,
           requiresContext: MenuContextRequirement.browserWindow,
         ),
+        supportedContexts: const [
+          SupportedContext(tag: 'documentation', label: I18nString(zh: '文档', en: 'Documentation')),
+          SupportedContext(tag: 'code', label: I18nString(zh: '代码', en: 'Code')),
+          SupportedContext(tag: 'news', label: I18nString(zh: '资讯', en: 'News')),
+          SupportedContext(tag: 'pdf', label: I18nString(zh: 'PDF', en: 'PDF')),
+        ],
       );
 
   @override

@@ -34,3 +34,26 @@ if ($BuildDir -eq "") {
 
 Copy-Item $HiclawBin "$BuildDir\hiclaw.exe" -Force
 Write-Host "Bundled hiclaw.exe -> $BuildDir\hiclaw.exe"
+
+# Bundle PaddleOCR native DLL + ONNX models
+$PaddleOcrDll = "$ProjectRoot\desktop\lib\platform\ocr\native\build\paddle_ocr_plugin.dll"
+if (Test-Path $PaddleOcrDll) {
+  Copy-Item $PaddleOcrDll "$BuildDir\paddle_ocr_plugin.dll" -Force
+  Write-Host "Bundled paddle_ocr_plugin.dll -> $BuildDir\paddle_ocr_plugin.dll"
+} else {
+  Write-Host "SKIP paddle_ocr_plugin.dll (not built — run desktop/lib/platform/ocr/native/build.bat)"
+}
+
+# Copy OCR models
+$OcrModelsDir = "$ProjectRoot\assets\ocr"
+$OcrDest = "$BuildDir\assets\ocr"
+if (Test-Path $OcrModelsDir) {
+  if (-not (Test-Path $OcrDest)) { New-Item -ItemType Directory -Path $OcrDest | Out-Null }
+  foreach ($f in @("det.onnx", "rec.onnx", "dict.txt")) {
+    $src = "$OcrModelsDir\$f"
+    if (Test-Path $src) {
+      Copy-Item $src "$OcrDest\$f" -Force
+      Write-Host "Bundled $f -> $OcrDest\$f"
+    }
+  }
+}
