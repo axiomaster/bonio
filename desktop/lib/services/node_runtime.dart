@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/foundation.dart';
@@ -431,18 +433,22 @@ class NodeRuntime extends ChangeNotifier {
   Future<void> createOcrResultWindow(String text, {String? imageBase64}) async {
     try {
       final main = await WindowController.fromCurrentEngine();
-      const w = 480.0;
-      const h = 420.0;
+      final layout = await _computeOcrWindowLayout(text, imageBase64);
       final wc = await WindowController.create(
         WindowConfiguration(
           hiddenAtLaunch: true,
           borderless: false,
-          width: w,
-          height: h,
+          width: layout.windowWidth,
+          height: layout.windowHeight,
           arguments: jsonEncode({
             'bonioWindow': 'ocr_result',
             'text': text,
             'imageBase64': imageBase64 ?? '',
+            'preferredImageHeight': layout.imageHeight,
+            'minimumTextLines': layout.minimumTextLines,
+            'minimumTextFieldHeight': layout.textFieldHeight,
+            'minimumWindowWidth': layout.windowWidth,
+            'minimumWindowHeight': layout.windowHeight,
             'mainWindowId': main.windowId,
           }),
         ),
@@ -453,6 +459,62 @@ class NodeRuntime extends ChangeNotifier {
     } catch (e) {
       AppLogger.instance.warn('createOcrResultWindow failed: $e');
     }
+  }
+
+  Future<_OcrWindowLayout> _computeOcrWindowLayout(
+      String text, String? imageBase64) async {
+    const minWindowWidth = 520.0;
+    const maxWindowWidth = 1400.0;
+    const minTextFieldHeight = 120.0;
+    const maxTextFieldHeight = 520.0;
+    const chromeHeight = 96.0;
+    const minWindowHeight = 320.0;
+    const maxWindowHeight = 1200.0;
+
+    final logicalLineCount = math.max(
+      2,
+      text
+              .split('\n')
+              .where((line) => line.trim().isNotEmpty)
+              .length +
+          1,
+    );
+    final textFieldHeight = (logicalLineCount * 24.0 + 28.0)
+        .clamp(minTextFieldHeight, maxTextFieldHeight);
+
+    var imageHeight = 0.0;
+    var windowWidth = minWindowWidth;
+
+    if (imageBase64 != null && imageBase64.isNotEmpty) {
+      try {
+        final imageBytes = base64Decode(imageBase64);
+        final codec = await ui.instantiateImageCodec(imageBytes);
+        final frame = await codec.getNextFrame();
+        final image = frame.image;
+        final imageWidth = image.width.toDouble();
+        final rawImageHeight = image.height.toDouble();
+        image.dispose();
+        codec.dispose();
+
+        final fittedWidth = imageWidth.clamp(minWindowWidth - 24.0, maxWindowWidth - 24.0);
+        final scale = imageWidth > 0 ? fittedWidth / imageWidth : 1.0;
+        imageHeight = (rawImageHeight * scale).clamp(120.0, 720.0);
+        windowWidth = (fittedWidth + 24.0).clamp(minWindowWidth, maxWindowWidth);
+      } catch (e) {
+        AppLogger.instance.warn('createOcrResultWindow: decode image size failed: $e');
+      }
+    }
+
+    final windowHeight =
+        (imageHeight + textFieldHeight + chromeHeight).clamp(minWindowHeight, maxWindowHeight);
+
+    return _OcrWindowLayout(
+      windowWidth: windowWidth,
+      windowHeight: windowHeight,
+      imageHeight: imageHeight,
+      minimumTextLines: logicalLineCount,
+      textFieldHeight: textFieldHeight,
+    );
   }
 
   Future<void> createSearchWindow(String imagePath, double x, double y) async {
@@ -835,4 +897,20 @@ class NodeRuntime extends ChangeNotifier {
     avatarController.dispose();
     super.dispose();
   }
+}
+
+class _OcrWindowLayout {
+  final double windowWidth;
+  final double windowHeight;
+  final double imageHeight;
+  final int minimumTextLines;
+  final double textFieldHeight;
+
+  const _OcrWindowLayout({
+    required this.windowWidth,
+    required this.windowHeight,
+    required this.imageHeight,
+    required this.minimumTextLines,
+    required this.textFieldHeight,
+  });
 }

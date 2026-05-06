@@ -10,9 +10,21 @@ import '../../l10n/app_strings.dart';
 class OcrResultWindow extends StatefulWidget {
   final String initialText;
   final String? imageBase64;
+  final double preferredImageHeight;
+  final int minimumTextLines;
+  final double minimumTextFieldHeight;
+  final double minimumWindowWidth;
+  final double minimumWindowHeight;
 
   const OcrResultWindow(
-      {super.key, this.initialText = '', this.imageBase64});
+      {super.key,
+      this.initialText = '',
+      this.imageBase64,
+      this.preferredImageHeight = 0,
+      this.minimumTextLines = 2,
+      this.minimumTextFieldHeight = 120,
+      this.minimumWindowWidth = 520,
+      this.minimumWindowHeight = 320});
 
   @override
   State<OcrResultWindow> createState() => _OcrResultWindowState();
@@ -31,6 +43,9 @@ class _OcrResultWindowState extends State<OcrResultWindow>
     windowManager.addListener(this);
     windowManager.setPreventClose(true);
     windowManager.setTitle(S.current.ocrResultTitle);
+    windowManager.setMinimumSize(
+      Size(widget.minimumWindowWidth, widget.minimumWindowHeight),
+    );
   }
 
   @override
@@ -70,7 +85,14 @@ class _OcrResultWindowState extends State<OcrResultWindow>
                 if (widget.imageBase64 != null &&
                     widget.imageBase64!.isNotEmpty)
                   ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 200),
+                    constraints: BoxConstraints(
+                      minHeight: widget.preferredImageHeight > 0
+                          ? widget.preferredImageHeight
+                          : 120,
+                      maxHeight: widget.preferredImageHeight > 0
+                          ? widget.preferredImageHeight
+                          : 320,
+                    ),
                     child: Container(
                       width: double.infinity,
                       decoration: BoxDecoration(
@@ -85,41 +107,47 @@ class _OcrResultWindowState extends State<OcrResultWindow>
                       child: Image.memory(
                         base64Decode(widget.imageBase64!),
                         fit: BoxFit.contain,
+                        alignment: Alignment.topCenter,
                       ),
                     ),
                   ),
                 Expanded(
-                  child: Padding(
+                  child: SingleChildScrollView(
                     padding: const EdgeInsets.all(12),
-                    child: TextField(
-                      controller: _controller,
-                      maxLines: null,
-                      expands: true,
-                      textAlignVertical: TextAlignVertical.top,
-                      cursorColor: cs.primary,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: cs.onSurface,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: widget.minimumTextFieldHeight,
                       ),
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
+                      child: TextField(
+                        controller: _controller,
+                        maxLines: null,
+                        minLines: widget.minimumTextLines,
+                        textAlignVertical: TextAlignVertical.top,
+                        cursorColor: cs.primary,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: cs.onSurface,
                         ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: cs.outlineVariant),
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: cs.outlineVariant),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: cs.primary),
+                          ),
+                          contentPadding: const EdgeInsets.all(12),
+                          hintText: s.ocrNoText,
+                          hintStyle: TextStyle(
+                            color: cs.onSurfaceVariant,
+                          ),
+                          filled: true,
+                          fillColor: cs.surfaceContainerHigh,
                         ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: cs.primary),
-                        ),
-                        contentPadding: const EdgeInsets.all(12),
-                        hintText: s.ocrNoText,
-                        hintStyle: TextStyle(
-                          color: cs.onSurfaceVariant,
-                        ),
-                        filled: true,
-                        fillColor: cs.surfaceContainerHigh,
                       ),
                     ),
                   ),
