@@ -52,15 +52,16 @@ class Win32ScreenCapture {
     }
   }
 
-  /// Captures the primary screen. Returns null on failure.
+  /// Captures the entire virtual desktop across all monitors.
   /// Result contains raw BGRA pixels and dimensions in physical pixels.
   static ScreenCaptureResult? captureScreen() {
     try {
       final scale = _getDpiForSystem() / 96.0;
-      final screenW = _getSystemMetrics(0); // SM_CXSCREEN
-      final screenH = _getSystemMetrics(1); // SM_CYSCREEN
-      final physW = screenW;
-      final physH = screenH;
+      final screenX = _getSystemMetrics(76); // SM_XVIRTUALSCREEN
+      final screenY = _getSystemMetrics(77); // SM_YVIRTUALSCREEN
+      final physW = _getSystemMetrics(78); // SM_CXVIRTUALSCREEN
+      final physH = _getSystemMetrics(79); // SM_CYVIRTUALSCREEN
+      if (physW <= 0 || physH <= 0) return null;
 
       final getDC = _user32
           .lookupFunction<IntPtr Function(IntPtr), int Function(int)>('GetDC');
@@ -97,7 +98,7 @@ class Win32ScreenCapture {
       selectObject(memDC, bitmap);
 
       // SRCCOPY = 0x00CC0020
-      bitBlt(memDC, 0, 0, physW, physH, screenDC, 0, 0, 0x00CC0020);
+      bitBlt(memDC, 0, 0, physW, physH, screenDC, screenX, screenY, 0x00CC0020);
 
       final bmi = calloc<_BITMAPINFO>();
       bmi.ref.bmiHeader.biSize = sizeOf<_BITMAPINFOHEADER>();
@@ -122,6 +123,8 @@ class Win32ScreenCapture {
       releaseDC(0, screenDC);
 
       return ScreenCaptureResult(
+        originX: screenX,
+        originY: screenY,
         width: physW,
         height: physH,
         bgraPixels: pixels,

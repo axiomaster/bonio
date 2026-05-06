@@ -1411,7 +1411,8 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     if (wc == null) return;
 
     if (ocr) {
-      // OCR mode: capture the entire screen so the user can select any area.
+      // OCR mode: capture the entire virtual desktop so the user can select
+      // any area across all monitors.
       final capture = ScreenCapture.captureScreen();
       if (capture == null) {
         debugPrint('BonioLens: screen capture failed');
@@ -1422,10 +1423,12 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
       final expandW = capture.width.toDouble();
       final expandH = capture.height.toDouble();
       _programmaticMove = true;
-      await windowManager.setSize(Size(expandW / _avatarDpiScale, expandH / _avatarDpiScale));
-      await wc.setPositionPhysical(0, 0);
-      _currentX = 0;
-      _currentY = 0;
+      await windowManager.setSize(
+          Size(expandW / capture.dpiScale, expandH / capture.dpiScale));
+      await wc.setPositionPhysical(
+          capture.originX.toDouble(), capture.originY.toDouble());
+      _currentX = capture.originX.toDouble();
+      _currentY = capture.originY.toDouble();
       _programmaticMove = false;
 
       if (!mounted) return;
@@ -1438,8 +1441,9 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
         _lensDrawingRect = null;
         _lensWindowTitle = '';
       });
-      debugPrint('BonioLens: entered OCR screen-capture mode '
-          '(${capture.width}x${capture.height})');
+      debugPrint('BonioLens: entered OCR virtual-screen mode '
+          'origin=(${capture.originX},${capture.originY}) '
+          'size=${capture.width}x${capture.height}');
       return;
     }
 
@@ -1808,6 +1812,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
                 rects: _lensRects,
                 drawingRect: _lensDrawingRect,
                 searchSimilarMode: _searchSimilarMode,
+                showViewportBorder: !_ocrMode,
                 onRectStart: _onLensRectStart,
                 onRectUpdate: _onLensRectUpdate,
                 onRectEnd: _onLensRectEnd,

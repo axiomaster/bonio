@@ -68,6 +68,7 @@ class NodeRuntime extends ChangeNotifier {
   late final GuiAgent guiAgent;
   late final PluginManager pluginManager;
   late final PaddleOcr paddleOcr;
+  Future<bool>? _paddleOcrInitFuture;
 
   WindowController? _avatarWindowController;
   WindowController? _readingWindowController;
@@ -153,25 +154,38 @@ class NodeRuntime extends ChangeNotifier {
     pluginManager.addListener(pushPluginMenuToAvatar);
     unawaited(pluginManager.initialize());
     // Initialize PaddleOCR (local OCR engine)
-    unawaited(_initPaddleOcr());
+    _paddleOcrInitFuture = _initPaddleOcr();
     // ChatController / AvatarController updates must bubble to AppState.
     chatController.addListener(_onChatControllerChanged);
     avatarController.addListener(_onAvatarControllerChanged);
   }
 
-  Future<void> _initPaddleOcr() async {
-    if (!Platform.isWindows) return; // macOS/Linux not yet supported
+  Future<bool> ensurePaddleOcrReady() async {
+    if (paddleOcr.isInitialized) return true;
+    final future = _paddleOcrInitFuture ??= _initPaddleOcr();
+    return future;
+  }
+
+  Future<bool> _initPaddleOcr() async {
+    if (!Platform.isWindows) return false; // macOS/Linux not yet supported
     try {
       final exeDir = Directory(Platform.resolvedExecutable).parent;
-      final modelDir = '${exeDir.path}${Platform.pathSeparator}assets${Platform.pathSeparator}ocr';
+      final modelDir =
+          '${exeDir.path}${Platform.pathSeparator}assets${Platform.pathSeparator}ocr';
+      final ortPath = '${exeDir.path}${Platform.pathSeparator}onnxruntime.dll';
+      AppLogger.instance.info(
+          'PaddleOCR: initializing, exe_dir=${exeDir.path}, model_dir=$modelDir, ort=$ortPath');
       final ok = await paddleOcr.init(modelDir: modelDir);
       if (ok) {
         AppLogger.instance.info('PaddleOCR: initialized successfully');
       } else {
-        AppLogger.instance.warn('PaddleOCR: init failed, will use AI fallback');
+        AppLogger.instance.warn(
+            'PaddleOCR: init failed, OCR will stay on client and report unavailable');
       }
+      return ok;
     } catch (e) {
       AppLogger.instance.warn('PaddleOCR: init error: $e');
+      return false;
     }
   }
 
