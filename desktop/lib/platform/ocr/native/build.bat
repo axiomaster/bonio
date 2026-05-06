@@ -1,6 +1,6 @@
 @echo off
 REM Build paddle_ocr_plugin.dll for Windows x64
-REM Requires: Visual Studio Build Tools 2022 + CMake + Ninja
+REM Requires: Visual Studio Build Tools 2022
 
 REM Find vcvars
 set "VCVARS="
@@ -21,10 +21,8 @@ if "%VCVARS%"=="" (
 call "%VCVARS%" >nul 2>&1
 cd /d "%~dp0"
 
-if exist build rmdir /s /q build
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-if errorlevel 1 exit /b 1
-cmake --build build
+if not exist build mkdir build
+cl /nologo /LD /O2 /EHsc /std:c++17 paddle_ocr_wrapper.cpp /Fe:build\paddle_ocr_plugin.dll
 if errorlevel 1 exit /b 1
 
 echo.
