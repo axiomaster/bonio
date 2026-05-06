@@ -201,6 +201,63 @@ struct TextBox {
   int x0, y0, x1, y1;
 };
 
+static inline uint8_t gray_at(const uint8_t* bgra, int img_w, int x, int y) {
+  const uint8_t* p = bgra + (y * img_w + x) * 4;
+  const float r = (float)p[2];
+  const float g = (float)p[1];
+  const float b = (float)p[0];
+  return (uint8_t)(0.299f * r + 0.587f * g + 0.114f * b);
+}
+
+static std::vector<TextBox> segment_text_lines(const uint8_t* bgra, int w, int h) {
+  std::vector<TextBox> lines;
+  if (!bgra || w < 8 || h < 8) return lines;
+
+  std::vector<int> dark_counts(h, 0);
+  for (int y = 0; y < h; y++) {
+    int count = 0;
+    for (int x = 0; x < w; x++) {
+      if (gray_at(bgra, w, x, y) < 220) count++;
+    }
+    dark_counts[y] = count;
+  }
+
+  const int min_dark_pixels = std::max(2, w / 80);
+  int y = 0;
+  while (y < h) {
+    while (y < h && dark_counts[y] < min_dark_pixels) y++;
+    if (y >= h) break;
+    int y0 = y;
+    while (y < h && dark_counts[y] >= min_dark_pixels) y++;
+    int y1 = y - 1;
+
+    if ((y1 - y0 + 1) < 6) continue;
+
+    int x0 = w - 1;
+    int x1 = 0;
+    for (int yy = y0; yy <= y1; yy++) {
+      for (int x = 0; x < w; x++) {
+        if (gray_at(bgra, w, x, yy) < 220) {
+          x0 = std::min(x0, x);
+          x1 = std::max(x1, x);
+        }
+      }
+    }
+    if (x1 <= x0) continue;
+
+    const int pad_x = std::max(4, (x1 - x0 + 1) / 30);
+    const int pad_y = std::max(3, (y1 - y0 + 1) / 6);
+    lines.push_back({
+        std::max(0, x0 - pad_x),
+        std::max(0, y0 - pad_y),
+        std::min(w - 1, x1 + pad_x),
+        std::min(h - 1, y1 + pad_y),
+    });
+  }
+
+  return lines;
+}
+
 static std::vector<TextBox> db_postprocess(const float* prob, int h, int w,
                                             float thresh = 0.3f, float unclip_ratio = 1.5f) {
   // Threshold probability map
@@ -390,72 +447,15 @@ char* paddle_ocr_recognize(const uint8_t* bgra, int w, int h) {
   std::string result;
 
   try {
-    // --- Detection ---
-    // PP-OCRv4 detection input: 3x736x736 dynamic (we use 960 max side)
-    int det_max_side = 960;
-    int det_w, det_h;
-    if (w > h) { det_w = det_max_side; det_h = (int)((float)h / w * det_max_side); }
-    else        { det_h = det_max_side; det_w = (int)((float)w / h * det_max_side); }
-    if (det_w < 32) det_w = 32;
-    if (det_h < 32) det_h = 32;
-    // Align to multiples of 32 (DB requirement)
-    det_w = ((det_w + 31) / 32) * 32;
-    det_h = ((det_h + 31) / 32) * 32;
-
-    auto det_input = preprocess_det(bgra, w, h, det_w, det_h);
-
-    OrtRunOptions* run_opts = nullptr;
-    f_CreateRunOptions(&run_opts);
-
-    int64_t det_shape[] = {1, 3, (int64_t)det_h, (int64_t)det_w};
-    OrtValue* det_tensor = nullptr;
-    f_CreateTensor(g_mem_info, det_input.data(),
-        det_input.size() * sizeof(float), det_shape, 4,
-        ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, &det_tensor);
-
-    const char* det_input_names[] = {"x"};
-    const char* det_output_names[] = {"sigmoid_0.tmp_0"};
-    OrtValue* det_output = nullptr;
-    OrtStatus* st = f_Run(g_det_session, run_opts, det_input_names, &det_tensor, 1,
-                             det_output_names, 1, &det_output);
-    f_ReleaseValue(det_tensor);
-    f_ReleaseRunOptions(run_opts);
-    if (st) {
-      fprintf(stderr, "ORT: det inference failed: %s\n", f_GetErrorMessage(st));
-      f_ReleaseStatus(st);
-      return nullptr;
-    }
-
-    // Get detection output (probability map)
-    float* det_data = nullptr;
-    f_GetTensorMutableData(det_output, (void**)&det_data);
-
-    // DB post-processing
-    auto boxes = db_postprocess(det_data, det_h, det_w);
-    f_ReleaseValue(det_output);
-
-    bool used_detected_boxes = !boxes.empty();
+    // The user has already selected the text region manually. For this
+    // workflow, line segmentation over the selected crop is more stable than
+    // our simplified detection pipeline and keeps behavior consistent across
+    // platforms while still using PaddleOCR's recognition model.
+    auto boxes = segment_text_lines(bgra, w, h);
     if (boxes.empty()) {
-      // The user already manually selected the text region. If detection fails,
-      // fall back to recognizing the whole crop as a single line so simple
-      // standard-font selections still work.
       boxes.push_back({0, 0, w - 1, h - 1});
     }
 
-    if (used_detected_boxes) {
-      // Scale detected boxes back to original image coordinates.
-      float scale_x = (float)w / det_w;
-      float scale_y = (float)h / det_h;
-      for (auto& b : boxes) {
-        b.x0 = (int)(b.x0 * scale_x);
-        b.y0 = (int)(b.y0 * scale_y);
-        b.x1 = (int)(b.x1 * scale_x);
-        b.y1 = (int)(b.y1 * scale_y);
-      }
-    }
-
-    // --- Recognition ---
-    // PP-OCRv4 rec input: 3x48x320 dynamic
     int rec_h = 48, rec_w = 320;
 
     for (size_t bi = 0; bi < boxes.size(); bi++) {

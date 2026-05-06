@@ -84,6 +84,8 @@ Future<void> main(List<String> args) async {
   if (windowType == 'ocr_result') {
     final text = payload['text'] as String? ?? '';
     final imageBase64 = payload['imageBase64'] as String?;
+    final preferredImageWidth =
+        (payload['preferredImageWidth'] as num?)?.toDouble() ?? 0;
     final preferredImageHeight =
         (payload['preferredImageHeight'] as num?)?.toDouble() ?? 0;
     final minimumTextLines =
@@ -97,6 +99,7 @@ Future<void> main(List<String> args) async {
     runApp(OcrResultWindow(
       initialText: text,
       imageBase64: imageBase64,
+      preferredImageWidth: preferredImageWidth,
       preferredImageHeight: preferredImageHeight,
       minimumTextLines: minimumTextLines,
       minimumTextFieldHeight: minimumTextFieldHeight,
