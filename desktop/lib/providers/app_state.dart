@@ -207,19 +207,30 @@ class AppState extends ChangeNotifier {
     ctrl.setBubble(text: S.current.ocrProcessing);
 
     String? text;
+    final pngBytes = base64Decode(pngBase64);
     try {
-      final ready = await runtime.ensurePaddleOcrReady();
-      if (!ready) {
-        log.warn('AppState: PaddleOCR unavailable, OCR stays client-side');
-      } else {
-        // Decode PNG to BGRA pixels for PaddleOCR
-        final pngBytes = base64Decode(pngBase64);
-        final bgra = await _pngToBgra(pngBytes);
-        if (bgra != null) {
-          log.info('AppState: local OCR image ${bgra.width}x${bgra.height}');
-          text = runtime.paddleOcr.recognize(bgra.pixels, bgra.width, bgra.height);
-          log.info('AppState: local OCR result length=${text?.length ?? 0}');
+      if (Platform.isWindows) {
+        text = await runtime.windowsOcr.recognizePngBytes(pngBytes);
+        log.info('AppState: Windows OCR result length=${text?.length ?? 0}');
+      }
+
+      if (text == null || text.trim().isEmpty) {
+        final ready = await runtime.ensurePaddleOcrReady();
+        if (!ready) {
+          log.warn('AppState: PaddleOCR unavailable, OCR stays client-side');
+        } else {
+          // Decode PNG to BGRA pixels for PaddleOCR
+          log.info('AppState: Windows OCR empty, trying PaddleOCR');
+          final bgra = await _pngToBgra(pngBytes);
+          if (bgra != null) {
+            log.info('AppState: local OCR image ${bgra.width}x${bgra.height}');
+            text =
+                runtime.paddleOcr.recognize(bgra.pixels, bgra.width, bgra.height);
+            log.info('AppState: PaddleOCR result length=${text?.length ?? 0}');
+          }
         }
+      } else {
+        log.info('AppState: using Windows OCR result');
       }
     } catch (e) {
       log.warn('AppState: local OCR failed: $e');

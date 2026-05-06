@@ -32,6 +32,7 @@ import '../platform/cdp/cdp_browser_agent.dart';
 import '../plugins/builtin_plugins.dart';
 import '../plugins/plugin_manifest.dart';
 import '../platform/ocr/paddle_ocr_bridge.dart';
+import '../platform/ocr/windows_ocr.dart';
 import 'app_logger.dart';
 import '../plugins/plugin_manager.dart';
 
@@ -68,6 +69,7 @@ class NodeRuntime extends ChangeNotifier {
   late final GuiAgent guiAgent;
   late final PluginManager pluginManager;
   late final PaddleOcr paddleOcr;
+  late final WindowsOcr windowsOcr;
   Future<bool>? _paddleOcrInitFuture;
 
   WindowController? _avatarWindowController;
@@ -147,6 +149,7 @@ class NodeRuntime extends ChangeNotifier {
     guiAgent = GuiAgent.create();
     pluginManager = PluginManager();
     paddleOcr = PaddleOcr();
+    windowsOcr = WindowsOcr();
     pluginManager.registerBuiltin(NoteCapturePlugin());
     pluginManager.registerBuiltin(AiLensPlugin());
     pluginManager.registerBuiltin(SearchSimilarPlugin());
