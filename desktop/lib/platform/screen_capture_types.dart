@@ -3,12 +3,16 @@ import 'dart:ui' as ui;
 
 /// Shared result type returned by all screen capture implementations.
 class ScreenCaptureResult {
+  final int originX;
+  final int originY;
   final int width;
   final int height;
   final Uint8List bgraPixels;
   final double dpiScale;
 
   ScreenCaptureResult({
+    this.originX = 0,
+    this.originY = 0,
     required this.width,
     required this.height,
     required this.bgraPixels,

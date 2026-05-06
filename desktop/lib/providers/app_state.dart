@@ -208,28 +208,26 @@ class AppState extends ChangeNotifier {
 
     String? text;
     try {
-      if (!runtime.paddleOcr.isInitialized) {
-        log.warn('AppState: PaddleOCR not initialized, will use AI fallback');
+      final ready = await runtime.ensurePaddleOcrReady();
+      if (!ready) {
+        log.warn('AppState: PaddleOCR unavailable, OCR stays client-side');
       } else {
         // Decode PNG to BGRA pixels for PaddleOCR
         final pngBytes = base64Decode(pngBase64);
         final bgra = await _pngToBgra(pngBytes);
         if (bgra != null) {
+          log.info('AppState: local OCR image ${bgra.width}x${bgra.height}');
           text = runtime.paddleOcr.recognize(bgra.pixels, bgra.width, bgra.height);
+          log.info('AppState: local OCR result length=${text?.length ?? 0}');
         }
       }
     } catch (e) {
-      log.warn('AppState: local OCR failed, trying AI fallback: $e');
-    }
-
-    // AI fallback if local OCR fails
-    if (text == null || text.isEmpty) {
-      text = await _ocrViaAi(pngBase64);
+      log.warn('AppState: local OCR failed: $e');
     }
 
     ctrl.clearBubble();
     await runtime.createOcrResultWindow(
-      text.isNotEmpty ? text : S.current.ocrNoText,
+      (text != null && text.trim().isNotEmpty) ? text : S.current.ocrNoText,
       imageBase64: pngBase64,
     );
   }

@@ -794,6 +794,7 @@ class LensAnnotationOverlay extends StatefulWidget {
   final VoidCallback onCancel;
   final VoidCallback onConfirm;
   final bool searchSimilarMode;
+  final bool showViewportBorder;
 
   const LensAnnotationOverlay({
     super.key,
@@ -807,6 +808,7 @@ class LensAnnotationOverlay extends StatefulWidget {
     required this.onCancel,
     required this.onConfirm,
     this.searchSimilarMode = false,
+    this.showViewportBorder = true,
   });
 
   @override
@@ -891,7 +893,7 @@ class _LensAnnotationOverlayState extends State<LensAnnotationOverlay> {
                 ),
               ),
 
-            if (!isSearch)
+            if (!isSearch && widget.showViewportBorder)
               Positioned.fill(
                 child: IgnorePointer(
                   child: Container(
@@ -955,9 +957,9 @@ class _LensAnnotationOverlayState extends State<LensAnnotationOverlay> {
               ),
 
             if (!isSearch)
-              Positioned(
-                top: borderWidth + 8,
-                right: borderWidth + 8,
+              _LensToolbarPositioned(
+                rects: widget.rects,
+                drawingRect: widget.drawingRect,
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -987,6 +989,50 @@ class _LensAnnotationOverlayState extends State<LensAnnotationOverlay> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Positions the Lens toolbar below the last drawn selection rectangle.
+/// Falls back to a default position if no rectangles exist.
+class _LensToolbarPositioned extends StatelessWidget {
+  final List<Rect> rects;
+  final Rect? drawingRect;
+  final Widget child;
+
+  const _LensToolbarPositioned({
+    required this.rects,
+    this.drawingRect,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    double top = 14.0;
+    double right = 14.0;
+
+    // Position below the bottommost rect (committed or drawing)
+    final target = rects.isNotEmpty
+        ? rects.reduce((a, b) => a.bottom > b.bottom ? a : b)
+        : drawingRect;
+    if (target != null) {
+      top = target.bottom + 8;
+      // Center the toolbar horizontally relative to the rect
+      right = 8.0; // keep some padding from the right edge
+      // Use left-alignment near the rect's left edge, but clamp
+      final left = target.left.clamp(8.0, double.infinity);
+      return Positioned(
+        top: top,
+        left: left,
+        child: child,
+      );
+    }
+
+    // Fallback: top-right corner
+    return Positioned(
+      top: top,
+      right: right,
+      child: child,
     );
   }
 }
