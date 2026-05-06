@@ -34,7 +34,6 @@ import '../platform/cdp/cdp_browser_agent.dart';
 import '../plugins/builtin_plugins.dart';
 import '../plugins/plugin_manifest.dart';
 import '../platform/ocr/paddle_ocr_bridge.dart';
-import '../platform/ocr/windows_ocr.dart';
 import 'app_logger.dart';
 import '../plugins/plugin_manager.dart';
 
@@ -71,7 +70,6 @@ class NodeRuntime extends ChangeNotifier {
   late final GuiAgent guiAgent;
   late final PluginManager pluginManager;
   late final PaddleOcr paddleOcr;
-  late final WindowsOcr windowsOcr;
   Future<bool>? _paddleOcrInitFuture;
 
   WindowController? _avatarWindowController;
@@ -151,7 +149,6 @@ class NodeRuntime extends ChangeNotifier {
     guiAgent = GuiAgent.create();
     pluginManager = PluginManager();
     paddleOcr = PaddleOcr();
-    windowsOcr = WindowsOcr();
     pluginManager.registerBuiltin(NoteCapturePlugin());
     pluginManager.registerBuiltin(AiLensPlugin());
     pluginManager.registerBuiltin(SearchSimilarPlugin());
@@ -444,6 +441,7 @@ class NodeRuntime extends ChangeNotifier {
             'bonioWindow': 'ocr_result',
             'text': text,
             'imageBase64': imageBase64 ?? '',
+            'preferredImageWidth': layout.imageWidth,
             'preferredImageHeight': layout.imageHeight,
             'minimumTextLines': layout.minimumTextLines,
             'minimumTextFieldHeight': layout.textFieldHeight,
@@ -463,13 +461,13 @@ class NodeRuntime extends ChangeNotifier {
 
   Future<_OcrWindowLayout> _computeOcrWindowLayout(
       String text, String? imageBase64) async {
-    const minWindowWidth = 520.0;
-    const maxWindowWidth = 1400.0;
+    const minWindowWidth = 600.0;
+    const maxWindowWidth = 2200.0;
     const minTextFieldHeight = 120.0;
     const maxTextFieldHeight = 520.0;
     const chromeHeight = 96.0;
-    const minWindowHeight = 320.0;
-    const maxWindowHeight = 1200.0;
+    const minWindowHeight = 400.0;
+    const maxWindowHeight = 1600.0;
 
     final logicalLineCount = math.max(
       2,
@@ -484,6 +482,7 @@ class NodeRuntime extends ChangeNotifier {
 
     var imageHeight = 0.0;
     var windowWidth = minWindowWidth;
+    var imageWidth = 0.0;
 
     if (imageBase64 != null && imageBase64.isNotEmpty) {
       try {
@@ -491,15 +490,13 @@ class NodeRuntime extends ChangeNotifier {
         final codec = await ui.instantiateImageCodec(imageBytes);
         final frame = await codec.getNextFrame();
         final image = frame.image;
-        final imageWidth = image.width.toDouble();
+        imageWidth = image.width.toDouble();
         final rawImageHeight = image.height.toDouble();
         image.dispose();
         codec.dispose();
 
-        final fittedWidth = imageWidth.clamp(minWindowWidth - 24.0, maxWindowWidth - 24.0);
-        final scale = imageWidth > 0 ? fittedWidth / imageWidth : 1.0;
-        imageHeight = (rawImageHeight * scale).clamp(120.0, 720.0);
-        windowWidth = (fittedWidth + 24.0).clamp(minWindowWidth, maxWindowWidth);
+        imageHeight = rawImageHeight.clamp(120.0, 1000.0);
+        windowWidth = (imageWidth + 24.0).clamp(minWindowWidth, maxWindowWidth);
       } catch (e) {
         AppLogger.instance.warn('createOcrResultWindow: decode image size failed: $e');
       }
@@ -511,6 +508,7 @@ class NodeRuntime extends ChangeNotifier {
     return _OcrWindowLayout(
       windowWidth: windowWidth,
       windowHeight: windowHeight,
+      imageWidth: imageWidth,
       imageHeight: imageHeight,
       minimumTextLines: logicalLineCount,
       textFieldHeight: textFieldHeight,
@@ -902,6 +900,7 @@ class NodeRuntime extends ChangeNotifier {
 class _OcrWindowLayout {
   final double windowWidth;
   final double windowHeight;
+  final double imageWidth;
   final double imageHeight;
   final int minimumTextLines;
   final double textFieldHeight;
@@ -909,6 +908,7 @@ class _OcrWindowLayout {
   const _OcrWindowLayout({
     required this.windowWidth,
     required this.windowHeight,
+    required this.imageWidth,
     required this.imageHeight,
     required this.minimumTextLines,
     required this.textFieldHeight,

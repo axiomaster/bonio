@@ -10,6 +10,7 @@ import '../../l10n/app_strings.dart';
 class OcrResultWindow extends StatefulWidget {
   final String initialText;
   final String? imageBase64;
+  final double preferredImageWidth;
   final double preferredImageHeight;
   final int minimumTextLines;
   final double minimumTextFieldHeight;
@@ -20,11 +21,12 @@ class OcrResultWindow extends StatefulWidget {
       {super.key,
       this.initialText = '',
       this.imageBase64,
+      this.preferredImageWidth = 0,
       this.preferredImageHeight = 0,
       this.minimumTextLines = 2,
       this.minimumTextFieldHeight = 120,
-      this.minimumWindowWidth = 520,
-      this.minimumWindowHeight = 320});
+      this.minimumWindowWidth = 600,
+      this.minimumWindowHeight = 400});
 
   @override
   State<OcrResultWindow> createState() => _OcrResultWindowState();
@@ -86,15 +88,23 @@ class _OcrResultWindowState extends State<OcrResultWindow>
                     widget.imageBase64!.isNotEmpty)
                   ConstrainedBox(
                     constraints: BoxConstraints(
+                      minWidth: widget.preferredImageWidth > 0
+                          ? widget.preferredImageWidth
+                          : widget.minimumWindowWidth - 24,
                       minHeight: widget.preferredImageHeight > 0
                           ? widget.preferredImageHeight
                           : 120,
+                      maxWidth: widget.preferredImageWidth > 0
+                          ? widget.preferredImageWidth
+                          : double.infinity,
                       maxHeight: widget.preferredImageHeight > 0
                           ? widget.preferredImageHeight
                           : 320,
                     ),
                     child: Container(
-                      width: double.infinity,
+                      width: widget.preferredImageWidth > 0
+                          ? widget.preferredImageWidth
+                          : double.infinity,
                       decoration: BoxDecoration(
                         color: cs.surfaceContainerLow,
                         border: Border(
@@ -106,7 +116,7 @@ class _OcrResultWindowState extends State<OcrResultWindow>
                       ),
                       child: Image.memory(
                         base64Decode(widget.imageBase64!),
-                        fit: BoxFit.contain,
+                        fit: BoxFit.none,
                         alignment: Alignment.topCenter,
                       ),
                     ),
