@@ -33,9 +33,8 @@ class CdpBrowserAgent implements BrowserAgent {
   Future<bool> tryConnectToExisting({String? urlHint}) async {
     if (isConnected) return true;
 
-    // Strategy 1: Read DevToolsActivePort from default user data dir
-    final userDataDir = _getDefaultUserDataDir();
-    if (userDataDir != null) {
+    // Strategy 1: Read DevToolsActivePort from default browser user data dirs
+    for (final userDataDir in _getDefaultUserDataDirs()) {
       final portFile = File(
           '$userDataDir${Platform.pathSeparator}DevToolsActivePort');
       try {
@@ -87,7 +86,8 @@ class CdpBrowserAgent implements BrowserAgent {
 
     // Port 0 = OS picks a free port; Chrome writes the actual port to
     // DevToolsActivePort inside the user-data-dir.
-    final userDataDir = _getDefaultUserDataDir();
+    final userDataDirs = _getDefaultUserDataDirs();
+    final userDataDir = userDataDirs.isNotEmpty ? userDataDirs.first : null;
     final args = [
       '--remote-debugging-port=0',
       if (userDataDir != null) '--user-data-dir=$userDataDir',
@@ -231,14 +231,20 @@ class CdpBrowserAgent implements BrowserAgent {
     return null;
   }
 
-  static String? _getDefaultUserDataDir() {
+  static List<String> _getDefaultUserDataDirs() {
     if (Platform.isWindows) {
-      return _expandEnv(r'%LocalAppData%\Google\Chrome\User Data');
+      return [
+        _expandEnv(r'%LocalAppData%\Google\Chrome\User Data'),
+        _expandEnv(r'%LocalAppData%\Microsoft\Edge\User Data'),
+      ];
     } else if (Platform.isMacOS) {
       final home = Platform.environment['HOME'] ?? '';
-      return '$home/Library/Application Support/Google/Chrome';
+      return [
+        '$home/Library/Application Support/Google/Chrome',
+        '$home/Library/Application Support/Microsoft Edge',
+      ];
     }
-    return null;
+    return const [];
   }
 
   static String _expandEnv(String path) {

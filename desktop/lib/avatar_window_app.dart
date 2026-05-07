@@ -1192,6 +1192,50 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
   /// Dynamic plugin menu items pushed from the main window.
   List<Map<String, dynamic>> _pluginMenuItems = [];
 
+  _AvatarPopupMenu _buildGroupedAvatarMenu(S s) {
+    Map<String, dynamic> item(int id, String label) =>
+        {'id': id, 'label': label, 'enabled': true};
+
+    final byPluginId = {
+      for (final raw in _pluginMenuItems)
+        (raw['pluginId'] as String? ?? ''): raw,
+    };
+
+    final items = <Map<String, dynamic>>[];
+    final actions = <int, String>{};
+
+    void addPluginOrFallback(String pluginId, int fallbackId, String label,
+        String fallbackAction) {
+      final raw = byPluginId[pluginId];
+      if (raw != null) {
+        final id = raw['id'] as int;
+        items.add({...raw, 'label': label, 'enabled': raw['enabled'] != false});
+        actions[id] = fallbackAction;
+        return;
+      }
+      items.add(item(fallbackId, label));
+      actions[fallbackId] = fallbackAction;
+    }
+
+    addPluginOrFallback(
+        'builtin_note_capture', 1, s.menuTakeNote, 'note_capture');
+    addPluginOrFallback('builtin_ai_lens', 4, s.menuAiLens, 'ai_lens');
+    addPluginOrFallback(
+        'builtin_reading_companion', 6, s.menuStartReading, 'start_reading');
+    addPluginOrFallback(
+        'builtin_search_similar', 5, s.menuSearchSimilar, 'search_similar');
+
+    items.add({'id': 0, 'label': '', 'enabled': false});
+    items.add(item(7, s.menuOcrText));
+    actions[7] = 'ocr_text';
+
+    items.add({'id': 0, 'label': '', 'enabled': false});
+    items.add(item(9990, s.appName));
+    actions[9990] = 'show_main';
+
+    return _AvatarPopupMenu(items: items, actions: actions);
+  }
+
   Future<void> _onShowNativeMenu() async {
     if (_menuVisible) return;
     _menuVisible = true;
@@ -1207,40 +1251,11 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     try {
       final s = S.current;
 
-      // Build menu items: use plugin system if available, else fallback
-      final List<Map<String, dynamic>> items;
-      final Map<int, String> actions;
-      if (_pluginMenuItems.isNotEmpty) {
-        items = [
-          ..._pluginMenuItems,
-          {'id': 0, 'label': '', 'enabled': false},
-          {'id': 9990, 'label': s.appName, 'enabled': true},
-        ];
-        actions = {
-          for (final item in _pluginMenuItems)
-            (item['id'] as int): item['pluginId'] as String? ?? '',
-          9990: 'show_main',
-        };
-      } else {
-        items = [
-          {'id': 1, 'label': s.menuTakeNote, 'enabled': true},
-          {'id': 4, 'label': s.menuAiLens, 'enabled': true},
-          {'id': 7, 'label': s.menuOcrText, 'enabled': true},
-          {'id': 5, 'label': s.menuSearchSimilar, 'enabled': true},
-          {'id': 6, 'label': s.menuStartReading, 'enabled': true},
-          {'id': 0, 'label': '', 'enabled': false},
-          {'id': 2, 'label': s.appName, 'enabled': true},
-          {'id': 3, 'label': s.menuSwitchWindow, 'enabled': false},
-        ];
-        actions = const {
-          1: 'note_capture', 4: 'ai_lens', 7: 'ocr_text', 5: 'search_similar',
-          6: 'start_reading', 2: 'show_main', 3: 'switch_window',
-        };
-      }
+      final menu = _buildGroupedAvatarMenu(s);
 
       final action = await wc.showPopupMenu(
-        items: items,
-        actions: actions,
+        items: menu.items,
+        actions: menu.actions,
       );
 
       _menuVisible = false;
@@ -1853,6 +1868,16 @@ Future<void> initAvatarWindowEngine() async {
     await windowManager.setSkipTaskbar(true);
     await windowManager.setTitle(S.current.avatarWindowTitle);
     await windowManager.show();
+  });
+}
+
+class _AvatarPopupMenu {
+  final List<Map<String, dynamic>> items;
+  final Map<int, String> actions;
+
+  const _AvatarPopupMenu({
+    required this.items,
+    required this.actions,
   });
 }
 

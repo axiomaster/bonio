@@ -41,13 +41,18 @@ class _OcrResultWindowState extends State<OcrResultWindow>
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.initialText);
-    windowManager.ensureInitialized();
+    _configureWindow();
     windowManager.addListener(this);
-    windowManager.setPreventClose(true);
-    windowManager.setTitle(S.current.ocrResultTitle);
-    windowManager.setMinimumSize(
-      Size(widget.minimumWindowWidth, widget.minimumWindowHeight),
-    );
+  }
+
+  Future<void> _configureWindow() async {
+    await windowManager.ensureInitialized();
+    final desiredSize =
+        Size(widget.minimumWindowWidth, widget.minimumWindowHeight);
+    await windowManager.setPreventClose(true);
+    await windowManager.setTitle(S.current.ocrResultTitle);
+    await windowManager.setMinimumSize(desiredSize);
+    await windowManager.setSize(desiredSize);
   }
 
   @override

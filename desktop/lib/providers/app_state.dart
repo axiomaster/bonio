@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -422,6 +423,19 @@ class AppState extends ChangeNotifier {
     ctrl.setBubble(text: S.current.readingConnecting);
     ctrl.showTemporaryState(AgentAvatarActivity.thinking);
 
+    if (url.isEmpty && hwnd != 0 && Platform.isWindows) {
+      try {
+        final browserUrl =
+            await Win32ScreenCapture.getBrowserUrlViaKeyboard(hwnd);
+        if (browserUrl != null && browserUrl.isNotEmpty) {
+          url = browserUrl;
+          log.info('AppState: browser URL from address bar: $url');
+        }
+      } catch (e) {
+        log.warn('AppState: browser URL extraction failed: $e');
+      }
+    }
+
     // Try to get the real URL and page content via CDP
     PageContent? cdpContent;
     try {
@@ -447,8 +461,8 @@ class AppState extends ChangeNotifier {
         ctrl.setBubble(text: S.current.readingExtracting);
         final pageText =
             await Win32ScreenCapture.getBrowserPageTextViaUIA(hwnd);
-        if (pageText != null && pageText.length > 50) {
-          log.info('AppState: UIA extracted ${pageText.length} chars');
+        if (_isReadablePageText(pageText)) {
+          log.info('AppState: UIA extracted ${pageText!.length} chars');
           cdpContent = PageContent(
             title: title,
             url: url,
@@ -456,8 +470,8 @@ class AppState extends ChangeNotifier {
             headings: [],
           );
         } else {
-          log.warn('AppState: UIA text too short or empty '
-              '(${pageText?.length ?? 0} chars)');
+          log.warn('AppState: UIA text unusable '
+              '(${pageText?.length ?? 0} chars, mojibake=${_looksMojibake(pageText ?? '')})');
         }
       } catch (e) {
         log.error('AppState: UIA extraction failed: $e');
@@ -470,8 +484,8 @@ class AppState extends ChangeNotifier {
         ctrl.setBubble(text: S.current.readingExtracting);
         final pageText =
             await Win32ScreenCapture.getBrowserPageText(hwnd);
-        if (pageText != null && pageText.length > 50) {
-          log.info('AppState: clipboard extracted ${pageText.length} chars');
+        if (_isReadablePageText(pageText)) {
+          log.info('AppState: clipboard extracted ${pageText!.length} chars');
           cdpContent = PageContent(
             title: title,
             url: url,
@@ -479,11 +493,27 @@ class AppState extends ChangeNotifier {
             headings: [],
           );
         } else {
-          log.warn('AppState: clipboard text too short or empty '
-              '(${pageText?.length ?? 0} chars)');
+          log.warn('AppState: clipboard text unusable '
+              '(${pageText?.length ?? 0} chars, mojibake=${_looksMojibake(pageText ?? '')})');
         }
       } catch (e) {
         log.error('AppState: clipboard extraction failed: $e');
+      }
+    }
+
+    if (cdpContent == null && url.startsWith('http')) {
+      try {
+        ctrl.setBubble(text: S.current.readingExtracting);
+        final fetched = await _fetchReadablePageContent(url);
+        if (_isReadablePageText(fetched?.text)) {
+          cdpContent = fetched;
+          log.info('AppState: HTTP extracted ${fetched!.text.length} chars from $url');
+        } else {
+          log.warn('AppState: HTTP text unusable '
+              '(${fetched?.text.length ?? 0} chars)');
+        }
+      } catch (e) {
+        log.warn('AppState: HTTP extraction failed: $e');
       }
     }
 
@@ -492,12 +522,13 @@ class AppState extends ChangeNotifier {
       try {
         ctrl.setBubble(text: S.current.readingExtracting);
         final pageText = MacosScreenCapture.getBrowserPageText(hwnd);
-        if (pageText != null && pageText.length > 50) {
-          debugPrint('AppState: macOS AppleScript extracted ${pageText.length} chars');
+        if (_isReadablePageText(pageText)) {
+          final readableText = pageText!;
+          debugPrint('AppState: macOS AppleScript extracted ${readableText.length} chars');
           cdpContent = PageContent(
             title: title,
             url: url,
-            text: pageText,
+            text: readableText,
             headings: [],
           );
         } else {
@@ -533,6 +564,106 @@ class AppState extends ChangeNotifier {
       await runtime.createReadingWindow(url, title, 0, 0, 500, 800,
           cdpContent: cdpContent);
     }
+  }
+
+  bool _isReadablePageText(String? text) {
+    if (text == null) return false;
+    final trimmed = text.trim();
+    if (trimmed.length < 50) return false;
+    return !_looksMojibake(trimmed);
+  }
+
+  bool _looksMojibake(String text) {
+    if (text.isEmpty) return false;
+    final sample = text.length > 2000 ? text.substring(0, 2000) : text;
+    final suspicious = RegExp(r'[鐭箮鏃姤浣滄爣�]').allMatches(sample).length;
+    final cjk = RegExp(r'[\u4e00-\u9fff]').allMatches(sample).length;
+    if (suspicious >= 8 && suspicious / math.max(1, cjk) > 0.08) {
+      return true;
+    }
+    return sample.contains('乱码') ||
+        sample.contains('鏃') ||
+        sample.contains('鐭') ||
+        sample.contains('浣滆');
+  }
+
+  Future<PageContent?> _fetchReadablePageContent(String url) async {
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 10);
+    try {
+      final req = await client.getUrl(Uri.parse(url));
+      req.headers.set(HttpHeaders.userAgentHeader,
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+          '(KHTML, like Gecko) Chrome/124.0 Safari/537.36');
+      final resp = await req.close().timeout(const Duration(seconds: 15));
+      if (resp.statusCode < 200 || resp.statusCode >= 300) return null;
+      final bytes = await resp.fold<BytesBuilder>(
+        BytesBuilder(copy: false),
+        (builder, chunk) => builder..add(chunk),
+      ).then((builder) => builder.takeBytes());
+      final html = _decodeHtml(bytes, resp.headers.contentType?.charset);
+      final title = _stripHtml(_firstMatch(
+            html,
+            RegExp(r'<title[^>]*>([\s\S]*?)</title>', caseSensitive: false),
+          ) ??
+          '');
+      final text = _extractHtmlReadableText(html);
+      return PageContent(title: title, url: url, text: text, headings: []);
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  String _decodeHtml(Uint8List bytes, String? charset) {
+    return utf8.decode(bytes, allowMalformed: true);
+  }
+
+  String _extractHtmlReadableText(String html) {
+    final candidates = <String>[];
+    for (final pattern in [
+      r'<article[^>]*>([\s\S]*?)</article>',
+      r'<main[^>]*>([\s\S]*?)</main>',
+      r'''<div[^>]+class=["'][^"']*(?:Daily|content|article)[^"']*["'][^>]*>([\s\S]*?)</div>''',
+      r'<body[^>]*>([\s\S]*?)</body>',
+    ]) {
+      for (final match in RegExp(pattern, caseSensitive: false)
+          .allMatches(html)) {
+        final raw = match.group(1);
+        if (raw != null) candidates.add(_stripHtml(raw));
+      }
+    }
+    candidates.sort((a, b) => b.length.compareTo(a.length));
+    return candidates.isNotEmpty ? candidates.first : _stripHtml(html);
+  }
+
+  String? _firstMatch(String input, RegExp pattern) =>
+      pattern.firstMatch(input)?.group(1);
+
+  String _stripHtml(String html) {
+    var text = html
+        .replaceAll(RegExp(r'<script[\s\S]*?</script>', caseSensitive: false), ' ')
+        .replaceAll(RegExp(r'<style[\s\S]*?</style>', caseSensitive: false), ' ')
+        .replaceAll(RegExp(r'<[^>]+>'), '\n');
+    text = text
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&#39;', "'");
+    text = text.replaceAllMapped(RegExp(r'&#x([0-9a-fA-F]+);'), (m) {
+      final code = int.tryParse(m.group(1)!, radix: 16);
+      return code == null ? m.group(0)! : String.fromCharCode(code);
+    }).replaceAllMapped(RegExp(r'&#(\d+);'), (m) {
+      final code = int.tryParse(m.group(1)!);
+      return code == null ? m.group(0)! : String.fromCharCode(code);
+    });
+    return text
+        .split('\n')
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .join('\n')
+        .trim();
   }
 
   Future<void> _handleNoteCaptureWithData(Map<String, dynamic> data) async {
