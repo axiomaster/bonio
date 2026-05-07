@@ -270,7 +270,8 @@ bool WeChatAdapter::send_desktop_message(const std::string& session_key,
       error_message = "personal WeChat client is not ready";
       return false;
     }
-    if (!ilink_client_->send_message(user_id, content)) {
+    std::string mirrored_content = "[来自 Bonio Desktop]\n" + content;
+    if (!ilink_client_->send_message(user_id, mirrored_content)) {
       error_message = "failed to send message to personal WeChat";
       return false;
     }

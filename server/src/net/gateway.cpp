@@ -690,6 +690,8 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
             return;
           }
 
+          save_user_message();
+
           std::string send_error;
           if (!(*wechat_sender)(session_key, message, send_error)) {
             nlohmann::json res;
@@ -703,13 +705,13 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
             return;
           }
 
-          save_user_message();
+          std::string run_id = it->second.agent_manager->start_task(session_key, message, user_msg_json_override);
 
           nlohmann::json res;
           res["type"] = "res";
           res["id"] = id;
           res["ok"] = true;
-          res["payload"] = {{"sent", true}, {"channel", "wechat"}};
+          res["payload"] = {{"runId", run_id}, {"mirrored", true}, {"channel", "wechat"}};
           try {
             server.send(hdl, res.dump(), websocketpp::frame::opcode::text);
           } catch (...) {}
