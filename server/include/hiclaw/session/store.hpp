@@ -87,6 +87,8 @@ public:
 
 private:
   void load();
+  bool load_session_from_file(const std::string& path, Session& out) const;
+  void refresh_session_from_disk(const std::string& key);
   void scan_new_sessions();
   void ensure_session_dir();
   std::string session_file_path(const std::string& key) const;

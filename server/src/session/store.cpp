@@ -97,32 +97,8 @@ void SessionStore::load() {
       if (path.size() < 5 || path.substr(path.size() - 5) != ".json") continue;
 
       try {
-        std::ifstream f(path);
-        if (!f.is_open()) continue;
-
-        json j;
-        f >> j;
-
         Session s;
-        s.key = j.value("key", "");
-        s.display_name = j.value("displayName", s.key);
-        s.created_at = j.value("createdAt", int64_t(0));
-        s.updated_at = j.value("updatedAt", int64_t(0));
-
-        if (j.contains("messages") && j["messages"].is_array()) {
-          for (const auto& mj : j["messages"]) {
-            Message m;
-            m.role = mj.value("role", "");
-            m.content = mj.value("content", "");
-            m.timestamp = mj.value("timestamp", int64_t(0));
-            m.run_id = mj.value("runId", "");
-            m.tool_call_id = mj.value("toolCallId", "");
-            m.tool_name = mj.value("toolName", "");
-            s.messages.push_back(std::move(m));
-          }
-        }
-
-        if (!s.key.empty()) {
+        if (load_session_from_file(path, s) && !s.key.empty()) {
           sessions_.push_back(std::move(s));
         }
       } catch (const std::exception& e) {
@@ -131,6 +107,56 @@ void SessionStore::load() {
     }
   } catch (const std::exception& e) {
     log::error("SessionStore: failed to load sessions: " + std::string(e.what()));
+  }
+}
+
+bool SessionStore::load_session_from_file(const std::string& path, Session& out) const {
+  std::ifstream f(path);
+  if (!f.is_open()) return false;
+
+  json j;
+  f >> j;
+
+  Session s;
+  s.key = j.value("key", "");
+  s.display_name = j.value("displayName", s.key);
+  s.created_at = j.value("createdAt", int64_t(0));
+  s.updated_at = j.value("updatedAt", int64_t(0));
+
+  if (j.contains("messages") && j["messages"].is_array()) {
+    for (const auto& mj : j["messages"]) {
+      Message m;
+      m.role = mj.value("role", "");
+      m.content = mj.value("content", "");
+      m.timestamp = mj.value("timestamp", int64_t(0));
+      m.run_id = mj.value("runId", "");
+      m.tool_call_id = mj.value("toolCallId", "");
+      m.tool_name = mj.value("toolName", "");
+      s.messages.push_back(std::move(m));
+    }
+  }
+
+  out = std::move(s);
+  return !out.key.empty();
+}
+
+void SessionStore::refresh_session_from_disk(const std::string& key) {
+  // Must be called with mutex_ held.
+  try {
+    Session disk_session;
+    if (!load_session_from_file(session_file_path(key), disk_session)) return;
+    for (auto& s : sessions_) {
+      if (s.key == key) {
+        if (disk_session.updated_at >= s.updated_at ||
+            disk_session.messages.size() >= s.messages.size()) {
+          s = std::move(disk_session);
+        }
+        return;
+      }
+    }
+    sessions_.push_back(std::move(disk_session));
+  } catch (const std::exception& e) {
+    log::warn("SessionStore: failed to refresh session " + key + ": " + e.what());
   }
 }
 
@@ -151,33 +177,9 @@ void SessionStore::scan_new_sessions() {
       if (path.size() < 5 || path.substr(path.size() - 5) != ".json") continue;
 
       try {
-        std::ifstream f(path);
-        if (!f.is_open()) continue;
-        json j;
-        f >> j;
-
-        // Use the actual session key from JSON content (filename is sanitized)
-        std::string key = j.value("key", "");
-        if (key.empty() || known.count(key)) continue;
-
         Session s;
-        s.key = key;
-        s.display_name = j.value("displayName", s.key);
-        s.created_at = j.value("createdAt", int64_t(0));
-        s.updated_at = j.value("updatedAt", int64_t(0));
-
-        if (j.contains("messages") && j["messages"].is_array()) {
-          for (const auto& mj : j["messages"]) {
-            Message m;
-            m.role = mj.value("role", "");
-            m.content = mj.value("content", "");
-            m.timestamp = mj.value("timestamp", int64_t(0));
-            m.run_id = mj.value("runId", "");
-            m.tool_call_id = mj.value("toolCallId", "");
-            m.tool_name = mj.value("toolName", "");
-            s.messages.push_back(std::move(m));
-          }
-        }
+        if (!load_session_from_file(path, s)) continue;
+        if (known.count(s.key)) continue;
 
         sessions_.push_back(std::move(s));
       } catch (const std::exception& e) {
@@ -326,6 +328,7 @@ void SessionStore::save() {
 
 std::vector<Message> SessionStore::get_messages(const std::string& key, int limit) {
   std::lock_guard<std::mutex> lock(mutex_);
+  refresh_session_from_disk(key);
   for (const auto& s : sessions_) {
     if (s.key == key) {
       if (limit <= 0 || static_cast<int>(s.messages.size()) <= limit) {
