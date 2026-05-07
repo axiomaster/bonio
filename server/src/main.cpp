@@ -219,11 +219,12 @@ int main(int argc, char* argv[]) {
     // Shared broadcast function: gateway_run populates it once the WebSocket
     // server is up; WeChatAdapter calls it to push events to operator clients.
     auto broadcast = hiclaw::net::make_gateway_broadcast();
+    auto wechat_sender = hiclaw::net::make_wechat_sender();
 
     // Start WeChat adapter in a background thread if configured
     std::unique_ptr<hiclaw::net::WeChatAdapter> wechat_adapter;
     if (cfg.wechat.enabled) {
-      wechat_adapter = std::make_unique<hiclaw::net::WeChatAdapter>(cfg, broadcast);
+      wechat_adapter = std::make_unique<hiclaw::net::WeChatAdapter>(cfg, broadcast, wechat_sender);
       // WeChatAdapter::start() blocks, so run in a detached thread
       std::thread([&wechat_adapter]() {
         wechat_adapter->start();
@@ -231,7 +232,7 @@ int main(int argc, char* argv[]) {
       std::cout << "WeChat adapter enabled (mode: " << cfg.wechat.mode << ")\n";
     }
 
-    hiclaw::net::gateway_run(gateway_port, cfg, pairing_code, broadcast);
+    hiclaw::net::gateway_run(gateway_port, cfg, pairing_code, broadcast, wechat_sender);
 
     if (wechat_adapter) {
       wechat_adapter->stop();

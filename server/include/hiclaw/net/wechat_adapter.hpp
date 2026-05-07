@@ -21,7 +21,8 @@ namespace net {
 class WeChatAdapter {
 public:
   explicit WeChatAdapter(const config::Config& config,
-                         GatewayBroadcastRef broadcast = nullptr);
+                         GatewayBroadcastRef broadcast = nullptr,
+                         WeChatSendRef desktop_sender = nullptr);
   ~WeChatAdapter();
 
   WeChatAdapter(const WeChatAdapter&) = delete;
@@ -43,6 +44,9 @@ private:
 
   bool is_user_allowed(const std::string& user_id) const;
   bool is_duplicate(const std::string& msg_id);
+  bool send_desktop_message(const std::string& session_key,
+                            const std::string& content,
+                            std::string& error_message);
 
   void run_ilink_loop();
   void handle_ilink_message(const IlinkHttpClient::Message& msg);
@@ -50,6 +54,7 @@ private:
 
   const config::Config& config_;
   GatewayBroadcastRef broadcast_;
+  WeChatSendRef desktop_sender_;
   std::atomic<bool> running_{false};
 
   std::shared_ptr<session::SessionStore> session_store_;

@@ -516,7 +516,7 @@ struct WsppSession {
 };
 
 void run_wspp_server(int port, config::Config& config, const std::string& pairing_code,
-                     GatewayBroadcastRef broadcast) {
+                     GatewayBroadcastRef broadcast, WeChatSendRef wechat_sender) {
   ws_server_t server;
   server.set_reuse_addr(true);
   server.init_asio();
@@ -574,7 +574,7 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
     } catch (...) {}
   });
 
-  server.set_message_handler([&server, &sessions, &config, &pairing_code](websocketpp::connection_hdl hdl, ws_server_t::message_ptr msg) {
+  server.set_message_handler([&server, &sessions, &config, &pairing_code, wechat_sender](websocketpp::connection_hdl hdl, ws_server_t::message_ptr msg) {
     if (!msg || msg->get_opcode() != websocketpp::frame::opcode::text) return;
     std::string payload = msg->get_payload();
     auto it = sessions.find(hdl);
@@ -666,15 +666,58 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
                     "override_len=" + std::to_string(user_msg_json_override.size()));
         }
 
-        // Save user message to session store
-        if (it->second.session_store) {
-          session::Message user_msg;
-          user_msg.role = "user";
-          user_msg.content = message;
-          user_msg.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
-              std::chrono::system_clock::now().time_since_epoch()).count();
-          it->second.session_store->add_message(session_key, user_msg);
+        auto save_user_message = [&]() {
+          if (it->second.session_store) {
+            session::Message user_msg;
+            user_msg.role = "user";
+            user_msg.content = message;
+            user_msg.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count();
+            it->second.session_store->add_message(session_key, user_msg);
+          }
+        };
+
+        if (session_key.rfind("wechat:", 0) == 0) {
+          if (!wechat_sender || !*wechat_sender) {
+            nlohmann::json res;
+            res["type"] = "res";
+            res["id"] = id;
+            res["ok"] = false;
+            res["error"] = {{"code", "WECHAT_UNAVAILABLE"}, {"message", "WeChat adapter is not available"}};
+            try {
+              server.send(hdl, res.dump(), websocketpp::frame::opcode::text);
+            } catch (...) {}
+            return;
+          }
+
+          std::string send_error;
+          if (!(*wechat_sender)(session_key, message, send_error)) {
+            nlohmann::json res;
+            res["type"] = "res";
+            res["id"] = id;
+            res["ok"] = false;
+            res["error"] = {{"code", "WECHAT_SEND_FAILED"}, {"message", send_error.empty() ? "failed to send WeChat message" : send_error}};
+            try {
+              server.send(hdl, res.dump(), websocketpp::frame::opcode::text);
+            } catch (...) {}
+            return;
+          }
+
+          save_user_message();
+
+          nlohmann::json res;
+          res["type"] = "res";
+          res["id"] = id;
+          res["ok"] = true;
+          res["payload"] = {{"sent", true}, {"channel", "wechat"}};
+          try {
+            server.send(hdl, res.dump(), websocketpp::frame::opcode::text);
+          } catch (...) {}
+          return;
         }
+
+        // Save user message to session store
+        save_user_message();
 
         std::string run_id = it->second.agent_manager->start_task(session_key, message, user_msg_json_override);
         nlohmann::json res;
@@ -1673,8 +1716,8 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
 }  // namespace
 
 void gateway_run(int port, config::Config& config, const std::string& pairing_code,
-                 GatewayBroadcastRef broadcast) {
-  run_wspp_server(port, config, pairing_code, broadcast);
+                 GatewayBroadcastRef broadcast, WeChatSendRef wechat_sender) {
+  run_wspp_server(port, config, pairing_code, broadcast, wechat_sender);
 }
 
 // -----------------------------------------------------------------------------
@@ -1756,8 +1799,11 @@ static const struct lws_protocols protocols[] = {
 
 }  // namespace
 
-void gateway_run(int port, config::Config& config, const std::string& pairing_code) {
+void gateway_run(int port, config::Config& config, const std::string& pairing_code,
+                 GatewayBroadcastRef broadcast, WeChatSendRef wechat_sender) {
   static GatewayUser gu;
+  (void)broadcast;
+  (void)wechat_sender;
   gu.config = &config;
   gu.pairing_code = pairing_code;
 
@@ -1786,10 +1832,13 @@ void gateway_run(int port, config::Config& config, const std::string& pairing_co
 // -----------------------------------------------------------------------------
 #else
 
-void gateway_run(int port, config::Config& config, const std::string& pairing_code) {
+void gateway_run(int port, config::Config& config, const std::string& pairing_code,
+                 GatewayBroadcastRef broadcast, WeChatSendRef wechat_sender) {
   (void)port;
   (void)config;
   (void)pairing_code;
+  (void)broadcast;
+  (void)wechat_sender;
   std::cerr << "HiClaw gateway: no WebSocket backend built. Set HICLAW_GATEWAY_BACKEND=websocketpp (default for HarmonyOS) or install libwebsockets and use libwebsockets.\n";
 }
 

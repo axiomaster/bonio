@@ -15,9 +15,25 @@ using GatewayBroadcastFn = std::function<void(const std::string& event_name,
                                                const std::string& payload_json)>;
 using GatewayBroadcastRef = std::shared_ptr<GatewayBroadcastFn>;
 
+/// Shared WeChat send function: WeChatAdapter sets it once the channel client is ready.
+/// Returns true when the message was accepted by the channel.
+using WeChatSendFn = std::function<bool(const std::string& session_key,
+                                        const std::string& content,
+                                        std::string& error_message)>;
+using WeChatSendRef = std::shared_ptr<WeChatSendFn>;
+
 /// Create a shared broadcast function (initially a no-op).
 inline GatewayBroadcastRef make_gateway_broadcast() {
   return std::make_shared<GatewayBroadcastFn>([](const std::string&, const std::string&) {});
+}
+
+/// Create a shared WeChat sender (initially reports unavailable).
+inline WeChatSendRef make_wechat_sender() {
+  return std::make_shared<WeChatSendFn>(
+      [](const std::string&, const std::string&, std::string& error_message) {
+        error_message = "WeChat adapter is not ready";
+        return false;
+      });
 }
 
 /**
@@ -31,7 +47,8 @@ inline GatewayBroadcastRef make_gateway_broadcast() {
  * Blocks until process exits.
  */
 void gateway_run(int port, config::Config& config, const std::string& pairing_code = "",
-                 GatewayBroadcastRef broadcast = nullptr);
+                 GatewayBroadcastRef broadcast = nullptr,
+                 WeChatSendRef wechat_sender = nullptr);
 
 /**
  * Generate a one-time pairing code (e.g. 6 digits). Safe to print to console.

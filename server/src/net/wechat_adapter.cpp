@@ -25,9 +25,18 @@ static const int kDedupTtlSeconds = 300;  // 5 minutes
 }  // namespace
 
 WeChatAdapter::WeChatAdapter(const config::Config& config,
-                             GatewayBroadcastRef broadcast)
-    : config_(config), broadcast_(broadcast) {
+                             GatewayBroadcastRef broadcast,
+                             WeChatSendRef desktop_sender)
+    : config_(config), broadcast_(broadcast), desktop_sender_(desktop_sender) {
   session_store_ = std::make_shared<session::SessionStore>(config.config_dir);
+
+  if (desktop_sender_) {
+    *desktop_sender_ = [this](const std::string& session_key,
+                              const std::string& content,
+                              std::string& error_message) {
+      return send_desktop_message(session_key, content, error_message);
+    };
+  }
 
   // Event callback: captures final response and sends to WeChat, plus
   // forwards all agent/chat events to connected gateway clients.
@@ -139,6 +148,12 @@ void WeChatAdapter::start() {
 
 void WeChatAdapter::stop() {
   running_ = false;
+  if (desktop_sender_) {
+    *desktop_sender_ = [](const std::string&, const std::string&, std::string& error_message) {
+      error_message = "WeChat adapter is stopped";
+      return false;
+    };
+  }
   if (wecom_client_) {
     wecom_client_->stop();
   }
@@ -227,6 +242,49 @@ bool WeChatAdapter::is_duplicate(const std::string& msg_id) {
   if (it != dedup_cache_.end()) return true;
 
   dedup_cache_[msg_id] = now;
+  return false;
+}
+
+bool WeChatAdapter::send_desktop_message(const std::string& session_key,
+                                         const std::string& content,
+                                         std::string& error_message) {
+  if (!running_) {
+    error_message = "WeChat adapter is not running";
+    return false;
+  }
+
+  static const std::string kWeixinPrefix = "wechat:weixin:";
+  static const std::string kWecomPrefix = "wechat:wecom:";
+
+  if (session_key.rfind(kWeixinPrefix, 0) == 0) {
+    std::string user_id = session_key.substr(kWeixinPrefix.size());
+    if (user_id.empty()) {
+      error_message = "missing WeChat user id";
+      return false;
+    }
+    if (!is_user_allowed(user_id)) {
+      error_message = "WeChat user is not allowed";
+      return false;
+    }
+    if (!ilink_client_) {
+      error_message = "personal WeChat client is not ready";
+      return false;
+    }
+    if (!ilink_client_->send_message(user_id, content)) {
+      error_message = "failed to send message to personal WeChat";
+      return false;
+    }
+    log::info("wechat: sent desktop message for session " + session_key +
+              " (" + std::to_string(content.size()) + " chars)");
+    return true;
+  }
+
+  if (session_key.rfind(kWecomPrefix, 0) == 0) {
+    error_message = "Enterprise WeChat proactive send is not supported by this channel";
+    return false;
+  }
+
+  error_message = "not a WeChat session";
   return false;
 }
 
