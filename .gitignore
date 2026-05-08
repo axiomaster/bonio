@@ -1,4 +1,6 @@
 .vscode
+.claude
+debug
 reference
 *.log
 server/bin/
