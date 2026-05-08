@@ -2,9 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-请你永远永远记住，
-1. 每次修改完成代码后都编译一下，确保代码可以正常编译通过；
-2. 每次开发完一个功能，都git提交一下，确保不会丢失；
+## Mandatory Rules
+
+1. **Always compile after every code change** — run the appropriate build command to verify the code compiles successfully before proceeding.
+2. **Always git commit after completing a feature** — commit with a descriptive message to avoid losing work.
 
 ## Project Overview
 
@@ -28,6 +29,10 @@ cd server && scripts\build-win-amd64.bat
 # Linux amd64 (deps: apt install cmake ninja-build libssl-dev)
 cd server && scripts/build-linux-amd64.sh [--clean]
 # Output: server/build/linux-amd64/hiclaw
+
+# macOS arm64 (requires Xcode Command Line Tools)
+cd server && scripts/build-macos-arm64.sh
+# Output: server/build/macos-arm64/hiclaw
 
 # Android (requires ANDROID_NDK_HOME)
 cd server && scripts/build-android-arm64-v8a.sh
