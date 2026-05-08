@@ -649,10 +649,12 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     if (windows == null || windows.isEmpty) return null;
 
     for (final w in windows) {
-      // Skip the floating avatar window itself (identified by its small size),
-      // but allow the main bonio_desktop window to be anchored.
+      // Skip the floating avatar window itself (by native window ID)
+      if (_avatarSelfHwnd != 0 && w.windowID == _avatarSelfHwnd) continue;
+      // Fallback: skip small windows from our own process (avatar is <300x300)
       final b = w.bounds;
-      if ((w.ownerName == 'boji_desktop' || w.ownerName == 'bonio_desktop') &&
+      if ((w.ownerName == 'Bonio' || w.ownerName == 'boji_desktop' ||
+           w.ownerName == 'bonio_desktop') &&
           b != null && b['Width']! < 300 && b['Height']! < 300) continue;
       // Skip system/daemon windows (both English and localized names)
       final owner = w.ownerName.toLowerCase();
@@ -1012,6 +1014,11 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     final wc = await WindowController.fromCurrentEngine();
     _wc = wc;
     _theme = await DesktopAvatarTheme.load();
+
+    // Capture avatar's own CGWindowID for self-filtering in foreground detection
+    if (Platform.isMacOS) {
+      try { _avatarSelfHwnd = await wc.getHwnd(); } catch (_) {}
+    }
 
     // Listen for native OLE drag-and-drop events on the dedicated channel
     // created on this engine's messenger by the C++ side.
