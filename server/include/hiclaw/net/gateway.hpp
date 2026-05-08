@@ -19,6 +19,7 @@ using GatewayBroadcastRef = std::shared_ptr<GatewayBroadcastFn>;
 /// Returns true when the message was accepted by the channel.
 using WeChatSendFn = std::function<bool(const std::string& session_key,
                                         const std::string& content,
+                                        bool is_reply,
                                         std::string& error_message)>;
 using WeChatSendRef = std::shared_ptr<WeChatSendFn>;
 
@@ -30,7 +31,7 @@ inline GatewayBroadcastRef make_gateway_broadcast() {
 /// Create a shared WeChat sender (initially reports unavailable).
 inline WeChatSendRef make_wechat_sender() {
   return std::make_shared<WeChatSendFn>(
-      [](const std::string&, const std::string&, std::string& error_message) {
+      [](const std::string&, const std::string&, bool, std::string& error_message) {
         error_message = "WeChat adapter is not ready";
         return false;
       });

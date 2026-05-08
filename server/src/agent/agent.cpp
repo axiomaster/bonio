@@ -24,9 +24,37 @@ namespace {
 using json = nlohmann::json;
 
 #if defined(_WIN32)
+static bool is_valid_utf8(const std::string& input) {
+  size_t i = 0;
+  while (i < input.size()) {
+    unsigned char c = static_cast<unsigned char>(input[i]);
+    int expected = 0;
+    if (c <= 0x7F) {
+      expected = 1;
+    } else if ((c & 0xE0) == 0xC0) {
+      expected = 2;
+      if (c < 0xC2) return false;
+    } else if ((c & 0xF0) == 0xE0) {
+      expected = 3;
+    } else if ((c & 0xF8) == 0xF0) {
+      expected = 4;
+      if (c > 0xF4) return false;
+    } else {
+      return false;
+    }
+    if (i + expected > input.size()) return false;
+    for (int j = 1; j < expected; ++j) {
+      if ((static_cast<unsigned char>(input[i + j]) & 0xC0) != 0x80) return false;
+    }
+    i += expected;
+  }
+  return true;
+}
+
 /** Convert console input (typically CP936/GBK on Chinese Windows) to UTF-8 for API request body. */
 static std::string to_utf8(const std::string& input) {
   if (input.empty()) return input;
+  if (is_valid_utf8(input)) return input;
   int wlen = MultiByteToWideChar(CP_ACP, 0, input.c_str(), -1, nullptr, 0);
   if (wlen <= 0) return input;
   std::vector<wchar_t> wbuf(static_cast<size_t>(wlen));
@@ -224,7 +252,7 @@ RunResult run(const config::Config& config,
 
   messages_json.push_back(user_message_json(to_utf8(user_prompt)));
 
-  bool send_tools = (base_url.find("minimaxi.com") == std::string::npos);
+  bool send_tools = use_openai && (base_url.find("minimaxi.com") == std::string::npos);
   std::string tools_str = (send_tools) ? tools_array().dump() : "";
   for (int round = 0; round < 3; ++round) {
     std::string tools = (round == 0 && send_tools) ? tools_str : "";
@@ -454,7 +482,7 @@ RunResult run_streaming(const config::Config& config,
   });
   req_body["temperature"] = temp;
 
-  bool send_tools_s = (base_url.find("minimaxi.com") == std::string::npos);
+  bool send_tools_s = use_openai && (base_url.find("minimaxi.com") == std::string::npos);
   if (send_tools_s) {
     req_body["tools"] = tools_array();
   }
@@ -663,7 +691,7 @@ RunResult run_streaming_with_history(
     messages_json.push_back(user_message_json(to_utf8(user_prompt)));
   }
 
-  bool send_tools = (base_url.find("minimaxi.com") == std::string::npos);
+  bool send_tools = use_openai && (base_url.find("minimaxi.com") == std::string::npos);
   std::string tools_str = send_tools ? (remote_executor ? all_tools_array() : tools_array()).dump() : "";
 
   std::string full_content;

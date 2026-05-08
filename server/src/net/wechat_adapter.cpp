@@ -33,8 +33,9 @@ WeChatAdapter::WeChatAdapter(const config::Config& config,
   if (desktop_sender_) {
     *desktop_sender_ = [this](const std::string& session_key,
                               const std::string& content,
+                              bool is_reply,
                               std::string& error_message) {
-      return send_desktop_message(session_key, content, error_message);
+      return send_desktop_message(session_key, content, is_reply, error_message);
     };
   }
 
@@ -149,7 +150,7 @@ void WeChatAdapter::start() {
 void WeChatAdapter::stop() {
   running_ = false;
   if (desktop_sender_) {
-    *desktop_sender_ = [](const std::string&, const std::string&, std::string& error_message) {
+    *desktop_sender_ = [](const std::string&, const std::string&, bool, std::string& error_message) {
       error_message = "WeChat adapter is stopped";
       return false;
     };
@@ -247,6 +248,7 @@ bool WeChatAdapter::is_duplicate(const std::string& msg_id) {
 
 bool WeChatAdapter::send_desktop_message(const std::string& session_key,
                                          const std::string& content,
+                                         bool is_reply,
                                          std::string& error_message) {
   if (!running_) {
     error_message = "WeChat adapter is not running";
@@ -270,7 +272,7 @@ bool WeChatAdapter::send_desktop_message(const std::string& session_key,
       error_message = "personal WeChat client is not ready";
       return false;
     }
-    std::string mirrored_content = "[来自 Bonio Desktop]\n" + content;
+    std::string mirrored_content = is_reply ? content : ("[来自 Bonio Desktop]\n" + content);
     if (!ilink_client_->send_message(user_id, mirrored_content)) {
       error_message = "failed to send message to personal WeChat";
       return false;

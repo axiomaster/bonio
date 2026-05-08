@@ -524,14 +524,14 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
   // Per-connection session (connection_hdl as key; no set_user_data in default asio config)
   std::map<websocketpp::connection_hdl, WsppSession, std::owner_less<websocketpp::connection_hdl>> sessions;
 
-  server.set_open_handler([&server, &sessions, &config, &pairing_code](websocketpp::connection_hdl hdl) {
+  server.set_open_handler([&server, &sessions, &config, &pairing_code, wechat_sender](websocketpp::connection_hdl hdl) {
     sessions[hdl] = WsppSession();
     sessions[hdl].connected = false;
     sessions[hdl].tool_router = std::make_shared<ToolRouter>();
     sessions[hdl].session_store = std::make_shared<session::SessionStore>(config.config_dir);
 
     // 创建事件推送回调 - 使用 io_service.post 确保线程安全
-    auto event_callback = [&server, hdl, &sessions](const std::string& event_name, const std::string& payload) {
+    auto event_callback = [&server, hdl, &sessions, wechat_sender](const std::string& event_name, const std::string& payload) {
       nlohmann::json ev;
       ev["type"] = "event";
       ev["event"] = event_name;
@@ -539,6 +539,28 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
         ev["payload"] = nlohmann::json::parse(payload);
       } catch (...) {
         ev["payload"] = payload;
+      }
+
+      if (event_name == "chat" && wechat_sender && *wechat_sender &&
+          ev["payload"].is_object()) {
+        const auto& chat_payload = ev["payload"];
+        std::string session_key = chat_payload.value("sessionKey", "");
+        std::string state = chat_payload.value("state", "");
+        if (session_key.rfind("wechat:", 0) == 0 &&
+            (state == "final" || state == "error")) {
+          std::string reply;
+          if (state == "final") {
+            reply = chat_payload.value("message", "");
+          } else {
+            reply = "[Error] " + chat_payload.value("errorMessage", "Agent error");
+          }
+          if (!reply.empty()) {
+            std::string send_error;
+            if (!(*wechat_sender)(session_key, reply, true, send_error)) {
+              log::warn("gateway: failed to mirror WeChat reply: " + send_error);
+            }
+          }
+        }
       }
       std::string msg = ev.dump();
 
@@ -693,7 +715,7 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
           save_user_message();
 
           std::string send_error;
-          if (!(*wechat_sender)(session_key, message, send_error)) {
+          if (!(*wechat_sender)(session_key, message, false, send_error)) {
             nlohmann::json res;
             res["type"] = "res";
             res["id"] = id;

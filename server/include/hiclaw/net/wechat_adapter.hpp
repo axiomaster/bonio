@@ -46,6 +46,7 @@ private:
   bool is_duplicate(const std::string& msg_id);
   bool send_desktop_message(const std::string& session_key,
                             const std::string& content,
+                            bool is_reply,
                             std::string& error_message);
 
   void run_ilink_loop();
