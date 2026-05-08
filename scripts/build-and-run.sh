@@ -38,7 +38,7 @@ case "$OS" in
   Darwin)
     SERVER_BUILD_SCRIPT="$SERVER_DIR/scripts/build-macos-arm64.sh"
     FLUTTER_BUILD_CMD="flutter build macos"
-    RELEASE_DIR="$DESKTOP_DIR/build/macos/Build/Products/Release/bonio_desktop.app"
+    RELEASE_DIR="$DESKTOP_DIR/build/macos/Build/Products/Release/boji_desktop.app"
     ;;
   Linux)
     SERVER_BUILD_SCRIPT="$SERVER_DIR/scripts/build-linux-amd64.sh"
