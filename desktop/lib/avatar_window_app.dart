@@ -650,7 +650,7 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
 
     for (final w in windows) {
       // Skip our own app's windows
-      if (w.ownerName == 'bonio_desktop') continue;
+      if (w.ownerName == 'boji_desktop' || w.ownerName == 'bonio_desktop') continue;
       // Skip system/daemon windows (both English and localized names)
       final owner = w.ownerName.toLowerCase();
       if (owner.contains('window server') || owner.contains('systemuiserver') ||
