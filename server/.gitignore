@@ -10,6 +10,16 @@
 /.clang-tidy
 **/.test
 /.appanalyzer
+CMakeFiles
+CMakeCache.txt
+cmake_install.cmake
+CPackConfig.cmake
+CPackSourceConfig.cmake
+Makefile
+rules.ninja
+*.ninja_deps
+*.ninja_log
+hiclaw.exe
 plans
 output
 build
