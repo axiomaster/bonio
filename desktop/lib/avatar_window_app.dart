@@ -673,10 +673,24 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     return null;
   }
 
-  /// Check if a macOS window bounds represent a fullscreen window.
-  /// On macOS, floating-level windows appear above fullscreen apps, so
-  /// fullscreen detection is not needed. Always returns false.
+  /// Check if macOS window bounds represent a fullscreen or maximized window.
+  /// Fullscreen: covers entire screen (Y=0).
+  /// Maximized: fills visible area (from below menu bar to above dock).
   bool _isMacWindowFullscreen(Map<String, int> bounds) {
+    final screenSize = MacosScreenCapture.getScreenSizePoints();
+    if (screenSize == null) return false;
+    final sw = screenSize[0];
+    final sh = screenSize[1];
+    final bw = bounds['Width']!.toDouble();
+    final bh = bounds['Height']!.toDouble();
+    final by = bounds['Y']!.toDouble();
+    // Fullscreen: window covers entire screen
+    if (bw >= sw - 2 && bh >= sh - 2 && by <= 2) return true;
+    // Maximized: window fills visible area (below menu bar, above dock)
+    final menuBar = 25.0; // approximate menu bar height
+    final dockH = _dockAtBottom ? _dockHeight : 0;
+    final visibleH = sh - menuBar - dockH;
+    if (bw >= sw - 2 && bh >= visibleH - 2 && by >= menuBar - 2 && by <= menuBar + 2) return true;
     return false;
   }
 
@@ -698,6 +712,20 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
         _handleAnchoredWindowLostMacOS();
         return;
       }
+      // Check if anchored window became maximized/fullscreen
+      if (anchored.isFullscreen) {
+        debugPrint('AvatarAnchor macOS: anchored window went fullscreen/maximized');
+        _transitionToDock();
+        return;
+      }
+    }
+
+    // Check if new foreground window is maximized/fullscreen
+    if (w.bounds != null && _isMacWindowFullscreen(w.bounds!)) {
+      if (_placement != _PlacementState.onDock) {
+        _transitionToDock();
+      }
+      return;
     }
 
     // Already anchored to this window
@@ -2424,9 +2452,24 @@ _WindowRectInfo? _getMacWindowRect(int windowID) {
         bool isFullscreen = false;
         final screenSize = ScreenCapture.getScreenSizePoints();
         if (screenSize != null) {
-          isFullscreen = (b['Width']! - screenSize[0]).abs() < 2 &&
-              (b['Height']! - screenSize[1]).abs() < 2 &&
-              b['X'] == 0 && b['Y'] == 0;
+          final sw = screenSize[0];
+          final sh = screenSize[1];
+          // True fullscreen: covers entire screen
+          if ((b['Width']! - sw).abs() < 2 &&
+              (b['Height']! - sh).abs() < 2 &&
+              b['X'] == 0 && b['Y'] == 0) {
+            isFullscreen = true;
+          }
+          // Maximized: fills visible area below menu bar, above dock
+          if (!isFullscreen) {
+            final menuBar = 25.0;
+            final bw = b['Width']!.toDouble();
+            final bh = b['Height']!.toDouble();
+            final by = b['Y']!.toDouble();
+            if (bw >= sw - 2 && by >= menuBar - 2 && by <= menuBar + 2) {
+              isFullscreen = true;
+            }
+          }
         }
         return _WindowRectInfo(
           left: b['X']!.toDouble(),
