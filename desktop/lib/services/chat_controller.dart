@@ -91,7 +91,11 @@ class ChatController extends ChangeNotifier {
 
   void applyMainSessionKey(String mainSessionKey) {
     final trimmed = mainSessionKey.trim();
-    if (trimmed.isEmpty || _sessionKey == trimmed) return;
+    if (trimmed.isEmpty) return;
+    if (_sessionKey == trimmed) {
+      _bootstrap(forceHealth: true);
+      return;
+    }
     if (_sessionKey != 'main') return;
     _sessionKey = trimmed;
     notifyListeners();

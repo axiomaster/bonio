@@ -29,6 +29,12 @@ class ChatTab extends StatelessWidget {
           sessions: chat.sessions,
           currentSessionKey: chat.sessionKey,
           onSessionSelected: (key) => chat.switchSession(key),
+          onSessionDeleted: (key) async {
+            await chat.deleteSession(key);
+            if (chat.sessionKey == key) {
+              await chat.switchSession('main');
+            }
+          },
           onRefresh: () => chat.refresh(),
           onNewSession: () => chat.switchSession('main'),
         ),
@@ -133,6 +139,7 @@ class _ChatTopBar extends StatelessWidget {
   final List<ChatSessionEntry> sessions;
   final String currentSessionKey;
   final ValueChanged<String> onSessionSelected;
+  final Future<void> Function(String key) onSessionDeleted;
   final VoidCallback onRefresh;
   final VoidCallback onNewSession;
 
@@ -141,6 +148,7 @@ class _ChatTopBar extends StatelessWidget {
     required this.sessions,
     required this.currentSessionKey,
     required this.onSessionSelected,
+    required this.onSessionDeleted,
     required this.onRefresh,
     required this.onNewSession,
   });
@@ -168,18 +176,16 @@ class _ChatTopBar extends StatelessWidget {
                 scrollDirection: Axis.horizontal,
                 children: sessions.take(10).map((s) {
                   final isSelected = s.key == currentSessionKey;
-                  final label = s.displayName ?? s.key;
+                  final label = _sessionLabel(s);
                   return Padding(
                     padding: const EdgeInsets.only(right: 4),
-                    child: ChoiceChip(
-                      label: Text(
-                        label,
-                        style: const TextStyle(fontSize: 12),
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                    child: _SessionChip(
+                      entry: s,
+                      label: label,
                       selected: isSelected,
-                      onSelected: (_) => onSessionSelected(s.key),
-                      visualDensity: VisualDensity.compact,
+                      canDelete: s.key != 'main',
+                      onSelected: () => onSessionSelected(s.key),
+                      onDeleted: () => onSessionDeleted(s.key),
                     ),
                   );
                 }).toList(),
@@ -206,6 +212,121 @@ class _ChatTopBar extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _sessionLabel(ChatSessionEntry entry) {
+    final key = entry.key.trim();
+    final raw = (entry.displayName?.trim().isNotEmpty ?? false)
+        ? entry.displayName!.trim()
+        : key;
+    if (!key.startsWith('wechat:')) return raw;
+
+    final parts = key.split(':');
+    if (parts.length >= 3 && parts[1] == 'weixin') {
+      return '微信';
+    }
+    if (parts.length >= 3 && parts[1] == 'wecom') {
+      return '企业微信';
+    }
+    return '微信';
+  }
+}
+
+class _SessionChip extends StatelessWidget {
+  final ChatSessionEntry entry;
+  final String label;
+  final bool selected;
+  final bool canDelete;
+  final VoidCallback onSelected;
+  final Future<void> Function() onDeleted;
+
+  const _SessionChip({
+    required this.entry,
+    required this.label,
+    required this.selected,
+    required this.canDelete,
+    required this.onSelected,
+    required this.onDeleted,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onSecondaryTapDown: (details) => _showContextMenu(context, details),
+      child: Tooltip(
+        message: entry.key,
+        child: ChoiceChip(
+          label: Text(
+            label,
+            style: const TextStyle(fontSize: 12),
+            overflow: TextOverflow.ellipsis,
+          ),
+          selected: selected,
+          onSelected: (_) => onSelected(),
+          visualDensity: VisualDensity.compact,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showContextMenu(
+      BuildContext context, TapDownDetails details) async {
+    if (!canDelete) return;
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (overlay == null) return;
+
+    final selectedValue = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        details.globalPosition & const Size(1, 1),
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        PopupMenuItem<String>(
+          value: 'delete',
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.delete_outline, size: 18),
+              const SizedBox(width: 8),
+              Text(S.current.delete),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    if (selectedValue == 'delete') {
+      if (!context.mounted) return;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(S.current.delete),
+          content: Text(S.current.chatDeleteSessionConfirm(label)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(S.current.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(S.current.delete),
+            ),
+          ],
+        ),
+      );
+      if (confirmed == true) {
+        await onDeleted();
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(S.current.chatSessionDeleted(label)),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    }
   }
 }
 

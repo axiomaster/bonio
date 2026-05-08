@@ -83,6 +83,8 @@ abstract class S {
   String get chatFailed;
   String get chatStreamInterrupted;
   String get chatGatewayNotReady;
+  String chatDeleteSessionConfirm(String name);
+  String chatSessionDeleted(String name);
 
   // ── Chat composer ──
   String get composerThinking;
@@ -347,6 +349,8 @@ class _SZh extends S {
   @override String get chatFailed => '聊天失败';
   @override String get chatStreamInterrupted => '事件流中断，请尝试刷新。';
   @override String get chatGatewayNotReady => '网关未就绪，无法发送';
+  @override String chatDeleteSessionConfirm(String name) => '删除会话“$name”？此操作不可撤销。';
+  @override String chatSessionDeleted(String name) => '已删除会话：$name';
 
   @override String get composerThinking => '思考：';
   @override String get composerOff => '关';
@@ -596,6 +600,8 @@ class _SEn extends S {
   @override String get chatFailed => 'Chat failed';
   @override String get chatStreamInterrupted => 'Event stream interrupted; try refreshing.';
   @override String get chatGatewayNotReady => 'Gateway not ready; cannot send';
+  @override String chatDeleteSessionConfirm(String name) => 'Delete session "$name"? This cannot be undone.';
+  @override String chatSessionDeleted(String name) => 'Deleted session: $name';
 
   @override String get composerThinking => 'Thinking: ';
   @override String get composerOff => 'off';

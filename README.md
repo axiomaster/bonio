@@ -4,6 +4,8 @@
 
 **Bonio（波妞）** 是一个运行在 Windows / macOS 桌面上的 AI 伴随智能体。它是一只浮动在你当前窗口边缘的虚拟宠物，**看得见你的屏幕，听得见你的声音，记得住你喂给它的东西**——在你需要时默默帮忙，在你无聊时逗你开心。
 
+![bonio-desktop](docs/blog/imgs/bonio-desktop.png)
+
 ---
 
 ## 它跟别的 AI 工具有什么不一样？
@@ -30,6 +32,8 @@
 | **拖拽** 猫咪 | 手动挪开它 |
 | **右键** 猫咪 | 打开功能工具箱 |
 
+![bonio-avatar](docs/blog/imgs/bonio-avatar.png)
+
 ### 🖱️ 右键工具箱
 
 - **记一记** — 截图当前窗口 → AI 自动打标签、写摘要 → 存入记忆
@@ -37,14 +41,20 @@
 - **搜同款** — 圈选商品图片 → 自动淘宝以图搜图
 - **伴读** — 浏览器里看长文 → 自动 70/30 分屏，提取目录 + 摘要 + 笔记编辑器
 
+![bonio-right-menu](docs/blog/imgs/bonio-right-menu.png)
+
 ### 🎤 语音 + 📱 微信
 
 - **按住说话**：长按 Avatar 开始录音，松开发送，本地离线识别
 - **微信远程指挥**：通勤路上给 Bonio 发条微信，它会帮你操作电脑
 
+![bonio-wechat](docs/blog/imgs/bonio-wechat.png)
+
 ### 🧿 记忆系统
 
 看到想"记住"的东西，**右键一下**，或者**直接拖到猫咪身上**。AI 自动分析、分类、打标签。以后问它："帮我把 #购物 的笔记找出来"——它都能找到。
+
+![bonio-memory](docs/blog/imgs/bonio-memory.png)
 
 ---
 
@@ -152,7 +162,3 @@ scripts\build-desktop.bat --ninja --run
 ## 许可证
 
 MIT
-
----
-
-*桌面 AI 的终极形态不是 Copilot 式的侧边栏，而是一个有存在感、有记忆、能动手的"数字搭子"。*
