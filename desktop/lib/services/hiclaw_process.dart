@@ -19,7 +19,7 @@ class HiclawProcess extends ChangeNotifier {
 
   Future<String> _resolveBinaryPath() async {
     if (Platform.isMacOS) {
-      // <app>/Contents/MacOS/executable -> <app>/Contents/Resources/hiclaw
+      // Production: <app>/Contents/MacOS/executable -> <app>/Contents/Resources/hiclaw
       final exePath = Platform.resolvedExecutable;
       final macosIndex = exePath.indexOf('/Contents/MacOS/');
       if (macosIndex != -1) {
@@ -28,7 +28,15 @@ class HiclawProcess extends ChangeNotifier {
         final bundled = '$resourcesDir/hiclaw';
         if (await File(bundled).exists()) return bundled;
       }
-      // Fallback for development: check app support dir
+      // Development (flutter run): look relative to source tree
+      // exe is at <project>/desktop/build/macos/.../boji_desktop.app/Contents/MacOS/boji_desktop
+      final desktopIdx = exePath.indexOf('/desktop/build/');
+      if (desktopIdx != -1) {
+        final projectRoot = exePath.substring(0, desktopIdx);
+        final devBin = '$projectRoot/server/bin/hiclaw';
+        if (await File(devBin).exists()) return devBin;
+      }
+      // Fallback: check app support dir
       final supportDir = await getApplicationSupportDirectory();
       final localBin = '${supportDir.path}/bonio/hiclaw';
       if (await File(localBin).exists()) return localBin;
@@ -38,6 +46,13 @@ class HiclawProcess extends ChangeNotifier {
       final exeDir = exePath.substring(0, exePath.lastIndexOf('\\'));
       final bundled = '$exeDir\\hiclaw.exe';
       if (await File(bundled).exists()) return bundled;
+      // Development: look in source tree
+      final desktopIdx = exePath.indexOf('\\desktop\\build\\');
+      if (desktopIdx != -1) {
+        final projectRoot = exePath.substring(0, desktopIdx);
+        final devBin = '$projectRoot\\server\\bin\\hiclaw.exe';
+        if (await File(devBin).exists()) return devBin;
+      }
       final supportDir = await getApplicationSupportDirectory();
       final localBin = '${supportDir.path}\\bonio\\hiclaw.exe';
       if (await File(localBin).exists()) return localBin;
