@@ -649,8 +649,11 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
     if (windows == null || windows.isEmpty) return null;
 
     for (final w in windows) {
-      // Skip our own app's windows
-      if (w.ownerName == 'boji_desktop' || w.ownerName == 'bonio_desktop') continue;
+      // Skip the floating avatar window itself (identified by its small size),
+      // but allow the main bonio_desktop window to be anchored.
+      final b = w.bounds;
+      if ((w.ownerName == 'boji_desktop' || w.ownerName == 'bonio_desktop') &&
+          b != null && b['Width']! < 300 && b['Height']! < 300) continue;
       // Skip system/daemon windows (both English and localized names)
       final owner = w.ownerName.toLowerCase();
       if (owner.contains('window server') || owner.contains('systemuiserver') ||
