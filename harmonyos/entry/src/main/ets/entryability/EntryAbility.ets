@@ -29,7 +29,7 @@ export default class EntryAbility extends UIAbility {
         AppStorage.setOrCreate<NodeRuntime>('nodeRuntime', runtime);
         hilog.info(DOMAIN, 'testTag', 'NodeRuntime initialized and stored in AppStorage');
 
-        FloatWindowManager.getInstance().init(this.context);
+        FloatWindowManager.getInstance().setAbilityContext(this.context);
         hilog.info(DOMAIN, 'testTag', 'FloatWindowManager initialized');
       } catch (e) {
         hilog.error(DOMAIN, 'testTag', 'Failed to initialize NodeRuntime: %{public}s', JSON.stringify(e));

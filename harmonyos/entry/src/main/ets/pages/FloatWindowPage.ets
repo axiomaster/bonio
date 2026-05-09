@@ -1,5 +1,6 @@
 import lottie from '@ohos/lottie';
 import { NodeRuntime } from '../node/NodeRuntime';
+import { FloatWindowManager } from '../common/FloatWindowManager';
 
 @Entry
 @Component
@@ -78,13 +79,12 @@ struct FloatWindowPage {
     }
     .width(200)
     .height(200)
-    .backgroundColor('#00000000') // Transparent
-    .gesture(
-      PanGesture()
-        .onActionUpdate((event: GestureEvent) => {
-          // Dragging logic would go here if we had access to the window object directly in the page
-          // For now, it's a fixed position overlay unless we add a callback to the manager
-        })
-    )
+    .backgroundColor('#00000000')
+    .onTouch((event: TouchEvent) => {
+      if (event.type === TouchType.Down && event.touches.length > 0) {
+        const touch = event.touches[0];
+        FloatWindowManager.getInstance().startDragging(touch.windowX, touch.windowY);
+      }
+    })
   }
 }
