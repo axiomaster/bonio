@@ -403,16 +403,89 @@ BMS 和 AccessToken 都是系统关键数据库。写错可能导致包管理、
 
 ---
 
-## 9. 后续工程化方向
+## 9. 工程化脚本方案
 
-当前方案证明 root 实验路径可行，但还不是稳定工程化安装器。后续可以把手工过程封装成一个受控脚本：
+当前 root 实验路径已经封装为 HarmonyOS 平台专用脚本：
 
-1. 自动拉取 BMS 和 AccessToken 数据库。
-2. 自动解析当前 Bonio token。
-3. 自动 patch JSON 和 SQLite 表。
-4. 自动做完整性检查。
-5. 自动写回并修复 owner/context。
-6. 自动重启并验证 `bm dump`、AccessToken 行和 `CatSystemFloatWindow`。
+```text
+harmonyos/scripts/float-window-root.ps1
+harmonyos/scripts/float_window_patch.py
+```
 
-脚本必须强制生成备份，并在每一步输出可审计日志。默认只允许目标 bundle 为 `com.axiomaster.bonio`，避免误操作其它系统包。
+PowerShell 脚本负责设备交互、备份、写回和重启；Python 脚本只处理本地 SQLite/JSON patch，避免在设备 shell 中拼复杂 SQL 和 JSON。
 
+### 9.1 Dry-run
+
+默认不写回设备，只拉取数据库、生成补丁文件并做完整性校验：
+
+```powershell
+$env:DEVECO_SDK_HOME = "D:\Program Files\Huawei\DevEco Studio\sdk"
+powershell -ExecutionPolicy Bypass -File harmonyos\scripts\float-window-root.ps1
+```
+
+输出目录默认位于：
+
+```text
+.codex-build/harmonyos-float-window/<timestamp>/
+```
+
+其中：
+
+```text
+original/        # 从设备拉回的原始 DB
+patched/         # 本地 patch 后的 DB
+patch-summary.json
+```
+
+### 9.2 写回设备
+
+确认 dry-run 输出无误后，显式传入 `-Apply` 才会写回系统数据库：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File harmonyos\scripts\float-window-root.ps1 -Apply
+```
+
+写回流程会自动完成：
+
+1. 检查 hdc 连接。
+2. 检查 shell 是否为 root。
+3. 拉取 BMS 与 AccessToken 主/从库。
+4. 本地 patch 并执行 `PRAGMA integrity_check`。
+5. 上传补丁 DB 到 `/data/local/tmp/bonio_float_window_patch_<timestamp>`。
+6. 备份设备原始 DB。
+7. 替换 BMS 主/从库并恢复 `foundation:foundation`、`0660`、`bms_db_file`。
+8. 替换 AccessToken 主/从库并恢复 `access_token:access_token`、`0660`、`accesstoken_data_file`。
+9. 重启设备。
+
+如果需要手动控制重启：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File harmonyos\scripts\float-window-root.ps1 -Apply -NoReboot
+```
+
+### 9.3 安全约束
+
+脚本默认只允许目标 bundle 为：
+
+```text
+com.axiomaster.bonio
+```
+
+如果传入其它 bundle，脚本会直接拒绝执行。这样可以避免误 patch 系统包或其它应用。
+
+脚本不会替换已安装的 `entry.hap`。这是刻意设计：实验已经证明 root 直接替换 HAP 可能导致 Ark runtime `mmap errno[13]`，从而启动失败。稳定复现方案只 patch BMS 和 AccessToken 安装/授权态，保留原本可运行的 HAP 文件。
+
+### 9.4 复现验收
+
+设备重启后执行：
+
+```sh
+bm dump -n com.axiomaster.bonio | grep SYSTEM_FLOAT_WINDOW -C 3
+```
+
+然后启动 Bonio，点击 Settings 中的 `Enable Cat Overlay`。成功时：
+
+1. 不再出现 `Permission ohos.permission.SYSTEM_FLOAT_WINDOW is not granted`。
+2. 不再出现 `Failed to create system float window: {"code":201}`。
+3. `uitest dumpLayout` 可看到 200x200 左右的浮窗页面。
+4. WindowManager / RenderService 日志中可看到 `CatSystemFloatWindow`。
