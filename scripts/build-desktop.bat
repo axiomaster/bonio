@@ -9,6 +9,7 @@ REM   --clean    Clean build directory before building
 REM   --run      Launch after build
 REM   --ninja    Use Ninja instead of Visual Studio generator (avoids .vcxproj)
 REM             Requires: Ninja in PATH + VS Build Tools (or MSVC toolchain)
+REM   --pub-get  Force flutter pub get before building
 
 set "SCRIPT_DIR=%~dp0"
 set "PROJECT_ROOT=%SCRIPT_DIR%.."
@@ -17,10 +18,12 @@ set "DESKTOP_DIR=%PROJECT_ROOT%\desktop"
 set "CLEAN=false"
 set "RUN=false"
 set "USE_NINJA=false"
+set "FORCE_PUB_GET=false"
 for %%a in (%*) do (
   if "%%a"=="--clean" set "CLEAN=true"
   if "%%a"=="--run" set "RUN=true"
   if "%%a"=="--ninja" set "USE_NINJA=true"
+  if "%%a"=="--pub-get" set "FORCE_PUB_GET=true"
 )
 
 REM Build Flutter
@@ -51,7 +54,7 @@ if "%USE_NINJA%"=="true" (
   REM If vcvars64.bat hasn't been run, try to find it from VS Build Tools.
   where cl.exe >nul 2>&1
   if errorlevel 1 (
-    REM Try to locate vcvars64.bat — check (x86) paths first (default VS install location)
+    REM Try to locate vcvars64.bat ? check (x86) paths first (default VS install location)
     if exist "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat" (
       echo Setting up MSVC environment from VS Build Tools...
       call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat" >nul 2>&1
@@ -78,8 +81,31 @@ if "%USE_NINJA%"=="true" (
   )
 )
 
+set "NEED_PUB_GET=false"
+if "%FORCE_PUB_GET%"=="true" (
+  set "NEED_PUB_GET=true"
+) else (
+  if not exist ".dart_tool\package_config.json" set "NEED_PUB_GET=true"
+)
+
+if "%NEED_PUB_GET%"=="true" (
+  echo Resolving Flutter dependencies...
+  call flutter pub get
+  if errorlevel 1 (
+    echo ERROR: flutter pub get failed.
+    exit /b 1
+  )
+) else (
+  echo Flutter dependencies unchanged; skipping pub get.
+)
+
+where nuget >nul 2>&1
+if errorlevel 1 (
+  echo NuGet not found in PATH. Install nuget.exe to remove Flutter Windows NuGet checks/warnings.
+)
+
 echo Building Flutter desktop...
-call flutter build windows
+call flutter build windows --no-pub
 if errorlevel 1 (
   echo ERROR: Flutter build failed.
   exit /b 1

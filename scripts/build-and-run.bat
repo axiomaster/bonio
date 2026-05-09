@@ -8,6 +8,7 @@ REM   scripts\build-and-run.bat --skip-server  Skip server build
 REM   scripts\build-and-run.bat --skip-desktop Skip desktop build
 REM   scripts\build-and-run.bat --clean        Clean build before building
 REM   scripts\build-and-run.bat --ninja        Use Ninja instead of VS generator
+REM   scripts\build-and-run.bat --pub-get      Force flutter pub get before desktop build
 
 set "SCRIPT_DIR=%~dp0"
 set "PROJECT_ROOT=%SCRIPT_DIR%.."
@@ -18,12 +19,14 @@ set "SKIP_SERVER=false"
 set "SKIP_DESKTOP=false"
 set "CLEAN=false"
 set "USE_NINJA=false"
+set "FORCE_PUB_GET=false"
 
 for %%a in (%*) do (
   if "%%a"=="--skip-server" set "SKIP_SERVER=true"
   if "%%a"=="--skip-desktop" set "SKIP_DESKTOP=true"
   if "%%a"=="--clean" set "CLEAN=true"
   if "%%a"=="--ninja" set "USE_NINJA=true"
+  if "%%a"=="--pub-get" set "FORCE_PUB_GET=true"
 )
 
 REM ========== Step 0: Kill running hiclaw ==========
@@ -90,7 +93,30 @@ if "%SKIP_DESKTOP%"=="true" (
       )
     )
   )
-  call flutter build windows
+  set "NEED_PUB_GET=false"
+  if "%FORCE_PUB_GET%"=="true" (
+    set "NEED_PUB_GET=true"
+  ) else (
+    if not exist ".dart_tool\package_config.json" set "NEED_PUB_GET=true"
+  )
+
+  if "!NEED_PUB_GET!"=="true" (
+    echo Resolving Flutter dependencies...
+    call flutter pub get
+    if errorlevel 1 (
+      echo ERROR: flutter pub get failed.
+      exit /b 1
+    )
+  ) else (
+    echo Flutter dependencies unchanged; skipping pub get.
+  )
+
+  where nuget >nul 2>&1
+  if errorlevel 1 (
+    echo NuGet not found in PATH. Install nuget.exe to remove Flutter Windows NuGet checks/warnings.
+  )
+
+  call flutter build windows --no-pub
   if errorlevel 1 (
     echo ERROR: Flutter build failed.
     exit /b 1
