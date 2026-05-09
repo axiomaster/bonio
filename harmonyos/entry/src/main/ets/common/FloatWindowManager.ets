@@ -7,11 +7,18 @@ const DOMAIN = 0x3D00;
 const TAG = 'FloatWindowManager';
 const FLOAT_WINDOW_NAME = 'CatSystemFloatWindow';
 const FLOAT_WINDOW_SIZE = 200;
+const INITIAL_WINDOW_X = 100;
+const INITIAL_WINDOW_Y = 100;
 
 export class FloatWindowManager {
   private static instance: FloatWindowManager;
   private floatWindow: window.Window | null = null;
   private abilityContext: common.UIAbilityContext | null = null;
+  private windowX: number = INITIAL_WINDOW_X;
+  private windowY: number = INITIAL_WINDOW_Y;
+  private isMovePending: boolean = false;
+  private pendingX: number = INITIAL_WINDOW_X;
+  private pendingY: number = INITIAL_WINDOW_Y;
 
   private constructor() {}
 
@@ -45,11 +52,19 @@ export class FloatWindowManager {
       });
       hilog.info(DOMAIN, TAG, 'System float window created successfully');
 
-      await this.floatWindow.moveWindowTo(100, 100);
-      await this.floatWindow.resize(FLOAT_WINDOW_SIZE, FLOAT_WINDOW_SIZE);
-      this.floatWindow.setWindowBackgroundColor('#00000000');
-      await this.floatWindow.setWindowFocusable(false);
-      await this.floatWindow.setWindowTouchable(true);
+      await this.moveWindowTo(INITIAL_WINDOW_X, INITIAL_WINDOW_Y, false);
+      await this.tryConfigureWindow('resize', async () => {
+        await this.floatWindow?.resize(FLOAT_WINDOW_SIZE, FLOAT_WINDOW_SIZE);
+      });
+      await this.tryConfigureWindow('setWindowBackgroundColor', () => {
+        this.floatWindow?.setWindowBackgroundColor('#00000000');
+      });
+      await this.tryConfigureWindow('setWindowFocusable', async () => {
+        await this.floatWindow?.setWindowFocusable(false);
+      });
+      await this.tryConfigureWindow('setWindowTouchable', async () => {
+        await this.floatWindow?.setWindowTouchable(true);
+      });
       await this.floatWindow.setUIContent('pages/FloatWindowPage');
       await this.floatWindow.showWindow();
       hilog.info(DOMAIN, TAG, 'System float window shown successfully');
@@ -62,17 +77,50 @@ export class FloatWindowManager {
     }
   }
 
-  public async startDragging(offsetX: number = FLOAT_WINDOW_SIZE / 2, offsetY: number = FLOAT_WINDOW_SIZE / 2): Promise<void> {
+  private async tryConfigureWindow(name: string, operation: () => Promise<void> | void): Promise<void> {
+    try {
+      await operation();
+    } catch (err) {
+      const error = err as BusinessError;
+      hilog.warn(DOMAIN, TAG, 'Ignoring non-fatal float window configuration failure in %{public}s: %{public}s',
+        name, JSON.stringify(error));
+    }
+  }
+
+  public getWindowPosition(): [number, number] {
+    return [this.windowX, this.windowY];
+  }
+
+  public async moveWindowTo(x: number, y: number, coalesce: boolean = true): Promise<void> {
     if (!this.floatWindow) {
-      hilog.warn(DOMAIN, TAG, 'startDragging ignored because float window is not showing');
+      hilog.warn(DOMAIN, TAG, 'moveWindowTo ignored because float window is not showing');
       return;
     }
 
+    this.pendingX = Math.max(0, Math.floor(x));
+    this.pendingY = Math.max(0, Math.floor(y));
+    if (coalesce && this.isMovePending) {
+      return;
+    }
+
+    this.isMovePending = true;
     try {
-      await this.floatWindow.startMoving(Math.floor(offsetX), Math.floor(offsetY));
+      while (this.floatWindow) {
+        const targetX = this.pendingX;
+        const targetY = this.pendingY;
+        await this.floatWindow.moveWindowTo(targetX, targetY);
+        this.windowX = targetX;
+        this.windowY = targetY;
+
+        if (!coalesce || (this.pendingX === targetX && this.pendingY === targetY)) {
+          break;
+        }
+      }
     } catch (err) {
       const error = err as BusinessError;
-      hilog.error(DOMAIN, TAG, 'Failed to start moving float window: %{public}s', JSON.stringify(error));
+      hilog.error(DOMAIN, TAG, 'Failed to move float window: %{public}s', JSON.stringify(error));
+    } finally {
+      this.isMovePending = false;
     }
   }
 
@@ -85,6 +133,7 @@ export class FloatWindowManager {
         hilog.error(DOMAIN, TAG, 'Failed to clean up float window: %{public}s', JSON.stringify(error));
       }
       this.floatWindow = null;
+      this.isMovePending = false;
     }
   }
 
@@ -93,6 +142,7 @@ export class FloatWindowManager {
       try {
         await this.floatWindow.destroyWindow();
         this.floatWindow = null;
+        this.isMovePending = false;
         hilog.info(DOMAIN, TAG, 'Float window destroyed successfully');
       } catch (err) {
         const error = err as BusinessError;

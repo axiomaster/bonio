@@ -13,6 +13,11 @@ struct FloatWindowPage {
   @State agentState: string = 'idle';
   private runtime: NodeRuntime | undefined = undefined;
   private statusTimer: number = -1;
+  private isDragging: boolean = false;
+  private dragStartScreenX: number = 0;
+  private dragStartScreenY: number = 0;
+  private dragStartWindowX: number = 0;
+  private dragStartWindowY: number = 0;
 
   aboutToAppear() {
     this.runtime = AppStorage.get<NodeRuntime>('nodeRuntime');
@@ -81,9 +86,32 @@ struct FloatWindowPage {
     .height(200)
     .backgroundColor('#00000000')
     .onTouch((event: TouchEvent) => {
-      if (event.type === TouchType.Down && event.touches.length > 0) {
-        const touch = event.touches[0];
-        FloatWindowManager.getInstance().startDragging(touch.windowX, touch.windowY);
+      if (event.touches.length === 0) {
+        this.isDragging = false;
+        return;
+      }
+
+      const touch = event.touches[0];
+      const manager = FloatWindowManager.getInstance();
+      if (event.type === TouchType.Down) {
+        const position = manager.getWindowPosition();
+        this.isDragging = true;
+        this.dragStartScreenX = touch.screenX;
+        this.dragStartScreenY = touch.screenY;
+        this.dragStartWindowX = position[0];
+        this.dragStartWindowY = position[1];
+        return;
+      }
+
+      if (event.type === TouchType.Move && this.isDragging) {
+        const targetX = this.dragStartWindowX + touch.screenX - this.dragStartScreenX;
+        const targetY = this.dragStartWindowY + touch.screenY - this.dragStartScreenY;
+        manager.moveWindowTo(targetX, targetY);
+        return;
+      }
+
+      if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+        this.isDragging = false;
       }
     })
   }
