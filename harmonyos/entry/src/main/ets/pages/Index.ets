@@ -76,7 +76,7 @@ struct Index {
     RelativeContainer() {
       Column() {
         Row() {
-          Text("OpenClaw Node")
+          Text("Bonio")
             .fontSize(24)
             .fontWeight(FontWeight.Bold)
           

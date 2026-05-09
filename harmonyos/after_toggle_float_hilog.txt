@@ -1,0 +1,312 @@
+05-09 22:36:56.468     0     0 I I00000/HiLog: ========Zeroth log of type: init
+05-09 22:36:56.443   646   646 I I02C01/hmos_cust_carrier_mount/CustCarrierMount: MountCarrierToShared start
+05-09 22:36:56.443   646   646 I I02C01/hmos_cust_carrier_mount/CustCarrierMount: success to mount carrier to shared
+05-09 22:36:56.443   646   646 I I02C01/hmos_cust_carrier_mount/CustCarrierMount: MountCarrierToShared start
+05-09 22:36:56.444   646   646 I I02C01/hmos_cust_carrier_mount/CustCarrierMount: success to mount ANCO_APP_DATA to shared
+05-09 22:36:57.795  1141  1141 I I04301/light_sensor/LIGHT_SENSOR: AlsGetDetailInfo readBytes = 14, readBuff = A040C01020A89
+05-09 22:36:58.153  1292  1292 I I02C01/hmos_cust_carrier_mount/CustCarrierMount: UpdateCotaOpkeyLink start
+05-09 22:36:58.154  1292  1292 W I02C01/hmos_cust_carrier_mount/CustCarrierMount: not exsit CUST_GLOBAL_CARRIER_DIR or COTA_PARAM_CARRIER_DIR
+05-09 22:36:58.296  1141  1141 I I04301/light_sensor/LIGHT_SENSOR: AlsGetDetailInfo readBytes = 14, readBuff = A040C01020A89
+05-09 22:36:58.798  1141  1141 I I04301/light_sensor/LIGHT_SENSOR: AlsGetDetailInfo readBytes = 14, readBuff = A040C01020A89
+05-09 22:36:58.920  1292  1292 I I02C01/hmos_cust_carrier_mount/CustCarrierMount: success to update cota carrier
+05-09 22:36:59.303  1141  1141 I I04301/light_sensor/LIGHT_SENSOR: AlsGetDetailInfo readBytes = 17, readBuff = 800A040C01020A89
+05-09 22:36:59.303  1141  1141 I I04301/light_sensor/LIGHT_SENSOR: AlsJudgeUnderTpCaliInit: als under tp cali para init succ
+05-09 22:36:59.303  1141  1141 I I04301/light_sensor/LIGHT_SENSOR: AlsGetSpecifyXmlFileName phone_type = 137
+05-09 22:36:59.304  1141  1141 I I04301/light_sensor/LIGHT_SENSOR: readBuff is huawei,als_s006001
+05-09 22:36:59.304  1141  1141 I I04301/light_sensor/LIGHT_SENSOR: , strlen(readBuff) 19
+05-09 22:36:59.304  1141  1141 I I04301/light_sensor/LIGHT_SENSOR: AlsGetSpecifyXmlFileName: phoneType 137 not use XML send als para
+05-09 22:36:59.304  1141  1141 I I04301/light_sensor/LIGHT_SENSOR: AlsGetDetailInfo readBytes = 17, readBuff = 800F250C01020A89
+05-09 22:36:59.304  1141  1141 I I04301/light_sensor/LIGHT_SENSOR: AlsJudgeUnderTpCaliInit: als under tp cali para init succ
+05-09 22:36:59.304  1141  1141 I I04301/light_sensor/LIGHT_SENSOR: AlsGetSpecifyXmlFileName phone_type = 137
+05-09 22:36:59.305  1141  1141 I I04301/light_sensor/LIGHT_SENSOR: readBuff is huawei,als1_s001007
+05-09 22:36:59.305  1141  1141 I I04301/light_sensor/LIGHT_SENSOR: , strlen(readBuff) 20
+05-09 22:36:59.305  1141  1141 I I04301/light_sensor/LIGHT_SENSOR: AlsGetSpecifyXmlFileName: phoneType 137 not use XML send als para
+05-09 22:42:42.469  1977 15700 I C02D13/hdcd/HDC_LOG: [FinishShellProc:88] FinishShellProc finish pipeRead fd:43 pid:15699 count:1
+05-09 22:42:42.469  1977 15700 I C02D13/hdcd/HDC_LOG: [TaskFinish:55] HdcTaskBase::TaskFinish notify begin type:0 cid:1040795106 sid:190******492(L:10)
+05-09 22:42:42.471  1977 15700 I C02D13/hdcd/HDC_LOG: [TaskFinish:58] HdcTaskBase::TaskFinish notify end type:0 cid:1040795106 sid:190******492(L:10)
+05-09 22:42:42.472  1977  2385 I C02D13/hdcd/HDC_LOG: [FetchCommand:1142] FetchCommand channelId:1040795106 command:2
+05-09 22:42:42.472  1977  2385 W C02D13/hdcd/HDC_LOG: [BeginRemoveTask:160] BeginRemoveTask taskType:0 channelId:1040795106
+05-09 22:42:42.472  1977  2385 W C02D13/hdcd/HDC_LOG: [ClearOwnTasks:190] ClearOwnTasks OP_CLEAR finish, sessionId:190******492(L:10) channelIDInput:1040795106
+05-09 22:42:42.473  1977  2385 W C02D13/hdcd/HDC_LOG: [TaskClassDeleteRetry:115] taskClassDeleteRetry start clear task, taskType:0 cid:1040795106 sid:190******492(L:10)
+05-09 22:42:42.473  1977  2385 I C02D13/hdcd/HDC_LOG: [DoRelease:69] DoRelease rc:0 pid:15699
+05-09 22:42:42.473  1977  2385 I C02D13/hdcd/HDC_LOG: [TaskClassDeleteRetry:126] TaskDelay task remove retry count 0/30, taskType:0 channelId:1040795106, sessionId:190******492(L:10)
+05-09 22:42:42.473  1977  2385 I C02D13/hdcd/HDC_LOG: [~HdcDaemonUnity:31] ~HdcDaemonUnity cid:1040795106 sid:190******492(L:10)
+05-09 22:42:42.473  1977  2385 I C02D13/hdcd/HDC_LOG: [~HdcTaskBase:40] ~HdcTaskBase type:0 cid:1040795106 sid:190******492(L:10)
+05-09 22:42:42.473  1977  2385 W C02D13/hdcd/HDC_LOG: [TaskClassDeleteRetry:134] TaskDelay task remove finish, channelId:1040795106
+05-09 22:42:42.473  1977  2385 I C02D13/hdcd/HDC_LOG: [DispUvStreamInfo:969] before uv handle close, the uv handle type is 13
+05-09 22:42:42.491  1977  2385 I C02D13/hdcd/HDC_LOG: [FetchCommand:1142] FetchCommand channelId:1040795106 command:2
+05-09 22:42:42.548  1977  2385 I C02D13/hdcd/HDC_LOG: [FetchCommand:1142] FetchCommand channelId:2410109713 command:1001
+05-09 22:42:42.548  1977  2385 I C02D13/hdcd/HDC_LOG: [DispatchTaskData:1650] New HTaskInfo cid:2410109713 sid:190******492(L:10) command:1001
+05-09 22:42:42.549  1977  2385 I C02D13/hdcd/HDC_LOG: [AdminTask:886] AdminTask add task type:0 cid:2410109713 sid:190******492(L:10) mapsize:2
+05-09 22:42:42.549  1977  2385 I C02D13/hdcd/HDC_LOG: [HdcTaskBase:34] HdcTaskBase type:0 cid:2410109713 sid:190******492(L:10)
+05-09 22:42:42.549  1977  2385 I C02D13/hdcd/HDC_LOG: [CommandDispatch:414] Unity CommandDispatch command:1001 cid:2410109713 sid:190******492(L:10)
+05-09 22:42:42.549  1977  2385 W C02D13/hdcd/HDC_LOG: [GetDevItem:114] GetDevItem false key:persist.hdc.root
+05-09 22:42:42.551  1977 15702 I C02D13/hdcd/HDC_LOG: [Popen:225] Popen pipe fds[pipeRead]:43 fds[pipeWrite]:48, mode 0
+05-09 22:42:42.557  1977  2385 I C02D13/hdcd/HDC_LOG: [ExecuteCommand:286] ExecuteCommand cmd:uit******010(L:30) fd:43 pid:15703
+05-09 22:42:42.558  1977  2385 I C02D13/hdcd/HDC_LOG: [CommandDispatch:486] Unity CommandDispatch command:1001 finish cid:2410109713 sid:190******492(L:10)
+05-09 22:42:42.563 15703 15703 W C02D13/hdcd/HDC_LOG: [SetSelinuxLabel:140] SetSelinuxLabel con:u:r:su:s0 isRoot:0
+05-09 22:42:42.634  1151  2022 I C015B5/netmanager/NetMgrEnhanced: QOE: DumpData# DNS:0,0,0 UID:1051 UID:0 UID:20020203 Mov:16
+05-09 22:42:42.725 15703 15703 W C02C02/PARAM: Selinux check name debug.dfx.tags.enableleak in u:object_r:debug_param:s0 [15703 0 0] failed
+05-09 22:42:42.725 15703 15703 W C02C02/PARAM: SystemReadParam failed!name is:debug.dfx.tags.enableleak,err:1002
+05-09 22:42:42.740 15703 15703 W C02C02/PARAM: Selinux check name debug.graphic.cloudpushrestart in u:object_r:debug_param:s0 [15703 0 0] failed
+05-09 22:42:42.740 15703 15703 W C02C02/PARAM: SystemReadParam failed!name is:debug.graphic.cloudpushrestart,err:1002
+05-09 22:42:42.747 15703 15703 W C02C02/PARAM: Selinux check name persist.graphic.profiler.enabled in u:object_r:debug_param:s0 [15703 0 0] failed
+05-09 22:42:42.747 15703 15703 E C02C02/PARAM: Forbid to read parameter persist.graphic.profiler.enabled
+05-09 22:42:42.747 15703 15703 E C02C02/PARAM: Forbid to access parameter persist.graphic.profiler.enabled
+05-09 22:42:42.747 15703 15703 W C02C02/PARAM: Selinux check name persist.graphic.profiler.betarecording in u:object_r:debug_param:s0 [15703 0 0] failed
+05-09 22:42:42.747 15703 15703 E C02C02/PARAM: Forbid to read parameter persist.graphic.profiler.betarecording
+05-09 22:42:42.747 15703 15703 E C02C02/PARAM: Forbid to access parameter persist.graphic.profiler.betarecording
+05-09 22:42:42.753 15703 15703 I C03100/uitest/UiTestKit_Server: [system_ui_controller.cpp:(SetItemByType)] Add touchItem, finger:0, pressed:1, location:2100, 1010
+05-09 22:42:42.754 15703 15705 W C057C1/uitest/IPCWorkThread: ThreadHandler: proto:0 policy:1 name:OS_IPC_0_15705 invoker:4079008512
+05-09 22:42:42.754 15703 15703 W C04201/uitest/DMS: RegisterClientDeathListener: regis reverse death
+05-09 22:42:42.754 15703 15703 I C04201/uitest/DMS: RegisterClientDeathListener: ENTER
+05-09 22:42:42.754 15703 15706 W C057C1/uitest/IPCWorkThread: ThreadHandler: proto:0 policy:0 name:OS_IPC_1_15706 invoker:1696004608
+05-09 22:42:42.754  1806  2965 E C04200/foundation/WMS: UpdateBundleInfo: Failed
+05-09 22:42:42.754  1806  2965 W C04201/foundation/DMS: screen_session.cpp: call BMS
+05-09 22:42:42.754  1806  2965 I C04201/foundation/DMS: screen_session.cpp: pid:0, bundle:, api:0
+05-09 22:42:42.755 15703 15703 I C02800/uitest/InputManagerImpl: [|1254]Pointer event action:2
+05-09 22:42:42.755 15703 15703 I C02802/uitest/MultimodalEventHandler: [|252]10000|-1|0|0|0|0|0
+05-09 22:42:42.755 15703 15703 E C057C2/uitest/IPCObjectProxy: PrintErrorDetailedInfo: failed, handle:2 error:29201 desc:(subErr:4 SubErrDesc:outer:operation not permitted) *.IMultimodalInputConnect proxy:1694960000 time:352441435782
+05-09 22:42:42.755 15703 15703 E C02801/uitest/MultimodalInputConnect: [nodict]Send request failed! result = 29201
+05-09 22:42:42.755   965  5187 I C02805/multimodalinput/MouseEventInterface: [|600]Start loading Mouse
+05-09 22:42:42.757   965  5187 E C02800/multimodalinput/JsonParser: [|141]value is not str
+05-09 22:42:42.757   965  5187 I C02800/multimodalinput/ProductNameDefinitionParser: [][PrintProductNames:149] enter
+05-09 22:42:42.757   965  5187 I C02800/multimodalinput/ProductNameDefinitionParser: [][PrintProductNames] leave
+05-09 22:42:42.757   965  5187 I C02801/multimodalinput/ComponentManager: [|139]Create instance of module(<private>)
+05-09 22:42:42.757   965  5187 I C02805/multimodalinput/MouseEventInterface: [|611]Mouse loaded
+05-09 22:42:42.757   965  5187 I C02800/multimodalinput/MouseEventInterface: [][OnMouseLoaded:638] enter
+05-09 22:42:42.757   965  5187 I C02800/multimodalinput/MouseEventInterface: [][OnMouseLoaded] leave
+05-09 22:42:42.757   965  5187 I C02805/multimodalinput/MouseEventInterface: [|681]Schedule unloading Mouse
+05-09 22:42:42.757   965  1574 I C02805/multimodalinput/InputKeyFlow: [P:D:518|6048]13440|46|46|2210|2416|0|46|102.000000
+05-09 22:42:42.758   965  1574 I C02802/multimodalinput/InputActiveSubscriberHandler: [P:D:518|317]0|10000|1710
+05-09 22:42:42.758   965  1574 I C02802/multimodalinput/TouchGestureAdapter: [P:D:518|517]GestureType:2,No:518,PA:down,PI:10000,Touches:(10000)
+05-09 22:42:42.758   965  1574 I C02802/multimodalinput/TouchGestureAdapter: [P:D:518|517]GestureType:1,No:518,PA:down,PI:10000,Touches:(10000)
+05-09 22:42:42.759   965  1574 I C02805/multimodalinput/InputKeyFlow: [P:D:518|621]SendMsg:13440
+05-09 22:42:42.760 13440 13440 I C02805/com.axiomaster.bonio/InputKeyFlow: [P:D:518|247]ac: down: 518
+05-09 22:42:42.760 13440 13440 I C02805/com.axiomaster.bonio/InputKeyFlow: [P:D:518|649]recv
+05-09 22:42:42.760 13440 13440 I C04213/com.axiomaster.bonio/InputKeyFlow: HandleInputEvent: eid:66,InputId:518,wid:46,ac:2
+05-09 22:42:42.761  1787 14933 I C01407/render_service/hgm: MarkVoteChange internal_LTPO 0 -1 VOTER_PACKAGES 90 ONTOUCH 0.
+05-09 22:42:42.761 13440 13440 I C03951/com.axiomaster.bonio/InputKeyFlow: [(100000:100000:scope)] ITK Id:518, fId:10000, T:0, I=0, M=0
+05-09 22:42:42.761  1787 14933 E C01700/render_service/RSS: ResSchedClient::ReportData type not subscribed.
+05-09 22:42:42.761  3703  3703 I A04215/com.ohos.sceneboard/WMSHierarchy: request top id: 46, 5
+05-09 22:42:42.761 13440 13440 I C03951/com.axiomaster.bonio/InputKeyFlow: [(100000:100000:scope)] ITK Id:518, TTHNI:fId: 10000{ T: page, D: 3 };{ T: Swiper, D: 7 };{ T: List, D: 11 };{ T: Toggle, D: 14 };
+05-09 22:42:42.761 13440 13440 I C03951/com.axiomaster.bonio/InputKeyFlow: [(100000:100000:scope)] ITK Id:518, TTHRTI: T ClickRecognizer info: { T: Toggle };T PanRecognizer info: { T: Toggle }; { T: Swiper };
+05-09 22:42:42.761  3703  3703 I A04215/com.ohos.sceneboard/WMSHierarchy: onRaiseSceneToTop with persistentId:46
+05-09 22:42:42.762  3703  3703 I A04200/com.ohos.sceneboard/WINDOW: SCBSPVM: getSceneContainerSessionWithPersistentId from containerSessionList id: 46
+05-09 22:42:42.762  1081  2904 I C01727/resource_schedule_service/SceneRecognizeExt: [a92ab247e2b9e7a 0 0][ReportEnterUserInteractionSceneInner]report enter user interaction scene
+05-09 22:42:42.762  3703  3703 I A04200/com.ohos.sceneboard/WINDOW: SCBSPM: Remove container id: 2, 46
+05-09 22:42:42.762  3703  3703 I A01B09/com.ohos.sceneboard/RECENT: RecentDockRefreshAlarm: app exit width:2210 height:2416 EntryAbility/com.axiomaster.bonio/entry/0(persistentId: 46)(containerId: 2) 
+05-09 22:42:42.762  3703  3703 I A01B09/com.ohos.sceneboard/RECENT: RecentDockRefreshAlarm: start alarm recent dock: EntryAbility/com.axiomaster.bonio/entry/0(persistentId: 46)(containerId: 2)
+05-09 22:42:42.762 13440 13440 I C03944/com.axiomaster.bonio/AceSelectComponent: [(100000:100000:scope)] switch touch down hover status 0
+05-09 22:42:42.763 13440 13440 I C03915/com.axiomaster.bonio/AceSwiper: [(100000:100000:scope)] Swiper HandleTouchDown id: 7
+05-09 22:42:42.764 13440 13440 I C03919/com.axiomaster.bonio/AceInputTracking: [(100000:100000:scope)] Consumed id:518, last id:516
+05-09 22:42:42.764 13440 13440 I C04213/com.axiomaster.bonio/InputKeyFlow: ConsumePointerEventInner: InputId:518,wid:46,pointId:10000,srcType:2,rect:[0,0,2210,2416],notify:1
+05-09 22:42:42.765   683  1714 I C02DA0/hiview/FaultLeakDetectorManager: OnEventListeningCallback: receive domain: GRAPHIC, name: HGM_VOTER_INFO
+05-09 22:42:42.766  1787  2361 I C01406/render_service/RsSubThreadCache: ClearCacheSurfaceInThread id:30116310679721
+05-09 22:42:42.766  1787  2361 I C01401/render_service/Bufferqueue: <consumer_surface.cpp:60-~ConsumerSurface>: ~ConsumerSurface, producer_ sptrCnt: 1, uniqueId: 7675106558008.
+05-09 22:42:42.769  1401  2482 E A03200/composer_host/VHDR_TAG: DISPLAY_HDR_V301_ALGO-VHDR- :[NormalizeHistograms.516 ] Total Pixel is Zero
+05-09 22:42:42.769  1401  2482 I C014A0/composer_host/DE H BlWK: I BrightnessLevelToDbv<116>: BrightnessLevelToDbv brightness=0.000000, return -1.0f
+05-09 22:42:42.769  1401  2482 W C014A0/composer_host/DE H =BPMBase: W SetBrightnessInt<79>: [Main] Invalid input: 0 is out of range [12,16380]!
+05-09 22:42:42.770   923  5629 I C02C02/PARAM: SystemSetParameter name persist.ffrt.interval.appRate id:208 ret:0
+05-09 22:42:42.771   923  5629 I C02C02/PARAM: SystemSetParameter name persist.ffrt.interval.rsRate id:209 ret:0
+05-09 22:42:42.772   923  5629 I C02C02/PARAM: SystemSetParameter name persist.ffrt.interval.appRate id:210 ret:0
+05-09 22:42:42.772   923  5629 I C02C02/PARAM: SystemSetParameter name persist.ffrt.interval.rsRate id:211 ret:0
+05-09 22:42:42.772   923  5629 I C01707/concurrent_task_service/CONCUR: [a92ab247e2b9e7a 0 0]Deadline switch to perf mode
+05-09 22:42:42.811  1387  2053 I C01FFF/riladapter_host/BRIL: T00 AT m0_0<^BOOSTERNTF: 3, 20,"06001000010000040000000001029DFF0202F5FF"
+05-09 22:42:42.811  1387  2053 I C01F00/riladapter_host/HrilExt: BoosterRawInd
+05-09 22:42:42.811  1387  2053 I C01F00/riladapter_host/HrilExt: report 4201 to tel_ext
+05-09 22:42:42.811  1387  2053 I C01F00/riladapter_host/HrilExt: report to booster net
+05-09 22:42:42.811  1387  2053 I C01FFF/riladapter_host/BRIL: T00 CHAN done for modem:0, index:0, atResponse: ^BOOSTERNTF: 3, 20,"06001000010000040000000001029DFF0202F5FF"
+05-09 22:42:42.816  1787  2361 I C01406/render_service/skia: RSSurfaceRenderNodeDrawable::OnDraw name:bonio0, the number of total processedNodes: 14
+05-09 22:42:42.862 15703 15703 I C03100/uitest/UiTestKit_Server: [system_ui_controller.cpp:(SetItemByType)] Add touchItem, finger:0, pressed:0, location:2100, 1010
+05-09 22:42:42.863 15703 15703 I C02800/uitest/InputManagerImpl: [|1254]Pointer event action:4
+05-09 22:42:42.863 15703 15703 I C02802/uitest/MultimodalEventHandler: [|252]10000|-1|0|0|0|0|0
+05-09 22:42:42.864   965  1574 I C02805/multimodalinput/InputKeyFlow: [P:U:519|6048]13440|46|46|2210|2416|0|46|102.000000
+05-09 22:42:42.864   965  1574 I C02802/multimodalinput/TouchGestureAdapter: [P:U:519|517]GestureType:2,No:519,PA:up,PI:10000,Touches:(10000)
+05-09 22:42:42.864   965  1574 I C02802/multimodalinput/TouchGestureAdapter: [P:U:519|517]GestureType:1,No:519,PA:up,PI:10000,Touches:(10000)
+05-09 22:42:42.864  3703  3703 I A01B09/com.ohos.sceneboard/RECENT: RecentDockRefreshAlarm: app exit width:2210 height:2416 EntryAbility/com.axiomaster.bonio/entry/0(persistentId: 46)(containerId: 2) 
+05-09 22:42:42.865   965  1574 I C02805/multimodalinput/InputKeyFlow: [P:U:519|621]SendMsg:13440
+05-09 22:42:42.865  3703  3703 I A01B01/com.ohos.sceneboard/HOME: RecentDockModel: app is already first in recent dock
+05-09 22:42:42.865  3703  3703 I A01B09/com.ohos.sceneboard/RECENT: RecentDockRefreshAlarm: refresh recent dock: EntryAbility/com.axiomaster.bonio/entry/0(persistentId: 46)(containerId: 2)
+05-09 22:42:42.865 13440 13440 I C02805/com.axiomaster.bonio/InputKeyFlow: [P:U:519|247]ac: up: 519
+05-09 22:42:42.865 13440 13440 I C02805/com.axiomaster.bonio/InputKeyFlow: [P:U:519|649]recv
+05-09 22:42:42.865 13440 13440 I C04213/com.axiomaster.bonio/InputKeyFlow: HandleInputEvent: eid:67,InputId:519,wid:46,ac:4
+05-09 22:42:42.866   683  3258 I C02D66/hiview/XPERF_SERVICE: [NotifyToXperf]: XperfServiceServer_NotifyToXperf domainId:6 eventId:0 msg:#TYPE:LAST_UP#TIME:1778337762866#BUNDLE_NAME:com.axiomaster.bonio#PID:13440
+05-09 22:42:42.866 13440 13440 I C03951/com.axiomaster.bonio/InputKeyFlow: [(100000:100000:scope)] ITK Id:519, fId:10000, T:1, I=0, M=0
+05-09 22:42:42.866 13440 13440 I C03934/com.axiomaster.bonio/AceUIEvent: [(100000:100000:scope)] TpFlush end by up event
+05-09 22:42:42.866 13440 13440 I C03944/com.axiomaster.bonio/AceSelectComponent: [(100000:100000:scope)] switch touch up hover status 0
+05-09 22:42:42.867 13440 13440 I C03915/com.axiomaster.bonio/AceSwiper: [(100000:100000:scope)] Swiper HandleTouchUp id: 7
+05-09 22:42:42.867 13440 13440 I C0391E/com.axiomaster.bonio/AceGesture: [(100000:100000:scope)] Click try accept Toggle
+05-09 22:42:42.867 13440 13440 I C03951/com.axiomaster.bonio/InputKeyFlow: [(100000:100000:scope)] CLK RACC, T: Toggle
+05-09 22:42:42.867 13440 13440 I C03944/com.axiomaster.bonio/AceSelectComponent: [(100000:100000:scope)] switch click result 1
+05-09 22:42:42.867 13440 13440 I C03919/com.axiomaster.bonio/AceInputTracking: [(100000:100000:scope)] Consumed id:519, last id:516
+05-09 22:42:42.867 13440 13440 I C04213/com.axiomaster.bonio/InputKeyFlow: ConsumePointerEventInner: InputId:519,wid:46,pointId:10000,srcType:2,rect:[0,0,2210,2416],notify:1
+05-09 22:42:42.868  1806  2616 I C057C2/foundation/IPCObjectProxy: hd:651 ct:1 D:
+05-09 22:42:42.868  1977 15704 I C02D13/hdcd/HDC_LOG: [FinishShellProc:88] FinishShellProc finish pipeRead fd:43 pid:15703 count:1
+05-09 22:42:42.868  1977 15704 I C02D13/hdcd/HDC_LOG: [TaskFinish:55] HdcTaskBase::TaskFinish notify begin type:0 cid:2410109713 sid:190******492(L:10)
+05-09 22:42:42.868 13440 13440 I C04200/com.axiomaster.bonio/JsWindowManager: CreateNewSystemWindowTask: [NAPI]
+05-09 22:42:42.868 13440 13440 E C04200/com.axiomaster.bonio/JsUtils: CheckCallingPermission: Permission ohos.permission.SYSTEM_FLOAT_WINDOW is not granted
+05-09 22:42:42.869 13440 13440 W C01320/com.axiomaster.bonio/JsEnv: [source_map.cpp145]the stack without line info
+05-09 22:42:42.869 13440 13440 E A03D00/com.axiomaster.bonio/FloatWindowManager: Failed to create system float window: {"code":201}
+05-09 22:42:42.869  1977 15704 I C02D13/hdcd/HDC_LOG: [TaskFinish:58] HdcTaskBase::TaskFinish notify end type:0 cid:2410109713 sid:190******492(L:10)
+05-09 22:42:42.869 13440 13440 I C03944/com.axiomaster.bonio/AceSelectComponent: [(100000:100000:scope)] switch update isOn 0
+05-09 22:42:42.872  1977  2385 I C02D13/hdcd/HDC_LOG: [FetchCommand:1142] FetchCommand channelId:2410109713 command:2
+05-09 22:42:42.872  1977  2385 W C02D13/hdcd/HDC_LOG: [BeginRemoveTask:160] BeginRemoveTask taskType:0 channelId:2410109713
+05-09 22:42:42.872  1977  2385 W C02D13/hdcd/HDC_LOG: [ClearOwnTasks:190] ClearOwnTasks OP_CLEAR finish, sessionId:190******492(L:10) channelIDInput:2410109713
+05-09 22:42:42.873  1977  2385 W C02D13/hdcd/HDC_LOG: [TaskClassDeleteRetry:115] taskClassDeleteRetry start clear task, taskType:0 cid:2410109713 sid:190******492(L:10)
+05-09 22:42:42.873  1977  2385 I C02D13/hdcd/HDC_LOG: [DoRelease:69] DoRelease rc:0 pid:15703
+05-09 22:42:42.873  1977  2385 I C02D13/hdcd/HDC_LOG: [TaskClassDeleteRetry:126] TaskDelay task remove retry count 0/30, taskType:0 channelId:2410109713, sessionId:190******492(L:10)
+05-09 22:42:42.873  1977  2385 I C02D13/hdcd/HDC_LOG: [~HdcDaemonUnity:31] ~HdcDaemonUnity cid:2410109713 sid:190******492(L:10)
+05-09 22:42:42.873  1977  2385 I C02D13/hdcd/HDC_LOG: [~HdcTaskBase:40] ~HdcTaskBase type:0 cid:2410109713 sid:190******492(L:10)
+05-09 22:42:42.873  1977  2385 W C02D13/hdcd/HDC_LOG: [TaskClassDeleteRetry:134] TaskDelay task remove finish, channelId:2410109713
+05-09 22:42:42.873  1977  2385 I C02D13/hdcd/HDC_LOG: [DispUvStreamInfo:969] before uv handle close, the uv handle type is 13
+05-09 22:42:42.881  1977  2385 I C02D13/hdcd/HDC_LOG: [FetchCommand:1142] FetchCommand channelId:2410109713 command:2
+05-09 22:42:43.114  1622  1622 I C05B01/tlogcat/teeos: index: 10873: cpu0/01603:   05/09 22:42:42.050 [apm_service] [INFO] 427:>>>apm_measure: begin, uuid=3ec8f65f-830c-4ad9-98dc-604e3b7156c3, mspc_level=0x0
+05-09 22:42:43.115  1622  1622 I C05B01/tlogcat/teeos: index: 10874: cpu0/01603:   05/09 22:42:42.052 [apm_service] [INFO] 119:coresight trace
+05-09 22:42:43.115  1622  1622 I C05B01/tlogcat/teeos: index: 10875: cpu0/01603:   05/09 22:42:42.054 [apm_service] [INFO] 450:>>>apm_measure: end, uuid=3ec8f65f-830c-4ad9-98dc-604e3b7156c3, mspc_level=0x0
+05-09 22:42:43.190  1385  2033 W C02943/power_host/ThermalHdi: Read node failed, title = bright_in
+05-09 22:42:43.190  1385  2033 W C02943/power_host/ThermalHdi: Read node failed, title = bright_out
+05-09 22:42:43.575  1977  2385 I C02D13/hdcd/HDC_LOG: [SendHeartbeatMsg:1519] send heartbeat count is 67 and messages count is 902 for session 190******492(L:10)
+05-09 22:42:43.585  1977  2385 I C02D13/hdcd/HDC_LOG: [FetchCommand:1142] FetchCommand channelId:0 command:5000
+05-09 22:42:43.585  1977  2385 I C02D13/hdcd/HDC_LOG: [FetchCommand:1163] recv heartbeat count is 67 for session 190******492(L:10)
+05-09 22:42:43.620  1081  1528 I C01713/resource_schedule_service/SUSPEND_MANAGER: [a92ab547dfc8725 0 0]Doze has special:ERR_CONNECT_WITH_NATIVE, 20008_com.huawei.hmos.location_[3221][3775_0,1606_0,], DOZE_AFTER_REMOVE_PROCESS
+05-09 22:42:43.674  1151  2022 I C015B5/netmanager/NetMgrEnhanced: QOE: DumpData# DNS:0,0,0 UID:1051 UID:0 UID:20020203 Mov:16
+05-09 22:42:43.676  1333  1631 W C01C42/time_service/TimeService: t3 354685
+05-09 22:42:43.708  1787 15708 I C01407/render_service/hgm: MarkVoteChange internal_LTPO 0 -1 VOTER_PACKAGES 90  0.
+05-09 22:42:43.708  1787 15708 I C01407/render_service/hgm: MarkVoteChange internal_LTPO 0 -1 VOTER_IDLE 60  0.
+05-09 22:42:43.708  1787 15708 E C01700/render_service/RSS: ResSchedClient::ReportData type not subscribed.
+05-09 22:42:43.711   923  5629 I C02C02/PARAM: SystemSetParameter name persist.ffrt.interval.appRate id:212 ret:0
+05-09 22:42:43.713   923  5629 I C02C02/PARAM: SystemSetParameter name persist.ffrt.interval.rsRate id:213 ret:0
+05-09 22:42:43.720  1401  2482 E A03200/composer_host/VHDR_TAG: DISPLAY_HDR_V301_ALGO-VHDR- :[NormalizeHistograms.516 ] Total Pixel is Zero
+05-09 22:42:43.720  1401  2482 I C014A0/composer_host/DE H BlWK: I BrightnessLevelToDbv<116>: BrightnessLevelToDbv brightness=0.000000, return -1.0f
+05-09 22:42:43.720  1401  2482 W C014A0/composer_host/DE H =BPMBase: W SetBrightnessInt<79>: [Main] Invalid input: 0 is out of range [12,16380]!
+05-09 22:42:43.758   965  1574 I C02802/multimodalinput/InputActiveSubscriberHandler: [|317]0|10000|1710
+05-09 22:42:43.958  6482  6484 I C02925/bms_behavior/bms_behavior: [WaitConditionStatus]: runState = 1, cvStatus = 1 
+05-09 22:42:43.964  6482  6485 I C02925/bms_behavior/bms_behavior: [WaitConditionStatus]: runState = 1, cvStatus = 1 
+05-09 22:42:43.978  6482  6484 E C02925/bms_behavior/bms_file: [BmsFileReadBuffer]: file /sys/class/hw_power/coul/coul_data/rbatt is invalid
+05-09 22:42:43.979  6482  6484 E C02925/bms_behavior/bms_file: [BmsFileReadBuffer]: file /sys/class/hw_power/bat_heating/heat_up is invalid
+05-09 22:42:43.981  6482  6485 E C02925/bms_behavior/bms_file: [BmsFileReadBuffer]: file /sys/class/hw_power/coul/coul_data/rbatt is invalid
+05-09 22:42:43.981  6482  6484 I C02925/bms_behavior/bms_behavior: [Monitor]: monitor interval count 66, name: battery_gauge_aux
+05-09 22:42:43.982  6482  6485 E C02925/bms_behavior/bms_file: [BmsFileReadBuffer]: file /sys/class/hw_power/bat_heating/heat_up is invalid
+05-09 22:42:43.985  6482  6485 I C02925/bms_behavior/bms_behavior: [Monitor]: monitor interval count 66, name: Battery
+05-09 22:42:44.013  6482  6483 I C02925/bms_behavior/bms_behavior: [WaitConditionStatus]: runState = 1, cvStatus = 1 
+05-09 22:42:44.027  6482  6483 E C02925/bms_behavior/bms_file: [BmsFileReadBuffer]: file /sys/class/hw_power/coul/coul_data/rbatt is invalid
+05-09 22:42:44.028  6482  6483 E C02925/bms_behavior/bms_file: [BmsFileReadBuffer]: file /sys/class/hw_power/bat_heating/heat_up is invalid
+05-09 22:42:44.031  6482  6483 I C02925/bms_behavior/bms_behavior: [Monitor]: monitor interval count 66, name: battery_gauge
+05-09 22:42:44.045  1710 11762 I C02986/powermgr/DisplayPowerBrightness: PrintCurrentLuxLog, lux=[176.5/360, 176.6/239, 176.7/360, 176.6/240, 176.5/359, 176.4|353730], slux=157.0, blux=124.8, oLux=157.0, bTh=638.8, bTh2=183.2, sbTh=446.1, dTh=25.7, dTh2=145.8, bt=1000, dt=1000, pxs=0, sz=35, bl=49, scene=DefaultMode, als=0, als1=1, color=0, pxa=0, locked=0, dl=43.0
+05-09 22:42:44.090  1387  2053 I C01FFF/riladapter_host/BRIL: T00 AT m0_0<^BOOSTERNTF: 3, 20,"06001000010000040000000001029FFF0202F5FF"
+05-09 22:42:44.091  1387  2053 I C01F00/riladapter_host/HrilExt: BoosterRawInd
+05-09 22:42:44.091  1387  2053 I C01F00/riladapter_host/HrilExt: report 4201 to tel_ext
+05-09 22:42:44.091  1387  2053 I C01F00/riladapter_host/HrilExt: report to booster net
+05-09 22:42:44.091  1387  2053 I C01FFF/riladapter_host/BRIL: T00 CHAN done for modem:0, index:0, atResponse: ^BOOSTERNTF: 3, 20,"06001000010000040000000001029FFF0202F5FF"
+05-09 22:42:44.193   683 14645 I C02D10/hiview/CpuCollector: CalculateProcessCpuStatInfos: startTime=1778337754071, endTime=1778337764193, startBootTime=343757, endBootTime=353879, period=10122, isNeedUpdate=1
+05-09 22:42:44.245   683  2681 W C01719/hiview/ffrt: 58:RecordTimeoutTask:304 dft_ue_report|5092|2|0|SUB|2026-05-09 22:42:04.266|PND|30|1
+05-09 22:42:44.246   683  2681 W C01719/hiview/ffrt: 59:RecordTimeoutTask:304 dft_ue_report|5091|2|0|CRB|2026-05-09 22:42:04.266|EXE|30|1
+05-09 22:42:44.246   683  2681 W C01719/hiview/ffrt: 60:RecordTimeoutTask:304 HoldDynamicLibraryForSomeTime|5093|2|0|CRB|2026-05-09 22:42:05.893|EXE|30|1
+05-09 22:42:44.246   683  2681 W C01719/hiview/ffrt: 61:RecordTimeoutTask:304 HoldDynamicLibraryForSomeTime|5094|2|0|SUB|2026-05-09 22:42:05.893|PND|30|1
+05-09 22:42:44.368  1081 13446 E C01720/resource_schedule_service/SmartGC: [a92ab547e2d3cac 0 0][ExitGCPauseSceneInner]ExitGCPauseSceneInner 352553 354054
+05-09 22:42:44.610  1735 11078 E C015C5/huawei_id_svc/NETSTACK_RCP: [a92ab646e50006c 0 0] epoll result: 0, errno: 13
+05-09 22:42:44.663  1787  2639 I C01406/render_service/RSScreenManager: OnScreenVBlankIdle: devId:0, ns:354348018750
+05-09 22:42:44.725  1151  2022 I C015B5/netmanager/NetMgrEnhanced: QOE: DumpData# DNS:0,0,0 UID:1051 UID:0 UID:20020203 Mov:16
+05-09 22:42:44.729  1411 15133 I C00102/bluetooth_service/bt_server_ble_central_manager: [16]OnScanCallback: pid:1681 uid:1024 address:48:BF:**:**:**:AD passed filter.
+05-09 22:42:44.753  1387  2053 I C01FFF/riladapter_host/BRIL: T00 AT m0_0<^BOOSTERNTF: 3, 20,"06001000010000040000000001029EFF0202F4FF"
+05-09 22:42:44.753  1387  2053 I C01F00/riladapter_host/HrilExt: BoosterRawInd
+05-09 22:42:44.753  1387  2053 I C01F00/riladapter_host/HrilExt: report 4201 to tel_ext
+05-09 22:42:44.753  1387  2053 I C01F00/riladapter_host/HrilExt: report to booster net
+05-09 22:42:44.753  1387  2053 I C01FFF/riladapter_host/BRIL: T00 CHAN done for modem:0, index:0, atResponse: ^BOOSTERNTF: 3, 20,"06001000010000040000000001029EFF0202F4FF"
+05-09 22:42:44.762  1081  1297 I C01727/resource_schedule_service/SceneRecognizeExt: [a92ab247e2b9e7a 0 0][ReportExitUserInteractionSceneInner]report exit user interaction scene
+05-09 22:42:44.766   923  5629 I C02C02/PARAM: SystemSetParameter name persist.ffrt.interval.appRate id:214 ret:0
+05-09 22:42:44.767   923  5629 I C02C02/PARAM: SystemSetParameter name persist.ffrt.interval.rsRate id:215 ret:0
+05-09 22:42:44.767   923  5629 I C01707/concurrent_task_service/CONCUR: [a92ab247e2b9e7a 0 0]Deadline switch to power mode
+05-09 22:42:44.864  1977  2385 I C02D13/hdcd/HDC_LOG: [FetchCommand:1142] FetchCommand channelId:668814569 command:1001
+05-09 22:42:44.864  1977  2385 I C02D13/hdcd/HDC_LOG: [DispatchTaskData:1650] New HTaskInfo cid:668814569 sid:190******492(L:10) command:1001
+05-09 22:42:44.864  1977  2385 I C02D13/hdcd/HDC_LOG: [AdminTask:886] AdminTask add task type:0 cid:668814569 sid:190******492(L:10) mapsize:2
+05-09 22:42:44.864  1977  2385 I C02D13/hdcd/HDC_LOG: [HdcTaskBase:34] HdcTaskBase type:0 cid:668814569 sid:190******492(L:10)
+05-09 22:42:44.865  1977  2385 I C02D13/hdcd/HDC_LOG: [CommandDispatch:414] Unity CommandDispatch command:1001 cid:668814569 sid:190******492(L:10)
+05-09 22:42:44.865  1977  2385 W C02D13/hdcd/HDC_LOG: [GetDevItem:114] GetDevItem false key:persist.hdc.root
+05-09 22:42:44.867  1977 15728 I C02D13/hdcd/HDC_LOG: [Popen:225] Popen pipe fds[pipeRead]:43 fds[pipeWrite]:48, mode 0
+05-09 22:42:44.873  1977  2385 I C02D13/hdcd/HDC_LOG: [ExecuteCommand:286] ExecuteCommand cmd:hid******39'(L:49) fd:43 pid:15729
+05-09 22:42:44.873  1977  2385 I C02D13/hdcd/HDC_LOG: [CommandDispatch:486] Unity CommandDispatch command:1001 finish cid:668814569 sid:190******492(L:10)
+05-09 22:42:44.879 15729 15729 W C02D13/hdcd/HDC_LOG: [SetSelinuxLabel:140] SetSelinuxLabel con:u:r:su:s0 isRoot:0
+05-09 22:42:44.929 15729 15729 I C02D20/hidumper/DumperService: SetCmdArgs# hidumper cmd:hidumper -e --list --since 2026-05-09 15:13:39 , calllingUid=0, calllingPid=15729, ppid:1977.
+05-09 22:42:44.931 15729 15731 W C057C1/hidumper/IPCWorkThread: ThreadHandler: proto:0 policy:1 name:OS_IPC_0_15731 invoker:3208691072
+05-09 22:42:44.933 15729 15732 W C057C1/hidumper/IPCWorkThread: ThreadHandler: proto:0 policy:0 name:OS_IPC_1_15732 invoker:1021851520
+05-09 22:42:44.933  5744  8479 I C02D20/hidumper_service/DumperService: DelayUnloadTask# recieve new request, delay unload task begin, calllingPid=15729
+05-09 22:42:44.934  5744  8479 I C02D20/hidumper_service/DumperService: PreExecute# info|EventListDumper PreExecute
+05-09 22:42:44.935  5744  8479 I C02D20/hidumper_service/DumperService: Execute# info|EventListDumper Execute
+05-09 22:42:44.937   683  3258 I C02D10/hiview/HiView-SysEventQueryBuilder: BaseEventQueryWrapper: uid is 1212, pid is 5744 of querier
+05-09 22:42:45.000  1333  1631 W C01C42/time_service/TimeService: uid:1096 id:838530867 wk:0
+05-09 22:42:45.000  1333  1631 W C01C42/time_service/TimeService: id:838530867 we:359685
+05-09 22:42:45.000  1333  1631 W C01C42/time_service/TimeService: t3 355362
+05-09 22:42:45.031  5744  8479 I C02D20/hidumper_service/DumperService: Execute# info|EventListDumper Execute end
+05-09 22:42:45.038  1977 15730 I C02D13/hdcd/HDC_LOG: [FinishShellProc:88] FinishShellProc finish pipeRead fd:43 pid:15729 count:1
+05-09 22:42:45.038  1977 15730 I C02D13/hdcd/HDC_LOG: [TaskFinish:55] HdcTaskBase::TaskFinish notify begin type:0 cid:668814569 sid:190******492(L:10)
+05-09 22:42:45.038  1977 15730 I C02D13/hdcd/HDC_LOG: [TaskFinish:58] HdcTaskBase::TaskFinish notify end type:0 cid:668814569 sid:190******492(L:10)
+05-09 22:42:45.040  1977  2385 I C02D13/hdcd/HDC_LOG: [FetchCommand:1142] FetchCommand channelId:668814569 command:2
+05-09 22:42:45.040  1977  2385 W C02D13/hdcd/HDC_LOG: [BeginRemoveTask:160] BeginRemoveTask taskType:0 channelId:668814569
+05-09 22:42:45.040  1977  2385 W C02D13/hdcd/HDC_LOG: [ClearOwnTasks:190] ClearOwnTasks OP_CLEAR finish, sessionId:190******492(L:10) channelIDInput:668814569
+05-09 22:42:45.040  1977  2385 W C02D13/hdcd/HDC_LOG: [TaskClassDeleteRetry:115] taskClassDeleteRetry start clear task, taskType:0 cid:668814569 sid:190******492(L:10)
+05-09 22:42:45.040  1977  2385 I C02D13/hdcd/HDC_LOG: [DoRelease:69] DoRelease rc:0 pid:15729
+05-09 22:42:45.040  1977  2385 I C02D13/hdcd/HDC_LOG: [TaskClassDeleteRetry:126] TaskDelay task remove retry count 0/30, taskType:0 channelId:668814569, sessionId:190******492(L:10)
+05-09 22:42:45.040  1977  2385 I C02D13/hdcd/HDC_LOG: [~HdcDaemonUnity:31] ~HdcDaemonUnity cid:668814569 sid:190******492(L:10)
+05-09 22:42:45.041  1977  2385 I C02D13/hdcd/HDC_LOG: [~HdcTaskBase:40] ~HdcTaskBase type:0 cid:668814569 sid:190******492(L:10)
+05-09 22:42:45.041  1977  2385 W C02D13/hdcd/HDC_LOG: [TaskClassDeleteRetry:134] TaskDelay task remove finish, channelId:668814569
+05-09 22:42:45.041  1977  2385 I C02D13/hdcd/HDC_LOG: [DispUvStreamInfo:969] before uv handle close, the uv handle type is 13
+05-09 22:42:45.047  1977  2385 I C02D13/hdcd/HDC_LOG: [FetchCommand:1142] FetchCommand channelId:668814569 command:2
+05-09 22:42:45.370  1387  2053 I C01FFF/riladapter_host/BRIL: T00 AT m0_0<^BOOSTERNTF: 3, 20,"06001000010000040000000001029EFF0202F5FF"
+05-09 22:42:45.371  1387  2053 I C01F00/riladapter_host/HrilExt: BoosterRawInd
+05-09 22:42:45.371  1387  2053 I C01F00/riladapter_host/HrilExt: report 4201 to tel_ext
+05-09 22:42:45.371  1387  2053 I C01F00/riladapter_host/HrilExt: report to booster net
+05-09 22:42:45.371  1387  2053 I C01FFF/riladapter_host/BRIL: T00 CHAN done for modem:0, index:0, atResponse: ^BOOSTERNTF: 3, 20,"06001000010000040000000001029EFF0202F5FF"
+05-09 22:42:45.677  1333  1631 W C01C42/time_service/TimeService: t3 357362
+05-09 22:42:45.755  1151  2022 I C015B5/netmanager/NetMgrEnhanced: QOE: DumpData# DNS:0,0,0 UID:1051 UID:0 UID:20020203 Mov:16
+05-09 22:42:45.945  1806 12891 I C01120/foundation/BMS: execute begin ReleaseResourceTask
+05-09 22:42:45.996  1806 12891 I C01120/foundation/BMS: [bundle_resource_manager.cpp(operator():533)]release system resource
+05-09 22:42:46.035  1387  2053 I C01FFF/riladapter_host/BRIL: T00 AT m0_0<^BOOSTERNTF: 3, 20,"06001000010000040000000001029EFF0202F5FF"
+05-09 22:42:46.035  1387  2053 I C01F00/riladapter_host/HrilExt: BoosterRawInd
+05-09 22:42:46.035  1387  2053 I C01F00/riladapter_host/HrilExt: report 4201 to tel_ext
+05-09 22:42:46.035  1387  2053 I C01F00/riladapter_host/HrilExt: report to booster net
+05-09 22:42:46.035  1387  2053 I C01FFF/riladapter_host/BRIL: T00 CHAN done for modem:0, index:0, atResponse: ^BOOSTERNTF: 3, 20,"06001000010000040000000001029EFF0202F5FF"
+05-09 22:42:46.149  1710 13711 I C02986/powermgr/DisplayPowerBrightness: PrintCurrentLuxLog, lux=[176.4/360, 176.4/240, 176.5/240, 176.7/361, 176.9/359, 176.9|355771], slux=157.0, blux=124.8, oLux=157.0, bTh=638.8, bTh2=183.2, sbTh=446.1, dTh=25.7, dTh2=145.8, bt=1000, dt=1000, pxs=0, sz=35, bl=49, scene=DefaultMode, als=0, als1=1, color=0, pxa=0, locked=0, dl=43.0
+05-09 22:42:46.478  1977  2385 I C02D13/hdcd/HDC_LOG: [FetchCommand:1142] FetchCommand channelId:2890636252 command:1001
+05-09 22:42:46.478  1977  2385 I C02D13/hdcd/HDC_LOG: [DispatchTaskData:1650] New HTaskInfo cid:2890636252 sid:190******492(L:10) command:1001
+05-09 22:42:46.478  1977  2385 I C02D13/hdcd/HDC_LOG: [AdminTask:886] AdminTask add task type:0 cid:2890636252 sid:190******492(L:10) mapsize:2
+05-09 22:42:46.478  1977  2385 I C02D13/hdcd/HDC_LOG: [HdcTaskBase:34] HdcTaskBase type:0 cid:2890636252 sid:190******492(L:10)
+05-09 22:42:46.479  1977  2385 I C02D13/hdcd/HDC_LOG: [CommandDispatch:414] Unity CommandDispatch command:1001 cid:2890636252 sid:190******492(L:10)
+05-09 22:42:46.479  1977  2385 W C02D13/hdcd/HDC_LOG: [GetDevItem:114] GetDevItem false key:persist.hdc.root
+05-09 22:42:46.480  1977 15738 I C02D13/hdcd/HDC_LOG: [Popen:225] Popen pipe fds[pipeRead]:43 fds[pipeWrite]:48, mode 0
+05-09 22:42:46.496  1977  2385 I C02D13/hdcd/HDC_LOG: [ExecuteCommand:286] ExecuteCommand cmd:hid******er"(L:36) fd:43 pid:15739
+05-09 22:42:46.497  1977  2385 I C02D13/hdcd/HDC_LOG: [CommandDispatch:486] Unity CommandDispatch command:1001 finish cid:2890636252 sid:190******492(L:10)
+05-09 22:42:46.502 15739 15739 W C02D13/hdcd/HDC_LOG: [SetSelinuxLabel:140] SetSelinuxLabel con:u:r:su:s0 isRoot:0
+05-09 22:42:46.557 15741 15741 I C02D20/hidumper/DumperService: SetCmdArgs# hidumper cmd:hidumper -s 1201 -a -p Faultlogger , calllingUid=0, calllingPid=15741, ppid:15739.
+05-09 22:42:46.558 15741 15743 W C057C1/hidumper/IPCWorkThread: ThreadHandler: proto:0 policy:1 name:OS_IPC_0_15743 invoker:2030091008
+05-09 22:42:46.558 15741 15744 W C057C1/hidumper/IPCWorkThread: ThreadHandler: proto:0 policy:0 name:OS_IPC_1_15744 invoker:4138235392
+05-09 22:42:46.559  5744  8479 I C02D20/hidumper_service/DumperService: DelayUnloadTask# recieve new request, delay unload task begin, calllingPid=15741
+05-09 22:42:46.562   683  3258 I C02D11/hiview/Faultlogger: DumpByCommands: DumpRequest: detail:0, list:0, file:, name:, time:-1
+05-09 22:42:46.563  5744  8479 I C02D20/hidumper_service/DumperService: GetData# SA name:1201 dump success, cmd:-p Faultlogger , calllingPid=15741!
+05-09 22:42:46.570  1977 15740 I C02D13/hdcd/HDC_LOG: [FinishShellProc:88] FinishShellProc finish pipeRead fd:43 pid:15739 count:1
+05-09 22:42:46.570  1977 15740 I C02D13/hdcd/HDC_LOG: [TaskFinish:55] HdcTaskBase::TaskFinish notify begin type:0 cid:2890636252 sid:190******492(L:10)
+05-09 22:42:46.570  1977 15740 I C02D13/hdcd/HDC_LOG: [TaskFinish:58] HdcTaskBase::TaskFinish notify end type:0 cid:2890636252 sid:190******492(L:10)
+05-09 22:42:46.574  1977  2385 I C02D13/hdcd/HDC_LOG: [FetchCommand:1142] FetchCommand channelId:2890636252 command:2
+05-09 22:42:46.574  1977  2385 W C02D13/hdcd/HDC_LOG: [BeginRemoveTask:160] BeginRemoveTask taskType:0 channelId:2890636252
+05-09 22:42:46.574  1977  2385 W C02D13/hdcd/HDC_LOG: [ClearOwnTasks:190] ClearOwnTasks OP_CLEAR finish, sessionId:190******492(L:10) channelIDInput:2890636252
+05-09 22:42:46.574  1977  2385 W C02D13/hdcd/HDC_LOG: [TaskClassDeleteRetry:115] taskClassDeleteRetry start clear task, taskType:0 cid:2890636252 sid:190******492(L:10)
+05-09 22:42:46.574  1977  2385 I C02D13/hdcd/HDC_LOG: [DoRelease:69] DoRelease rc:-3 pid:15739
+05-09 22:42:46.574  1977  2385 I C02D13/hdcd/HDC_LOG: [TaskClassDeleteRetry:126] TaskDelay task remove retry count 0/30, taskType:0 channelId:2890636252, sessionId:190******492(L:10)
+05-09 22:42:46.574  1977  2385 I C02D13/hdcd/HDC_LOG: [~HdcDaemonUnity:31] ~HdcDaemonUnity cid:2890636252 sid:190******492(L:10)
+05-09 22:42:46.574  1977  2385 I C02D13/hdcd/HDC_LOG: [~HdcTaskBase:40] ~HdcTaskBase type:0 cid:2890636252 sid:190******492(L:10)
+05-09 22:42:46.574  1977  2385 W C02D13/hdcd/HDC_LOG: [TaskClassDeleteRetry:134] TaskDelay task remove finish, channelId:2890636252
+05-09 22:42:46.574  1977  2385 I C02D13/hdcd/HDC_LOG: [DispUvStreamInfo:969] before uv handle close, the uv handle type is 13
+05-09 22:42:46.589  1977  2385 I C02D13/hdcd/HDC_LOG: [FetchCommand:1142] FetchCommand channelId:2890636252 command:2
+05-09 22:42:46.795  1151  2022 I C015B5/netmanager/NetMgrEnhanced: QOE: DumpData# DNS:0,0,0 UID:1051 UID:0 UID:20020203 Mov:16
+05-09 22:42:46.984  1977  2385 I C02D13/hdcd/HDC_LOG: [FetchCommand:1142] FetchCommand channelId:539924991 command:1001
+05-09 22:42:46.984  1977  2385 I C02D13/hdcd/HDC_LOG: [DispatchTaskData:1650] New HTaskInfo cid:539924991 sid:190******492(L:10) command:1001
+05-09 22:42:46.984  1977  2385 I C02D13/hdcd/HDC_LOG: [AdminTask:886] AdminTask add task type:0 cid:539924991 sid:190******492(L:10) mapsize:2
+05-09 22:42:46.984  1977  2385 I C02D13/hdcd/HDC_LOG: [HdcTaskBase:34] HdcTaskBase type:0 cid:539924991 sid:190******492(L:10)
+05-09 22:42:46.984  1977  2385 I C02D13/hdcd/HDC_LOG: [CommandDispatch:414] Unity CommandDispatch command:1001 cid:539924991 sid:190******492(L:10)
+05-09 22:42:46.984  1977  2385 W C02D13/hdcd/HDC_LOG: [GetDevItem:114] GetDevItem false key:persist.hdc.root
+05-09 22:42:46.987  1977 15745 I C02D13/hdcd/HDC_LOG: [Popen:225] Popen pipe fds[pipeRead]:43 fds[pipeWrite]:48, mode 0
+05-09 22:42:46.990  3319  9188 E C015B0/om.huawei.hms.analyticsservice/NETSTACK: [epoll_multi_driver.cpp:97] epoll wait event 0 err: 111
+05-09 22:42:46.993  1977  2385 I C02D13/hdcd/HDC_LOG: [ExecuteCommand:286] ExecuteCommand cmd:hil****** -x(L:8) fd:43 pid:15746
+05-09 22:42:46.994  1977  2385 I C02D13/hdcd/HDC_LOG: [CommandDispatch:486] Unity CommandDispatch command:1001 finish cid:539924991 sid:190******492(L:10)
+05-09 22:42:46.999 15746 15746 W C02D13/hdcd/HDC_LOG: [SetSelinuxLabel:140] SetSelinuxLabel con:u:r:su:s0 isRoot:0

@@ -1,0 +1,663 @@
+{
+  "allowedAcls": [],
+  "appFeature": "hos_normal_app",
+  "appIndex": 0,
+  "appType": 2,
+  "applyQuickFixFrequency": 0,
+  "baseAbilityInfos": {
+    "com.axiomaster.bonio.entry.EntryAbility": {
+      "allowSelfRedirect": true,
+      "appIndex": 0,
+      "applicationName": "com.axiomaster.bonio",
+      "arkTSMode": "dynamic",
+      "backgroundModes": 1,
+      "bundleName": "com.axiomaster.bonio",
+      "codePath": "",
+      "compileMode": 1,
+      "configChanges": [],
+      "continuable": false,
+      "continueBundleName": [],
+      "continueType": [
+        "EntryAbility"
+      ],
+      "defaultFormHeight": 0,
+      "defaultFormWidth": 0,
+      "description": "$string:EntryAbility_desc",
+      "descriptionId": 16777220,
+      "deviceCapabilities": [],
+      "deviceTypes": [
+        "phone"
+      ],
+      "enabled": true,
+      "excludeFromDock": false,
+      "excludeFromMissions": false,
+      "extensionAbilityType": 255,
+      "formEnabled": false,
+      "formEntity": 0,
+      "hapPath": "/data/app/el1/bundle/public/com.axiomaster.bonio/entry.hap",
+      "iconId": 16777219,
+      "iconPath": "$media:layered_image",
+      "isLauncherAbility": false,
+      "isModuleJson": true,
+      "isNativeAbility": false,
+      "isStageBasedModel": true,
+      "isolationProcess": false,
+      "kind": "",
+      "label": "$string:EntryAbility_label",
+      "labelId": 16777221,
+      "launchMode": 0,
+      "maxWindowHeight": 0,
+      "maxWindowRatio": 0,
+      "maxWindowWidth": 0,
+      "metaData": {
+        "customizeData": []
+      },
+      "metadata": [],
+      "minFormHeight": 0,
+      "minFormWidth": 0,
+      "minWindowHeight": 0,
+      "minWindowRatio": 0,
+      "minWindowWidth": 0,
+      "moduleName": "entry",
+      "name": "EntryAbility",
+      "orientation": 0,
+      "orientationId": 0,
+      "package": "entry",
+      "permissions": [],
+      "preferMultiWindowOrientation": "default",
+      "priority": 0,
+      "process": "",
+      "readPermission": "",
+      "recoverable": false,
+      "removeMissionAfterTerminate": false,
+      "resourcePath": "/data/app/el1/bundle/public/com.axiomaster.bonio/entry/resources.index",
+      "skills": [
+        {
+          "actions": [
+            "ohos.want.action.home"
+          ],
+          "domainVerify": false,
+          "entities": [
+            "entity.system.home"
+          ],
+          "permissions": [],
+          "uris": []
+        }
+      ],
+      "srcEntrance": "./ets/entryability/EntryAbility.ets",
+      "srcLanguage": "js",
+      "srcPath": "",
+      "startWindow": "",
+      "startWindowBackground": "$color:start_window_background",
+      "startWindowBackgroundId": 16777229,
+      "startWindowIcon": "$media:startIcon",
+      "startWindowIconId": 16777239,
+      "startWindowId": 0,
+      "startWindowResource": {
+        "startWindowAppIconId": 0,
+        "startWindowBackgroundColorId": 0,
+        "startWindowBackgroundImageFit": "Cover",
+        "startWindowBackgroundImageId": 0,
+        "startWindowBrandingImageId": 0,
+        "startWindowIllustrationId": 0
+      },
+      "supportExtNames": [],
+      "supportMimeTypes": [],
+      "supportPipMode": false,
+      "supportWindowMode": [
+        0,
+        1,
+        2
+      ],
+      "targetAbility": "",
+      "theme": "",
+      "type": 1,
+      "uid": -1,
+      "unclearableMission": false,
+      "uri": "",
+      "visible": true,
+      "writePermission": ""
+    }
+  },
+  "baseApplicationInfo": {
+    "GWPAsanEnabled": false,
+    "accessTokenId": 0,
+    "accessTokenIdEx": 0,
+    "accessible": false,
+    "allowAppRunWhenDeviceFirstLocked": false,
+    "allowArkTsLargeHeap": false,
+    "allowCommonEvent": [],
+    "allowEnableNotification": false,
+    "allowMultiProcess": false,
+    "apiCompatibleVersion": 60001021,
+    "apiReleaseType": "Release",
+    "apiTargetVersion": 60002022,
+    "appDetailAbilityLibraryPath": "",
+    "appDistributionType": "none",
+    "appEnvironments": [],
+    "appIndex": 0,
+    "appPreloadPhase": 0,
+    "appPrivilegeLevel": "normal",
+    "appProvisionType": "debug",
+    "appQuickFix": {
+      "bundleName": "",
+      "deployedAppqfInfo": {
+        "cpuAbi": "",
+        "hqfInfos": [],
+        "nativeLibraryPath": "",
+        "type": 0,
+        "versionCode": 0,
+        "versionName": ""
+      },
+      "deployingAppqfInfo": {
+        "cpuAbi": "",
+        "hqfInfos": [],
+        "nativeLibraryPath": "",
+        "type": 0,
+        "versionCode": 0,
+        "versionName": ""
+      },
+      "versionCode": 0,
+      "versionName": ""
+    },
+    "appSignType": "none",
+    "applicationFlags": 1,
+    "applicationReservedFlag": 0,
+    "arkNativeFileAbi": "",
+    "arkNativeFilePath": "",
+    "arkTSMode": "",
+    "asanEnabled": false,
+    "asanLogPath": "",
+    "assetAccessGroups": [],
+    "associatedWakeUp": false,
+    "bundleName": "com.axiomaster.bonio",
+    "bundleType": 0,
+    "cacheDir": "",
+    "cloudFileSyncEnabled": false,
+    "cloudStructuredDataSyncEnabled": false,
+    "codePath": "/data/app/el1/bundle/public/com.axiomaster.bonio",
+    "compileSdkType": "HarmonyOS",
+    "compileSdkVersion": "6.0.2.130",
+    "configuration": "",
+    "cpuAbi": "arm64-v8a",
+    "crowdtestDeadline": -1,
+    "dataBaseDir": "/data/app/el2/database/com.axiomaster.bonio",
+    "dataDir": "",
+    "debug": true,
+    "description": "",
+    "descriptionId": 0,
+    "descriptionResource": {
+      "bundleName": "com.axiomaster.bonio",
+      "id": 0,
+      "moduleName": "entry"
+    },
+    "deviceId": "PHONE-001",
+    "distributedNotificationEnabled": true,
+    "enabled": true,
+    "entityType": "unspecified",
+    "entryDir": "",
+    "entryModuleName": "",
+    "fingerprint": "8AD1C6D020F08A0912614C9520B277AC4DACD5957E58B3445C6926B5694FC674",
+    "flags": 0,
+    "formVisibleNotify": false,
+    "hasPlugin": false,
+    "hideDesktopIcon": false,
+    "hnpPackages": {},
+    "hwasanEnabled": false,
+    "icon": "",
+    "iconId": 16777219,
+    "iconPath": "$media:layered_image",
+    "iconResource": {
+      "bundleName": "com.axiomaster.bonio",
+      "id": 16777219,
+      "moduleName": "entry"
+    },
+    "installSource": "unknown",
+    "installedForAllUser": false,
+    "isCompressNativeLibs": true,
+    "isForceRotate": false,
+    "isFreeInstallApp": false,
+    "isLauncherApp": false,
+    "isSystemApp": false,
+    "keepAlive": false,
+    "label": "$string:app_name",
+    "labelId": 16777216,
+    "labelResource": {
+      "bundleName": "com.axiomaster.bonio",
+      "id": 16777216,
+      "moduleName": "entry"
+    },
+    "maxChildProcess": 512,
+    "metaData": {},
+    "metadata": {},
+    "minCompatibleVersionCode": 1000000,
+    "moduleInfos": [],
+    "moduleSourceDirs": [],
+    "multiAppMode": {
+      "maxCount": 0,
+      "multiAppModeType": 0
+    },
+    "multiProjects": false,
+    "name": "com.axiomaster.bonio",
+    "nativeLibraryPath": "",
+    "needAppDetail": false,
+    "organization": "李世明",
+    "overlayState": 0,
+    "permissions": [],
+    "process": "com.axiomaster.bonio",
+    "profileable": false,
+    "removable": true,
+    "resourcesApply": [],
+    "runningResourcesApply": false,
+    "signatureKey": "",
+    "singleton": false,
+    "startMode": 1,
+    "supportedModes": 0,
+    "targetBundleList": [],
+    "targetBundleName": "",
+    "targetMinorApiVersion": 0,
+    "targetPatchApiVersion": 0,
+    "targetPriority": 0,
+    "tsanEnabled": false,
+    "ubsanEnabled": false,
+    "uid": -1,
+    "userDataClearable": true,
+    "vendor": "example",
+    "versionCode": 1000000,
+    "versionName": "1.0.0"
+  },
+  "baseBundleInfo": {
+    "abilityInfos": [],
+    "appId": "com.axiomaster.bonio_BAGNRl5Z6fnMC4lqgvLTqNIoNy8XlJHhS/zJZrMZYmsbNFr2CkJfvMpEhXngjeCAJD5DGSaeEeMI3n6rJ8GthKU=",
+    "appIndex": 0,
+    "buildVersion": "",
+    "compatibleVersion": 60001021,
+    "cpuAbi": "",
+    "defPermissions": [],
+    "description": "",
+    "entryInstallationFree": false,
+    "entryModuleName": "entry",
+    "extensionAbilityInfo": [],
+    "firstInstallTime": 0,
+    "gid": -1,
+    "hapModuleInfos": [],
+    "hapModuleNames": [],
+    "installTime": 0,
+    "isDifferentName": false,
+    "isKeepAlive": false,
+    "isNativeApp": false,
+    "isNewVersion": false,
+    "isPreInstallApp": false,
+    "jointUserId": "",
+    "label": "",
+    "mainEntry": "entry",
+    "maxSdkVersion": -1,
+    "minCompatibleVersionCode": 1000000,
+    "minSdkVersion": -1,
+    "moduleDirs": [],
+    "moduleNames": [],
+    "modulePublicDirs": [],
+    "moduleResPaths": [],
+    "name": "com.axiomaster.bonio",
+    "oldAppIds": [
+      "com.axiomaster.bonio_BAGNRl5Z6fnMC4lqgvLTqNIoNy8XlJHhS/zJZrMZYmsbNFr2CkJfvMpEhXngjeCAJD5DGSaeEeMI3n6rJ8GthKU="
+    ],
+    "overlayBundleInfos": [],
+    "overlayType": 3,
+    "releaseType": "Release",
+    "reqPermissionDetails": [],
+    "reqPermissionStates": [],
+    "reqPermissions": [],
+    "routerArray": [],
+    "seInfo": "",
+    "signatureInfo": {
+      "appId": "",
+      "appIdentifier": "6918730965088478322",
+      "fingerprint": ""
+    },
+    "singleton": false,
+    "targetMinorApiVersion": 0,
+    "targetPatchApiVersion": 0,
+    "targetVersion": 60002022,
+    "uid": -1,
+    "updateTime": 0,
+    "vendor": "example",
+    "versionCode": 1000000,
+    "versionName": "1.0.0"
+  },
+  "baseExtensionInfos": {
+    "com.axiomaster.bonio.entry.EntryBackupAbility": {
+      "appIdentifierAllowList": [],
+      "appIndex": 0,
+      "arkTSMode": "dynamic",
+      "bundleName": "com.axiomaster.bonio",
+      "compileMode": 1,
+      "customProcess": "",
+      "dataGroupIds": [],
+      "description": "",
+      "descriptionId": 0,
+      "enabled": true,
+      "extensionProcessMode": -1,
+      "extensionTypeName": "backup",
+      "hapPath": "/data/app/el1/bundle/public/com.axiomaster.bonio/entry.hap",
+      "icon": "",
+      "iconId": 0,
+      "isolationProcess": false,
+      "label": "",
+      "labelId": 0,
+      "metadata": [
+        {
+          "name": "ohos.extension.backup",
+          "resource": "$profile:backup_config",
+          "value": "",
+          "valueId": 0
+        }
+      ],
+      "moduleName": "entry",
+      "name": "EntryBackupAbility",
+      "needCreateSandbox": false,
+      "permissions": [],
+      "priority": 0,
+      "process": "com.axiomaster.bonio:backup",
+      "readPermission": "",
+      "resourcePath": "/data/app/el1/bundle/public/com.axiomaster.bonio/entry/resources.index",
+      "skills": [],
+      "srcEntrance": "./ets/entrybackupability/EntryBackupAbility.ets",
+      "type": 9,
+      "uid": -1,
+      "uri": "",
+      "validDataGroupIds": [],
+      "visible": false,
+      "writePermission": ""
+    }
+  },
+  "bundlePackInfo": {
+    "packages": [
+      {
+        "deliveryWithInstall": true,
+        "deviceType": [
+          "phone"
+        ],
+        "moduleType": "entry",
+        "name": "entry-default"
+      }
+    ],
+    "summary": {
+      "app": {
+        "bundleName": "com.axiomaster.bonio",
+        "version": {
+          "code": 1000000,
+          "minCompatibleVersionCode": 0,
+          "name": "1.0.0"
+        }
+      },
+      "modules": [
+        {
+          "abilities": [
+            {
+              "forms": [],
+              "label": "$string:EntryAbility_label",
+              "name": "EntryAbility",
+              "visible": false
+            }
+          ],
+          "apiVersion": {
+            "compatible": 21,
+            "releaseType": "Release",
+            "target": 22
+          },
+          "deviceType": [
+            "phone"
+          ],
+          "distro": {
+            "deliveryWithInstall": true,
+            "installationFree": false,
+            "moduleName": "entry",
+            "moduleType": "entry"
+          },
+          "extensionAbilities": [
+            {
+              "forms": [],
+              "name": "EntryBackupAbility"
+            }
+          ],
+          "mainAbility": "EntryAbility"
+        }
+      ]
+    }
+  },
+  "bundleStatus": 1,
+  "commonEvents": {},
+  "curDynamicIconModule": "",
+  "dataGroupInfos": {},
+  "developerId": "70086000148008417",
+  "dynamicSkills": {},
+  "extendResources": {},
+  "extensionSkillInfos": {
+    "com.axiomaster.bonio.entry.EntryBackupAbility": []
+  },
+  "formInfos": {},
+  "hqfInfos": [],
+  "innerBundleUserInfos": {
+    "com.axiomaster.bonio_100": {
+      "accessTokenId": 537557554,
+      "accessTokenIdEx": 34897295922,
+      "bundleName": "com.axiomaster.bonio",
+      "bundleUserInfo": {
+        "disabledAbilities": [],
+        "enabled": true,
+        "overlayState": [],
+        "setEnabledCaller": "",
+        "userId": 100
+      },
+      "canUninstall": true,
+      "cloneInfos": {},
+      "curDynamicIconModule": "",
+      "firstInstallTime": 1778322663736,
+      "gids": [
+        20020203
+      ],
+      "installTime": 1778332000755,
+      "installedPluginSet": [],
+      "isRemovable": true,
+      "uid": 20020203,
+      "updateTime": 1778337585833
+    }
+  },
+  "innerModuleInfos": {
+    "entry": {
+      "abilityKeys": [
+        "com.axiomaster.bonio.entry.EntryAbility"
+      ],
+      "abilitySrcEntryDelegator": "",
+      "abilityStageSrcEntryDelegator": "",
+      "aotCompileStatus": 0,
+      "appEnvironments": [],
+      "appStartup": "",
+      "arkTSMode": "dynamic",
+      "asanEnabled": false,
+      "boolSet": 0,
+      "buildHash": "",
+      "bundleType": 2,
+      "colorMode": -1,
+      "compileMode": "esmodule",
+      "compressNativeLibs": true,
+      "cpuAbi": "",
+      "crossAppSharedConfig": "",
+      "debug": true,
+      "definePermissions": [],
+      "dependencies": [],
+      "description": "$string:module_desc",
+      "descriptionId": 16777222,
+      "deviceTypes": [
+        "phone"
+      ],
+      "distro": {
+        "deliveryWithInstall": true,
+        "installationFree": false,
+        "moduleName": "entry",
+        "moduleType": "entry"
+      },
+      "easyGo": "",
+      "entryAbilityKey": "com.axiomaster.bonio.entry.EntryAbility",
+      "executableBinaryPaths": [],
+      "extensionKeys": [
+        "com.axiomaster.bonio.entry.EntryBackupAbility"
+      ],
+      "extensionSkillKeys": [
+        "com.axiomaster.bonio.entry.EntryBackupAbility"
+      ],
+      "fileContextMenu": "",
+      "formExtensionModule": "",
+      "formWidgetModule": "",
+      "gwpAsanEnabled": false,
+      "hapPath": "/data/app/el1/bundle/public/com.axiomaster.bonio/entry.hap",
+      "hashValue": "",
+      "hnpPackage": [],
+      "hwasanEnabled": false,
+      "icon": "$media:layered_image",
+      "iconId": 16777219,
+      "installationFree": false,
+      "isEncrypted": false,
+      "isEntry": true,
+      "isLibIsolated": false,
+      "isModuleJson": true,
+      "isRemovable": {},
+      "isRemovableSet": [],
+      "isStageBasedModel": true,
+      "isolationMode": "",
+      "label": "$string:EntryAbility_label",
+      "labelId": 16777221,
+      "mainAbility": "EntryAbility",
+      "metaData": {
+        "customizeData": []
+      },
+      "metadata": [],
+      "moduleArkTSMode": "dynamic",
+      "moduleDataDir": "",
+      "moduleName": "entry",
+      "modulePackage": "entry",
+      "modulePath": "/data/app/el1/bundle/public/com.axiomaster.bonio/entry",
+      "moduleResPath": "/data/app/el1/bundle/public/com.axiomaster.bonio/entry/resources.index",
+      "name": "entry",
+      "nativeLibraryFileNames": [],
+      "nativeLibraryPath": "",
+      "overlayModuleInfo": [],
+      "packageName": "entry",
+      "pages": "$profile:main_pages",
+      "preloads": [],
+      "process": "com.axiomaster.bonio",
+      "proxyDatas": [],
+      "querySchemes": [],
+      "reqCapabilities": [],
+      "requestPermissions": [
+        {
+          "moduleName": "",
+          "name": "ohos.permission.INTERNET",
+          "reason": "",
+          "reasonId": 0,
+          "usedScene": {
+            "abilities": [],
+            "when": ""
+          }
+        },
+        {
+          "moduleName": "",
+          "name": "ohos.permission.APPROXIMATELY_LOCATION",
+          "reason": "$string:reason_location",
+          "reasonId": 16777225,
+          "usedScene": {
+            "abilities": [
+              "EntryAbility"
+            ],
+            "when": "inuse"
+          }
+        },
+        {
+          "moduleName": "",
+          "name": "ohos.permission.CAMERA",
+          "reason": "$string:reason_camera",
+          "reasonId": 16777223,
+          "usedScene": {
+            "abilities": [
+              "EntryAbility"
+            ],
+            "when": "inuse"
+          }
+        },
+        {
+          "moduleName": "",
+          "name": "ohos.permission.MICROPHONE",
+          "reason": "$string:reason_microphone",
+          "reasonId": 16777226,
+          "usedScene": {
+            "abilities": [
+              "EntryAbility"
+            ],
+            "when": "inuse"
+          }
+        },
+        {
+          "moduleName": "",
+          "name": "ohos.permission.KEEP_BACKGROUND_RUNNING",
+          "reason": "",
+          "reasonId": 0,
+          "usedScene": {
+            "abilities": [],
+            "when": ""
+          }
+        }
+      ],
+      "requiredDeviceFeatures": {},
+      "resizeable": false,
+      "routerMap": "",
+      "shareFiles": "",
+      "skillKeys": [
+        "com.axiomaster.bonio.entry.EntryAbility"
+      ],
+      "srcEntrance": "",
+      "srcPath": "",
+      "systemTheme": "",
+      "targetModuleName": "",
+      "targetPriority": 0,
+      "tsanEnabled": false,
+      "ubsanEnabled": false,
+      "uiSyntax": "hml",
+      "upgradeFlag": 0,
+      "versionCode": 1000000,
+      "versionName": "",
+      "virtualMachine": ""
+    }
+  },
+  "innerSharedModuleInfos": {},
+  "installMark": {
+    "installMarkBundle": "com.axiomaster.bonio",
+    "installMarkPackage": "",
+    "installMarkStatus": 2
+  },
+  "isDelayAging": false,
+  "isNewVersion": true,
+  "isSandboxApp": false,
+  "odid": "827bc8eb-226d-931c-6dbe-f63bc04e8a11",
+  "overlayBundleInfo": [],
+  "overlayType": 3,
+  "pluginBundleInfos": {},
+  "shortcutInfos": {},
+  "skillInfos": {
+    "com.axiomaster.bonio.entry.EntryAbility": [
+      {
+        "actions": [
+          "ohos.want.action.home"
+        ],
+        "domainVerify": false,
+        "entities": [
+          "entity.system.home"
+        ],
+        "permissions": [],
+        "uris": []
+      }
+    ]
+  },
+  "uninstallState": true,
+  "userId_": 100
+}

@@ -113,25 +113,6 @@ export struct SettingsTab {
         ListItem() { this.SectionHeader("Floating Window") }
         ListItem() {
           Row() {
-            Text("Floating Window Permission")
-              .fontSize(14)
-              .fontColor('#333333')
-            Blank()
-            Button("Grant")
-              .type(ButtonType.Capsule)
-              .backgroundColor('#0A59F7')
-              .fontColor(Color.White)
-              .fontSize(12)
-              .height(28)
-              .onClick(() => {
-                this.requestFloatWindowPermission();
-              })
-          }
-          .width('100%')
-          .padding({ left: 16, right: 16, top: 8, bottom: 8 })
-        }
-        ListItem() {
-          Row() {
             Text("Enable Cat Overlay")
               .fontSize(14)
               .fontColor('#333333')
@@ -287,26 +268,12 @@ export struct SettingsTab {
   private async toggleFloatingWindow(isOn: boolean) {
     this.isFloatingWindowEnabled = isOn;
     if (isOn) {
-      await FloatWindowManager.getInstance().showFloatWindow();
+      const shown = await FloatWindowManager.getInstance().showFloatWindow();
+      if (!shown) {
+        this.isFloatingWindowEnabled = false;
+      }
     } else {
       await FloatWindowManager.getInstance().hideFloatWindow();
-    }
-  }
-
-  private requestFloatWindowPermission() {
-    const context = getContext(this) as common.UIAbilityContext;
-    try {
-      context.startAbility({
-        bundleName: 'com.huawei.hmos.settings',
-        abilityName: 'com.huawei.hmos.settings.MainAbility',
-        uri: 'application_info_entry',
-        parameters: {
-          pushParams: context.abilityInfo.bundleName
-        }
-      });
-      hilog.info(DOMAIN, 'SettingsTab', 'Navigating to system settings for float window permission');
-    } catch (err) {
-      hilog.error(DOMAIN, 'SettingsTab', 'Failed to jump to settings: %{public}s', JSON.stringify(err));
     }
   }
 }

@@ -1,0 +1,34 @@
+{
+  "verifiedPassed": true,
+  "message": "OK",
+  "content": {
+    "version-name": "2.0.0",
+    "version-code": 2,
+    "uuid": "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+    "validity": {
+      "not-before": 1778321210,
+      "not-after": 1809857210
+    },
+    "type": "debug",
+    "bundle-info": {
+      "developer-id": "debug",
+      "development-certificate": "-----BEGIN CERTIFICATE-----\nMIICMzCCAbigAwIBAgIEY/LeQjAKBggqhkjOPQQDAjBjMQswCQYDVQQGEwJDTjEU\nMBIGA1UECgwLT3Blbkhhcm1vbnkxGTAXBgNVBAsMEE9wZW5IYXJtb255IFRlYW0x\nIzAhBgNVBAMMGk9wZW5IYXJtb255IEFwcGxpY2F0aW9uIENBMB4XDTI2MDUwOTEw\nMDYyOVoXDTI5MDUwODEwMDYyOVowUjELMAkGA1UEBhMCQ04xFDASBgNVBAoMC09w\nZW5IYXJtb255MRkwFwYDVQQLDBBPcGVuSGFybW9ueSBUZWFtMRIwEAYDVQQDDAlC\nb25pbyBBcHAwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAATbYOCQQpW5fdkYHN45\nv0X3AHax12jPBdEDosFRIZ1eXmxOYzSGJwMfsHhUU90E8lI0TXYZnNmgM1sovube\nQqATo2swaTAdBgNVHQ4EFgQU+3Gu6GVxEFCwl3Bxmou72g1RWBowCQYDVR0TBAIw\nADAOBgNVHQ8BAf8EBAMCB4AwEwYDVR0lBAwwCgYIKwYBBQUHAwMwGAYMKwYBBAGP\nWwKCeAEDBAgwBgIBAQoBADAKBggqhkjOPQQDAgNpADBmAjEAxlLWOVp8fSy9RuOR\nmBFv2uvzr/yhC1LZsfYZL5fS6NrWt2rdBQVNBv5TiqkjJVEAAjEA352aW0xRVOED\nm9tjVvOg9CNfOQEPe3SjRkEA1A/Bh2jJ694tJrSX70RbuxC0gaaj\n-----END CERTIFICATE-----",
+      "bundle-name": "com.huawei.openclaw",
+      "apl": "normal",
+      "app-feature": "hos_normal_app",
+      "app-identifier": "f5d4e0dedb054327b45"
+    },
+    "baseapp-info": {},
+    "permissions": {},
+    "debug-info": {
+      "device-ids": [
+        ":1068578A7F9BEA7ED57F6D48203324EBD87C943E9734B7C929DEDD700B12DB34"
+      ],
+      "device-id-type": "udid"
+    },
+    "acls": {
+      "allowed-acls": []
+    },
+    "issuer": "debug"
+  }
+}

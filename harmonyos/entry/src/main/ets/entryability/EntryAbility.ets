@@ -14,7 +14,7 @@ export default class EntryAbility extends UIAbility {
   private isBackgroundRunning: boolean = false;
 
   async onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): Promise<void> {
-    hilog.info(DOMAIN, 'testTag', '!!! EntryAbility onCreate - ai.openclaw.harmonyos STARTING !!!');
+    hilog.info(DOMAIN, 'testTag', '!!! EntryAbility onCreate - com.axiomaster.bonio STARTING !!!');
 
     this.initPromise = (async () => {
       try {
@@ -103,7 +103,7 @@ export default class EntryAbility extends UIAbility {
       const wantAgentInfo: wantAgent.WantAgentInfo = {
         wants: [
           {
-            bundleName: 'ai.openclaw.harmonyos',
+            bundleName: 'com.axiomaster.bonio',
             abilityName: 'EntryAbility'
           }
         ],

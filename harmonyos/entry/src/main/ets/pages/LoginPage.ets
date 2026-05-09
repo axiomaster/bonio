@@ -93,7 +93,7 @@ struct LoginPage {
         .height(120)
         .margin({ bottom: 8 })
 
-      Text("OpenClaw Node")
+      Text("Bonio")
         .fontSize(28)
         .fontWeight(FontWeight.Bold)
         .fontColor('#333333')

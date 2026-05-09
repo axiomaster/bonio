@@ -1,0 +1,37 @@
+{
+  "verifiedPassed": true,
+  "message": "OK",
+  "content": {
+    "version-name": "2.0.0",
+    "version-code": 2,
+    "uuid": "f5d4e0de-db05-4327-b455-6a8b9e39e184",
+    "validity": {
+      "not-before": 1778318875,
+      "not-after": 1809854875
+    },
+    "type": "debug",
+    "bundle-info": {
+      "developer-id": "debug",
+      "development-certificate": "-----BEGIN CERTIFICATE-----\nMIIB5DCCAYqgAwIBAgIELqvq+zAKBggqhkjOPQQDAjBGMQswCQYDVQQGEwJDTjEO\nMAwGA1UECgwFQm9uaW8xDDAKBgNVBAsMA0FwcDEZMBcGA1UEAwwQQm9uaW8gQXBw\nIFN1YiBDQTAeFw0yNjA1MDkxNDI5MDVaFw0yOTA1MDgxNDI5MDVaMEExCzAJBgNV\nBAYTAkNOMQ4wDAYDVQQKDAVCb25pbzEOMAwGA1UECwwFRGVidWcxEjAQBgNVBAMM\nCUJvbmlvIEFwcDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABNhY9AQILDqfoeaV\niw2dLiknlqE1wkp07wcbiOBw4C/dHyErQ4SzHEzE7E2LHiUlULtYBTarQFbaaU0f\nypTniLajazBpMB0GA1UdDgQWBBTdDkZplEwkTlpmLHIYiYooAfxvcjAJBgNVHRME\nAjAAMA4GA1UdDwEB/wQEAwIHgDATBgNVHSUEDDAKBggrBgEFBQcDAzAYBgwrBgEE\nAY9bAoJ4AQMECDAGAgEBCgEAMAoGCCqGSM49BAMCA0gAMEUCIQDUuXlSFo98uKCY\nl53wTE/Yn7033BN0a+RH91EMZFz0uwIgEa7frYEN4rsV+8LxHUpxi447is4VIsS0\n55u6wjOQc1E=\n-----END CERTIFICATE-----",
+      "bundle-name": "com.axiomaster.bonio",
+      "apl": "normal",
+      "app-feature": "hos_normal_app",
+      "app-identifier": "bonio-root-float-20260509"
+    },
+    "baseapp-info": {},
+    "permissions": {},
+    "debug-info": {
+      "device-ids": [
+        ":1068578A7F9BEA7ED57F6D48203324EBD87C943E9734B7C929DEDD700B12DB34",
+        "1068578A7F9BEA7ED57F6D48203324EBD87C943E9734B7C929DEDD700B12DB34"
+      ],
+      "device-id-type": "udid"
+    },
+    "acls": {
+      "allowed-acls": [
+        "ohos.permission.SYSTEM_FLOAT_WINDOW"
+      ]
+    },
+    "issuer": "debug"
+  }
+}

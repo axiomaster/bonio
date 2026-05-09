@@ -259,7 +259,7 @@ export class GatewaySession {
           'Host': endpoint.host,
           'Origin': origin,
           'User-Agent': nativeUA,
-          'X-Requested-With': 'ai.openclaw.harmonyos'
+          'X-Requested-With': 'com.axiomaster.bonio'
         }
       };
       await this.ws.connect(url, options);
