@@ -61,16 +61,10 @@ export class FloatWindowManager {
       await this.tryConfigureWindow('setWindowTouchable', async () => {
         await this.floatWindow?.setWindowTouchable(true);
       });
-      await this.tryConfigureWindow('setWindowBackgroundColor', () => {
-        this.floatWindow?.setWindowBackgroundColor('#00000000');
-      });
       await this.moveWindowTo(INITIAL_WINDOW_X, INITIAL_WINDOW_Y, false);
 
       await this.floatWindow.setUIContent('pages/FloatWindowPage');
       await this.floatWindow.showWindow();
-      await this.tryConfigureWindow('setWindowBackgroundColorAfterShow', () => {
-        this.floatWindow?.setWindowBackgroundColor('#00000000');
-      });
       hilog.info(DOMAIN, TAG, 'System float window shown successfully');
       return true;
     } catch (err) {
