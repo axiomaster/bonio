@@ -118,13 +118,6 @@ struct FloatWindowPage {
   build() {
     Stack() {
       this.NativeCatAvatar()
-      Canvas(this.catCanvasContext)
-        .width(176)
-        .height(176)
-        .backgroundColor('#00000000')
-        .onReady(() => {
-          this.onCatCanvasReady();
-        })
     }
     .width(200)
     .height(200)
