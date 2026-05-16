@@ -250,10 +250,10 @@ class SecurePrefs(context: Context) {
 
   private fun loadOrMigrateDisplayName(context: Context): String {
     val existing = plainPrefs.getString(displayNameKey, null)?.trim().orEmpty()
-    if (existing.isNotEmpty() && existing != "BoJi Node") return existing
+    if (existing.isNotEmpty() && existing != "Bonio Node") return existing
 
     val candidate = DeviceNames.bestDefaultNodeName(context).trim()
-    val resolved = candidate.ifEmpty { "BoJi Node" }
+    val resolved = candidate.ifEmpty { "Bonio Node" }
 
     plainPrefs.edit { putString(displayNameKey, resolved) }
     return resolved

@@ -105,24 +105,29 @@ class FloatingWindowService : Service() {
             val channelId = "boji_agent_channel"
             val channel = android.app.NotificationChannel(
                 channelId,
-                "Desktop Agent Service",
+                "Agent Service",
                 android.app.NotificationManager.IMPORTANCE_LOW
             )
             val manager = getSystemService(android.app.NotificationManager::class.java)
             manager?.createNotificationChannel(channel)
 
             val notification = android.app.Notification.Builder(this, channelId)
-                .setContentTitle("BoJi Agent")
+                .setContentTitle("Bonio Agent")
                 .setContentText("Agent is running in the background")
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .build()
 
             if (Build.VERSION.SDK_INT >= 34) {
-                startForeground(
-                    101, notification,
+                val hasMic = ContextCompat.checkSelfPermission(
+                    this, android.Manifest.permission.RECORD_AUDIO
+                ) == PackageManager.PERMISSION_GRANTED
+                val serviceType = if (hasMic) {
                     android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or
                         android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
-                )
+                } else {
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                }
+                startForeground(101, notification, serviceType)
             } else {
                 startForeground(101, notification)
             }

@@ -79,7 +79,7 @@ class MainActivity : ComponentActivity() {
             // For a "Desktop Assistant", this is critical.
             android.app.AlertDialog.Builder(this)
                 .setTitle("Overlay Permission Required")
-                .setMessage("BoJi needs 'Display over other apps' permission to function as a floating virtual assistant. Please authorize it in the next screen.")
+                .setMessage("Bonio needs 'Display over other apps' permission to function as a floating virtual assistant. Please authorize it in the next screen.")
                 .setPositiveButton("Authorize") { _, _ ->
                     val intent = Intent(
                         Settings.ACTION_MANAGE_OVERLAY_PERMISSION,

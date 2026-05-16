@@ -95,7 +95,7 @@ class ConnectionManager(
     val version = resolvedVersionName()
     val release = Build.VERSION.RELEASE?.trim().orEmpty()
     val releaseLabel = if (release.isEmpty()) "unknown" else release
-    return "BoJiAndroid/$version (Android $releaseLabel; SDK ${Build.VERSION.SDK_INT})"
+    return "BonioAndroid/$version (Android $releaseLabel; SDK ${Build.VERSION.SDK_INT})"
   }
 
   fun buildClientInfo(clientId: String, clientMode: String): GatewayClientInfo {

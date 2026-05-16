@@ -26,7 +26,7 @@ class NodeForegroundService : Service() {
   override fun onCreate() {
     super.onCreate()
     ensureChannel()
-    val initial = buildNotification(title = "BoJi Remote", text = "Starting…")
+    val initial = buildNotification(title = "Bonio Remote", text = "Starting…")
     startForegroundWithTypes(notification = initial, requiresMic = false)
 
     val runtime = (application as BoJiApp).runtime
@@ -39,7 +39,7 @@ class NodeForegroundService : Service() {
         ) { status, server, connected ->
           Triple(status, server, connected)
         }.collect { (status, server, connected) ->
-          val title = if (connected) "BoJi Remote · Connected" else "BoJi Remote"
+          val title = if (connected) "Bonio Remote · Connected" else "Bonio Remote"
           val text = server?.let { "$status · $it" } ?: status
 
           // Mic requirement check (simplified for now)
@@ -79,7 +79,7 @@ class NodeForegroundService : Service() {
         "Connection",
         NotificationManager.IMPORTANCE_LOW,
       ).apply {
-        description = "BoJi remote connection status"
+        description = "Bonio remote connection status"
         setShowBadge(false)
       }
     mgr.createNotificationChannel(channel)
@@ -143,7 +143,7 @@ class NodeForegroundService : Service() {
   companion object {
     private const val CHANNEL_ID = "connection"
     private const val NOTIFICATION_ID = 1
-    private const val ACTION_STOP = "ai.axiomaster.BoJi.action.STOP"
+    private const val ACTION_STOP = "ai.axiomaster.Bonio.action.STOP"
 
     fun start(context: Context) {
       val intent = Intent(context, NodeForegroundService::class.java)

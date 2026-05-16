@@ -260,7 +260,7 @@ fun SettingsTab(
       item {
         PermissionRow(
           title = "Overlay Permission",
-          description = if (overlayPermissionGranted) "Granted. BoJi can run as a desktop assistant." else "BoJi needs to 'Display over other apps' to be a virtual assistant.",
+          description = if (overlayPermissionGranted) "Granted. Bonio can run as a desktop assistant." else "Bonio needs to 'Display over other apps' to be a virtual assistant.",
           buttonLabel = if (overlayPermissionGranted) "Manage" else "Grant",
           onClick = {
             val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -305,7 +305,7 @@ fun SettingsTab(
         }
         SwitchRow(
           title = "Late Night Reminder",
-          description = "BoJi will remind you to rest when using phone late at night.",
+          description = "Bonio will remind you to rest when using phone late at night.",
           checked = healthNagEnabled,
           onCheckedChange = { checked ->
             healthNagEnabled = checked
