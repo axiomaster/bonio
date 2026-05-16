@@ -1,9 +1,19 @@
+import lottie from '@ohos/lottie';
+import { hilog } from '@kit.PerformanceAnalysisKit';
 import { NodeRuntime } from '../node/NodeRuntime';
 import { FloatWindowManager } from '../common/FloatWindowManager';
+
+const DOMAIN = 0x3D00;
+const TAG = 'FloatWindowPage';
 
 @Entry
 @Component
 struct FloatWindowPage {
+  private catCanvasSettings: RenderingContextSettings = new RenderingContextSettings(true);
+  private catCanvasContext: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.catCanvasSettings);
+  private currentLottieAnim: string = 'cat_float_anim';
+  private lastLoadedAsset: string = '';
+
   @State agentState: string = 'idle';
   @State blinkMarker: boolean = false;
   private runtime: NodeRuntime | undefined = undefined;
@@ -16,6 +26,7 @@ struct FloatWindowPage {
   private dragStartWindowY: number = 0;
 
   aboutToAppear() {
+    hilog.info(DOMAIN, TAG, 'Float window page appearing');
     this.runtime = AppStorage.get<NodeRuntime>('nodeRuntime');
     if (this.runtime) {
       this.statusTimer = setInterval(() => {
@@ -33,6 +44,7 @@ struct FloatWindowPage {
   }
 
   aboutToDisappear() {
+    hilog.info(DOMAIN, TAG, 'Float window page disappearing');
     if (this.statusTimer !== -1) {
       clearInterval(this.statusTimer);
       this.statusTimer = -1;
@@ -41,11 +53,52 @@ struct FloatWindowPage {
       clearInterval(this.blinkTimer);
       this.blinkTimer = -1;
     }
+    try {
+      lottie.destroy(this.currentLottieAnim);
+    } catch (_e) { /* ignore */ }
+  }
+
+  private getLottieAsset(): string {
+    switch (this.agentState) {
+      case 'idle': return 'cat-idle.json';
+      case 'listening': return 'cat-listening.json';
+      case 'thinking': return 'cat-thinking.json';
+      case 'speaking': return 'cat-speaking.json';
+      case 'working': return 'cat-working.json';
+      default: return 'cat-idle.json';
+    }
+  }
+
+  private loadCatAnimation() {
+    const asset = this.getLottieAsset();
+    if (asset === this.lastLoadedAsset) return;
+    this.lastLoadedAsset = asset;
+    try {
+      lottie.destroy(this.currentLottieAnim);
+    } catch (_e) { /* ignore */ }
+
+    hilog.info(DOMAIN, TAG, 'Loading float avatar lottie: %{public}s', asset);
+    lottie.loadAnimation({
+      container: this.catCanvasContext,
+      renderer: 'canvas',
+      loop: true,
+      autoplay: true,
+      name: this.currentLottieAnim,
+      path: asset,
+    });
   }
 
   build() {
     Stack() {
       this.NativeCatAvatar()
+      Canvas(this.catCanvasContext)
+        .width(176)
+        .height(176)
+        .backgroundColor('#00000000')
+        .onReady(() => {
+          hilog.info(DOMAIN, TAG, 'Float avatar canvas ready');
+          this.loadCatAnimation();
+        })
     }
     .width(200)
     .height(200)
