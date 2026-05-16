@@ -2,7 +2,7 @@
 
 > 它不是一个聊天窗口，而是一个坐在你窗口边缘的、有灵魂的小家伙。
 
-**Bonio（波妞）** 是一个跨桌面与移动端的 AI 伴随智能体。它是一只浮动在你窗口边缘的虚拟宠物，**看得见你的屏幕，听得见你的声音，记得住你喂给它的东西**——在你需要时默默帮忙，在你无聊时逗你开心。桌面端支持 Windows / macOS，移动端支持 Android / HarmonyOS。
+**Bonio（波妞）** 是一个跨桌面与移动端的 AI 搭子。它是一只浮动在你窗口边缘的虚拟宠物，**看得见你的屏幕，听得见你的声音，记得住你喂给它的东西**——在你需要时默默帮忙，在你无聊时逗你开心。桌面端支持 Windows / macOS，移动端支持 Android / HarmonyOS。
 
 ![bonio-desktop](docs/blog/imgs/bonio-desktop.png)
 
@@ -10,9 +10,9 @@
 
 ## 它跟别的 AI 工具有什么不一样？
 
-| 传统 AI 助手 | Bonio |
+| 传统 AI | Bonio |
 |-------------|-------|
-| 藏在聊天窗口里，等你去叫它 | 一直浮在窗口边缘，**主动陪伴** |
+| 藏在聊天窗口里，等你去叫它 | 一直浮在窗口边缘，**主动陪着你** |
 | 只知道你打的字 | 知道你当前在用哪个应用、浏览器里在看什么 |
 | 只能聊天 | 能截图、调窗口布局、控制浏览器、执行脚本 |
 | 记不住东西 | 有**记忆系统**，截图/文件/文本拖给它就能自动分类存档 |
@@ -43,9 +43,9 @@
 
 ![bonio-right-menu](docs/blog/imgs/bonio-right-menu.png)
 
-### 📱 移动端伴侣
+### 📱 移动端
 
-除了桌面端，Bonio 还提供 **Android** 和 **HarmonyOS** 移动客户端，将 AI 搭子带到手机上：
+除了桌面端，Bonio 还提供 **Android** 和 **HarmonyOS** 移动客户端，把 AI 搭子带到手机上：
 
 - **浮动猫咪 Avatar**：跟桌面端一样的可爱猫咪，浮在手机屏幕上方
 - **语音聊天**：按住说话，AI 实时回复
@@ -91,7 +91,7 @@ Bonio 由四个组件构成，通过统一的 **WebSocket 协议 v3** 通信：
      ▼
 ┌──────────┐  ┌──────────┐
 │ Android  │  │HarmonyOS │
-│ 手机伴侣   │  │ 手机伴侣   │
+│ 手机搭子   │  │ 手机搭子   │
 └──────────┘  └──────────┘
 ```
 
@@ -152,8 +152,8 @@ scripts\build-desktop.bat --ninja --run
 |------|--------|------|
 | `desktop/` | Flutter / Dart | Windows & macOS 桌面客户端 |
 | `server/` | C++17 / CMake | HiClaw 网关服务器 |
-| `android/` | Kotlin / Jetpack Compose | Android 手机伴侣 |
-| `harmonyos/` | ArkTS | HarmonyOS 手机伴侣 |
+| `android/` | Kotlin / Jetpack Compose | Android 手机搭子 |
+| `harmonyos/` | ArkTS | HarmonyOS 手机搭子 |
 | `docs/blog/` | — | 技术博客系列（中英双语） |
 | `docs/design/` | — | 产品需求文档（PRD） |
 | `docs/plans/` | — | 实现计划 |
