@@ -12,7 +12,7 @@
 
 | 传统 AI 助手 | Bonio |
 |-------------|-------|
-| 藏在聊天窗口里，等你去叫它 | 一直浮在窗口边缘，**主动陪着你** |
+| 藏在聊天窗口里，等你去叫它 | 一直趴在窗口边缘，**主动陪着你** |
 | 只知道你打的字 | 知道你当前在用哪个应用、浏览器里在看什么 |
 | 只能聊天 | 能截图、调窗口布局、控制浏览器、执行脚本 |
 | 记不住东西 | 有**记忆系统**，截图/文件/文本拖给它就能自动分类存档 |
@@ -33,6 +33,16 @@
 | **右键** 猫咪 | 打开功能工具箱 |
 
 ![bonio-avatar](docs/blog/imgs/bonio-avatar.png)
+
+它有丰富的表情和动作，不同状态会自动切换：
+
+| 待机 | 倾听 | 思考 |
+|:----:|:----:|:----:|
+| ![待机](docs/blog/imgs/cat-idle-right.gif) | ![倾听](docs/blog/imgs/cat-listening.gif) | ![思考](docs/blog/imgs/cat-thinking.gif) |
+
+| 打字 | 无聊 | 出场 |
+|:----:|:----:|:----:|
+| ![打字](docs/blog/imgs/cat-typing.gif) | ![无聊](docs/blog/imgs/cat-bored.gif) | ![出场](docs/blog/imgs/cat-appear.gif) |
 
 ### 🖱️ 右键工具箱
 

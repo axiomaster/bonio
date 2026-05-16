@@ -93,6 +93,18 @@ PointerDown (右键, buttons & 0x02)
 
 ## 动画状态系统
 
+Avatar 的 6 种核心状态一览：
+
+| 待机 `idle` | 倾听 `listening` | 思考 `thinking` |
+|:-----------:|:----------------:|:---------------:|
+| ![待机](../../imgs/cat-idle-right.gif) | ![倾听](../../imgs/cat-listening.gif) | ![思考](../../imgs/cat-thinking.gif) |
+| 默认状态，安静趴着 | 用户长按录音中，竖起耳朵 | LLM 请求进行中 |
+
+| 打字 `typing` | 无聊 `bored` | 出场 `appear` |
+|:-------------:|:------------:|:-------------:|
+| ![打字](../../imgs/cat-typing.gif) | ![无聊](../../imgs/cat-bored.gif) | ![出场](../../imgs/cat-appear.gif) |
+| 键盘输入动作 | 单击随机动作 | 启动时探出头来 |
+
 Avatar 的动画分为三个层级，按**优先级**叠加：
 
 ### 1. 手势动作（最高优先级）
