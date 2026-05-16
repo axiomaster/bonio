@@ -2,7 +2,7 @@
 
 > 它不是一个聊天窗口，而是一个坐在你窗口边缘的、有灵魂的小家伙。
 
-**Bonio（波妞）** 是一个运行在 Windows / macOS 桌面上的 AI 伴随智能体。它是一只浮动在你当前窗口边缘的虚拟宠物，**看得见你的屏幕，听得见你的声音，记得住你喂给它的东西**——在你需要时默默帮忙，在你无聊时逗你开心。
+**Bonio（波妞）** 是一个跨桌面与移动端的 AI 伴随智能体。它是一只浮动在你窗口边缘的虚拟宠物，**看得见你的屏幕，听得见你的声音，记得住你喂给它的东西**——在你需要时默默帮忙，在你无聊时逗你开心。桌面端支持 Windows / macOS，移动端支持 Android / HarmonyOS。
 
 ![bonio-desktop](docs/blog/imgs/bonio-desktop.png)
 
@@ -42,6 +42,17 @@
 - **伴读** — 浏览器里看长文 → 自动 70/30 分屏，提取目录 + 摘要 + 笔记编辑器
 
 ![bonio-right-menu](docs/blog/imgs/bonio-right-menu.png)
+
+### 📱 移动端伴侣
+
+除了桌面端，Bonio 还提供 **Android** 和 **HarmonyOS** 移动客户端，将 AI 搭子带到手机上：
+
+- **浮动猫咪 Avatar**：跟桌面端一样的可爱猫咪，浮在手机屏幕上方
+- **语音聊天**：按住说话，AI 实时回复
+- **设备能力扩展**：相机拍照、GPS 定位、短信收发、屏幕截图、来电管理
+- **服务端工具调用**：AI 可以远程调用手机传感器完成真实世界任务
+
+![bonio-android-avatar](docs/blog/imgs/bonio-android-avatar.png)
 
 ### 🎤 语音 + 📱 微信
 
@@ -114,6 +125,15 @@ scripts\build-desktop.bat --ninja --run
 | **Linux** | build-essential + cmake + ninja + libssl-dev |
 
 详见 [CLAUDE.md](CLAUDE.md) 中的完整构建文档。
+
+### 移动端
+
+| 平台 | 构建 |
+|------|------|
+| **Android** | `cd android && ./gradlew assembleDebug`（需要 Android SDK，minSdk 31） |
+| **HarmonyOS** | `cd harmonyos && hvigorw --mode module -p product=default assembleHap`（需要 DevEco Studio SDK） |
+
+移动端连接同一个 HiClaw 后端，共享 AI 对话、会话历史和记忆系统。
 
 ### 连接后端
 
