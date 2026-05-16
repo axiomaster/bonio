@@ -13,6 +13,7 @@ struct FloatWindowPage {
   private catCanvasContext: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.catCanvasSettings);
   private currentLottieAnim: string = 'cat_float_anim';
   private lastLoadedAsset: string = '';
+  private canvasReady: boolean = false;
 
   @State agentState: string = 'idle';
   @State blinkMarker: boolean = false;
@@ -34,6 +35,7 @@ struct FloatWindowPage {
           const state = this.runtime.isConnected ? 'idle' : 'working';
           if (this.agentState !== state) {
             this.agentState = state;
+            this.loadCatAnimation();
           }
         }
       }, 1000);
@@ -56,6 +58,10 @@ struct FloatWindowPage {
     try {
       lottie.destroy(this.currentLottieAnim);
     } catch (_e) { /* ignore */ }
+    try {
+      lottie.setAttachedCanvasHasVisibleArea(this.catCanvasContext, false);
+    } catch (_e) { /* ignore */ }
+    this.canvasReady = false;
   }
 
   private getLottieAsset(): string {
@@ -70,6 +76,7 @@ struct FloatWindowPage {
   }
 
   private loadCatAnimation() {
+    if (!this.canvasReady) return;
     const asset = this.getLottieAsset();
     if (asset === this.lastLoadedAsset) return;
     this.lastLoadedAsset = asset;
@@ -78,6 +85,9 @@ struct FloatWindowPage {
     } catch (_e) { /* ignore */ }
 
     hilog.info(DOMAIN, TAG, 'Loading float avatar lottie: %{public}s', asset);
+    try {
+      lottie.setAttachedCanvasHasVisibleArea(this.catCanvasContext, true);
+    } catch (_e) { /* ignore */ }
     lottie.loadAnimation({
       container: this.catCanvasContext,
       renderer: 'canvas',
@@ -86,6 +96,23 @@ struct FloatWindowPage {
       name: this.currentLottieAnim,
       path: asset,
     });
+    try {
+      lottie.resize(176, 176, this.currentLottieAnim, true);
+      lottie.play(this.currentLottieAnim, true);
+    } catch (_e) { /* ignore */ }
+  }
+
+  private onCatCanvasReady() {
+    hilog.info(DOMAIN, TAG, 'Float avatar canvas ready');
+    this.canvasReady = true;
+    this.lastLoadedAsset = '';
+    try {
+      lottie.bindContext2dToCoordinator(this.catCanvasContext);
+      lottie.setAttachedCanvasHasVisibleArea(this.catCanvasContext, true);
+    } catch (_e) { /* ignore */ }
+    setTimeout(() => {
+      this.loadCatAnimation();
+    }, 50);
   }
 
   build() {
@@ -96,8 +123,7 @@ struct FloatWindowPage {
         .height(176)
         .backgroundColor('#00000000')
         .onReady(() => {
-          hilog.info(DOMAIN, TAG, 'Float avatar canvas ready');
-          this.loadCatAnimation();
+          this.onCatCanvasReady();
         })
     }
     .width(200)
