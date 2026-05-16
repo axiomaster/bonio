@@ -1,4 +1,3 @@
-import lottie from '@ohos/lottie';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { NodeRuntime } from '../node/NodeRuntime';
 import { FloatWindowManager } from '../common/FloatWindowManager';
@@ -9,12 +8,6 @@ const TAG = 'FloatWindowPage';
 @Entry
 @Component
 struct FloatWindowPage {
-  private catCanvasSettings: RenderingContextSettings = new RenderingContextSettings(true);
-  private catCanvasContext: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.catCanvasSettings);
-  private currentLottieAnim: string = 'cat_float_anim';
-  private lastLoadedAsset: string = '';
-  private canvasReady: boolean = false;
-
   @State agentState: string = 'idle';
   @State blinkMarker: boolean = false;
   private runtime: NodeRuntime | undefined = undefined;
@@ -35,7 +28,6 @@ struct FloatWindowPage {
           const state = this.runtime.isConnected ? 'idle' : 'working';
           if (this.agentState !== state) {
             this.agentState = state;
-            this.loadCatAnimation();
           }
         }
       }, 1000);
@@ -55,64 +47,6 @@ struct FloatWindowPage {
       clearInterval(this.blinkTimer);
       this.blinkTimer = -1;
     }
-    try {
-      lottie.destroy(this.currentLottieAnim);
-    } catch (_e) { /* ignore */ }
-    try {
-      lottie.setAttachedCanvasHasVisibleArea(this.catCanvasContext, false);
-    } catch (_e) { /* ignore */ }
-    this.canvasReady = false;
-  }
-
-  private getLottieAsset(): string {
-    switch (this.agentState) {
-      case 'idle': return 'cat-idle.json';
-      case 'listening': return 'cat-listening.json';
-      case 'thinking': return 'cat-thinking.json';
-      case 'speaking': return 'cat-speaking.json';
-      case 'working': return 'cat-working.json';
-      default: return 'cat-idle.json';
-    }
-  }
-
-  private loadCatAnimation() {
-    if (!this.canvasReady) return;
-    const asset = this.getLottieAsset();
-    if (asset === this.lastLoadedAsset) return;
-    this.lastLoadedAsset = asset;
-    try {
-      lottie.destroy(this.currentLottieAnim);
-    } catch (_e) { /* ignore */ }
-
-    hilog.info(DOMAIN, TAG, 'Loading float avatar lottie: %{public}s', asset);
-    try {
-      lottie.setAttachedCanvasHasVisibleArea(this.catCanvasContext, true);
-    } catch (_e) { /* ignore */ }
-    lottie.loadAnimation({
-      container: this.catCanvasContext,
-      renderer: 'canvas',
-      loop: true,
-      autoplay: true,
-      name: this.currentLottieAnim,
-      path: asset,
-    });
-    try {
-      lottie.resize(176, 176, this.currentLottieAnim, true);
-      lottie.play(this.currentLottieAnim, true);
-    } catch (_e) { /* ignore */ }
-  }
-
-  private onCatCanvasReady() {
-    hilog.info(DOMAIN, TAG, 'Float avatar canvas ready');
-    this.canvasReady = true;
-    this.lastLoadedAsset = '';
-    try {
-      lottie.bindContext2dToCoordinator(this.catCanvasContext);
-      lottie.setAttachedCanvasHasVisibleArea(this.catCanvasContext, true);
-    } catch (_e) { /* ignore */ }
-    setTimeout(() => {
-      this.loadCatAnimation();
-    }, 50);
   }
 
   build() {
@@ -121,7 +55,8 @@ struct FloatWindowPage {
     }
     .width(200)
     .height(200)
-    .backgroundColor('#00000000')
+    .backgroundColor('#FFF7E4')
+    .borderRadius(24)
     .onTouch((event: TouchEvent) => {
       if (event.touches.length === 0) {
         this.isDragging = false;
@@ -211,7 +146,7 @@ struct FloatWindowPage {
     }
     .width(200)
     .height(200)
-    .backgroundColor('#00000000')
+    .backgroundColor('#FFF7E4')
   }
 
   @Builder
