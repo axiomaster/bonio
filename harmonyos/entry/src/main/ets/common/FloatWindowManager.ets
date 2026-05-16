@@ -52,12 +52,8 @@ export class FloatWindowManager {
       });
       hilog.info(DOMAIN, TAG, 'System float window created successfully');
 
-      await this.moveWindowTo(INITIAL_WINDOW_X, INITIAL_WINDOW_Y, false);
       await this.tryConfigureWindow('resize', async () => {
         await this.floatWindow?.resize(FLOAT_WINDOW_SIZE, FLOAT_WINDOW_SIZE);
-      });
-      await this.tryConfigureWindow('setWindowBackgroundColor', () => {
-        this.floatWindow?.setWindowBackgroundColor('#00000000');
       });
       await this.tryConfigureWindow('setWindowFocusable', async () => {
         await this.floatWindow?.setWindowFocusable(false);
@@ -65,8 +61,16 @@ export class FloatWindowManager {
       await this.tryConfigureWindow('setWindowTouchable', async () => {
         await this.floatWindow?.setWindowTouchable(true);
       });
+      await this.tryConfigureWindow('setWindowBackgroundColor', () => {
+        this.floatWindow?.setWindowBackgroundColor('#00000000');
+      });
+      await this.moveWindowTo(INITIAL_WINDOW_X, INITIAL_WINDOW_Y, false);
+
       await this.floatWindow.setUIContent('pages/FloatWindowPage');
       await this.floatWindow.showWindow();
+      await this.tryConfigureWindow('setWindowBackgroundColorAfterShow', () => {
+        this.floatWindow?.setWindowBackgroundColor('#00000000');
+      });
       hilog.info(DOMAIN, TAG, 'System float window shown successfully');
       return true;
     } catch (err) {
@@ -118,7 +122,7 @@ export class FloatWindowManager {
       }
     } catch (err) {
       const error = err as BusinessError;
-      hilog.error(DOMAIN, TAG, 'Failed to move float window: %{public}s', JSON.stringify(error));
+      hilog.warn(DOMAIN, TAG, 'moveWindowTo failed: %{public}s', JSON.stringify(error));
     } finally {
       this.isMovePending = false;
     }

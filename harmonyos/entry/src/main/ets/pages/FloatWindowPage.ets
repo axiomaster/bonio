@@ -9,7 +9,7 @@ struct FloatWindowPage {
   private catCanvasContext: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.catCanvasSettings);
   private currentLottieAnim: string = 'cat_float_anim';
   private lastLoadedAsset: string = '';
-  
+
   @State agentState: string = 'idle';
   private runtime: NodeRuntime | undefined = undefined;
   private statusTimer: number = -1;
@@ -24,7 +24,6 @@ struct FloatWindowPage {
     if (this.runtime) {
       this.statusTimer = setInterval(() => {
         if (this.runtime) {
-          // Simplified state for floating window
           const state = this.runtime.isConnected ? 'idle' : 'working';
           if (this.agentState !== state) {
             this.agentState = state;
@@ -62,7 +61,7 @@ struct FloatWindowPage {
     try {
       lottie.destroy(this.currentLottieAnim);
     } catch (e) { /* ignore */ }
-    
+
     lottie.loadAnimation({
       container: this.catCanvasContext,
       renderer: 'canvas',
@@ -78,6 +77,7 @@ struct FloatWindowPage {
       Canvas(this.catCanvasContext)
         .width('100%')
         .height('100%')
+        .backgroundColor('#00000000')
         .onReady(() => {
           this.loadCatAnimation();
         })
