@@ -10,7 +10,7 @@
 
 ## 它跟别的 AI 工具有什么不一样？
 
-| 传统 AI | Bonio |
+| 传统 AI 助手 | Bonio |
 |-------------|-------|
 | 藏在聊天窗口里，等你去叫它 | 一直浮在窗口边缘，**主动陪着你** |
 | 只知道你打的字 | 知道你当前在用哪个应用、浏览器里在看什么 |
@@ -91,7 +91,7 @@ Bonio 由四个组件构成，通过统一的 **WebSocket 协议 v3** 通信：
      ▼
 ┌──────────┐  ┌──────────┐
 │ Android  │  │HarmonyOS │
-│ 手机搭子   │  │ 手机搭子   │
+│ AI 搭子    │  │ AI 搭子     │
 └──────────┘  └──────────┘
 ```
 
@@ -152,8 +152,8 @@ scripts\build-desktop.bat --ninja --run
 |------|--------|------|
 | `desktop/` | Flutter / Dart | Windows & macOS 桌面客户端 |
 | `server/` | C++17 / CMake | HiClaw 网关服务器 |
-| `android/` | Kotlin / Jetpack Compose | Android 手机搭子 |
-| `harmonyos/` | ArkTS | HarmonyOS 手机搭子 |
+| `android/` | Kotlin / Jetpack Compose | Android AI 搭子 |
+| `harmonyos/` | ArkTS | HarmonyOS AI 搭子 |
 | `docs/blog/` | — | 技术博客系列（中英双语） |
 | `docs/design/` | — | 产品需求文档（PRD） |
 | `docs/plans/` | — | 实现计划 |
