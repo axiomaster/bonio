@@ -62,7 +62,7 @@
 - **设备能力扩展**：相机拍照、GPS 定位、短信收发、屏幕截图、来电管理
 - **服务端工具调用**：AI 可以远程调用手机传感器完成真实世界任务
 
-![bonio-android-avatar](docs/blog/imgs/bonio-android-avatar.png)
+![bonio-android-avatar](docs/blog/imgs/bonio-android-avatar.jpg)
 
 ### 🎤 语音 + 📱 微信
 
