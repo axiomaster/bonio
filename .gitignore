@@ -3,4 +3,33 @@
 debug
 reference
 *.log
+*.obj
+
+# Local build/test sandboxes
+.codex-build/
+
+# Flutter / Dart
+.dart_tool/
+desktop/.dart_tool/
+desktop/build/
+desktop/.flutter-plugins
+desktop/.flutter-plugins-dependencies
+
+# Android / Gradle
+.gradle/
+android/.gradle/
+android/**/build/
+
+# HarmonyOS / Hvigor
+harmonyos/.hvigor/
+harmonyos/node_modules/
+harmonyos/oh_modules/
+harmonyos/**/build/
+harmonyos/output/
+harmonyos/build_output.txt
+
+# CMake / native build outputs
+build/
+cmake-build-*/
+server/build/
 server/bin/
