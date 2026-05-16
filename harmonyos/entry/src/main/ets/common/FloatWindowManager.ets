@@ -59,7 +59,7 @@ export class FloatWindowManager {
         await this.floatWindow?.setWindowFocusable(false);
       });
       await this.tryConfigureWindow('setWindowTouchable', async () => {
-        await this.floatWindow?.setWindowTouchable(true);
+        await this.floatWindow?.setWindowTouchable(false);
       });
       await this.moveWindowTo(INITIAL_WINDOW_X, INITIAL_WINDOW_Y, false);
 
