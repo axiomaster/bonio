@@ -7,9 +7,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 1. **Always compile after every code change** — run the appropriate build command to verify the code compiles successfully before proceeding.
 2. **Always git commit after completing a feature** — commit with a descriptive message to avoid losing work.
 
+## Design Document Workflow
+
+Feature development follows a three-stage document pipeline:
+
+| Stage | Input | Output | Naming |
+|-------|-------|--------|--------|
+| Raw PRD | User provides original design intent | `docs/design/rr/{feature}-{date}.md` | e.g. `note-export-20260517.md` |
+| Refined PRD | PM reviews raw PRD, clarifies requirements with user | `docs/design/prd/{feature}-prd-{date}.md` | e.g. `note-export-prd-20260517.md` |
+| Architecture | Architect designs implementation based on refined PRD | `docs/design/arch/{feature}-arch-{date}.md` | e.g. `note-export-arch-20260517.md` |
+
+- Raw PRDs in `rr/` are user-authored; do not modify without user confirmation.
+- Refined PRDs and architecture docs are produced by the team and must reference the source raw PRD.
+
 ## Project Overview
 
-BoJi (HiClaw) is an AI agent gateway system with four components:
+Bonio (HiClaw) is an AI agent gateway system with four components:
 - **server/** — C++ WebSocket gateway server (HiClaw) that connects to LLM providers and routes tool calls
 - **android/** — Kotlin/Jetpack Compose companion app for device control (camera, location, SMS)
 - **harmonyos/** — ArkTS/HarmonyOS port of the Android app
@@ -134,7 +147,7 @@ Requires Flutter SDK >=3.2.0. Cross-platform (Windows + macOS) via single Flutte
 
 - Avatar `tts` / `stopTts` use [`desktop/lib/services/desktop_tts.dart`](desktop/lib/services/desktop_tts.dart): **no** `flutter_tts` native plugin (avoids Windows CMake/NuGet). Speech is implemented with **PowerShell + System.Speech** on Windows, **`say`** on macOS, and **`spd-say` / `espeak-ng` / `espeak`** on Linux when available in `PATH`.
 - Assistant reply **speech** (when enabled in Settings) uses the same `DesktopTts` after each completed chat turn (`ChatController` → `onAssistantReplyForTts`), so OpenClaw does not need to emit `avatar.command` for basic read-aloud.
-- The pet is shown in a **second OS window** via [`desktop_multi_window`](desktop/pubspec.yaml) + [`window_manager`](desktop/pubspec.yaml) (see [`desktop/lib/main.dart`](desktop/lib/main.dart), [`desktop/lib/avatar_window_app.dart`](desktop/lib/avatar_window_app.dart)), so it stays visible when the main BoJi window is minimized. State is pushed from [`AvatarController`](desktop/lib/services/avatar_controller.dart) with `invokeMethod('sync', …)`; drag deltas go back through `avatarPan` on the main window controller.
+- The pet is shown in a **second OS window** via [`desktop_multi_window`](desktop/pubspec.yaml) + [`window_manager`](desktop/pubspec.yaml) (see [`desktop/lib/main.dart`](desktop/lib/main.dart), [`desktop/lib/avatar_window_app.dart`](desktop/lib/avatar_window_app.dart)), so it stays visible when the main Bonio window is minimized. State is pushed from [`AvatarController`](desktop/lib/services/avatar_controller.dart) with `invokeMethod('sync', …)`; drag deltas go back through `avatarPan` on the main window controller.
 
 **Desktop STT (voice input)**
 

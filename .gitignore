@@ -33,3 +33,6 @@ build/
 cmake-build-*/
 server/build/
 server/bin/
+
+# Release packages
+release/
