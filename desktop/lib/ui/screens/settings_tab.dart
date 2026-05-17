@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../l10n/app_strings.dart';
 import '../../providers/app_state.dart';
 
@@ -265,9 +266,157 @@ class SettingsTab extends StatelessWidget {
                 ),
               ),
             ),
+            const SizedBox(height: 16),
+
+            // Note Sync Settings
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.sync_alt,
+                            size: 20, color: colorScheme.primary),
+                        const SizedBox(width: 8),
+                        Text('笔记同步 (Note Sync)',
+                            style: theme.textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      '将“记一记”和“阅读搭子”的内容快捷同步到你常用的笔记软件中。',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: colorScheme.onSurface.withOpacity(0.65),
+                        height: 1.35,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('自动同步'),
+                      subtitle: Text(
+                        '新创建的笔记将自动导出到配置的目标',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      value: appState.runtime.noteExportService.autoSyncEnabled,
+                      onChanged: (v) {
+                        appState.runtime.noteExportService.updateConfig(
+                          autoSyncEnabled: v,
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    _SettingsRowWidget(
+                      label: '默认同步目标',
+                      child: DropdownButton<String>(
+                        value: appState.runtime.noteExportService.defaultExporterId.isEmpty 
+                            ? 'none' 
+                            : appState.runtime.noteExportService.defaultExporterId,
+                        isExpanded: true,
+                        underline: const SizedBox(),
+                        items: const [
+                          DropdownMenuItem(value: 'none', child: Text('无 (仅手动保存)')),
+                          DropdownMenuItem(value: 'obsidian', child: Text('Obsidian (本地)')),
+                          DropdownMenuItem(value: 'zip', child: Text('ZIP 归档 (手动)')),
+                        ],
+                        onChanged: (v) {
+                          appState.runtime.noteExportService.updateConfig(
+                            defaultExporterId: v == 'none' ? '' : v,
+                          );
+                        },
+                      ),
+                    ),
+                    if (appState.runtime.noteExportService.defaultExporterId == 'obsidian') ...[
+                      const SizedBox(height: 8),
+                      _SettingsRowWidget(
+                        label: 'Vault 路径',
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                appState.runtime.noteExportService.obsidianVaultPath.isEmpty
+                                    ? '未设置'
+                                    : appState.runtime.noteExportService.obsidianVaultPath,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: appState.runtime.noteExportService.obsidianVaultPath.isEmpty
+                                      ? colorScheme.error
+                                      : colorScheme.onSurface,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () async {
+                                final path = await FilePicker.getDirectoryPath(
+                                  dialogTitle: '选择 Obsidian Vault 文件夹',
+                                );
+                                if (path != null) {
+                                  appState.runtime.noteExportService.updateConfig(
+                                    obsidianVaultPath: path,
+                                  );
+                                }
+                              },
+                              child: const Text('选择'),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _SettingsRowWidget(
+                        label: '存放子目录',
+                        child: TextFormField(
+                          initialValue: appState.runtime.noteExportService.obsidianSubFolder,
+                          style: const TextStyle(fontSize: 13),
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                            border: OutlineInputBorder(),
+                          ),
+                          onChanged: (v) {
+                            appState.runtime.noteExportService.updateConfig(
+                              obsidianSubFolder: v.trim(),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _SettingsRowWidget extends StatelessWidget {
+  final String label;
+  final Widget child;
+  const _SettingsRowWidget({required this.label, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 160,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              fontSize: 13,
+            ),
+          ),
+        ),
+        Expanded(child: child),
+      ],
     );
   }
 }

@@ -77,6 +77,13 @@
 
 ![bonio-memory](docs/blog/imgs/bonio-memory.png)
 
+**笔记导出与同步**：记忆中的笔记可以一键导出到你的主力笔记应用：
+- **Obsidian 本地 Vault**：自动生成 Markdown 文件 + YAML Frontmatter + Wiki 链接，支持 `obsidian://` 深度链接直接打开
+- **ZIP 归档**：打包为标准 Markdown 格式，附件完整保留
+- **自动同步**：开启后新笔记自动导出到 Obsidian，静默无感
+- **批量导出**：多选笔记后一次性导出，显示进度和结果
+- **同步状态**：笔记卡片显示已同步标识和时间，详情中查看完整同步历史
+
 ---
 
 ## 架构

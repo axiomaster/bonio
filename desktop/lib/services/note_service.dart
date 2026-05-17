@@ -33,6 +33,9 @@ class NoteService extends ChangeNotifier {
   List<BonioNote> _notes = [];
   bool _initialized = false;
 
+  /// Callback invoked when a note is saved (for auto-sync).
+  void Function(BonioNote note)? _onNoteSaved;
+
   /// Pending analysis: runId → accumulated assistant text.
   final Map<String, StringBuffer> _pendingAnalysis = {};
 
@@ -97,6 +100,10 @@ class NoteService extends ChangeNotifier {
     _notes.insert(0, note);
     await _saveIndex();
     notifyListeners();
+
+    // Trigger auto-sync callback if set
+    _onNoteSaved?.call(note);
+
     return note;
   }
 
@@ -131,6 +138,11 @@ class NoteService extends ChangeNotifier {
 
   /// Full path to a thumbnail file.
   String thumbnailPath(String fileName) => '${_thumbDir.path}/$fileName';
+
+  /// Set the auto-sync callback (called when a note is saved).
+  void setAutoSyncCallback(void Function(BonioNote note) callback) {
+    _onNoteSaved = callback;
+  }
 
   // ---------------------------------------------------------------------------
   // Capture

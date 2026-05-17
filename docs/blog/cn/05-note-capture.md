@@ -170,4 +170,112 @@ Bonio 检索 `boji-notes` 会话上下文中积累的记忆，以卡片形式展
 
 ---
 
+## 笔记导出与同步：从捕捉到归档的完整工作流
+
+"记一记"解决了信息捕获的痛点，但长期的知识管理（PKM）通常需要依赖用户习惯的专业笔记应用。Bonio 的定位是"智能伴随与捕捉入口"，而非"重度笔记编辑器"。因此我们提供了**极简的笔记导出与同步功能**，将 Bonio 作为知识收集的"触角"，无缝流转到用户的主力笔记应用中。
+
+### 核心特性
+
+**纯本地文件互操作**：Bonio 直接读写本地文件系统，无需云端中转。用户在设置中配置目标应用的本地路径（如 Obsidian Vault），笔记转化为 Markdown 文件并直接写入目标目录。
+
+**资源本地化兜底**：截图/图片附件自动复制到目标应用的附件目录。Markdown 中的图片语法转换为目标应用友好的格式：
+- **Obsidian**：`![[image.png]]`（Wiki Link）
+- **ZIP**：标准 Markdown `![](attachments/image.png)`
+
+**元数据完整保留**：AI 生成的标签转换为 YAML Frontmatter，来源 URL、创建时间等元数据完整保留：
+
+```yaml
+---
+tags:
+  - 阅读搭子
+  - 技术
+source: https://example.com/article
+date: 2026-05-17T14:30:00.000Z
+---
+```
+
+**URL Scheme 深度链接**：导出成功后，可通过 URL Scheme 直接唤起目标应用。Obsidian: `obsidian://open?vault=VaultName&file=BoJi-Inbox/note.md`，用户无需手动导航到目标文件。
+
+**同步状态跟踪**：每条笔记记录 `syncStatus` 字段，记录每次成功导出的目标 ID 和时间戳。笔记卡片上显示同步状态标识（绿色云图标），详情中可查看完整同步历史。
+
+### 交互方式
+
+**单条笔记导出**：Memory 页面 → 笔记卡片 → 详情对话框 → 点击"导出/同步"按钮。导出成功后显示 SnackBar，提供"打开"按钮直接跳转到 Obsidian。
+
+**批量导出**：Memory 页面提供"批量选择"模式，用户可勾选多条笔记后批量导出。显示批量进度（如"正在导出 3/10..."），完成后显示成功/失败统计。
+
+**自动同步**：设置中提供"自动同步"开关。开启后，每条新笔记自动导出到默认目标（仅 Obsidian）。静默失败处理：自动同步失败不阻断用户操作，仅记录日志。
+
+### 配置方式
+
+设置 → "笔记同步" 配置卡片：
+- **自动同步**：Switch 开关，开启后新笔记自动导出到 Obsidian
+- **默认同步目标**：下拉选择（无、Obsidian 本地、ZIP 归档）
+- **Obsidian Vault 路径**：文件夹选择器
+- **存放子目录**：默认 `Bonio-Inbox`，可自定义避免弄乱用户 Vault 根目录
+
+**⚠️ Vault 路径配置说明**
+
+Vault 路径必须指向 Obsidian Vault 的**根目录**（即包含 `.obsidian` 隐藏文件夹的那个目录），而不是其他路径。配置错误会导致文件导出成功但 Obsidian 中看不到。
+
+常见错误示例：
+
+```
+# ❌ 错误：指向了 .obsidian 配置目录（Obsidian 不会索引此目录的内容）
+D:\lism\Documents\obsidian\projects\.obsidian
+
+# ❌ 错误：指向了包含多个 Vault 的父目录
+D:\lism\Documents\obsidian
+
+# ✅ 正确：指向包含 .obsidian 的 Vault 根目录
+D:\lism\Documents\obsidian\projects
+```
+
+如何确认你的 Vault 根目录：
+1. 打开 Obsidian → 左下角齿轮（设置）→ 关于 → 查看"Vault 路径"
+2. 或在文件管理器中找到包含 `.obsidian` 文件夹的目录
+
+配置正确的 Vault 路径后，导出的笔记会出现在 `{Vault根目录}/{子目录}/` 下，例如：
+
+```
+D:\lism\Documents\obsidian\
+└── projects\              ← Vault 根目录（选择这个）
+    ├── .obsidian\         ← Obsidian 配置（不要选这个）
+    ├── Bonio-Inbox\       ← 导出的笔记在这里
+    │   ├── attachments\   ← 截图附件
+    │   ├── 微信.md
+    │   └── 阅读搭子.md
+    └── 欢迎.md
+```
+
+### 技术实现
+
+导出器接口采用插件化设计：
+- `NoteExporter`：抽象接口，定义 `id`、`name` 和 `exportNote()` 方法
+- `ObsidianExporter`：实现 Obsidian 本地 Vault 导出，支持 Wiki 链接转换和 URL Scheme
+- `ZipExporter`：实现 ZIP 归档导出，标准 Markdown 格式
+
+`NoteExportService` 提供统一导出服务：
+- `export()`：单条笔记导出
+- `exportBatch()`：批量导出，返回 `BatchExportResult`（成功/失败统计和错误详情）
+- `autoSyncNote()`：自动同步单条笔记，静默执行，失败仅记录日志
+
+配置持久化使用 `shared_preferences`：
+- Key 命名规范：`note_export_*` 前缀
+- 支持的配置项：`auto_sync`、`default_target`、`obsidian_vault`、`obsidian_subfolder`
+
+### 用户体验亮点
+
+**一键流转**：从"记一记"到"归档"只需一次点击。无需复制粘贴，无需手动打标签，AI 已经帮你完成了所有组织工作。
+
+**零学习成本**：无需在目标应用中安装任何插件或配置。生成的 Markdown 文件天然兼容主流本地笔记应用。
+
+**本地优先**：纯本地文件互操作，保护隐私。无需云端中转，不依赖第三方服务。
+
+**冲突处理**：同一条笔记重复导出时生成新文件（不覆盖）。文件名冲突时自动添加后缀 `_1`、`2`...。
+
+**批量友好**：支持多选笔记后一次性导出，显示进度和结果。单条失败不影响其他笔记，完成后列出失败的笔记及原因。
+
+---
+
 *下一篇：[搜同款：一键比价的购物搭子](06-search-similar.md)*

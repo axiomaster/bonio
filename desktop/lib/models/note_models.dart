@@ -68,6 +68,7 @@ class BonioNote {
   List<String> tags;
   String? summary;
   bool analyzed;
+  Map<String, String>? syncStatus;
 
   BonioNote({
     required this.id,
@@ -81,6 +82,7 @@ class BonioNote {
     this.tags = const [],
     this.summary,
     this.analyzed = false,
+    this.syncStatus,
   });
 
   Map<String, dynamic> toJson() => {
@@ -95,6 +97,7 @@ class BonioNote {
         'tags': tags,
         'summary': summary,
         'analyzed': analyzed,
+        if (syncStatus != null) 'syncStatus': syncStatus,
       };
 
   factory BonioNote.fromJson(Map<String, dynamic> m) {
@@ -113,6 +116,7 @@ class BonioNote {
       tags: (m['tags'] as List?)?.cast<String>() ?? [],
       summary: m['summary'] as String?,
       analyzed: m['analyzed'] as bool? ?? false,
+      syncStatus: (m['syncStatus'] as Map?)?.cast<String, String>(),
     );
   }
 }

@@ -27,6 +27,7 @@ import 'chat_controller.dart';
 import 'camera_service.dart';
 import 'desktop_tts.dart';
 import 'note_service.dart';
+import 'note_export_service.dart';
 import '../l10n/app_strings.dart';
 import '../platform/gui_agent.dart';
 import '../platform/gui_grounder.dart';
@@ -67,6 +68,7 @@ class NodeRuntime extends ChangeNotifier {
   late final AvatarCommandExecutor avatarCommandExecutor;
   late final DesktopTts desktopTts;
   late final NoteService noteService;
+  late final NoteExportService noteExportService;
   late final GuiAgent guiAgent;
   late final PluginManager pluginManager;
   late final PaddleOcr paddleOcr;
@@ -146,6 +148,11 @@ class NodeRuntime extends ChangeNotifier {
       tts: desktopTts,
     );
     noteService = NoteService(session: operatorSession);
+    noteExportService = NoteExportService(noteService: noteService);
+    // Set up auto-sync callback
+    noteService.setAutoSyncCallback((note) {
+      noteExportService.triggerAutoSync(note);
+    });
     guiAgent = GuiAgent.create();
     pluginManager = PluginManager();
     paddleOcr = PaddleOcr();
@@ -155,6 +162,7 @@ class NodeRuntime extends ChangeNotifier {
     pluginManager.registerBuiltin(ReadingCompanionPlugin());
     pluginManager.addListener(pushPluginMenuToAvatar);
     unawaited(pluginManager.initialize());
+    unawaited(noteExportService.init());
     // Initialize PaddleOCR (local OCR engine)
     _paddleOcrInitFuture = _initPaddleOcr();
     // ChatController / AvatarController updates must bubble to AppState.
