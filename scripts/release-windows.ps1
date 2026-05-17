@@ -28,7 +28,7 @@ Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
 
 # ---------- Step 1: Build hiclaw server ----------
-Write-Host "[1/4] Building hiclaw server..." -ForegroundColor Yellow
+Write-Host "[1/5] Building hiclaw server..." -ForegroundColor Yellow
 & "$ServerDir\scripts\build-win-amd64.bat"
 if ($LASTEXITCODE -ne 0) {
     Write-Error "hiclaw build failed"
@@ -37,7 +37,7 @@ if ($LASTEXITCODE -ne 0) {
 
 # ---------- Step 2: Build Flutter desktop ----------
 Write-Host ""
-Write-Host "[2/4] Building Flutter desktop..." -ForegroundColor Yellow
+Write-Host "[2/5] Building Flutter desktop..." -ForegroundColor Yellow
 
 Push-Location $DesktopDir
 try {
@@ -78,7 +78,7 @@ try {
 
 # ---------- Step 3: Bundle ----------
 Write-Host ""
-Write-Host "[3/4] Bundling hiclaw + assets..." -ForegroundColor Yellow
+Write-Host "[3/5] Bundling hiclaw + assets..." -ForegroundColor Yellow
 & powershell -ExecutionPolicy Bypass -File "$DesktopDir\scripts\bundle-hiclaw.ps1"
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Bundle failed"
@@ -87,7 +87,7 @@ if ($LASTEXITCODE -ne 0) {
 
 # ---------- Step 4: Package ----------
 Write-Host ""
-Write-Host "[4/4] Packaging release..." -ForegroundColor Yellow
+Write-Host "[4/5] Packaging release (portable ZIP)..." -ForegroundColor Yellow
 
 # Find build output
 $BuildDir = $null
@@ -137,6 +137,34 @@ Remove-Item $StageDir -Recurse -Force
 
 $ZipSize = [math]::Round((Get-Item $ZipPath).Length / 1MB, 1)
 Write-Host "  Created: $ZipPath ($ZipSize MB)"
+
+# ---------- Step 5: Build Installer ----------
+Write-Host ""
+Write-Host "[5/5] Building installer..." -ForegroundColor Yellow
+
+$ISCC = $null
+$ISCCPaths = @(
+    "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
+    "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+    "C:\Program Files\Inno Setup 6\ISCC.exe"
+)
+foreach ($p in $ISCCPaths) {
+    if (Test-Path $p) { $ISCC = $p; break }
+}
+
+if ($ISCC) {
+    $SetupName = "Bonio-v$Version-windows-x64-setup.exe"
+    & $ISCC "$ScriptDir\bonio-setup.iss" /DAppVersion=$Version
+    if ($LASTEXITCODE -eq 0) {
+        $SetupPath = "$ReleaseDir\$SetupName"
+        $SetupSize = [math]::Round((Get-Item $SetupPath).Length / 1MB, 1)
+        Write-Host "  Created: $SetupPath ($SetupSize MB)"
+    } else {
+        Write-Host "  WARNING: Installer build failed (non-fatal)" -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "  Skipped: InnoSetup not found (install with: winget install JRSoftware.InnoSetup)" -ForegroundColor Yellow
+}
 
 # ---------- Generate RELEASE-NOTES.md ----------
 $date = Get-Date -Format 'yyyy-MM-dd'
