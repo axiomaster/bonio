@@ -102,6 +102,9 @@ class DesktopAvatarView extends StatefulWidget {
   /// Called when the input field should be dismissed (Esc, focus loss).
   final VoidCallback? onInputDismiss;
 
+  /// Called when the lens attachment and prompt are cleared by the user.
+  final VoidCallback? onClearLens;
+
   /// Programmatically add attachments (e.g. from Bonio Lens capture).
   final List<OutgoingAttachment>? initialAttachments;
 
@@ -129,6 +132,7 @@ class DesktopAvatarView extends StatefulWidget {
     this.onShowNativeMenu,
     this.onTextSubmit,
     this.onInputDismiss,
+    this.onClearLens,
     this.initialAttachments,
     this.initialText,
     this.preloadedTheme,
@@ -694,8 +698,12 @@ class _DesktopAvatarViewState extends State<DesktopAvatarView> {
                     final removed = _attachments[i];
                     setState(() {
                       _attachments.removeAt(i);
-                      if (removed.fileName == 'bonio_lens_capture.png') {
+                      final text = _inputController.text;
+                      if (removed.fileName == 'bonio_lens_capture.png' ||
+                          text.startsWith('[Bonio Lens') ||
+                          text.contains('Annotated regions:')) {
                         _inputController.clear();
+                        widget.onClearLens?.call();
                       }
                     });
                   },

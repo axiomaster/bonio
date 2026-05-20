@@ -1884,6 +1884,14 @@ class _AvatarFloatingAppState extends State<AvatarFloatingApp>
                   _sendTextSubmitToMain(text, attachments: attachments);
                 },
                 onInputDismiss: _sendInputDismissToMain,
+                onClearLens: () {
+                  if (mounted) {
+                    setState(() {
+                      _pendingLensAttachments = null;
+                      _pendingLensPrompt = null;
+                    });
+                  }
+                },
                 initialAttachments: _pendingLensAttachments,
                 initialText: _pendingLensPrompt,
                 preloadedTheme: _theme,
