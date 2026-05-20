@@ -177,7 +177,26 @@ class NoteService extends ChangeNotifier {
     }
 
     final title = ScreenCapture.getWindowTitle(hwnd);
-    final browserUrl = ScreenCapture.getBrowserUrl(hwnd);
+    
+    // Extract browser URL and page content asynchronously
+    String? browserUrl;
+    String? pageText;
+    final isBrowser = ScreenCapture.isBrowserWindow(hwnd);
+    if (isBrowser) {
+      try {
+        browserUrl = await ScreenCapture.getBrowserUrlAsync(hwnd);
+      } catch (e) {
+        log.warn('NoteService: failed to get browser URL: $e');
+      }
+      try {
+        pageText = await ScreenCapture.getBrowserPageTextAsync(hwnd);
+      } catch (e) {
+        log.warn('NoteService: failed to get browser page text: $e');
+      }
+    }
+    // Fallback URL if async failed or returned empty
+    browserUrl ??= ScreenCapture.getBrowserUrl(hwnd);
+
     final png = await capture.toPng();
     if (png == null) {
       log.error('NoteService: PNG encode failed');
@@ -197,7 +216,7 @@ class NoteService extends ChangeNotifier {
       await thumbFile.writeAsBytes(thumb);
     }
 
-    log.info('NoteService: captured "$title", url=$browserUrl');
+    log.info('NoteService: captured "$title", url=$browserUrl, text length=${pageText?.length ?? 0}');
 
     final note = BonioNote(
       id: id,
@@ -205,12 +224,14 @@ class NoteService extends ChangeNotifier {
       type: NoteType.screenshot,
       sourceApp: title ?? '',
       sourceUrl: browserUrl,
+      rawText: pageText,
       fileName: fileName,
       thumbnail: thumb != null ? thumbName : null,
     );
 
     return saveNote(note, attachment: png);
   }
+
 
   /// Save dropped content (text, image bytes, or file) as a note.
   Future<BonioNote?> saveDroppedContent({
@@ -504,9 +525,10 @@ class NoteService extends ChangeNotifier {
       prompt.writeln('1. 同一条内容可以打多个标签（1~3个），选择最贴切的');
       prompt.writeln('2. 如果预定义标签都不合适，可以自定义一个简短的标签');
       prompt.writeln('3. 给出一句话中文摘要（不超过30字）');
+      prompt.writeln('4. 如果文本内容或页面URL是网页文章，请从内容中提取出文章真实的、干净的标题（去除网站后缀如“- 知乎”、“_知乎”、“- Google Chrome”等）。如果无法提取，请保留原“来源窗口”名称作为标题');
       prompt.writeln();
       prompt.writeln('严格只返回如下JSON（不要包含其他内容）：');
-      prompt.writeln('{"tags": ["美食", "种草"], "summary": "一句话摘要"}');
+      prompt.writeln('{"tags": ["美食", "种草"], "summary": "一句话摘要", "title": "提取的文章标题或来源窗口"}');
 
       // Generate a client-side runId for tracking the streaming response
       final runId = const Uuid().v4();
@@ -593,9 +615,15 @@ class NoteService extends ChangeNotifier {
           final rawTags = (parsed['tags'] as List?)?.cast<String>() ?? [];
           note.tags = _normalizeTags(rawTags);
           note.summary = parsed['summary'] as String? ?? '';
+          
+          final extractedTitle = parsed['title'] as String? ?? '';
+          if (extractedTitle.isNotEmpty) {
+            note.sourceApp = extractedTitle;
+          }
+          
           note.analyzed = true;
           unawaited(updateNote(note));
-          log.info('NoteService: parsed tags=${note.tags}, summary=${note.summary}');
+          log.info('NoteService: parsed tags=${note.tags}, summary=${note.summary}, title=${note.sourceApp}');
           return;
         } on FormatException {
           // JSON parse failed, try fallback below

@@ -60,7 +60,7 @@ class BonioNote {
   final String id;
   final DateTime createdAt;
   final NoteType type;
-  final String sourceApp;
+  String sourceApp;
   final String? sourceUrl;
   String? rawText;
   final String fileName;

@@ -39,6 +39,32 @@ class ScreenCapture {
     return null;
   }
 
+  static Future<String?> getBrowserUrlAsync(int windowId) async {
+    if (Platform.isWindows) {
+      var url = await win.Win32ScreenCapture.getBrowserUrlViaKeyboard(windowId);
+      url ??= win.Win32ScreenCapture.getBrowserUrl(windowId);
+      return url;
+    }
+    if (Platform.isMacOS) {
+      return mac.MacosScreenCapture.getBrowserUrl(windowId);
+    }
+    return null;
+  }
+
+  static Future<String?> getBrowserPageTextAsync(int windowId) async {
+    if (Platform.isWindows) {
+      var text = await win.Win32ScreenCapture.getBrowserPageTextViaUIA(windowId);
+      if (text == null || text.isEmpty) {
+        text = await win.Win32ScreenCapture.getBrowserPageText(windowId);
+      }
+      return text;
+    }
+    if (Platform.isMacOS) {
+      return mac.MacosScreenCapture.getBrowserPageText(windowId);
+    }
+    return null;
+  }
+
   static double getDpiScaleForWindow(int windowId) {
     if (Platform.isWindows) return win.Win32ScreenCapture.getDpiScaleForWindow(windowId);
     if (Platform.isMacOS) return mac.MacosScreenCapture.getDpiScaleForWindow(windowId);
