@@ -762,10 +762,12 @@ class NoteService extends ChangeNotifier {
     final prompt = StringBuffer();
 
     prompt.writeln('你是文章分析专家。阅读下面的文章，按要求返回JSON。');
-    prompt.writeln('要求：提取标题和作者，给出2-4字分类标签，写200字摘要，将内容按主题分段深度总结。');
+    prompt.writeln('要求：从内容中提取文章真实的、干净的标题（去除网站名如“- 知乎”、“- 搜狐”、“_知乎”、“- Google Chrome”等）。提取作者，给出2-4字分类标签，写200字摘要，将内容按主题分段深度总结。');
     prompt.writeln('仅基于文章内容，不添加外部知识。不使用任何工具。');
     prompt.writeln();
-    if (title.isNotEmpty) prompt.writeln('文章标题: $title');
+    if (title.isNotEmpty) {
+      prompt.writeln('参考标题 (可能是浏览器窗口名，请忽略网站后缀并重新从正文内容中提取真实的标题): $title');
+    }
     if (url.isNotEmpty) prompt.writeln('URL: $url');
     prompt.writeln();
     prompt.writeln('文章内容:');
