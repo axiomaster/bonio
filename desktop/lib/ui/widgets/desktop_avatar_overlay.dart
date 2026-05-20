@@ -690,7 +690,15 @@ class _DesktopAvatarViewState extends State<DesktopAvatarView> {
                 top: -6,
                 right: -6,
                 child: GestureDetector(
-                  onTap: () => setState(() => _attachments.removeAt(i)),
+                  onTap: () {
+                    final removed = _attachments[i];
+                    setState(() {
+                      _attachments.removeAt(i);
+                      if (removed.fileName == 'bonio_lens_capture.png') {
+                        _inputController.clear();
+                      }
+                    });
+                  },
                   child: Container(
                     width: 16,
                     height: 16,
