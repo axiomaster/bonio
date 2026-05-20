@@ -95,6 +95,150 @@ ToolResult web_fetch_impl(const std::string& args_json) {
   return ToolResult{true, res.body, ""};
 }
 
+ToolResult web_search_impl(const std::string& args_json) {
+  std::string query = get_arg(args_json, "query");
+  if (query.empty()) return ToolResult{false, "", "missing 'query' argument"};
+  int count = get_arg_int(args_json, "count", 5);
+  if (count <= 0 || count > 20) count = 5;
+
+  // URL-encode the query
+  std::string encoded_query;
+  for (char c : query) {
+    if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+        c == '-' || c == '_' || c == '.' || c == '~') {
+      encoded_query += c;
+    } else if (c == ' ') {
+      encoded_query += '+';
+    } else {
+      char hex[4];
+      snprintf(hex, sizeof(hex), "%%%02X", static_cast<unsigned char>(c));
+      encoded_query += hex;
+    }
+  }
+
+  // Use DuckDuckGo HTML search (no API key required)
+  std::string search_url = "https://html.duckduckgo.com/html/?q=" + encoded_query;
+  net::HttpResponse res;
+  if (!net::get(search_url, res))
+    return ToolResult{false, "", res.error.empty() ? "search failed" : res.error};
+
+  // Parse HTML response to extract search results
+  std::ostringstream out;
+  out << "Search results for \"" << query << "\":\n\n";
+
+  // Simple HTML parsing to extract results
+  std::string body = res.body;
+  size_t pos = 0;
+  int result_count = 0;
+
+  // Look for result snippets: <a rel="nofollow" class="result__a" href="...">
+  const std::string result_start = "<a rel=\"nofollow\" class=\"result__a\"";
+  const std::string href_start = "href=\"";
+  const std::string title_end_marker = "</a>";
+  const std::string snippet_start = "<a class=\"result__snippet\"";
+  const std::string snippet_end = "</a>";
+
+  while ((pos = body.find(result_start, pos)) != std::string::npos && result_count < count) {
+    // Extract URL
+    size_t href_pos = body.find(href_start, pos);
+    if (href_pos == std::string::npos) break;
+    size_t url_start = href_pos + href_start.length();
+    size_t url_end = body.find("\"", url_start);
+    if (url_end == std::string::npos) break;
+    std::string url = body.substr(url_start, url_end - url_start);
+
+    // Skip DuckDuckGo redirect links
+    if (url.find("/l/?uddg=") == 0) {
+      // Extract real URL from redirect
+      size_t real_url_start = url.find("uddg=");
+      if (real_url_start != std::string::npos) {
+        real_url_start += 5;
+        size_t real_url_end = url.find("&", real_url_start);
+        if (real_url_end == std::string::npos) real_url_end = url.length();
+        // URL is encoded, decode basic %XX
+        std::string real_url = url.substr(real_url_start, real_url_end - real_url_start);
+        // Simple decode
+        std::string decoded_url;
+        for (size_t i = 0; i < real_url.length(); ++i) {
+          if (real_url[i] == '%' && i + 2 < real_url.length()) {
+            char hex[3] = {real_url[i+1], real_url[i+2], 0};
+            unsigned char val = static_cast<unsigned char>(strtol(hex, nullptr, 16));
+            decoded_url += val;
+            i += 2;
+          } else {
+            decoded_url += real_url[i];
+          }
+        }
+        url = decoded_url;
+      } else {
+        pos = url_end + 1;
+        continue;
+      }
+    }
+
+    // Extract title (between > and </a>)
+    size_t title_start = body.find(">", url_end);
+    if (title_start == std::string::npos) break;
+    title_start += 1;
+    size_t title_end = body.find(title_end_marker, title_start);
+    if (title_end == std::string::npos) break;
+    std::string title_html = body.substr(title_start, title_end - title_start);
+
+    // Strip HTML tags from title
+    std::string title;
+    bool in_tag = false;
+    for (char c : title_html) {
+      if (c == '<') in_tag = true;
+      else if (c == '>') in_tag = false;
+      else if (!in_tag) title += c;
+    }
+
+    // Try to find snippet
+    std::string snippet;
+    size_t snippet_pos = body.find(snippet_start, title_end);
+    if (snippet_pos != std::string::npos) {
+      size_t snippet_content_start = body.find(">", snippet_pos);
+      if (snippet_content_start != std::string::npos) {
+        snippet_content_start += 1;
+        size_t snippet_content_end = body.find(snippet_end, snippet_content_start);
+        if (snippet_content_end != std::string::npos) {
+          std::string snippet_html = body.substr(snippet_content_start, snippet_content_end - snippet_content_start);
+          // Strip HTML tags from snippet
+          in_tag = false;
+          for (char c : snippet_html) {
+            if (c == '<') in_tag = true;
+            else if (c == '>') in_tag = false;
+            else if (!in_tag && c != '\r' && c != '\n') snippet += c;
+          }
+        }
+      }
+    }
+
+    // Format result
+    out << "[" << (result_count + 1) << "] " << title << "\n";
+    out << "    URL: " << url << "\n";
+    if (!snippet.empty()) {
+      // Truncate snippet if too long
+      if (snippet.length() > 200) {
+        snippet = snippet.substr(0, 197) + "...";
+      }
+      out << "    " << snippet << "\n";
+    }
+    out << "\n";
+
+    result_count++;
+    pos = title_end + title_end_marker.length();
+  }
+
+  if (result_count == 0) {
+    out << "No results found. The search service may be unavailable.\n";
+  } else {
+    out << "Found " << result_count << " result(s).";
+  }
+
+  return ToolResult{true, out.str(), ""};
+}
+
 ToolResult shell_impl(const std::string& args_json) {
   std::string command = get_arg(args_json, "command");
   if (command.empty()) {
@@ -215,6 +359,7 @@ void register_builtin_tools() {
   register_tool("memory_recall", memory_recall_impl);
   register_tool("memory_forget", memory_forget_impl);
   register_tool("web_fetch", web_fetch_impl);
+  register_tool("web_search", web_search_impl);
   register_tool("skill.read", skill_read_impl);
   register_tool("memo.save", [](const std::string& args_json) -> ToolResult { return memo_save(args_json); });
   register_tool("memo.list", [](const std::string& args_json) -> ToolResult { return memo_list(args_json); });

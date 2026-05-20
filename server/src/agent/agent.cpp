@@ -84,6 +84,9 @@ static json tools_array() {
   // web_fetch tool
   tools.push_back(json::parse(R"({"type":"function","function":{"name":"web_fetch","description":"Fetch URL content via HTTP GET. Returns response body as text.","parameters":{"type":"object","properties":{"url":{"type":"string"}},"required":["url"]}}})"));
 
+  // web_search tool
+  tools.push_back(json::parse(R"({"type":"function","function":{"name":"web_search","description":"Search the web for information using DuckDuckGo. Returns search results with titles, URLs, and snippets.","parameters":{"type":"object","properties":{"query":{"type":"string","description":"Search query"},"count":{"type":"integer","description":"Number of results to return (default 5, max 20)"}},"required":["query"]}}})"));
+
   // memory_store tool
   tools.push_back(json::parse(R"({"type":"function","function":{"name":"memory_store","description":"Store a fact or note in long-term memory. Use category core (permanent), daily, or conversation.","parameters":{"type":"object","properties":{"key":{"type":"string"},"content":{"type":"string"},"category":{"type":"string"}},"required":["key","content"]}}})"));
 
