@@ -31,6 +31,7 @@ import 'note_export_service.dart';
 import '../l10n/app_strings.dart';
 import '../platform/gui_agent.dart';
 import '../platform/gui_grounder.dart';
+import '../platform/screen_capture.dart';
 import '../platform/cdp/cdp_browser_agent.dart';
 import '../plugins/builtin_plugins.dart';
 import '../plugins/plugin_manifest.dart';
@@ -738,6 +739,7 @@ class NodeRuntime extends ChangeNotifier {
     return [
       'device.info',
       'device.platform',
+      'screen.capture',
       ...cameraService.commands,
     ];
   }
@@ -823,6 +825,8 @@ class NodeRuntime extends ChangeNotifier {
       case 'camera.clip':
         return InvokeResult.fail(
             'NOT_IMPLEMENTED', 'camera.clip video recording is not yet supported on desktop');
+      case 'screen.capture':
+        return await _handleScreenCapture();
       default:
         return InvokeResult.fail('UNSUPPORTED_COMMAND',
             'Desktop client does not support: ${request.command}');
@@ -862,6 +866,30 @@ class NodeRuntime extends ChangeNotifier {
       return InvokeResult.fail(e.code, e.message);
     } catch (e) {
       return InvokeResult.fail('CAMERA_CAPTURE_FAILED', 'Unexpected error: $e');
+    }
+  }
+
+  Future<InvokeResult> _handleScreenCapture() async {
+    try {
+      final result = ScreenCapture.captureScreen();
+      if (result == null) {
+        return InvokeResult.fail('SCREEN_CAPTURE_UNAVAILABLE',
+            'Screen capture is not supported on this platform');
+      }
+      final pngBytes = await result.toPng();
+      if (pngBytes == null) {
+        return InvokeResult.fail('SCREEN_CAPTURE_ENCODE_FAILED',
+            'Failed to encode screen capture as PNG');
+      }
+      final base64Png = base64Encode(pngBytes);
+      return InvokeResult.success(jsonEncode({
+        'data': base64Png,
+        'width': result.width,
+        'height': result.height,
+        'dpiScale': result.dpiScale,
+      }));
+    } catch (e) {
+      return InvokeResult.fail('SCREEN_CAPTURE_FAILED', 'Unexpected error: $e');
     }
   }
 
