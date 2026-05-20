@@ -93,12 +93,24 @@ class NoteExportService extends ChangeNotifier {
       }
     }
 
-    final result = await exporter.exportNote(note, markdown, attachments);
+    // Check for previous export path (for overwrite)
+    final prevEntry = note.syncStatus?[exporter.id];
+    final previousPath = (prevEntry != null && prevEntry.contains('|'))
+        ? prevEntry.substring(prevEntry.indexOf('|') + 1)
+        : null;
+
+    final result = await exporter.exportNote(
+      note, markdown, attachments,
+      previousPath: previousPath,
+    );
 
     if (result.success) {
-      // Update note status
+      // Store timestamp and file path for overwrite tracking
       note.syncStatus ??= {};
-      note.syncStatus![exporter.id] = DateTime.now().toIso8601String();
+      final ts = DateTime.now().toIso8601String();
+      note.syncStatus![exporter.id] = result.filePath != null
+          ? '$ts|${result.filePath}'
+          : ts;
       await _noteService.updateNote(note);
     }
 

@@ -18,7 +18,8 @@ class ZipExporter implements NoteExporter {
 
   @override
   Future<ExportResult> exportNote(
-      BonioNote note, String markdownContent, List<File> attachments) async {
+      BonioNote note, String markdownContent, List<File> attachments,
+      {String? previousPath}) async {
     try {
       final archive = Archive();
 

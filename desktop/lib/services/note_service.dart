@@ -413,16 +413,9 @@ class NoteService extends ChangeNotifier {
       final state = payload['state'] as String?;
       final runId = payload['runId'] as String?;
 
-      if (state == 'delta') {
-        final text = _extractDeltaText(payload);
-        if (text.isNotEmpty) {
-          for (final buf in _pendingAnalysis.values) {
-            buf.write(text);
-          }
-        }
-        return true;
-      }
-
+      // Only use chat events for completion detection — content comes from
+      // agent events above.  Accumulating chat.delta too would duplicate
+      // content when the server sends both event types (e.g. OpenClaw).
       if (state == 'final' || state == 'aborted' || state == 'error') {
         if (runId != null && _analysisCompleters.containsKey(runId)) {
           final text = _pendingAnalysis.remove(runId)?.toString() ?? '';

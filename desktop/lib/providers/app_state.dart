@@ -680,8 +680,12 @@ class AppState extends ChangeNotifier {
       unawaited(runtime.noteService.analyzeNote(note).then((_) {
         final updated =
             runtime.noteService.notes.where((n) => n.id == note.id).firstOrNull;
-        if (updated != null && updated.tags.isNotEmpty) {
-          ctrl.setBubble(text: S.current.bubbleSaved(updated.tags.join(' ')));
+        if (updated != null) {
+          if (updated.tags.isNotEmpty) {
+            ctrl.setBubble(text: S.current.bubbleSaved(updated.tags.join(' ')));
+          }
+          // Re-sync to Obsidian now that title/tags/summary have been updated
+          runtime.noteExportService.triggerAutoSync(updated);
         }
       }));
     } else {
