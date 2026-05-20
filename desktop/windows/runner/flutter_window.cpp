@@ -5,16 +5,20 @@
 #include "flutter/generated_plugin_registrant.h"
 #include "desktop_multi_window/desktop_multi_window_plugin.h"
 #include <screen_retriever_windows/screen_retriever_windows_plugin_c_api.h>
+#include <webview_windows/webview_windows_plugin.h>
 #include <window_manager/window_manager_plugin.h>
 
-// Register only the plugins that the child (avatar) window actually needs.
-// The avatar window only needs multi-window messaging, screen info, and window
-// management — not camera, system tray, url launcher, etc.
+// Register only the plugins that child windows actually need.
+// Child windows use multi-window messaging, screen info, window management,
+// and optionally webview (e.g., search_similar window). Not needed here:
+// camera, system tray, url launcher, etc.
 static void RegisterChildPlugins(flutter::PluginRegistry* registry) {
   DesktopMultiWindowPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("DesktopMultiWindowPlugin"));
   ScreenRetrieverWindowsPluginCApiRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("ScreenRetrieverWindowsPluginCApi"));
+  WebviewWindowsPluginRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("WebviewWindowsPlugin"));
   WindowManagerPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("WindowManagerPlugin"));
 }
