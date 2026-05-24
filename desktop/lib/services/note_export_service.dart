@@ -187,7 +187,10 @@ class NoteExportService extends ChangeNotifier {
   Map<String, DateTime> getNoteSyncSummary(BonioNote note) {
     if (note.syncStatus == null) return {};
     return note.syncStatus!.map(
-      (key, value) => MapEntry(key, DateTime.parse(value)),
+      (key, value) {
+        final tsStr = value.contains('|') ? value.substring(0, value.indexOf('|')) : value;
+        return MapEntry(key, DateTime.parse(tsStr));
+      },
     );
   }
 

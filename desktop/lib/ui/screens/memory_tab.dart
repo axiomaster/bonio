@@ -635,7 +635,10 @@ class _NoteCard extends StatelessWidget {
                               child: Wrap(
                                 spacing: 8,
                                 children: note.syncStatus!.entries.map((entry) {
-                                  final timestamp = DateTime.parse(entry.value);
+                                  final tsStr = entry.value.contains('|')
+                                      ? entry.value.substring(0, entry.value.indexOf('|'))
+                                      : entry.value;
+                                  final timestamp = DateTime.parse(tsStr);
                                   return Chip(
                                     avatar: const Icon(Icons.sync, size: 14),
                                     label: Text(
