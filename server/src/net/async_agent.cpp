@@ -218,7 +218,7 @@ void AsyncAgentManager::run_task(std::shared_ptr<AsyncTask> task) {
       auto event_cb = [this](const std::string& name, const std::string& payload) {
         send_event(name, payload);
       };
-      remote_executor = [tr, event_cb, &task](
+      remote_executor = [tr, event_cb, &task, session_key_copy](
           const std::string& tool_call_id,
           const std::string& tool_name,
           const std::string& args_json) -> types::ToolResult {
@@ -254,6 +254,16 @@ void AsyncAgentManager::run_task(std::shared_ptr<AsyncTask> task) {
 
         try {
           auto result = future.get();
+          // Emit tool.result event for screen captures so adapters can forward images
+          if (result.success && !result.output.empty() &&
+              (tool_name == "screen.capture" || tool_name == "camera.snap" || tool_name == "photos.capture")) {
+            nlohmann::json tool_result_payload;
+            tool_result_payload["sessionKey"] = session_key_copy;
+            tool_result_payload["toolName"] = tool_name;
+            tool_result_payload["toolCallId"] = tool_call_id;
+            tool_result_payload["output"] = result.output;
+            event_cb("tool.result", tool_result_payload.dump());
+          }
           return types::ToolResult{result.success, result.output, result.error};
         } catch (const std::exception& e) {
           return types::ToolResult{false, "", std::string("Remote tool error: ") + e.what()};

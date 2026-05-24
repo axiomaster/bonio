@@ -40,6 +40,10 @@ public:
   bool send_message(const std::string& to_user_id,
                     const std::string& content);
 
+  /// Send image via CDN upload (AES-128-ECB encrypted).
+  bool send_image(const std::string& to_user_id,
+                  const std::string& image_data);
+
   /// Signal the polling loop to stop.
   void stop();
 
@@ -47,6 +51,8 @@ private:
   bool do_post(const std::string& path, const std::string& body,
                int& ret_code, int& err_code, std::string& resp_body);
   bool do_get(const std::string& url, std::string& resp_body);
+  bool post_binary(const std::string& url, const std::string& data,
+                   std::string& encrypted_param);
 
   std::string extract_text(const void* item_list_json);
   std::string generate_client_id();

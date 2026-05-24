@@ -79,6 +79,62 @@ WeChatAdapter::WeChatAdapter(const config::Config& config,
       return;
     }
 
+    // Handle tool.result for image-forwarding (screen capture, camera)
+    if (event_name == "tool.result") {
+      try {
+        auto j = json::parse(payload_json);
+        std::string tool_name = j.value("toolName", "");
+        std::string session_key = j.value("sessionKey", "");
+        std::string output = j.value("output", "");
+
+        if ((tool_name == "screen.capture" || tool_name == "camera.snap" || tool_name == "photos.capture")
+            && !output.empty()) {
+          // output is base64-encoded image data from the device
+          // Decode base64 to binary and send via ilink
+          if (ilink_client_) {
+            // Look up reply context for this session
+            std::string reply_to;
+            {
+              std::lock_guard<std::mutex> lock(reply_ctx_mutex_);
+              auto it = pending_reply_ctx_.find(session_key);
+              if (it != pending_reply_ctx_.end()) {
+                reply_to = it->second;
+              }
+            }
+            if (!reply_to.empty()) {
+              // Decode base64
+              static const std::string kB64 =
+                  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+              std::string decoded;
+              std::vector<int> T(256, -1);
+              for (int i = 0; i < 64; i++) T[kB64[i]] = i;
+
+              uint32_t val = 0;
+              int valb = -8;
+              for (unsigned char c : output) {
+                if (T[c] == -1) break;
+                val = (val << 6) + T[c];
+                valb += 6;
+                if (valb >= 0) {
+                  decoded.push_back(static_cast<char>((val >> valb) & 0xFF));
+                  valb -= 8;
+                }
+              }
+
+              if (!decoded.empty()) {
+                ilink_client_->send_image(reply_to, decoded);
+                log::info("wechat: sent captured image to " + reply_to +
+                          " (" + std::to_string(decoded.size()) + " bytes)");
+              }
+            }
+          }
+        }
+      } catch (const std::exception& e) {
+        log::warn("wechat: failed to handle tool.result: " + std::string(e.what()));
+      }
+      return;
+    }
+
     // Forward all agent/chat events to gateway operator sessions
     if (broadcast_ && *broadcast_) {
       if (event_name == "agent" || event_name == "chat") {

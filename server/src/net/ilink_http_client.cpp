@@ -1,6 +1,8 @@
 #include "hiclaw/net/ilink_http_client.hpp"
 #include "hiclaw/observability/log.hpp"
 #include <hv/HttpClient.h>
+#include <mbedtls/aes.h>
+#include <mbedtls/md5.h>
 #include <nlohmann/json.hpp>
 #include <algorithm>
 #include <chrono>
@@ -77,6 +79,70 @@ bool write_file(const std::string& path, const std::string& data) {
   if (!f.is_open()) return false;
   f << data;
   return true;
+}
+
+// --- AES-128-ECB with PKCS#7 padding (for WeChat CDN upload) ---
+
+std::string pkcs7_pad(const std::string& data) {
+  size_t pad_len = 16 - (data.size() % 16);
+  std::string padded = data;
+  padded.append(pad_len, static_cast<char>(pad_len));
+  return padded;
+}
+
+std::string aes_ecb_encrypt(const std::string& plaintext, const std::string& key) {
+  std::string padded = pkcs7_pad(plaintext);
+  size_t len = padded.size();
+
+  mbedtls_aes_context ctx;
+  mbedtls_aes_init(&ctx);
+  mbedtls_aes_setkey_enc(&ctx, reinterpret_cast<const unsigned char*>(key.data()), 128);
+
+  std::string ciphertext(len, '\0');
+  for (size_t i = 0; i < len; i += 16) {
+    mbedtls_aes_crypt_ecb(&ctx, MBEDTLS_AES_ENCRYPT,
+                           reinterpret_cast<const unsigned char*>(padded.data() + i),
+                           reinterpret_cast<unsigned char*>(&ciphertext[i]));
+  }
+  mbedtls_aes_free(&ctx);
+  return ciphertext;
+}
+
+std::string bytes_to_hex(const std::string& data) {
+  std::string result;
+  result.reserve(data.size() * 2);
+  for (unsigned char c : data) {
+    char buf[3];
+    snprintf(buf, sizeof(buf), "%02x", c);
+    result += buf;
+  }
+  return result;
+}
+
+std::string md5_hex(const std::string& data) {
+  unsigned char digest[16];
+  mbedtls_md5(reinterpret_cast<const unsigned char*>(data.data()),
+              data.size(), digest);
+  return bytes_to_hex(std::string(reinterpret_cast<char*>(digest), 16));
+}
+
+std::string base64_encode(const std::string& data) {
+  static const char kTable[] =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  std::string result;
+  result.reserve((data.size() + 2) / 3 * 4);
+  size_t i = 0;
+  while (i < data.size()) {
+    uint32_t a = static_cast<unsigned char>(data[i++]);
+    uint32_t b = (i < data.size()) ? static_cast<unsigned char>(data[i++]) : 0;
+    uint32_t c = (i < data.size()) ? static_cast<unsigned char>(data[i++]) : 0;
+    uint32_t triple = (a << 16) | (b << 8) | c;
+    result += kTable[(triple >> 18) & 0x3F];
+    result += kTable[(triple >> 12) & 0x3F];
+    result += (i > data.size() + 1) ? '=' : kTable[(triple >> 6) & 0x3F];
+    result += (i > data.size()) ? '=' : kTable[triple & 0x3F];
+  }
+  return result;
 }
 
 }  // namespace
@@ -423,6 +489,177 @@ bool IlinkHttpClient::save_all_context_tokens() {
     }
     return write_file(state_dir_ + "/context_tokens.json", j.dump(2));
   } catch (...) {}
+  return false;
+}
+
+bool IlinkHttpClient::post_binary(const std::string& url,
+                                   const std::string& data,
+                                   std::string& encrypted_param) {
+  hv::HttpClient cli;
+  cli.setTimeout(60);
+
+  ::HttpRequest req;
+  req.method = HTTP_POST;
+  req.url = url;
+  req.headers["Content-Type"] = "application/octet-stream";
+  req.body = data;
+  req.timeout = 60;
+  req.connect_timeout = 30;
+
+  ::HttpResponse resp;
+  int ret = cli.send(&req, &resp);
+  if (ret != 0) {
+    log::error("ilink: CDN upload failed: " + std::to_string(ret));
+    return false;
+  }
+
+  if (resp.status_code != 200) {
+    log::error("ilink: CDN upload HTTP " + std::to_string(resp.status_code));
+    return false;
+  }
+
+  encrypted_param = resp.headers["x-encrypted-param"];
+  if (encrypted_param.empty()) {
+    log::error("ilink: CDN response missing x-encrypted-param");
+    return false;
+  }
+  return true;
+}
+
+bool IlinkHttpClient::send_image(const std::string& to_user_id,
+                                  const std::string& image_data) {
+  if (image_data.empty()) {
+    log::error("ilink: send_image called with empty data");
+    return false;
+  }
+
+  // Generate random 16-byte AES key
+  std::string aes_key(16, '\0');
+  {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<int> dist(0, 255);
+    for (int i = 0; i < 16; ++i)
+      aes_key[i] = static_cast<char>(dist(gen));
+  }
+
+  std::string filekey = random_hex(16);
+  std::string raw_md5 = md5_hex(image_data);
+  std::string ciphertext = aes_ecb_encrypt(image_data, aes_key);
+  int cipher_size = static_cast<int>(ciphertext.size());
+
+  // Step 1: get upload URL
+  json upload_req;
+  upload_req["filekey"] = filekey;
+  upload_req["media_type"] = 1;  // image
+  upload_req["to_user_id"] = to_user_id;
+  upload_req["rawsize"] = static_cast<int>(image_data.size());
+  upload_req["rawfilemd5"] = raw_md5;
+  upload_req["filesize"] = cipher_size;
+  upload_req["no_need_thumb"] = true;
+  upload_req["aeskey"] = bytes_to_hex(aes_key);
+  upload_req["base_info"]["channel_version"] = kChannelVersion;
+
+  int ret_code = 0, err_code = 0;
+  std::string resp_body;
+  if (!do_post("/ilink/bot/getuploadurl", upload_req.dump(),
+               ret_code, err_code, resp_body)) {
+    log::error("ilink: getuploadurl request failed");
+    return false;
+  }
+
+  std::string cdn_upload_url;
+  try {
+    auto j = json::parse(resp_body);
+    if (ret_code != 0) {
+      log::error("ilink: getuploadurl ret=" + std::to_string(ret_code));
+      return false;
+    }
+    cdn_upload_url = j.value("upload_full_url", "");
+    if (cdn_upload_url.empty()) {
+      // Fallback: build URL from upload_param
+      std::string upload_param = j.value("upload_param", "");
+      if (upload_param.empty()) {
+        log::error("ilink: getuploadurl returned no upload URL");
+        return false;
+      }
+      cdn_upload_url = "https://novac2c.cdn.weixin.qq.com/c2c/upload?encrypted_query_param=" +
+                       upload_param + "&filekey=" + filekey;
+    }
+  } catch (const json::parse_error& e) {
+    log::error("ilink: failed to parse getuploadurl response: " + std::string(e.what()));
+    return false;
+  }
+
+  // Step 2: upload encrypted image to CDN
+  std::string download_param;
+  if (!post_binary(cdn_upload_url, ciphertext, download_param)) {
+    log::error("ilink: CDN upload failed");
+    return false;
+  }
+
+  // Step 3: send image message
+  std::string ctx_token;
+  {
+    std::lock_guard<std::mutex> lock(ctx_mutex_);
+    auto it = context_tokens_.find(to_user_id);
+    if (it != context_tokens_.end()) ctx_token = it->second;
+  }
+
+  // Format aes_key as base64(hex_string) per ilink API convention
+  std::string aes_key_for_api = base64_encode(bytes_to_hex(aes_key));
+
+  json media;
+  media["encrypt_query_param"] = download_param;
+  media["aes_key"] = aes_key_for_api;
+  media["encrypt_type"] = 1;
+
+  json image_item;
+  image_item["media"] = media;
+  image_item["mid_size"] = cipher_size;
+
+  json item;
+  item["type"] = 2;  // image
+  item["image_item"] = image_item;
+
+  json msg;
+  msg["msg"]["from_user_id"] = "";
+  msg["msg"]["to_user_id"] = to_user_id;
+  msg["msg"]["client_id"] = generate_client_id();
+  msg["msg"]["message_type"] = 2;
+  msg["msg"]["message_state"] = 2;
+  msg["msg"]["item_list"] = json::array({item});
+  if (!ctx_token.empty()) {
+    msg["msg"]["context_token"] = ctx_token;
+  }
+  msg["base_info"]["channel_version"] = kChannelVersion;
+
+  for (int attempt = 0; attempt < kMaxSendRetries; ++attempt) {
+    int send_ret = 0, send_err = 0;
+    std::string send_resp;
+    if (!do_post("/ilink/bot/sendmessage", msg.dump(),
+                 send_ret, send_err, send_resp)) {
+      if (attempt < kMaxSendRetries - 1) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        continue;
+      }
+      log::error("ilink: failed to send image to " + to_user_id);
+      return false;
+    }
+
+    if (send_ret == -2) {
+      log::warn("ilink: sendImage ret=-2, retry " + std::to_string(attempt + 1));
+      std::this_thread::sleep_for(std::chrono::milliseconds(500));
+      continue;
+    }
+
+    log::info("ilink: sent image to " + to_user_id +
+              " (" + std::to_string(image_data.size()) + " bytes)");
+    return true;
+  }
+
+  log::error("ilink: failed to send image after " +
+             std::to_string(kMaxSendRetries) + " retries");
   return false;
 }
 
