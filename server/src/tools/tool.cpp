@@ -348,6 +348,97 @@ bool is_remote_tool(const std::string& name) {
   return false;
 }
 
+// --- Vision/image analysis tool ---
+
+namespace {
+std::string g_vision_base_url;
+std::string g_vision_model_id;
+std::string g_vision_api_key;
+}  // namespace
+
+void set_vision_config(const std::string& base_url,
+                       const std::string& model_id,
+                       const std::string& api_key) {
+  g_vision_base_url = base_url;
+  g_vision_model_id = model_id;
+  g_vision_api_key = api_key;
+}
+
+ToolResult image_impl(const std::string& args_json) {
+  if (g_vision_base_url.empty() || g_vision_model_id.empty()) {
+    return ToolResult{false, "", "No vision model configured. Set a model with vision capability in hiclaw.json."};
+  }
+
+  std::string image_data = get_arg(args_json, "image");
+  std::string prompt = get_arg(args_json, "prompt");
+
+  if (image_data.empty()) {
+    return ToolResult{false, "", "missing 'image' argument (base64 data or data URL)"};
+  }
+
+  // Build data URL if raw base64 provided (no prefix)
+  std::string image_url;
+  if (image_data.find("data:") == 0) {
+    image_url = image_data;
+  } else {
+    image_url = "data:image/png;base64," + image_data;
+  }
+
+  // Construct OpenAI-compatible vision request
+  nlohmann::json user_content = nlohmann::json::array();
+  if (!prompt.empty()) {
+    user_content.push_back({{"type", "text"}, {"text", prompt}});
+  } else {
+    user_content.push_back({{"type", "text"}, {"text", "Please describe what you see in this image in detail."}});
+  }
+  user_content.push_back({
+    {"type", "image_url"},
+    {"image_url", {{"url", image_url}}}
+  });
+
+  nlohmann::json req_body;
+  req_body["model"] = g_vision_model_id;
+  req_body["messages"] = nlohmann::json::array({
+    {{"role", "user"}, {"content", user_content}}
+  });
+  req_body["max_tokens"] = 2048;
+
+  std::string url = g_vision_base_url;
+  if (!url.empty() && url.back() != '/') url += '/';
+  url += "chat/completions";
+
+  std::string auth_header;
+  if (!g_vision_api_key.empty()) {
+    auth_header = "Bearer " + g_vision_api_key;
+  }
+
+  net::HttpResponse res;
+  if (!net::post_json(url, req_body.dump(), res, auth_header)) {
+    return ToolResult{false, "", "Vision API request failed: " + (res.error.empty() ? "unknown error" : res.error)};
+  }
+
+  try {
+    auto j = nlohmann::json::parse(res.body);
+    if (j.contains("choices") && j["choices"].is_array() && !j["choices"].empty()) {
+      auto& choice = j["choices"][0];
+      if (choice.contains("message") && choice["message"].contains("content")) {
+        std::string description = choice["message"]["content"].get<std::string>();
+        return ToolResult{true, description, ""};
+      }
+    }
+    // Check for API error
+    if (j.contains("error")) {
+      std::string err_msg = j["error"].contains("message")
+          ? j["error"]["message"].get<std::string>()
+          : j["error"].dump();
+      return ToolResult{false, "", "Vision API error: " + err_msg};
+    }
+    return ToolResult{false, "", "Unexpected vision API response format"};
+  } catch (const nlohmann::json::parse_error& e) {
+    return ToolResult{false, "", "Failed to parse vision API response: " + std::string(e.what())};
+  }
+}
+
 void register_builtin_tools() {
   static bool done = false;
   if (done) return;
@@ -360,6 +451,7 @@ void register_builtin_tools() {
   register_tool("memory_forget", memory_forget_impl);
   register_tool("web_fetch", web_fetch_impl);
   register_tool("web_search", web_search_impl);
+  register_tool("image", image_impl);
   register_tool("skill.read", skill_read_impl);
   register_tool("memo.save", [](const std::string& args_json) -> ToolResult { return memo_save(args_json); });
   register_tool("memo.list", [](const std::string& args_json) -> ToolResult { return memo_list(args_json); });

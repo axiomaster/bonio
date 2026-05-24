@@ -114,6 +114,8 @@ static json tools_array() {
   tools.push_back(json::parse(R"___({"type":"function","function":{"name":"memo.save","description":"Save a memo/note. Use when the user asks to remember, save, or note something from the screen or conversation.","parameters":{"type":"object","properties":{"title":{"type":"string","description":"Short title for the memo"},"content":{"type":"string","description":"The content to save"},"source":{"type":"string","description":"Source of the memo (e.g. screen, voice)"}},"required":["title","content"]}}})___"));
   tools.push_back(json::parse(R"___({"type":"function","function":{"name":"memo.list","description":"List saved memos/notes. Returns recent memos.","parameters":{"type":"object","properties":{"limit":{"type":"integer","description":"Max number of memos to return, default 20"}}}}})___"));
 
+  tools.push_back(json::parse(R"({"type":"function","function":{"name":"image","description":"Analyze an image using vision AI. Provide a base64-encoded image and optional prompt describing what you want to know. Use this to understand screenshots, photos, or any visual content.","parameters":{"type":"object","properties":{"image":{"type":"string","description":"Base64-encoded image data or data URL"},"prompt":{"type":"string","description":"What to analyze or describe in the image"}},"required":["image"]}}})"));
+
   return tools;
 }
 
@@ -209,6 +211,7 @@ RunResult run(const config::Config& config,
     r.error = "resolve_model failed";
     return r;
   }
+  tools::set_vision_config(base_url, model_id, api_key);
   std::string mod = model_id.empty() ? "llama3.2" : model_id;
 
   log::debug("run base_url=" + base_url + " model=" + mod +
@@ -240,6 +243,7 @@ RunResult run(const config::Config& config,
         "- `web_fetch` — fetch web pages\n"
         "- `memory_store` / `memory_recall` / `memory_forget` — long-term memory\n"
         "- `skill.read` — load skill instructions (see Available Skills below)\n"
+        "- `image` — analyze images (screenshots, photos) using vision AI\n"
         "\n"
         "### Remote (device hardware/app)\n"
         "- `camera.snap` — take photo (front/back camera)\n"
@@ -250,6 +254,12 @@ RunResult run(const config::Config& config,
         "- `notifications.list` — recent notifications\n"
         "- `calendar.events` — upcoming events\n"
         "- `system.notify` — send notification\n"
+        "\n"
+        "### Screen capture workflow\n"
+        "When the user asks you to capture or look at the screen:\n"
+        "1. Call `screen.capture` to get a base64-encoded screenshot\n"
+        "2. Call `image` with the screenshot data to analyze what's on screen\n"
+        "3. Respond to the user with a description of what you see\n"
         "\n"
         "## Skill Usage\n"
         "When a user request matches an Available Skill, you MUST:\n"
@@ -438,6 +448,7 @@ RunResult run_streaming(const config::Config& config,
     r.error = "resolve_model failed";
     return r;
   }
+  tools::set_vision_config(base_url, model_id, api_key);
 
   std::string mod = model_id.empty() ? "llama3.2" : model_id;
   double temp = (temperature >= 0.0 && temperature <= 2.0) ? temperature : 0.7;
@@ -471,6 +482,7 @@ RunResult run_streaming(const config::Config& config,
         "- `web_fetch` — fetch web pages\n"
         "- `memory_store` / `memory_recall` / `memory_forget` — long-term memory\n"
         "- `skill.read` — load skill instructions (see Available Skills below)\n"
+        "- `image` — analyze images (screenshots, photos) using vision AI\n"
         "\n"
         "### Remote (device hardware/app)\n"
         "- `camera.snap` — take photo (front/back camera)\n"
@@ -481,6 +493,12 @@ RunResult run_streaming(const config::Config& config,
         "- `notifications.list` — recent notifications\n"
         "- `calendar.events` — upcoming events\n"
         "- `system.notify` — send notification\n"
+        "\n"
+        "### Screen capture workflow\n"
+        "When the user asks you to capture or look at the screen:\n"
+        "1. Call `screen.capture` to get a base64-encoded screenshot\n"
+        "2. Call `image` with the screenshot data to analyze what's on screen\n"
+        "3. Respond to the user with a description of what you see\n"
         "\n"
         "## Skill Usage\n"
         "When a user request matches an Available Skill, you MUST:\n"
@@ -638,6 +656,7 @@ RunResult run_streaming_with_history(
     r.error = "resolve_model failed";
     return r;
   }
+  tools::set_vision_config(base_url, model_id, api_key);
 
   std::string mod = model_id.empty() ? "llama3.2" : model_id;
   double temp = (temperature >= 0.0 && temperature <= 2.0) ? temperature : 0.7;
@@ -669,6 +688,7 @@ RunResult run_streaming_with_history(
         "- `web_fetch` — fetch web pages\n"
         "- `memory_store` / `memory_recall` / `memory_forget` — long-term memory\n"
         "- `skill.read` — load skill instructions (see Available Skills below)\n"
+        "- `image` — analyze images (screenshots, photos) using vision AI\n"
         "\n"
         "### Remote (device hardware/app)\n"
         "- `camera.snap` — take photo (front/back camera)\n"
@@ -679,6 +699,12 @@ RunResult run_streaming_with_history(
         "- `notifications.list` — recent notifications\n"
         "- `calendar.events` — upcoming events\n"
         "- `system.notify` — send notification\n"
+        "\n"
+        "### Screen capture workflow\n"
+        "When the user asks you to capture or look at the screen:\n"
+        "1. Call `screen.capture` to get a base64-encoded screenshot\n"
+        "2. Call `image` with the screenshot data to analyze what's on screen\n"
+        "3. Respond to the user with a description of what you see\n"
         "\n"
         "## Skill Usage\n"
         "When a user request matches an Available Skill, you MUST:\n"

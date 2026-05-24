@@ -5,6 +5,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <unordered_map>
 
 namespace hiclaw {
 namespace net {
@@ -22,6 +23,28 @@ using WeChatSendFn = std::function<bool(const std::string& session_key,
                                         bool is_reply,
                                         std::string& error_message)>;
 using WeChatSendRef = std::shared_ptr<WeChatSendFn>;
+
+/// Shared node invoke function: gateway_run populates it to allow non-gateway sessions
+/// (e.g. WeChat adapter) to route remote tool calls to connected desktop/mobile nodes.
+/// Returns true if the request was sent to a connected node.
+using NodeInvokeFn = std::function<bool(const std::string& tool_call_id,
+                                         const std::string& invoke_payload_json)>;
+using NodeInvokeRef = std::shared_ptr<NodeInvokeFn>;
+
+/// Create a shared node invoke function (initially a no-op that returns false).
+inline NodeInvokeRef make_node_invoker() {
+  return std::make_shared<NodeInvokeFn>(
+      [](const std::string&, const std::string&) -> bool { return false; });
+}
+
+/// External tool router registration: allows non-gateway sessions to register
+/// their ToolRouter for a specific tool_call_id so that node.invoke.result
+/// can be routed back to the correct session.
+class ToolRouter;
+using ExternalRouterRegistry = std::shared_ptr<std::unordered_map<std::string, ToolRouter*>>;
+inline ExternalRouterRegistry make_external_router_registry() {
+  return std::make_shared<std::unordered_map<std::string, ToolRouter*>>();
+}
 
 /// Create a shared broadcast function (initially a no-op).
 inline GatewayBroadcastRef make_gateway_broadcast() {
@@ -49,7 +72,9 @@ inline WeChatSendRef make_wechat_sender() {
  */
 void gateway_run(int port, config::Config& config, const std::string& pairing_code = "",
                  GatewayBroadcastRef broadcast = nullptr,
-                 WeChatSendRef wechat_sender = nullptr);
+                 WeChatSendRef wechat_sender = nullptr,
+                 NodeInvokeRef node_invoker = nullptr,
+                 ExternalRouterRegistry external_routers = nullptr);
 
 /**
  * Generate a one-time pairing code (e.g. 6 digits). Safe to print to console.

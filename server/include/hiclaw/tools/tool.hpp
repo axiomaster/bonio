@@ -25,6 +25,12 @@ bool is_remote_tool(const std::string& name);
 /// Built-in tools (shell, file_read, file_write) are registered on first use.
 void register_builtin_tools();
 
+/// Set the vision model config for the image tool.
+/// Call once at startup after loading config.
+void set_vision_config(const std::string& base_url,
+                       const std::string& model_id,
+                       const std::string& api_key);
+
 }  // namespace tools
 }  // namespace hiclaw
 

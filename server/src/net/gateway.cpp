@@ -516,13 +516,52 @@ struct WsppSession {
 };
 
 void run_wspp_server(int port, config::Config& config, const std::string& pairing_code,
-                     GatewayBroadcastRef broadcast, WeChatSendRef wechat_sender) {
+                     GatewayBroadcastRef broadcast, WeChatSendRef wechat_sender,
+                     NodeInvokeRef node_invoker, ExternalRouterRegistry external_routers) {
   ws_server_t server;
   server.set_reuse_addr(true);
   server.init_asio();
 
   // Per-connection session (connection_hdl as key; no set_user_data in default asio config)
   std::map<websocketpp::connection_hdl, WsppSession, std::owner_less<websocketpp::connection_hdl>> sessions;
+
+  // Populate the node_invoker callback: finds a connected desktop node and sends
+  // node.invoke.request to it. Used by WeChat adapter for remote tool execution.
+  if (node_invoker) {
+    *node_invoker = [&server, &sessions, external_routers](
+                        const std::string& tool_call_id,
+                        const std::string& invoke_payload_json) -> bool {
+      // Find first connected session to route the tool call through
+      for (auto& [hdl, session] : sessions) {
+        if (session.connected) {
+          // Register the tool_call_id in the external router registry
+          if (external_routers && session.tool_router) {
+            (*external_routers)[tool_call_id] = session.tool_router.get();
+          }
+          // Send node.invoke.request as an event to this session's operator connection
+          nlohmann::json ev;
+          ev["type"] = "event";
+          ev["event"] = "node.invoke.request";
+          try {
+            ev["payload"] = nlohmann::json::parse(invoke_payload_json);
+          } catch (...) {
+            ev["payload"] = invoke_payload_json;
+          }
+          std::string msg = ev.dump();
+          try {
+            server.send(hdl, msg, websocketpp::frame::opcode::text);
+            log::info("gateway: routed external tool call " + tool_call_id + " via connected node");
+            return true;
+          } catch (const std::exception& e) {
+            log::warn("gateway: failed to send external tool call: " + std::string(e.what()));
+          }
+          break;  // Only try the first connected session
+        }
+      }
+      log::warn("gateway: no connected node for external tool call " + tool_call_id);
+      return false;
+    };
+  }
 
   server.set_open_handler([&server, &sessions, &config, &pairing_code, wechat_sender](websocketpp::connection_hdl hdl) {
     sessions[hdl] = WsppSession();
@@ -596,7 +635,7 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
     } catch (...) {}
   });
 
-  server.set_message_handler([&server, &sessions, &config, &pairing_code, wechat_sender](websocketpp::connection_hdl hdl, ws_server_t::message_ptr msg) {
+  server.set_message_handler([&server, &sessions, &config, &pairing_code, wechat_sender, external_routers](websocketpp::connection_hdl hdl, ws_server_t::message_ptr msg) {
     if (!msg || msg->get_opcode() != websocketpp::frame::opcode::text) return;
     std::string payload = msg->get_payload();
     auto it = sessions.find(hdl);
@@ -847,6 +886,20 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
         result.error = error;
         bool routed = it->second.tool_router->complete_tool_call(tool_call_id, result);
         log::info("gateway: tool_router routing " + std::string(routed ? "succeeded" : "failed"));
+      }
+
+      // Also check external router registry (for WeChat and other non-gateway sessions)
+      if (external_routers && !tool_call_id.empty()) {
+        auto ext_it = external_routers->find(tool_call_id);
+        if (ext_it != external_routers->end()) {
+          ToolResult result;
+          result.success = success;
+          result.output = output;
+          result.error = error;
+          ext_it->second->complete_tool_call(tool_call_id, result);
+          external_routers->erase(ext_it);
+          log::info("gateway: routed external tool result for " + tool_call_id);
+        }
       }
 
       nlohmann::json res;
@@ -1740,8 +1793,9 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
 }  // namespace
 
 void gateway_run(int port, config::Config& config, const std::string& pairing_code,
-                 GatewayBroadcastRef broadcast, WeChatSendRef wechat_sender) {
-  run_wspp_server(port, config, pairing_code, broadcast, wechat_sender);
+                 GatewayBroadcastRef broadcast, WeChatSendRef wechat_sender,
+                 NodeInvokeRef node_invoker, ExternalRouterRegistry external_routers) {
+  run_wspp_server(port, config, pairing_code, broadcast, wechat_sender, node_invoker, external_routers);
 }
 
 // -----------------------------------------------------------------------------
@@ -1824,10 +1878,13 @@ static const struct lws_protocols protocols[] = {
 }  // namespace
 
 void gateway_run(int port, config::Config& config, const std::string& pairing_code,
-                 GatewayBroadcastRef broadcast, WeChatSendRef wechat_sender) {
+                 GatewayBroadcastRef broadcast, WeChatSendRef wechat_sender,
+                 NodeInvokeRef node_invoker, ExternalRouterRegistry external_routers) {
   static GatewayUser gu;
   (void)broadcast;
   (void)wechat_sender;
+  (void)node_invoker;
+  (void)external_routers;
   gu.config = &config;
   gu.pairing_code = pairing_code;
 
@@ -1857,12 +1914,15 @@ void gateway_run(int port, config::Config& config, const std::string& pairing_co
 #else
 
 void gateway_run(int port, config::Config& config, const std::string& pairing_code,
-                 GatewayBroadcastRef broadcast, WeChatSendRef wechat_sender) {
+                 GatewayBroadcastRef broadcast, WeChatSendRef wechat_sender,
+                 NodeInvokeRef node_invoker, ExternalRouterRegistry external_routers) {
   (void)port;
   (void)config;
   (void)pairing_code;
   (void)broadcast;
   (void)wechat_sender;
+  (void)node_invoker;
+  (void)external_routers;
   std::cerr << "HiClaw gateway: no WebSocket backend built. Set HICLAW_GATEWAY_BACKEND=websocketpp (default for HarmonyOS) or install libwebsockets and use libwebsockets.\n";
 }
 

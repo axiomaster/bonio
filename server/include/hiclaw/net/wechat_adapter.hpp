@@ -5,6 +5,7 @@
 #include "hiclaw/net/async_agent.hpp"
 #include "hiclaw/net/gateway.hpp"
 #include "hiclaw/net/ilink_http_client.hpp"
+#include "hiclaw/net/tool_router.hpp"
 #include "hiclaw/session/store.hpp"
 #include <atomic>
 #include <memory>
@@ -22,7 +23,9 @@ class WeChatAdapter {
 public:
   explicit WeChatAdapter(const config::Config& config,
                          GatewayBroadcastRef broadcast = nullptr,
-                         WeChatSendRef desktop_sender = nullptr);
+                         WeChatSendRef desktop_sender = nullptr,
+                         NodeInvokeRef node_invoker = nullptr,
+                         ExternalRouterRegistry external_routers = nullptr);
   ~WeChatAdapter();
 
   WeChatAdapter(const WeChatAdapter&) = delete;
@@ -56,9 +59,12 @@ private:
   const config::Config& config_;
   GatewayBroadcastRef broadcast_;
   WeChatSendRef desktop_sender_;
+  NodeInvokeRef node_invoker_;
+  ExternalRouterRegistry external_routers_;
   std::atomic<bool> running_{false};
 
   std::shared_ptr<session::SessionStore> session_store_;
+  std::shared_ptr<ToolRouter> tool_router_;
   std::unique_ptr<AsyncAgentManager> agent_manager_;
   std::unique_ptr<class WecomWsClient> wecom_client_;
   std::unique_ptr<IlinkHttpClient> ilink_client_;

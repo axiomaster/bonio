@@ -26,9 +26,15 @@ static const int kDedupTtlSeconds = 300;  // 5 minutes
 
 WeChatAdapter::WeChatAdapter(const config::Config& config,
                              GatewayBroadcastRef broadcast,
-                             WeChatSendRef desktop_sender)
-    : config_(config), broadcast_(broadcast), desktop_sender_(desktop_sender) {
+                             WeChatSendRef desktop_sender,
+                             NodeInvokeRef node_invoker,
+                             ExternalRouterRegistry external_routers)
+    : config_(config), broadcast_(broadcast), desktop_sender_(desktop_sender),
+      node_invoker_(node_invoker), external_routers_(external_routers) {
   session_store_ = std::make_shared<session::SessionStore>(config.config_dir);
+
+  // Create a ToolRouter so remote tools (screen.capture, etc.) can be used
+  tool_router_ = std::make_shared<ToolRouter>();
 
   if (desktop_sender_) {
     *desktop_sender_ = [this](const std::string& session_key,
@@ -43,6 +49,36 @@ WeChatAdapter::WeChatAdapter(const config::Config& config,
   // forwards all agent/chat events to connected gateway clients.
   auto event_callback = [this](const std::string& event_name,
                                const std::string& payload_json) {
+    // Route node.invoke.request to connected desktop node
+    if (event_name == "node.invoke.request") {
+      if (node_invoker_ && *node_invoker_) {
+        try {
+          auto j = json::parse(payload_json);
+          std::string invoke_id = j.value("id", "");
+          std::string tool_call_id = invoke_id;
+          if (tool_call_id.rfind("invoke_", 0) == 0) {
+            tool_call_id = tool_call_id.substr(7);
+          }
+          // Register in external router before sending
+          if (external_routers_ && tool_router_) {
+            (*external_routers_)[tool_call_id] = tool_router_.get();
+          }
+          bool sent = (*node_invoker_)(tool_call_id, payload_json);
+          if (!sent) {
+            log::warn("wechat: no connected node for remote tool " + tool_call_id);
+            // Complete with error so agent doesn't hang
+            tool_router_->complete_tool_call(tool_call_id,
+                ToolResult{false, "", "No connected device node available"});
+          }
+        } catch (const std::exception& e) {
+          log::warn("wechat: failed to route node.invoke.request: " + std::string(e.what()));
+        }
+      } else {
+        log::warn("wechat: node.invoke.request but no node_invoker available");
+      }
+      return;
+    }
+
     // Forward all agent/chat events to gateway operator sessions
     if (broadcast_ && *broadcast_) {
       if (event_name == "agent" || event_name == "chat") {
@@ -104,9 +140,9 @@ WeChatAdapter::WeChatAdapter(const config::Config& config,
     }
   };
 
-  // No ToolRouter — WeChat sessions have no device node for remote tools
+  // Pass ToolRouter so remote tools are available when a desktop node is connected
   agent_manager_ = std::make_unique<AsyncAgentManager>(
-      config_, event_callback, session_store_, nullptr);
+      config_, event_callback, session_store_, tool_router_);
 }
 
 WeChatAdapter::~WeChatAdapter() {
