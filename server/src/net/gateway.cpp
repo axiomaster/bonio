@@ -117,7 +117,8 @@ static std::string sanitize_utf8(const std::string& input) {
 std::string gateway_handle_frame(const std::string& frame,
                                  const config::Config& config,
                                  const std::string& pairing_code,
-                                 bool& connected) {
+                                 bool& connected,
+                                 std::string& out_role) {
   std::string method, id, message;
   try {
     json j = json::parse(frame);
@@ -162,6 +163,9 @@ std::string gateway_handle_frame(const std::string& frame,
       }
 
       connected = auth_ok;
+      if (auth_ok && params.contains("role") && params["role"].is_string()) {
+        out_role = params["role"].get<std::string>();
+      }
       res["ok"] = auth_ok;
       if (auth_ok) {
         // OpenClaw hello-compatible payload (v3)
@@ -505,6 +509,7 @@ typedef websocketpp::server<websocketpp::config::asio> ws_server_t;
 
 struct WsppSession {
   bool connected = false;
+  std::string role;  // "operator" or "node"
   std::unique_ptr<AsyncAgentManager> agent_manager;
   std::unique_ptr<CallHandler> call_handler;
   std::unique_ptr<HealthMonitor> health_monitor;
@@ -531,9 +536,10 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
     *node_invoker = [&server, &sessions, external_routers](
                         const std::string& tool_call_id,
                         const std::string& invoke_payload_json) -> bool {
-      // Find first connected session to route the tool call through
+      // Find a connected NODE session (role=="node") to route the tool call through.
+      // Node sessions have onInvoke handlers; operator sessions do not.
       for (auto& [hdl, session] : sessions) {
-        if (session.connected) {
+        if (session.connected && session.role == "node") {
           // Register the tool_call_id in the external router registry if not already registered
           if (external_routers && session.tool_router) {
             if (external_routers->find(tool_call_id) == external_routers->end()) {
@@ -1711,8 +1717,10 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
 
     // 其他方法使用原来的 gateway_handle_frame
     bool connected = it->second.connected;
-    std::string response = gateway_handle_frame(payload, config, pairing_code, connected);
+    std::string role;
+    std::string response = gateway_handle_frame(payload, config, pairing_code, connected, role);
     it->second.connected = connected;
+    if (!role.empty()) it->second.role = role;
     try {
       server.send(hdl, response, websocketpp::frame::opcode::text);
     } catch (...) {}
@@ -1816,6 +1824,7 @@ struct GatewayUser {
 
 struct SessionData {
   bool connected = false;
+  std::string role;
   std::deque<std::string> write_queue;
 };
 
@@ -1850,7 +1859,9 @@ static int gateway_callback(struct lws* wsi, enum lws_callback_reasons reason,
   case LWS_CALLBACK_RECEIVE: {
     if (!pss || !*pss) break;
     std::string frame(static_cast<const char*>(in), len);
-    std::string response = gateway_handle_frame(frame, config, pairing_code, (*pss)->connected);
+    std::string role;
+    std::string response = gateway_handle_frame(frame, config, pairing_code, (*pss)->connected, role);
+    if (!role.empty()) (*pss)->role = role;
     (*pss)->write_queue.push_back(std::move(response));
     lws_callback_on_writable(wsi);
     break;
