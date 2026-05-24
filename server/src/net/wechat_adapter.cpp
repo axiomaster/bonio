@@ -85,13 +85,21 @@ WeChatAdapter::WeChatAdapter(const config::Config& config,
         auto j = json::parse(payload_json);
         std::string tool_name = j.value("toolName", "");
         std::string session_key = j.value("sessionKey", "");
-        std::string output = j.value("output", "");
+        std::string output_str = j.value("output", "");
 
         if ((tool_name == "screen.capture" || tool_name == "camera.snap" || tool_name == "photos.capture")
-            && !output.empty()) {
-          // output is base64-encoded image data from the device
-          // Decode base64 to binary and send via ilink
-          if (ilink_client_) {
+            && !output_str.empty()) {
+          // output is JSON like {"data": "base64...", "width": ..., "height": ...}
+          // Extract the base64 "data" field
+          std::string b64_data;
+          try {
+            auto out_j = json::parse(output_str);
+            b64_data = out_j.value("data", "");
+          } catch (...) {
+            b64_data = output_str;  // fallback: treat as raw base64
+          }
+
+          if (!b64_data.empty() && ilink_client_) {
             // Look up reply context for this session
             std::string reply_to;
             {
@@ -102,7 +110,7 @@ WeChatAdapter::WeChatAdapter(const config::Config& config,
               }
             }
             if (!reply_to.empty()) {
-              // Decode base64
+              // Decode base64 to binary
               static const std::string kB64 =
                   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
               std::string decoded;
@@ -111,7 +119,7 @@ WeChatAdapter::WeChatAdapter(const config::Config& config,
 
               uint32_t val = 0;
               int valb = -8;
-              for (unsigned char c : output) {
+              for (unsigned char c : b64_data) {
                 if (T[c] == -1) break;
                 val = (val << 6) + T[c];
                 valb += 6;

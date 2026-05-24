@@ -534,9 +534,11 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
       // Find first connected session to route the tool call through
       for (auto& [hdl, session] : sessions) {
         if (session.connected) {
-          // Register the tool_call_id in the external router registry
+          // Register the tool_call_id in the external router registry if not already registered
           if (external_routers && session.tool_router) {
-            (*external_routers)[tool_call_id] = session.tool_router.get();
+            if (external_routers->find(tool_call_id) == external_routers->end()) {
+              (*external_routers)[tool_call_id] = session.tool_router.get();
+            }
           }
           // Send node.invoke.request as an event to this session's operator connection
           nlohmann::json ev;
@@ -865,6 +867,8 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
           }
           if (params.contains("result")) {
             output = params["result"].dump();
+          } else if (params.contains("payload")) {
+            output = params["payload"].dump();
           }
           if (params.contains("error")) {
             if (params["error"].is_string()) {
