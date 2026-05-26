@@ -19,6 +19,8 @@ struct Message {
   std::string run_id;     // Associated run ID (for tracking)
   std::string tool_call_id;  // For tool messages
   std::string tool_name;     // For tool messages
+  std::string content_type;  // "text" (default) or "image"
+  std::string mime_type;     // e.g. "image/png" (for image content)
 };
 
 /**

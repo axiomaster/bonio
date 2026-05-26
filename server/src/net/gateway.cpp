@@ -978,7 +978,12 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
         for (const auto& m : messages) {
           nlohmann::json mj;
           mj["role"] = m.role;
-          mj["content"] = nlohmann::json::array({{{"type", "text"}, {"text", sanitize_utf8(m.content)}}});
+          if (m.content_type == "image") {
+            mj["content"] = nlohmann::json::array({
+                {{"type", "image"}, {"content", m.content}, {"mimeType", m.mime_type.empty() ? "image/png" : m.mime_type}}});
+          } else {
+            mj["content"] = nlohmann::json::array({{{"type", "text"}, {"text", sanitize_utf8(m.content)}}});
+          }
           mj["timestamp"] = m.timestamp;
           if (!m.run_id.empty()) mj["runId"] = m.run_id;
           if (!m.tool_call_id.empty()) mj["toolCallId"] = m.tool_call_id;

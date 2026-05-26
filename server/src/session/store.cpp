@@ -132,6 +132,8 @@ bool SessionStore::load_session_from_file(const std::string& path, Session& out)
       m.run_id = mj.value("runId", "");
       m.tool_call_id = mj.value("toolCallId", "");
       m.tool_name = mj.value("toolName", "");
+      m.content_type = mj.value("contentType", "");
+      m.mime_type = mj.value("mimeType", "");
       s.messages.push_back(std::move(m));
     }
   }
@@ -310,6 +312,8 @@ void SessionStore::save() {
       if (!m.run_id.empty()) mj["runId"] = m.run_id;
       if (!m.tool_call_id.empty()) mj["toolCallId"] = m.tool_call_id;
       if (!m.tool_name.empty()) mj["toolName"] = m.tool_name;
+      if (!m.content_type.empty()) mj["contentType"] = m.content_type;
+      if (!m.mime_type.empty()) mj["mimeType"] = m.mime_type;
       msgs.push_back(std::move(mj));
     }
     j["messages"] = msgs;

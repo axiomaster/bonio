@@ -128,6 +128,7 @@ ilink 使用 **HTTP 长轮询** 而非 WebSocket：
 IlinkHttpClient
   ├─ get_updates() → 长轮询新消息（阻塞等待有消息或超时）
   ├─ send_message(user_id, content) → 回复用户（自动分块 3800 字符）
+  ├─ send_image(user_id, image_data) → 发送图片（CDN 加密上传）
   └─ 维护 context_token（每个用户的会话上下文令牌）
 ```
 
@@ -135,6 +136,24 @@ IlinkHttpClient
 - 回复内容超过 3800 字符自动分割
 - 自动处理 `ret=-2`（微信侧 token 过期）并重试
 - 每个用户的 `context_token` 持久化在状态目录中
+
+### 图片发送（ilink CDN 上传）
+
+ilink 通道支持发送图片，采用微信 CDN 加密上传方案。当你通过微信让 Bonio 截屏时，截图会以图片形式直接发到你的微信聊天中：
+
+```
+截图请求 → screen.capture → 桌面截屏（PNG）→ base64
+  │
+  ▼
+ilink send_image(user_id, image_bytes)
+  ├─ 1. 生成随机 AES-128-ECB 密钥（32 字节 hex）
+  ├─ 2. getuploadurl → 获取 CDN 上传地址
+  ├─ 3. AES 加密图片数据
+  ├─ 4. POST 到 CDN → 获得 x-encrypted-param
+  └─ 5. sendmessage(type=2, image_item) → 图片出现在微信聊天
+
+依赖：mbedtls 提供 AES 和 MD5 实现。
+```
 
 ---
 
@@ -173,6 +192,50 @@ WeChatAdapter.handle_message(msg_id, user_id, chat_id, chat_type, content, callb
 **会话持久化。** 每个微信用户的对话历史都保存在 HiClaw 的 SessionStore 中（session key = `wechat:wecom:{chat_id}:{user_id}`）。这意味着多轮对话的上下文是连续的——你跟微信上的 Bonio 聊，跟桌面上的 Bonio 聊，**用的是同一个 AI 大脑**。
 
 **用户鉴权。** 通过 `allow_from` 配置项控制谁能通过微信指挥你的 Bonio。留空表示允许所有人（适合单人使用场景），填写 user_id 列表则仅允许指定用户。
+
+---
+
+## 远程工具调用：微信指挥桌面
+
+微信消息进入 HiClaw 后，不仅能让 AI 回复文本，还能**远程调用桌面客户端的工具**。最典型的场景就是截图：
+
+```
+你（微信）："帮我截个图"
+  │
+  ▼
+HiClaw Agent → LLM 识别意图 → 调用 screen.capture 工具
+  │
+  ▼ node.invoke.request → 桌面 nodeSession
+  │
+  ▼ 桌面执行截屏 → 返回 base64 PNG（~300KB）
+  │
+  ├─→ 图片通过 ilink CDN 发送到你的微信
+  └─→ 轻量确认 {"sent":true} 返回给 LLM → LLM 回复"截图已发送"
+```
+
+### 关键设计决策
+
+**工具定义必须发送给 LLM。** HiClaw 支持多种 LLM 提供商（Ollama、OpenAI、GLM 等）。工具定义（`tools` 参数）需要作为 API 请求的一部分发送给模型，模型才能知道有 `screen.capture` 可用。HiClaw 统一通过 `/v1/chat/completions` 端点与所有提供商通信，因此工具定义对 Ollama 等本地模型同样生效。
+
+**图片数据不回传 LLM。** 截屏产生的 base64 数据可达 300-400KB。如果把这些数据直接作为工具结果返回给 LLM，小模型（如 gemma4:e4b）容易产生幻觉。因此 HiClaw 在转发图片给微信后，只向 LLM 返回一个轻量确认 `{"sent":true}`，避免大量数据干扰模型推理。
+
+**双会话架构。** 桌面客户端同时维护两个 WebSocket 连接：
+- **operatorSession**（角色：operator）— 聊天、配置、事件广播
+- **nodeSession**（角色：node）— 接收服务端发起的工具调用（screen.capture、camera.snap 等）
+
+服务端根据会话角色（role）路由 `node.invoke.request`，只发送给 node 角色的会话，避免工具请求误发到 operator 会话。
+
+**桌面端同步显示。** 工具执行结果（如截图）通过 `tool.result` 事件广播到桌面 operatorSession，桌面的 ChatController 接收后创建图片消息，在聊天界面中以缩略图形式展示，点击可查看大图。
+
+### 支持的远程工具
+
+| 工具名 | 功能 | 桌面支持 |
+|--------|------|---------|
+| `screen.capture` | 截取桌面屏幕 | ✅ |
+| `camera.list` | 列出可用摄像头 | ✅ |
+| `camera.snap` | 拍照 | ✅（需摄像头） |
+| `device.info` | 获取设备信息 | ✅ |
+| `location.get` | 获取位置 | ❌ |
 
 ---
 

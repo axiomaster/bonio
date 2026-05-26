@@ -99,40 +99,58 @@ WeChatAdapter::WeChatAdapter(const config::Config& config,
             b64_data = output_str;  // fallback: treat as raw base64
           }
 
-          if (!b64_data.empty() && ilink_client_) {
-            // Look up reply context for this session
-            std::string reply_to;
-            {
-              std::lock_guard<std::mutex> lock(reply_ctx_mutex_);
-              auto it = pending_reply_ctx_.find(session_key);
-              if (it != pending_reply_ctx_.end()) {
-                reply_to = it->second;
-              }
+          if (!b64_data.empty()) {
+            // Save image as an assistant message in the session store
+            if (!session_key.empty()) {
+              session::Message img_msg;
+              img_msg.role = "assistant";
+              img_msg.content = b64_data;
+              img_msg.content_type = "image";
+              img_msg.mime_type = "image/png";
+              img_msg.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+                  std::chrono::system_clock::now().time_since_epoch()).count();
+              img_msg.tool_name = tool_name;
+              session_store_->add_message(session_key, img_msg);
+              log::info("wechat: saved image message to session " + session_key +
+                        " (" + std::to_string(b64_data.size()) + " chars base64)");
             }
-            if (!reply_to.empty()) {
-              // Decode base64 to binary
-              static const std::string kB64 =
-                  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-              std::string decoded;
-              std::vector<int> T(256, -1);
-              for (int i = 0; i < 64; i++) T[kB64[i]] = i;
 
-              uint32_t val = 0;
-              int valb = -8;
-              for (unsigned char c : b64_data) {
-                if (T[c] == -1) break;
-                val = (val << 6) + T[c];
-                valb += 6;
-                if (valb >= 0) {
-                  decoded.push_back(static_cast<char>((val >> valb) & 0xFF));
-                  valb -= 8;
+            // Forward image to WeChat (ilink)
+            if (ilink_client_) {
+              // Look up reply context for this session
+              std::string reply_to;
+              {
+                std::lock_guard<std::mutex> lock(reply_ctx_mutex_);
+                auto it = pending_reply_ctx_.find(session_key);
+                if (it != pending_reply_ctx_.end()) {
+                  reply_to = it->second;
                 }
               }
+              if (!reply_to.empty()) {
+                // Decode base64 to binary
+                static const std::string kB64 =
+                    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+                std::string decoded;
+                std::vector<int> T(256, -1);
+                for (int i = 0; i < 64; i++) T[kB64[i]] = i;
 
-              if (!decoded.empty()) {
-                ilink_client_->send_image(reply_to, decoded);
-                log::info("wechat: sent captured image to " + reply_to +
-                          " (" + std::to_string(decoded.size()) + " bytes)");
+                uint32_t val = 0;
+                int valb = -8;
+                for (unsigned char c : b64_data) {
+                  if (T[c] == -1) break;
+                  val = (val << 6) + T[c];
+                  valb += 6;
+                  if (valb >= 0) {
+                    decoded.push_back(static_cast<char>((val >> valb) & 0xFF));
+                    valb -= 8;
+                  }
+                }
+
+                if (!decoded.empty()) {
+                  ilink_client_->send_image(reply_to, decoded);
+                  log::info("wechat: sent captured image to " + reply_to +
+                            " (" + std::to_string(decoded.size()) + " bytes)");
+                }
               }
             }
           }

@@ -480,17 +480,16 @@ class ChatController extends ChangeNotifier {
 
       // Parse the image data from the tool output
       String? base64Data;
-      int? width, height;
       try {
         final out = jsonDecode(output) as Map<String, dynamic>;
         base64Data = out['data'] as String?;
-        width = out['width'] as int?;
-        height = out['height'] as int?;
       } catch (_) {
         base64Data = output;
       }
       if (base64Data == null || base64Data.isEmpty) return;
 
+      // Show image immediately; server persists it in session history,
+      // so _fetchHistoryAndMerge will include it after the LLM responds.
       final msg = ChatMessage(
         id: 'img_${DateTime.now().millisecondsSinceEpoch}',
         role: 'assistant',
