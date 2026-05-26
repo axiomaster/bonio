@@ -538,6 +538,17 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
                         const std::string& invoke_payload_json) -> bool {
       // Find a connected NODE session (role=="node") to route the tool call through.
       // Node sessions have onInvoke handlers; operator sessions do not.
+      log::info("gateway: node_invoker looking for node session, tool_call_id=" + tool_call_id);
+      int total = 0, connected = 0, node_count = 0;
+      for (auto& [hdl, session] : sessions) {
+        total++;
+        if (session.connected) connected++;
+        if (session.connected && session.role == "node") node_count++;
+      }
+      log::info("gateway: sessions total=" + std::to_string(total) +
+                " connected=" + std::to_string(connected) +
+                " node=" + std::to_string(node_count));
+
       for (auto& [hdl, session] : sessions) {
         if (session.connected && session.role == "node") {
           // Register the tool_call_id in the external router registry if not already registered
@@ -886,7 +897,10 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
         }
       } catch (...) {}
 
-      log::info("gateway: node.invoke.result toolCallId=" + tool_call_id + " success=" + (success ? "true" : "false"));
+      log::info("gateway: node.invoke.result toolCallId=" + tool_call_id +
+                " success=" + (success ? "true" : "false") +
+                " output_len=" + std::to_string(output.size()) +
+                " from_role=" + it->second.role);
 
       // Route to ToolRouter if available
       if (it->second.tool_router && !tool_call_id.empty()) {
@@ -895,11 +909,12 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
         result.output = output;
         result.error = error;
         bool routed = it->second.tool_router->complete_tool_call(tool_call_id, result);
-        log::info("gateway: tool_router routing " + std::string(routed ? "succeeded" : "failed"));
+        log::info("gateway: tool_router routing " + std::string(routed ? "succeeded" : "failed (not found)"));
       }
 
       // Also check external router registry (for WeChat and other non-gateway sessions)
       if (external_routers && !tool_call_id.empty()) {
+        log::info("gateway: checking external_routers, size=" + std::to_string(external_routers->size()));
         auto ext_it = external_routers->find(tool_call_id);
         if (ext_it != external_routers->end()) {
           ToolResult result;
@@ -909,6 +924,8 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
           ext_it->second->complete_tool_call(tool_call_id, result);
           external_routers->erase(ext_it);
           log::info("gateway: routed external tool result for " + tool_call_id);
+        } else {
+          log::warn("gateway: external_routers has no entry for " + tool_call_id);
         }
       }
 
@@ -1720,7 +1737,10 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
     std::string role;
     std::string response = gateway_handle_frame(payload, config, pairing_code, connected, role);
     it->second.connected = connected;
-    if (!role.empty()) it->second.role = role;
+    if (!role.empty()) {
+      it->second.role = role;
+      log::info("gateway: session role set to '" + role + "'");
+    }
     try {
       server.send(hdl, response, websocketpp::frame::opcode::text);
     } catch (...) {}

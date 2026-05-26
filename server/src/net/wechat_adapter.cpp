@@ -143,9 +143,9 @@ WeChatAdapter::WeChatAdapter(const config::Config& config,
       return;
     }
 
-    // Forward all agent/chat events to gateway operator sessions
+    // Forward all agent/chat/tool events to gateway operator sessions
     if (broadcast_ && *broadcast_) {
-      if (event_name == "agent" || event_name == "chat") {
+      if (event_name == "agent" || event_name == "chat" || event_name == "tool.result") {
         (*broadcast_)(event_name, payload_json);
       }
     }

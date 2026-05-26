@@ -254,7 +254,8 @@ void AsyncAgentManager::run_task(std::shared_ptr<AsyncTask> task) {
 
         try {
           auto result = future.get();
-          // Emit tool.result event for screen captures so adapters can forward images
+          // For image-capture tools: forward image to adapter, but don't send
+          // the large base64 payload back to the LLM (causes hallucinations).
           if (result.success && !result.output.empty() &&
               (tool_name == "screen.capture" || tool_name == "camera.snap" || tool_name == "photos.capture")) {
             nlohmann::json tool_result_payload;
@@ -263,6 +264,8 @@ void AsyncAgentManager::run_task(std::shared_ptr<AsyncTask> task) {
             tool_result_payload["toolCallId"] = tool_call_id;
             tool_result_payload["output"] = result.output;
             event_cb("tool.result", tool_result_payload.dump());
+            // Return a lightweight confirmation instead of the full base64 data
+            return types::ToolResult{true, R"({"sent":true})", ""};
           }
           return types::ToolResult{result.success, result.output, result.error};
         } catch (const std::exception& e) {

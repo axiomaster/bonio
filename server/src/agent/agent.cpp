@@ -277,10 +277,10 @@ RunResult run(const config::Config& config,
 
   messages_json.push_back(user_message_json(to_utf8(user_prompt)));
 
-  bool send_tools = use_openai && (base_url.find("minimaxi.com") == std::string::npos);
-  std::string tools_str = (send_tools) ? tools_array().dump() : "";
+  bool send_tools = true;
+  std::string tools_str = tools_array().dump();
   for (int round = 0; round < 3; ++round) {
-    std::string tools = (round == 0 && send_tools) ? tools_str : "";
+    std::string tools = (round == 0) ? tools_str : "";
     providers::OllamaResponse resp;
     if (use_openai)
       resp = providers::chat(base_url, api_key, mod, messages_json, temp, tools);
@@ -515,10 +515,7 @@ RunResult run_streaming(const config::Config& config,
   });
   req_body["temperature"] = temp;
 
-  bool send_tools_s = use_openai && (base_url.find("minimaxi.com") == std::string::npos);
-  if (send_tools_s) {
-    req_body["tools"] = tools_array();
-  }
+  req_body["tools"] = tools_array();
 
   // Build URL
   std::string url = base_url;
@@ -732,8 +729,8 @@ RunResult run_streaming_with_history(
     messages_json.push_back(user_message_json(to_utf8(user_prompt)));
   }
 
-  bool send_tools = use_openai && (base_url.find("minimaxi.com") == std::string::npos);
-  std::string tools_str = send_tools ? (remote_executor ? all_tools_array() : tools_array()).dump() : "";
+  bool send_tools = true;
+  std::string tools_str = (remote_executor ? all_tools_array() : tools_array()).dump();
 
   std::string full_content;
 
@@ -754,7 +751,7 @@ RunResult run_streaming_with_history(
       req_body["messages"].push_back(json::parse(mj_str));
     }
     req_body["temperature"] = temp;
-    if (send_tools && !tools_str.empty()) {
+    if (!tools_str.empty()) {
       req_body["tools"] = json::parse(tools_str);
     }
 

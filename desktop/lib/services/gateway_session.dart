@@ -322,6 +322,7 @@ class GatewaySession {
     }
 
     if (event == 'node.invoke.request' && payloadJson != null && onInvoke != null) {
+      AppLogger.instance.info('GatewaySession: received node.invoke.request');
       _handleInvokeEvent(payloadJson);
       return;
     }
@@ -345,7 +346,10 @@ class GatewaySession {
       final id = payload['id'] as String?;
       final nodeId = payload['nodeId'] as String?;
       final command = payload['command'] as String?;
-      if (id == null || nodeId == null || command == null) return;
+      if (id == null || nodeId == null || command == null) {
+        AppLogger.instance.warn('GatewaySession: invoke event missing fields: id=$id nodeId=$nodeId command=$command');
+        return;
+      }
 
       final params = payload['paramsJSON'] as String? ??
           (payload['params'] != null ? jsonEncode(payload['params']) : null);
@@ -363,10 +367,14 @@ class GatewaySession {
       try {
         result = await onInvoke!(request);
       } catch (err) {
+        AppLogger.instance.warn('GatewaySession: invoke handler threw: $err');
         result = InvokeResult.fail('INTERNAL', err.toString());
       }
+      AppLogger.instance.info('GatewaySession: sending invoke result for $command ok=${result.ok}');
       await _sendInvokeResult(id, nodeId, result, timeoutMs);
-    } catch (_) {}
+    } catch (e) {
+      AppLogger.instance.warn('GatewaySession: _handleInvokeEvent error: $e');
+    }
   }
 
   Future<void> _sendInvokeResult(

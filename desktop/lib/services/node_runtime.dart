@@ -808,6 +808,7 @@ class NodeRuntime extends ChangeNotifier {
   }
 
   Future<InvokeResult> _onNodeInvoke(InvokeRequest request) async {
+    AppLogger.instance.info('NodeRuntime: received invoke ${request.command} id=${request.id}');
     switch (request.command) {
       case 'device.info':
         return InvokeResult.success(jsonEncode({
@@ -870,18 +871,22 @@ class NodeRuntime extends ChangeNotifier {
   }
 
   Future<InvokeResult> _handleScreenCapture() async {
+    AppLogger.instance.info('NodeRuntime: _handleScreenCapture starting');
     try {
       final result = ScreenCapture.captureScreen();
       if (result == null) {
+        AppLogger.instance.warn('NodeRuntime: screen capture returned null');
         return InvokeResult.fail('SCREEN_CAPTURE_UNAVAILABLE',
             'Screen capture is not supported on this platform');
       }
       final pngBytes = await result.toPng();
       if (pngBytes == null) {
+        AppLogger.instance.warn('NodeRuntime: screen capture toPng returned null');
         return InvokeResult.fail('SCREEN_CAPTURE_ENCODE_FAILED',
             'Failed to encode screen capture as PNG');
       }
       final base64Png = base64Encode(pngBytes);
+      AppLogger.instance.info('NodeRuntime: screen capture success, ${pngBytes.length} bytes');
       return InvokeResult.success(jsonEncode({
         'data': base64Png,
         'width': result.width,

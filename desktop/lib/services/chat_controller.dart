@@ -293,6 +293,9 @@ class ChatController extends ChangeNotifier {
       case 'agent':
         if (payloadJson != null) _handleAgentEvent(payloadJson);
         break;
+      case 'tool.result':
+        if (payloadJson != null) _handleToolResultEvent(payloadJson);
+        break;
     }
   }
 
@@ -463,6 +466,52 @@ class ChatController extends ChangeNotifier {
         break;
     }
   }
+
+  void _handleToolResultEvent(String payloadJson) {
+    try {
+      final payload = jsonDecode(payloadJson) as Map<String, dynamic>;
+      final toolName = payload['toolName'] as String? ?? '';
+      final output = payload['output'] as String? ?? '';
+      final sessionKey = payload['sessionKey'] as String? ?? '';
+
+      if (!_imageToolNames.contains(toolName) || output.isEmpty) return;
+
+      // Only show in the currently active session
+      if (sessionKey != sessionId) return;
+
+      // Parse the image data from the tool output
+      String? base64Data;
+      int? width, height;
+      try {
+        final out = jsonDecode(output) as Map<String, dynamic>;
+        base64Data = out['data'] as String?;
+        width = out['width'] as int?;
+        height = out['height'] as int?;
+      } catch (_) {
+        base64Data = output;
+      }
+      if (base64Data == null || base64Data.isEmpty) return;
+
+      final msg = ChatMessage(
+        id: 'img_${DateTime.now().millisecondsSinceEpoch}',
+        role: 'assistant',
+        content: [
+          ChatMessageContent(
+            type: 'image',
+            base64: base64Data,
+            fileName: toolName == 'screen.capture'
+                ? 'screenshot.png'
+                : 'photo.jpg',
+          ),
+        ],
+        timestampMs: DateTime.now().millisecondsSinceEpoch,
+      );
+      _messages.add(msg);
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  static const _imageToolNames = {'screen.capture', 'camera.snap', 'photos.capture'};
 
   void _handleAgentEvent(String payloadJson) {
     final payload = _tryParseJson(payloadJson);
