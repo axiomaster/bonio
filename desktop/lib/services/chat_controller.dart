@@ -474,10 +474,9 @@ class ChatController extends ChangeNotifier {
       final output = payload['output'] as String? ?? '';
       final sessionKey = payload['sessionKey'] as String? ?? '';
 
-      if (!_imageToolNames.contains(toolName) || output.isEmpty) return;
+      AppLogger.instance.info('ChatController: tool.result event toolName=$toolName sessionKey=$sessionKey activeSession=$sessionId');
 
-      // Only show in the currently active session
-      if (sessionKey != sessionId) return;
+      if (!_imageToolNames.contains(toolName) || output.isEmpty) return;
 
       // Parse the image data from the tool output
       String? base64Data;

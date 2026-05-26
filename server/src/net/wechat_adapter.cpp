@@ -140,7 +140,7 @@ WeChatAdapter::WeChatAdapter(const config::Config& config,
       } catch (const std::exception& e) {
         log::warn("wechat: failed to handle tool.result: " + std::string(e.what()));
       }
-      return;
+      // Don't return — fall through to broadcast tool.result to operator sessions
     }
 
     // Forward all agent/chat/tool events to gateway operator sessions
