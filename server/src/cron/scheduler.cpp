@@ -209,14 +209,16 @@ std::string CronScheduler::add_job(const std::string& session_key,
     return "";
   }
 
+  std::string new_id;
   {
     std::lock_guard<std::mutex> lock(mutex_);
     jobs_.push_back(std::move(job));
+    new_id = jobs_.back().id;
     save_jobs();
   }
 
-  log::info("CronScheduler: added job " + jobs_.back().id + " (type=" + schedule_type + ")");
-  return jobs_.back().id;
+  log::info("CronScheduler: added job " + new_id + " (type=" + schedule_type + ")");
+  return new_id;
 }
 
 bool CronScheduler::remove_job(const std::string& id) {
@@ -255,6 +257,7 @@ void CronScheduler::scheduler_loop() {
 
     {
       std::lock_guard<std::mutex> lock(mutex_);
+      bool dirty = false;
       for (auto& job : jobs_) {
         if (!job.enabled) continue;
         if (job.next_run <= 0) continue;
@@ -272,16 +275,20 @@ void CronScheduler::scheduler_loop() {
         std::string result_summary;
         bool success = false;
 
-        try {
-          std::string run_id = agent_manager_->start_task(job.session_key, job.prompt);
-          if (!run_id.empty()) {
-            success = true;
-            result_summary = "run_id=" + run_id;
-          } else {
-            result_summary = "start_task returned empty run_id";
+        if (!agent_manager_) {
+          result_summary = "no agent_manager";
+        } else {
+          try {
+            std::string run_id = agent_manager_->start_task(job.session_key, job.prompt);
+            if (!run_id.empty()) {
+              success = true;
+              result_summary = "run_id=" + run_id;
+            } else {
+              result_summary = "start_task returned empty run_id";
+            }
+          } catch (const std::exception& e) {
+            result_summary = std::string("error: ") + e.what();
           }
-        } catch (const std::exception& e) {
-          result_summary = std::string("error: ") + e.what();
         }
 
         rec.completed_at = now_ms();
@@ -289,6 +296,7 @@ void CronScheduler::scheduler_loop() {
         rec.result_summary = result_summary;
 
         job.run_count++;
+        dirty = true;
 
         // Append run record, trimming to kMaxRecentRuns
         job.recent_runs.push_back(std::move(rec));
@@ -336,7 +344,7 @@ void CronScheduler::scheduler_loop() {
         }
       }
 
-      save_jobs();
+      if (dirty) save_jobs();
     }
 
     // Sleep for 1 second
