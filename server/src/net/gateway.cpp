@@ -731,7 +731,7 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
     } catch (...) {}
   });
 
-  server.set_message_handler([&server, &sessions, &config, &pairing_code, wechat_sender, external_routers](websocketpp::connection_hdl hdl, ws_server_t::message_ptr msg) {
+  server.set_message_handler([&server, &sessions, &config, &pairing_code, wechat_sender, external_routers, cron_scheduler](websocketpp::connection_hdl hdl, ws_server_t::message_ptr msg) {
     if (!msg || msg->get_opcode() != websocketpp::frame::opcode::text) return;
     std::string payload = msg->get_payload();
     auto it = sessions.find(hdl);
@@ -1228,6 +1228,193 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
         res["ok"] = false;
         res["error"] = {{"code", "NOT_FOUND"}, {"message", "session not found"}};
       }
+      try { server.send(hdl, res.dump(), websocketpp::frame::opcode::text); } catch (...) {}
+      return;
+    }
+
+    // --- Cron RPC handlers ---
+    if (method == "cron.list") {
+      if (!it->second.connected) {
+        nlohmann::json res;
+        res["type"] = "res"; res["id"] = id; res["ok"] = false;
+        res["error"] = {{"code", "UNAUTHORIZED"}, {"message", "connect first"}};
+        try { server.send(hdl, res.dump(), websocketpp::frame::opcode::text); } catch (...) {}
+        return;
+      }
+      auto jobs = cron_scheduler->list_jobs();
+      nlohmann::json arr = nlohmann::json::array();
+      for (const auto& job : jobs) {
+        arr.push_back({
+            {"id", job.id}, {"sessionKey", job.session_key},
+            {"scheduleType", job.schedule_type}, {"everyMs", job.every_ms},
+            {"atTimestamp", job.at_timestamp}, {"cronExpr", job.cron_expr},
+            {"prompt", job.prompt}, {"maxCount", job.max_count},
+            {"maxDurationMs", job.max_duration_ms}, {"runCount", job.run_count},
+            {"createdAt", job.created_at}, {"nextRun", job.next_run},
+            {"enabled", job.enabled}
+        });
+      }
+      nlohmann::json res;
+      res["type"] = "res"; res["id"] = id; res["ok"] = true;
+      res["payload"] = {{"jobs", arr}, {"count", arr.size()}};
+      try { server.send(hdl, res.dump(), websocketpp::frame::opcode::text); } catch (...) {}
+      return;
+    }
+
+    if (method == "cron.add") {
+      if (!it->second.connected) {
+        nlohmann::json res;
+        res["type"] = "res"; res["id"] = id; res["ok"] = false;
+        res["error"] = {{"code", "UNAUTHORIZED"}, {"message", "connect first"}};
+        try { server.send(hdl, res.dump(), websocketpp::frame::opcode::text); } catch (...) {}
+        return;
+      }
+      std::string schedule, prompt_str, session_key_rpc, max_dur_str;
+      int max_count = 0;
+      try {
+        nlohmann::json j = nlohmann::json::parse(payload);
+        if (j.contains("params") && j["params"].is_object()) {
+          schedule = wspp_get_string(j["params"], "schedule");
+          prompt_str = wspp_get_string(j["params"], "prompt");
+          session_key_rpc = wspp_get_string(j["params"], "sessionKey");
+          if (session_key_rpc.empty()) session_key_rpc = "main";
+          if (j["params"].contains("maxCount") && j["params"]["maxCount"].is_number_integer())
+            max_count = j["params"]["maxCount"].get<int>();
+          max_dur_str = wspp_get_string(j["params"], "maxDuration");
+        }
+      } catch (...) {}
+
+      if (schedule.empty() || prompt_str.empty()) {
+        nlohmann::json res;
+        res["type"] = "res"; res["id"] = id; res["ok"] = false;
+        res["error"] = {{"code", "BAD_REQUEST"}, {"message", "missing schedule or prompt"}};
+        try { server.send(hdl, res.dump(), websocketpp::frame::opcode::text); } catch (...) {}
+        return;
+      }
+
+      // Parse schedule string (same logic as cron_tool.cpp parse_schedule/parse_duration_ms)
+      std::string sched_type, cron_expr;
+      int64_t every_ms = 0, at_ts = 0;
+      bool ok = false;
+
+      if (schedule.compare(0, 6, "every ") == 0) {
+        sched_type = "every";
+        std::string dur = schedule.substr(6);
+        while (!dur.empty() && dur.back() == ' ') dur.pop_back();
+        // Try plain number (milliseconds)
+        char* end = nullptr;
+        long long val_ll = std::strtoll(dur.c_str(), &end, 10);
+        if (end != nullptr && *end == '\0' && val_ll > 0) {
+          every_ms = static_cast<int64_t>(val_ll);
+        } else {
+          double val = std::strtod(dur.c_str(), &end);
+          if (end != nullptr && end != dur.c_str() && val > 0) {
+            std::string suffix(end);
+            if (suffix == "s") every_ms = static_cast<int64_t>(val * 1000);
+            else if (suffix == "m") every_ms = static_cast<int64_t>(val * 60000);
+            else if (suffix == "h") every_ms = static_cast<int64_t>(val * 3600000);
+          }
+        }
+        ok = every_ms > 0;
+      } else if (schedule.compare(0, 3, "at ") == 0) {
+        sched_type = "at";
+        std::string rest = schedule.substr(3);
+        while (!rest.empty() && rest.back() == ' ') rest.pop_back();
+        if (!rest.empty() && rest[0] == '+') {
+          // Offset from now
+          std::string offset_str = rest.substr(1);
+          char* end = nullptr;
+          long long val_ll = std::strtoll(offset_str.c_str(), &end, 10);
+          int64_t ms = 0;
+          if (end != nullptr && *end == '\0' && val_ll > 0) {
+            ms = static_cast<int64_t>(val_ll);
+          } else {
+            double val = std::strtod(offset_str.c_str(), &end);
+            if (end != nullptr && end != offset_str.c_str() && val > 0) {
+              std::string suffix(end);
+              if (suffix == "s") ms = static_cast<int64_t>(val * 1000);
+              else if (suffix == "m") ms = static_cast<int64_t>(val * 60000);
+              else if (suffix == "h") ms = static_cast<int64_t>(val * 3600000);
+            }
+          }
+          if (ms > 0) {
+            at_ts = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        std::chrono::system_clock::now().time_since_epoch()).count() + ms;
+            ok = true;
+          }
+        } else {
+          // Plain timestamp
+          char* end = nullptr;
+          long long ts = std::strtoll(rest.c_str(), &end, 10);
+          if (end != nullptr && *end == '\0' && ts > 0) {
+            at_ts = static_cast<int64_t>(ts);
+            ok = true;
+          }
+        }
+      } else if (schedule.compare(0, 5, "cron ") == 0) {
+        sched_type = "cron";
+        cron_expr = schedule.substr(5);
+        while (!cron_expr.empty() && cron_expr.back() == ' ') cron_expr.pop_back();
+        ok = !cron_expr.empty();
+      }
+
+      if (!ok) {
+        nlohmann::json res;
+        res["type"] = "res"; res["id"] = id; res["ok"] = false;
+        res["error"] = {{"code", "BAD_REQUEST"},
+                        {"message", "invalid schedule format. Use: \"every 1m\", \"at +30m\", or \"cron 0 9 * * *\""}};
+        try { server.send(hdl, res.dump(), websocketpp::frame::opcode::text); } catch (...) {}
+        return;
+      }
+
+      // Parse maxDuration
+      int64_t max_duration_ms = 0;
+      if (!max_dur_str.empty()) {
+        char* end = nullptr;
+        long long val_ll = std::strtoll(max_dur_str.c_str(), &end, 10);
+        if (end != nullptr && *end == '\0' && val_ll > 0) {
+          max_duration_ms = static_cast<int64_t>(val_ll);
+        } else {
+          double dv = std::strtod(max_dur_str.c_str(), &end);
+          if (end != nullptr && end != max_dur_str.c_str() && dv > 0) {
+            std::string suffix(end);
+            if (suffix == "s") max_duration_ms = static_cast<int64_t>(dv * 1000);
+            else if (suffix == "m") max_duration_ms = static_cast<int64_t>(dv * 60000);
+            else if (suffix == "h") max_duration_ms = static_cast<int64_t>(dv * 3600000);
+          }
+        }
+      }
+
+      std::string job_id = cron_scheduler->add_job(
+          session_key_rpc, sched_type, every_ms, at_ts, cron_expr,
+          prompt_str, max_count, max_duration_ms);
+      nlohmann::json res;
+      res["type"] = "res"; res["id"] = id;
+      res["ok"] = !job_id.empty();
+      res["payload"] = {{"jobId", job_id}};
+      if (job_id.empty()) res["error"] = {{"message", "failed to create cron job"}};
+      try { server.send(hdl, res.dump(), websocketpp::frame::opcode::text); } catch (...) {}
+      return;
+    }
+
+    if (method == "cron.remove") {
+      if (!it->second.connected) {
+        nlohmann::json res;
+        res["type"] = "res"; res["id"] = id; res["ok"] = false;
+        res["error"] = {{"code", "UNAUTHORIZED"}, {"message", "connect first"}};
+        try { server.send(hdl, res.dump(), websocketpp::frame::opcode::text); } catch (...) {}
+        return;
+      }
+      std::string job_id;
+      try {
+        nlohmann::json j = nlohmann::json::parse(payload);
+        if (j.contains("params") && j["params"].is_object())
+          job_id = wspp_get_string(j["params"], "jobId");
+      } catch (...) {}
+      bool removed = !job_id.empty() && cron_scheduler->remove_job(job_id);
+      nlohmann::json res;
+      res["type"] = "res"; res["id"] = id; res["ok"] = removed;
+      if (!removed) res["error"] = {{"message", "job not found: " + job_id}};
       try { server.send(hdl, res.dump(), websocketpp::frame::opcode::text); } catch (...) {}
       return;
     }
