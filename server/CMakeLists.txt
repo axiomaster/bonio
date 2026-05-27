@@ -149,6 +149,7 @@ set(HICLAW_SOURCES
   src/cli/cli.cpp
   src/config/config.cpp
   src/cron/schedule.cpp
+  src/cron/scheduler.cpp
   src/cron/store.cpp
   src/memory/file_memory.cpp
   src/net/async_agent.cpp
