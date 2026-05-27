@@ -13,6 +13,8 @@
 #include "hiclaw/observability/log.hpp"
 #include "hiclaw/session/store.hpp"
 #include "hiclaw/skills/skill_manager.hpp"
+#include "hiclaw/cron/scheduler.hpp"
+#include "hiclaw/cron/cron_tool.hpp"
 #include <hv/HttpClient.h>
 
 #ifdef _WIN32
@@ -581,6 +583,81 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
       return false;
     };
   }
+
+  // --- CronScheduler ---
+  // Shared AsyncAgentManager for cron tasks (not tied to any WebSocket connection).
+  auto cron_session_store = std::make_shared<session::SessionStore>(config.config_dir);
+  auto cron_tool_router = std::make_shared<ToolRouter>();
+
+  auto cron_event_callback = [&server, &sessions, node_invoker, external_routers, cron_tool_router, wechat_sender](
+      const std::string& event_name, const std::string& payload) {
+    // Route node.invoke.request to connected desktop node (same pattern as wechat_adapter)
+    if (event_name == "node.invoke.request" && node_invoker && *node_invoker) {
+      try {
+        auto j = nlohmann::json::parse(payload);
+        std::string invoke_id = j.value("id", "");
+        std::string tool_call_id = invoke_id;
+        if (tool_call_id.rfind("invoke_", 0) == 0) {
+          tool_call_id = tool_call_id.substr(7);
+        }
+        if (external_routers && cron_tool_router) {
+          (*external_routers)[tool_call_id] = cron_tool_router.get();
+        }
+        bool sent = (*node_invoker)(tool_call_id, payload);
+        if (!sent) {
+          cron_tool_router->complete_tool_call(tool_call_id,
+              ToolResult{false, "", "No connected device node available"});
+        }
+      } catch (const std::exception& e) {
+        log::warn("cron: failed to route node.invoke.request: " + std::string(e.what()));
+      }
+      return;
+    }
+
+    // Mirror chat final/error events to WeChat (same pattern as per-session callback)
+    if (event_name == "chat" && wechat_sender && *wechat_sender) {
+      try {
+        auto chat_payload = nlohmann::json::parse(payload);
+        std::string sk = chat_payload.value("sessionKey", "");
+        std::string state = chat_payload.value("state", "");
+        if (sk.rfind("wechat:", 0) == 0 && (state == "final" || state == "error")) {
+          std::string reply;
+          if (state == "final") reply = chat_payload.value("message", "");
+          else reply = "[Error] " + chat_payload.value("errorMessage", "Agent error");
+          if (!reply.empty()) {
+            std::string send_error;
+            (*wechat_sender)(sk, reply, true, send_error);
+          }
+        }
+      } catch (...) {}
+    }
+
+    // Broadcast events to all connected operator sessions
+    nlohmann::json ev;
+    ev["type"] = "event";
+    ev["event"] = event_name;
+    try {
+      ev["payload"] = nlohmann::json::parse(payload);
+    } catch (...) {
+      ev["payload"] = payload;
+    }
+    std::string msg = ev.dump();
+    server.get_io_service().post([&server, &sessions, msg = std::move(msg)]() {
+      for (auto& kv : sessions) {
+        if (kv.second.connected) {
+          try { server.send(kv.first, msg, websocketpp::frame::opcode::text); } catch (...) {}
+        }
+      }
+    });
+  };
+
+  auto cron_agent_manager = std::make_shared<AsyncAgentManager>(
+      config, cron_event_callback, cron_session_store, cron_tool_router);
+
+  auto cron_scheduler = std::make_shared<cron::CronScheduler>(config.config_dir);
+  cron_scheduler->start(cron_agent_manager);
+  cron::set_cron_scheduler(cron_scheduler.get());
+  log::info("gateway: cron scheduler started");
 
   server.set_open_handler([&server, &sessions, &config, &pairing_code, wechat_sender](websocketpp::connection_hdl hdl) {
     sessions[hdl] = WsppSession();
@@ -1825,6 +1902,8 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
   }
 
   server.run();
+
+  cron_scheduler->stop();
 }
 
 }  // namespace
