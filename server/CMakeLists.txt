@@ -151,6 +151,7 @@ set(HICLAW_SOURCES
   src/cron/schedule.cpp
   src/cron/scheduler.cpp
   src/cron/store.cpp
+  src/cron/cron_tool.cpp
   src/memory/file_memory.cpp
   src/net/async_agent.cpp
   src/net/call_handler.cpp

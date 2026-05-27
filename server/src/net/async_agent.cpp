@@ -1,5 +1,6 @@
 #include "hiclaw/net/async_agent.hpp"
 #include "hiclaw/agent/agent.hpp"
+#include "hiclaw/cron/cron_tool.hpp"
 #include "hiclaw/observability/log.hpp"
 #include "hiclaw/tools/tool.hpp"
 #include <nlohmann/json.hpp>
@@ -277,6 +278,7 @@ void AsyncAgentManager::run_task(std::shared_ptr<AsyncTask> task) {
     // Execute multi-turn streaming agent with history and tool loop
     agent::RunResult result;
     if (!task->aborted) {
+      cron::set_session_key(session_key_copy);
       const std::string* user_override =
           task->user_message_json_override.empty() ? nullptr : &task->user_message_json_override;
       result = agent::run_streaming_with_history(

@@ -1,3 +1,4 @@
+#include "hiclaw/cron/cron_tool.hpp"
 #include "hiclaw/memory/memory.hpp"
 #include "hiclaw/net/http_client.hpp"
 #include "hiclaw/security/path_guard.hpp"
@@ -455,6 +456,7 @@ void register_builtin_tools() {
   register_tool("skill.read", skill_read_impl);
   register_tool("memo.save", [](const std::string& args_json) -> ToolResult { return memo_save(args_json); });
   register_tool("memo.list", [](const std::string& args_json) -> ToolResult { return memo_list(args_json); });
+  cron::register_cron_tools();
 }
 
 }  // namespace tools

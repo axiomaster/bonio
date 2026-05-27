@@ -1,4 +1,5 @@
 #include "hiclaw/agent/agent.hpp"
+#include "hiclaw/cron/cron_tool.hpp"
 #include "hiclaw/memory/memory.hpp"
 #include "hiclaw/observability/log.hpp"
 #include "hiclaw/net/http_client.hpp"
@@ -157,6 +158,13 @@ static json all_tools_array() {
   for (auto& t : remote) {
     tools.push_back(std::move(t));
   }
+
+  // Cron tools
+  tools.push_back(json::parse(R"CRON({"type":"function","function":{"name":"cron.add","description":"Schedule a recurring or one-time task. Supports 'every 1m' (interval), 'at +30m' (one-shot offset), or 'cron 0 9 * * *' (5-field cron expression).","parameters":{"type":"object","properties":{"schedule":{"type":"string","description":"Schedule expression: 'every <duration>' (e.g. 'every 5m'), 'at +<duration>' (e.g. 'at +30m'), or 'cron <expr>' (e.g. 'cron 0 9 * * *')"},"prompt":{"type":"string","description":"The message/prompt to send to the agent when the task fires"},"maxCount":{"type":"integer","description":"Maximum number of times to run (0 = unlimited)"},"maxDuration":{"type":"string","description":"Maximum total duration (e.g. '1h', '30m'). Job auto-removes after this duration."}},"required":["schedule","prompt"]}}})CRON"));
+  tools.push_back(json::parse(R"CRON({"type":"function","function":{"name":"cron.list","description":"List all scheduled cron jobs with their status.","parameters":{"type":"object","properties":{}}})CRON"));
+  tools.push_back(json::parse(R"CRON({"type":"function","function":{"name":"cron.remove","description":"Remove a scheduled cron job by its ID.","parameters":{"type":"object","properties":{"jobId":{"type":"string","description":"The ID of the cron job to remove"}},"required":["jobId"]}}})CRON"));
+  tools.push_back(json::parse(R"CRON({"type":"function","function":{"name":"cron.runs","description":"Get recent execution history for a cron job.","parameters":{"type":"object","properties":{"jobId":{"type":"string","description":"The ID of the cron job to inspect"}},"required":["jobId"]}}})CRON"));
+
   return tools;
 }
 
