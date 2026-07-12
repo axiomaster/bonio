@@ -12,8 +12,10 @@
         android:layout_height="wrap_content"
         android:layout_marginBottom="4dp"
         android:visibility="gone"
-        app:cardBackgroundColor="#FFFFFF"
-        app:cardCornerRadius="16dp"
+        android:clickable="true"
+        android:focusable="true"
+        app:cardBackgroundColor="#E62D303E"
+        app:cardCornerRadius="12dp"
         app:cardElevation="4dp"
         app:contentPadding="8dp">
 
@@ -27,7 +29,7 @@
                 android:id="@+id/bubble_label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="#1A73E8"
+                android:textColor="#FFFFFF"
                 android:textSize="11sp"
                 android:textStyle="bold"
                 android:visibility="gone" />
@@ -44,7 +46,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:maxWidth="200dp"
-                    android:textColor="#000000"
+                    android:textColor="#FFFFFF"
                     android:textSize="12sp" />
 
             </ScrollView>

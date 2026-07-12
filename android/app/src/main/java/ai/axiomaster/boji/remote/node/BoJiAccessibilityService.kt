@@ -80,6 +80,55 @@ class BoJiAccessibilityService : AccessibilityService() {
     return setTextOnNode(info.node, text)
   }
 
+  /** Inserts text into the active app editor and activates its send action. */
+  suspend fun sendTextToActiveChat(text: String): Boolean {
+    val root = rootInActiveWindow ?: return false
+    val editor = findFirstNode(root) { it.isEditable && it.isEnabled }
+    root.recycle()
+    if (editor == null || !setTextOnNode(editor, text)) {
+      editor?.recycle()
+      return false
+    }
+    editor.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+    editor.recycle()
+    delay(250)
+
+    val refreshedRoot = rootInActiveWindow ?: return false
+    val sendNode = findFirstNode(refreshedRoot) { node ->
+      val label = listOf(node.text, node.contentDescription)
+        .joinToString(" ") { it?.toString().orEmpty() }.trim()
+      node.isEnabled && (label == "发送" || label.equals("send", ignoreCase = true))
+    }
+    refreshedRoot.recycle()
+    var clickable = sendNode
+    while (clickable != null && !clickable.isClickable) {
+      val parent = clickable.parent
+      clickable.recycle()
+      clickable = parent
+    }
+    val sent = clickable?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
+    clickable?.recycle()
+    return sent
+  }
+
+  private fun findFirstNode(
+    root: AccessibilityNodeInfo,
+    predicate: (AccessibilityNodeInfo) -> Boolean,
+  ): AccessibilityNodeInfo? {
+    val queue = ArrayDeque<AccessibilityNodeInfo>()
+    for (index in 0 until root.childCount) root.getChild(index)?.let(queue::add)
+    while (queue.isNotEmpty()) {
+      val node = queue.removeFirst()
+      if (predicate(node)) {
+        while (queue.isNotEmpty()) queue.removeFirst().recycle()
+        return node
+      }
+      for (index in 0 until node.childCount) node.getChild(index)?.let(queue::add)
+      node.recycle()
+    }
+    return null
+  }
+
   /** Returns a compact, privacy-conscious UI tree snapshot for server-side screen understanding. */
   fun dumpActiveWindow(maxNodes: Int = 180, maxTextLength: Int = 240): String? {
     val root = rootInActiveWindow ?: return null

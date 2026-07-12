@@ -73,6 +73,7 @@ class FloatingWindowService : Service() {
     private var isVoiceActive = false
     private var voiceSessionId = 0
     private var screenSuggestionPending = false
+    private var actionableSuggestion: String? = null
 
     private var currentAssetPath: String? = null
     private var isPlayingTransition = false
@@ -147,6 +148,7 @@ class FloatingWindowService : Service() {
         runtime.chat.onAssistantReply = { text ->
             if (screenSuggestionPending) {
                 screenSuggestionPending = false
+                actionableSuggestion = text.trim()
                 mainHandler.post {
                     avatarController.setActivity(AgentState.Speaking)
                     avatarController.setBubble(text)
@@ -173,6 +175,7 @@ class FloatingWindowService : Service() {
         bubbleLabel = floatingView.findViewById(R.id.bubble_label)
         textBubble = floatingView.findViewById(R.id.text_bubble)
         textBubbleScroll = floatingView.findViewById(R.id.text_bubble_scroll)
+        bubbleContainer.setOnClickListener { sendActionableSuggestion() }
 
         val savedX = prefs.getInt(KEY_POS_X, 0)
         val savedY = prefs.getInt(KEY_POS_Y, 100)
@@ -600,11 +603,21 @@ class FloatingWindowService : Service() {
 
     private fun analyzeCurrentScreen() {
         if (screenSuggestionPending) return
+        val runtime = (application as BoJiApp).runtime
+        if (!runtime.chat.healthOk.value) {
+            avatarController.setActivity(AgentState.Confused)
+            avatarController.setBubble("Bonio 尚未连接 hiclaw")
+            mainHandler.postDelayed({
+                avatarController.clearBubble()
+                avatarController.setActivity(AgentState.Idle)
+            }, 2500L)
+            return
+        }
         avatarController.clearBubble()
+        actionableSuggestion = null
         avatarController.setActivity(AgentState.Thinking)
         avatarController.setBubble("正在理解当前屏幕…")
         serviceScope.launch {
-            val runtime = (application as BoJiApp).runtime
             try {
                 val uiTree = withContext(Dispatchers.Default) {
                     ai.axiomaster.boji.remote.node.BoJiAccessibilityService.instance?.dumpActiveWindow()
@@ -634,6 +647,28 @@ class FloatingWindowService : Service() {
                 avatarController.clearBubble()
                 avatarController.setActivity(AgentState.Idle)
             }
+        }
+    }
+
+    private fun sendActionableSuggestion() {
+        val suggestion = actionableSuggestion?.takeIf { it.isNotBlank() } ?: return
+        actionableSuggestion = null
+        avatarController.setActivity(AgentState.Working)
+        avatarController.setBubble("正在发送…")
+        serviceScope.launch {
+            val accessibility = ai.axiomaster.boji.remote.node.BoJiAccessibilityService.instance
+            val sent = accessibility?.sendTextToActiveChat(suggestion) == true
+            if (sent) {
+                avatarController.setActivity(AgentState.Happy)
+                avatarController.setBubble("已发送")
+            } else {
+                actionableSuggestion = suggestion
+                avatarController.setActivity(AgentState.Confused)
+                avatarController.setBubble("未找到输入框或发送按钮，点此重试")
+            }
+            delay(1800)
+            avatarController.clearBubble()
+            avatarController.setActivity(AgentState.Idle)
         }
     }
 
