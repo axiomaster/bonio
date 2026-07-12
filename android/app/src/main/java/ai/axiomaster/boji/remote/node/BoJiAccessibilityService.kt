@@ -7,6 +7,8 @@ import android.os.Bundle
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import org.json.JSONArray
+import org.json.JSONObject
 import kotlinx.coroutines.delay
 
 class BoJiAccessibilityService : AccessibilityService() {
@@ -76,6 +78,42 @@ class BoJiAccessibilityService : AccessibilityService() {
   fun setTextOnFocusedInput(text: String): Boolean {
     val info = findFocusedInput() ?: return false
     return setTextOnNode(info.node, text)
+  }
+
+  /** Returns a compact, privacy-conscious UI tree snapshot for server-side screen understanding. */
+  fun dumpActiveWindow(maxNodes: Int = 180, maxTextLength: Int = 240): String? {
+    val root = rootInActiveWindow ?: return null
+    val nodes = JSONArray()
+    val queue = ArrayDeque<Pair<AccessibilityNodeInfo, Int>>()
+    queue.add(root to 0)
+    try {
+      while (queue.isNotEmpty() && nodes.length() < maxNodes) {
+        val (node, depth) = queue.removeFirst()
+        val bounds = Rect().also(node::getBoundsInScreen)
+        val item = JSONObject()
+          .put("depth", depth)
+          .put("class", node.className?.toString()?.substringAfterLast('.').orEmpty())
+          .put("text", node.text?.toString()?.take(maxTextLength).orEmpty())
+          .put("description", node.contentDescription?.toString()?.take(maxTextLength).orEmpty())
+          .put("view_id", node.viewIdResourceName.orEmpty())
+          .put("bounds", "${bounds.left},${bounds.top},${bounds.right},${bounds.bottom}")
+          .put("clickable", node.isClickable)
+          .put("editable", node.isEditable)
+        nodes.put(item)
+        for (index in 0 until node.childCount) {
+          node.getChild(index)?.let { queue.add(it to depth + 1) }
+        }
+        if (node !== root) node.recycle()
+      }
+      return JSONObject()
+        .put("package", root.packageName?.toString().orEmpty())
+        .put("window_title", windows.firstOrNull { it.isActive }?.title?.toString().orEmpty())
+        .put("nodes", nodes)
+        .toString()
+    } finally {
+      while (queue.isNotEmpty()) queue.removeFirst().first.recycle()
+      root.recycle()
+    }
   }
 
   /**

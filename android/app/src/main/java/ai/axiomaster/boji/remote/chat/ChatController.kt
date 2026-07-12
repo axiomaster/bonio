@@ -50,6 +50,7 @@ class ChatController(
   val streamingAssistantText: StateFlow<String?> = _streamingAssistantText.asStateFlow()
 
   var onAssistantSpoke: ((String) -> Unit)? = null
+  var onAssistantReply: ((String) -> Unit)? = null
 
   private val pendingToolCallsById = ConcurrentHashMap<String, ChatPendingToolCall>()
   private val _pendingToolCalls = MutableStateFlow<List<ChatPendingToolCall>>(emptyList())
@@ -436,6 +437,7 @@ class ChatController(
                 val finalAssistantMessage = history.messages.lastOrNull { it.role == "assistant" }
                 val textToSpeak = finalAssistantMessage?.content?.find { it.type == "text" }?.text
                 if (!textToSpeak.isNullOrBlank()) {
+                  onAssistantReply?.invoke(textToSpeak)
                   onAssistantSpoke?.invoke(textToSpeak)
                 }
               } else {
@@ -453,6 +455,7 @@ class ChatController(
                   timestampMs = System.currentTimeMillis()
                 )
                 _messages.value = current + assistantMsg
+                onAssistantReply?.invoke(streamingText)
                 onAssistantSpoke?.invoke(streamingText)
               } else {
                 Log.d("ChatController", "handleChatEvent: No streaming text to save and history empty")

@@ -72,6 +72,7 @@ class FloatingWindowService : Service() {
     private var callTtsManager: ai.axiomaster.boji.remote.chat.SystemTtsManager? = null
     private var isVoiceActive = false
     private var voiceSessionId = 0
+    private var screenSuggestionPending = false
 
     private var currentAssetPath: String? = null
     private var isPlayingTransition = false
@@ -143,6 +144,21 @@ class FloatingWindowService : Service() {
         runtime.callStateMonitor.start()
         runtime.avatarCommandExecutor.ttsManager = callTtsManager
         runtime.floatingWindowIntentHandler = { payload -> handleIntentExecute(payload) }
+        runtime.chat.onAssistantReply = { text ->
+            if (screenSuggestionPending) {
+                screenSuggestionPending = false
+                mainHandler.post {
+                    avatarController.setActivity(AgentState.Speaking)
+                    avatarController.setBubble(text)
+                    mainHandler.postDelayed({
+                        if (stateManager.currentState.value == AgentState.Speaking) {
+                            avatarController.clearBubble()
+                            avatarController.setActivity(AgentState.Idle)
+                        }
+                    }, SUGGESTION_DISPLAY_MS)
+                }
+            }
+        }
 
         avatarController.updateScreenMetrics(resources.displayMetrics)
 
@@ -255,7 +271,7 @@ class FloatingWindowService : Service() {
                 Log.e(TAG, "FloatingWindowService - re-attempt add view failed", e)
             }
         }
-        return START_NOT_STICKY
+        return START_STICKY
     }
 
     private fun observeAvatarState() {
@@ -506,12 +522,13 @@ class FloatingWindowService : Service() {
             private var initialTouchY = 0f
             private var isDragging = false
             private var longPressTriggered = false
+            private var lastTapAt = 0L
 
             private val longPressRunnable = Runnable {
                 if (!isDragging) {
                     longPressTriggered = true
-                    Log.d(TAG, "Long press detected -> starting voice input")
-                    startVoiceInputFromFloating()
+                    Log.d(TAG, "Long press detected -> analyzing current screen")
+                    analyzeCurrentScreen()
                 }
             }
 
@@ -550,22 +567,25 @@ class FloatingWindowService : Service() {
                     MotionEvent.ACTION_UP -> {
                         mainHandler.removeCallbacks(longPressRunnable)
                         if (longPressTriggered) {
-                            Log.d(TAG, "Finger lifted -> stopping voice input")
-                            stopVoiceInputFromFloating()
                             longPressTriggered = false
                         } else if (isDragging) {
                             avatarController.endDrag()
                             savePosition()
                         } else {
                             v?.performClick()
-                            handleAgentClick()
+                            val now = android.os.SystemClock.uptimeMillis()
+                            if (now - lastTapAt <= DOUBLE_TAP_THRESHOLD_MS) {
+                                lastTapAt = 0L
+                                bringAppToFront()
+                            } else {
+                                lastTapAt = now
+                            }
                         }
                         return true
                     }
                     MotionEvent.ACTION_CANCEL -> {
                         mainHandler.removeCallbacks(longPressRunnable)
                         if (longPressTriggered) {
-                            cancelVoiceInputFromFloating()
                             longPressTriggered = false
                         } else if (isDragging) {
                             avatarController.endDrag()
@@ -576,6 +596,45 @@ class FloatingWindowService : Service() {
                 return false
             }
         })
+    }
+
+    private fun analyzeCurrentScreen() {
+        if (screenSuggestionPending) return
+        avatarController.clearBubble()
+        avatarController.setActivity(AgentState.Thinking)
+        avatarController.setBubble("正在理解当前屏幕…")
+        serviceScope.launch {
+            val runtime = (application as BoJiApp).runtime
+            try {
+                val uiTree = withContext(Dispatchers.Default) {
+                    ai.axiomaster.boji.remote.node.BoJiAccessibilityService.instance?.dumpActiveWindow()
+                }
+                if (uiTree == null) {
+                    throw IllegalStateException("请先在系统设置中启用 Bonio 无障碍服务")
+                }
+                val attachments = mutableListOf<OutgoingAttachment>()
+                try {
+                    val payload = runtime.screenCaptureManager.capture("{\"quality\":70,\"maxWidth\":1080}")
+                    val obj = jsonLenient.parseToJsonElement(payload.payloadJson) as? JsonObject
+                    val base64 = obj?.get("base64")?.jsonPrimitive?.content.orEmpty()
+                    if (base64.isNotEmpty()) attachments += OutgoingAttachment(
+                        type = "image", mimeType = "image/jpeg", fileName = "screen-context.jpg", base64 = base64,
+                    )
+                } catch (e: Exception) {
+                    Log.i(TAG, "Screenshot unavailable; using accessibility tree only: ${e.message}")
+                }
+                val prompt = """你是用户的屏幕助理。请结合长期记忆理解当前 Android 屏幕，并给出此刻最有帮助的简短建议。若是微信或其他聊天页面，优先给出一条可直接发送、符合用户语气和关系背景的推荐回复；不要声称已经发送。只输出建议正文，不超过120字。\n\n当前 UI 树：\n$uiTree"""
+                screenSuggestionPending = true
+                runtime.chat.sendMessage(prompt, runtime.chat.thinkingLevel.value, attachments)
+            } catch (e: Exception) {
+                Log.e(TAG, "Screen context analysis failed", e)
+                avatarController.setActivity(AgentState.Confused)
+                avatarController.setBubble(e.message ?: "屏幕分析失败")
+                delay(2500)
+                avatarController.clearBubble()
+                avatarController.setActivity(AgentState.Idle)
+            }
+        }
     }
 
     private fun startVoiceInputFromFloating() {
@@ -1052,6 +1111,7 @@ class FloatingWindowService : Service() {
         runtime.callEventHandler.sttManager = null
         runtime.avatarCommandExecutor.ttsManager = null
         runtime.floatingWindowIntentHandler = null
+        runtime.chat.onAssistantReply = null
         serviceScope.cancel()
         if (::floatingView.isInitialized && isViewAttached) {
             try {
@@ -1066,6 +1126,8 @@ class FloatingWindowService : Service() {
     companion object {
         private const val TAG = "BoJiApp"
         private const val LONG_PRESS_THRESHOLD_MS = 600L
+        private const val DOUBLE_TAP_THRESHOLD_MS = 350L
+        private const val SUGGESTION_DISPLAY_MS = 15_000L
         private const val DRAG_THRESHOLD_DP = 10f
         private const val PREFS_NAME = "boji_floating_window"
         private const val KEY_POS_X = "pos_x"
