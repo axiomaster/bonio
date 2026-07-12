@@ -55,8 +55,8 @@
 
     <com.airbnb.lottie.LottieAnimationView
         android:id="@+id/lottie_agent"
-        android:layout_width="180dp"
-        android:layout_height="180dp"
+        android:layout_width="126dp"
+        android:layout_height="126dp"
         app:lottie_loop="true" />
 
 </LinearLayout>
