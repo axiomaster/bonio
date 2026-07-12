@@ -6,6 +6,9 @@ import android.graphics.Rect
 import android.graphics.Path
 import android.accessibilityservice.GestureDescription
 import android.os.Bundle
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -133,7 +136,7 @@ class BoJiAccessibilityService : AccessibilityService() {
     if (editor == null) {
       val metrics = resources.displayMetrics
       val path = Path().apply {
-        moveTo(metrics.widthPixels * 0.45f, metrics.heightPixels * 0.92f)
+        moveTo(metrics.widthPixels * 0.45f, metrics.heightPixels * 0.87f)
       }
       dispatchGesture(
         GestureDescription.Builder()
@@ -149,10 +152,20 @@ class BoJiAccessibilityService : AccessibilityService() {
       root.recycle()
     }
     if (editor == null) return false
-    val filled = setTextOnNode(editor, text)
-    if (filled) editor.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+    editor.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+    val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    clipboard.setPrimaryClip(ClipData.newPlainText("Bonio suggestion", text))
+    val pasted = editor.performAction(AccessibilityNodeInfo.ACTION_PASTE)
+    if (!pasted) setTextOnNode(editor, text)
     editor.recycle()
-    return filled
+    delay(250)
+    val verifiedRoot = externalApplicationRoot() ?: return false
+    val verifiedEditor = verifiedRoot.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+      ?: findFirstNode(verifiedRoot) { it.isEditable && it.isEnabled }
+    verifiedRoot.recycle()
+    val actualText = verifiedEditor?.text?.toString().orEmpty()
+    verifiedEditor?.recycle()
+    return actualText.contains(text)
   }
 
   private fun findFirstNode(
