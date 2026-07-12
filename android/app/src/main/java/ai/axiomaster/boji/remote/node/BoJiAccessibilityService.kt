@@ -7,11 +7,13 @@ import android.os.Bundle
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import org.json.JSONArray
 import org.json.JSONObject
 import kotlinx.coroutines.delay
 
 class BoJiAccessibilityService : AccessibilityService() {
+  private val recentEventText = ArrayDeque<String>()
 
   override fun onServiceConnected() {
     val info =
@@ -29,7 +31,17 @@ class BoJiAccessibilityService : AccessibilityService() {
   }
 
   override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-    // We don't need to process events actively; we query on-demand
+    event ?: return
+    val values = buildList {
+      addAll(event.text.map(CharSequence::toString))
+      event.contentDescription?.toString()?.let(::add)
+    }.filter(String::isNotBlank)
+    synchronized(recentEventText) {
+      for (value in values) {
+        recentEventText.addLast(value.take(500))
+        while (recentEventText.size > 80) recentEventText.removeFirst()
+      }
+    }
   }
 
   override fun onInterrupt() {
@@ -82,7 +94,7 @@ class BoJiAccessibilityService : AccessibilityService() {
 
   /** Inserts text into the active app editor and activates its send action. */
   suspend fun sendTextToActiveChat(text: String): Boolean {
-    val root = rootInActiveWindow ?: return false
+    val root = externalApplicationRoot() ?: return false
     val editor = findFirstNode(root) { it.isEditable && it.isEnabled }
     root.recycle()
     if (editor == null || !setTextOnNode(editor, text)) {
@@ -93,7 +105,7 @@ class BoJiAccessibilityService : AccessibilityService() {
     editor.recycle()
     delay(250)
 
-    val refreshedRoot = rootInActiveWindow ?: return false
+    val refreshedRoot = externalApplicationRoot() ?: return false
     val sendNode = findFirstNode(refreshedRoot) { node ->
       val label = listOf(node.text, node.contentDescription)
         .joinToString(" ") { it?.toString().orEmpty() }.trim()
@@ -131,7 +143,17 @@ class BoJiAccessibilityService : AccessibilityService() {
 
   /** Returns a compact, privacy-conscious UI tree snapshot for server-side screen understanding. */
   fun dumpActiveWindow(maxNodes: Int = 180, maxTextLength: Int = 240): String? {
-    val root = rootInActiveWindow ?: return null
+    val window = windows
+      .sortedByDescending { it.layer }
+      .firstOrNull { candidate ->
+        candidate.root?.let { root ->
+          val isExternal = candidate.type == AccessibilityWindowInfo.TYPE_APPLICATION &&
+            root.packageName?.toString() != packageName
+          root.recycle()
+          isExternal
+        } == true
+      }
+    val root = window?.root ?: rootInActiveWindow ?: return null
     val nodes = JSONArray()
     val queue = ArrayDeque<Pair<AccessibilityNodeInfo, Int>>()
     queue.add(root to 0)
@@ -156,13 +178,23 @@ class BoJiAccessibilityService : AccessibilityService() {
       }
       return JSONObject()
         .put("package", root.packageName?.toString().orEmpty())
-        .put("window_title", windows.firstOrNull { it.isActive }?.title?.toString().orEmpty())
+        .put("window_title", window?.title?.toString().orEmpty())
+        .put("recent_events", JSONArray(synchronized(recentEventText) { recentEventText.toList() }))
         .put("nodes", nodes)
         .toString()
     } finally {
       while (queue.isNotEmpty()) queue.removeFirst().first.recycle()
       root.recycle()
     }
+  }
+
+  private fun externalApplicationRoot(): AccessibilityNodeInfo? {
+    return windows
+      .sortedByDescending { it.layer }
+      .firstNotNullOfOrNull { candidate ->
+        if (candidate.type != AccessibilityWindowInfo.TYPE_APPLICATION) return@firstNotNullOfOrNull null
+        candidate.root?.takeIf { it.packageName?.toString() != packageName }
+      } ?: rootInActiveWindow
   }
 
   /**

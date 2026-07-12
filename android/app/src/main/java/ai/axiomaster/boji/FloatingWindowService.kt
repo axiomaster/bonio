@@ -151,7 +151,7 @@ class FloatingWindowService : Service() {
                 actionableSuggestion = text.trim()
                 mainHandler.post {
                     avatarController.setActivity(AgentState.Speaking)
-                    avatarController.setBubble(text)
+                    avatarController.setBubble(text, SUGGESTION_BG_COLOR, android.graphics.Color.WHITE)
                     mainHandler.postDelayed({
                         if (stateManager.currentState.value == AgentState.Speaking) {
                             avatarController.clearBubble()
@@ -359,11 +359,8 @@ class FloatingWindowService : Service() {
         val chatController = (application as BoJiApp).runtime.chat
         serviceScope.launch {
             chatController.streamingAssistantText.collect { text: String? ->
-                val state = stateManager.currentState.value
                 if (!text.isNullOrEmpty()) {
                     stateManager.setBubble(text)
-                } else if (state != AgentState.Listening && state != AgentState.Speaking) {
-                    stateManager.clearBubble()
                 }
             }
         }
@@ -603,16 +600,6 @@ class FloatingWindowService : Service() {
 
     private fun analyzeCurrentScreen() {
         if (screenSuggestionPending) return
-        val runtime = (application as BoJiApp).runtime
-        if (!runtime.chat.healthOk.value) {
-            avatarController.setActivity(AgentState.Confused)
-            avatarController.setBubble("Bonio 尚未连接 hiclaw")
-            mainHandler.postDelayed({
-                avatarController.clearBubble()
-                avatarController.setActivity(AgentState.Idle)
-            }, 2500L)
-            return
-        }
         avatarController.clearBubble()
         actionableSuggestion = null
         avatarController.setActivity(AgentState.Thinking)
@@ -625,20 +612,26 @@ class FloatingWindowService : Service() {
                 if (uiTree == null) {
                     throw IllegalStateException("请先在系统设置中启用 Bonio 无障碍服务")
                 }
-                val attachments = mutableListOf<OutgoingAttachment>()
-                try {
-                    val payload = runtime.screenCaptureManager.capture("{\"quality\":70,\"maxWidth\":1080}")
-                    val obj = jsonLenient.parseToJsonElement(payload.payloadJson) as? JsonObject
-                    val base64 = obj?.get("base64")?.jsonPrimitive?.content.orEmpty()
-                    if (base64.isNotEmpty()) attachments += OutgoingAttachment(
-                        type = "image", mimeType = "image/jpeg", fileName = "screen-context.jpg", base64 = base64,
-                    )
-                } catch (e: Exception) {
-                    Log.i(TAG, "Screenshot unavailable; using accessibility tree only: ${e.message}")
+                val suggestion = withContext(Dispatchers.Default) {
+                    ai.axiomaster.boji.remote.node.ScreenSuggestionRules.match(uiTree)
                 }
-                val prompt = """你是用户的屏幕助理。请结合长期记忆理解当前 Android 屏幕，并给出此刻最有帮助的简短建议。若是微信或其他聊天页面，优先给出一条可直接发送、符合用户语气和关系背景的推荐回复；不要声称已经发送。只输出建议正文，不超过120字。\n\n当前 UI 树：\n$uiTree"""
-                screenSuggestionPending = true
-                runtime.chat.sendMessage(prompt, runtime.chat.thinkingLevel.value, attachments)
+                if (suggestion == null) {
+                    avatarController.setActivity(AgentState.Confused)
+                    avatarController.setBubble("暂时没有匹配的建议")
+                    delay(2500)
+                    avatarController.clearBubble()
+                    avatarController.setActivity(AgentState.Idle)
+                    return@launch
+                }
+                actionableSuggestion = suggestion
+                avatarController.setActivity(AgentState.Speaking)
+                avatarController.setBubble(suggestion, SUGGESTION_BG_COLOR, android.graphics.Color.WHITE)
+                delay(SUGGESTION_DISPLAY_MS)
+                if (actionableSuggestion == suggestion) {
+                    actionableSuggestion = null
+                    avatarController.clearBubble()
+                    avatarController.setActivity(AgentState.Idle)
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Screen context analysis failed", e)
                 avatarController.setActivity(AgentState.Confused)
@@ -1163,6 +1156,7 @@ class FloatingWindowService : Service() {
         private const val LONG_PRESS_THRESHOLD_MS = 600L
         private const val DOUBLE_TAP_THRESHOLD_MS = 350L
         private const val SUGGESTION_DISPLAY_MS = 15_000L
+        private const val SUGGESTION_BG_COLOR = 0xE62D303E.toInt()
         private const val DRAG_THRESHOLD_DP = 10f
         private const val PREFS_NAME = "boji_floating_window"
         private const val KEY_POS_X = "pos_x"
