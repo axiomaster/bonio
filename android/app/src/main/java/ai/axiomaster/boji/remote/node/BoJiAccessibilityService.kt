@@ -3,6 +3,8 @@ package ai.axiomaster.boji.remote.node
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.graphics.Rect
+import android.graphics.Path
+import android.accessibilityservice.GestureDescription
 import android.os.Bundle
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
@@ -121,6 +123,36 @@ class BoJiAccessibilityService : AccessibilityService() {
     val sent = clickable?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
     clickable?.recycle()
     return sent
+  }
+
+  /** Writes text to the active app's reply field without sending it. */
+  suspend fun fillActiveReplyField(text: String): Boolean {
+    var root = externalApplicationRoot() ?: return false
+    var editor = findFirstNode(root) { it.isEditable && it.isEnabled }
+    root.recycle()
+    if (editor == null) {
+      val metrics = resources.displayMetrics
+      val path = Path().apply {
+        moveTo(metrics.widthPixels * 0.45f, metrics.heightPixels * 0.92f)
+      }
+      dispatchGesture(
+        GestureDescription.Builder()
+          .addStroke(GestureDescription.StrokeDescription(path, 0, 80))
+          .build(),
+        null,
+        null,
+      )
+      delay(350)
+      root = externalApplicationRoot() ?: return false
+      editor = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+        ?: findFirstNode(root) { it.isEditable && it.isEnabled }
+      root.recycle()
+    }
+    if (editor == null) return false
+    val filled = setTextOnNode(editor, text)
+    if (filled) editor.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+    editor.recycle()
+    return filled
   }
 
   private fun findFirstNode(

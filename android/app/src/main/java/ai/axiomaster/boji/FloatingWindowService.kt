@@ -32,6 +32,7 @@ import android.util.Log
 import android.view.ViewGroup
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.LinearLayout
 import androidx.cardview.widget.CardView
 import androidx.core.content.ContextCompat
 import com.airbnb.lottie.LottieAnimationView
@@ -59,6 +60,7 @@ class FloatingWindowService : Service() {
     private lateinit var bubbleLabel: TextView
     private lateinit var textBubble: TextView
     private lateinit var textBubbleScroll: ScrollView
+    private lateinit var floatingRoot: LinearLayout
 
     private val avatarController: AvatarController get() = AgentManager.avatarController
     private val stateManager get() = AgentManager.stateManager
@@ -166,6 +168,7 @@ class FloatingWindowService : Service() {
 
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         floatingView = LayoutInflater.from(this).inflate(R.layout.floating_agent_layout, null)
+        floatingRoot = floatingView.findViewById(R.id.floating_root)
 
         lottieAnimationView = floatingView.findViewById(R.id.lottie_agent)
         lottieAnimationView.setFailureListener { e ->
@@ -471,6 +474,7 @@ class FloatingWindowService : Service() {
     }
 
     private fun showBubbleAnimated() {
+        positionBubbleBesideAvatar()
         bubbleContainer.animate().cancel()
         if (bubbleContainer.visibility == View.VISIBLE &&
             bubbleContainer.alpha == 1f &&
@@ -490,6 +494,27 @@ class FloatingWindowService : Service() {
             .setDuration(250)
             .setInterpolator(OvershootInterpolator(1.5f))
             .start()
+    }
+
+    private fun positionBubbleBesideAvatar() {
+        if (!::floatingRoot.isInitialized || !::lottieAnimationView.isInitialized) return
+        val showOnLeft = avatarController.avatarState.value.position.x > resources.displayMetrics.widthPixels / 2f
+        val bubbleIndex = floatingRoot.indexOfChild(bubbleContainer)
+        val desiredBubbleIndex = if (showOnLeft) 0 else 1
+        if (bubbleIndex != desiredBubbleIndex) {
+            floatingRoot.removeView(bubbleContainer)
+            floatingRoot.addView(bubbleContainer, desiredBubbleIndex)
+        }
+        val spacing = (8 * resources.displayMetrics.density).toInt()
+        (bubbleContainer.layoutParams as? LinearLayout.LayoutParams)?.let { params ->
+            params.setMargins(
+                if (showOnLeft) 0 else spacing,
+                0,
+                if (showOnLeft) spacing else 0,
+                0,
+            )
+            bubbleContainer.layoutParams = params
+        }
     }
 
     private fun hideBubbleAnimated() {
@@ -650,14 +675,14 @@ class FloatingWindowService : Service() {
         avatarController.setBubble("正在发送…")
         serviceScope.launch {
             val accessibility = ai.axiomaster.boji.remote.node.BoJiAccessibilityService.instance
-            val sent = accessibility?.sendTextToActiveChat(suggestion) == true
-            if (sent) {
+            val filled = accessibility?.fillActiveReplyField(suggestion) == true
+            if (filled) {
                 avatarController.setActivity(AgentState.Happy)
-                avatarController.setBubble("已发送")
+                avatarController.setBubble("已写入回复框")
             } else {
                 actionableSuggestion = suggestion
                 avatarController.setActivity(AgentState.Confused)
-                avatarController.setBubble("未找到输入框或发送按钮，点此重试")
+                avatarController.setBubble("未找到回复框，点此重试")
             }
             delay(1800)
             avatarController.clearBubble()

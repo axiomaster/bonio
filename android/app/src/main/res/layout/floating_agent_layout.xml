@@ -1,23 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/floating_root"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:gravity="center_horizontal">
+    android:orientation="horizontal"
+    android:gravity="center_vertical">
 
     <androidx.cardview.widget.CardView
         android:id="@+id/bubble_container"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="4dp"
         android:visibility="gone"
         android:clickable="true"
         android:focusable="true"
         app:cardBackgroundColor="#E62D303E"
-        app:cardCornerRadius="12dp"
+        app:cardCornerRadius="14dp"
         app:cardElevation="4dp"
-        app:contentPadding="8dp">
+        app:contentPadding="12dp">
 
         <LinearLayout
             android:layout_width="wrap_content"
@@ -30,7 +30,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textColor="#FFFFFF"
-                android:textSize="11sp"
+                android:textSize="13sp"
                 android:textStyle="bold"
                 android:visibility="gone" />
 
@@ -45,9 +45,9 @@
                     android:id="@+id/text_bubble"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:maxWidth="200dp"
+                    android:maxWidth="280dp"
                     android:textColor="#FFFFFF"
-                    android:textSize="12sp" />
+                    android:textSize="15sp" />
 
             </ScrollView>
 
