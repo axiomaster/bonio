@@ -6,9 +6,6 @@ import android.graphics.Rect
 import android.graphics.Path
 import android.accessibilityservice.GestureDescription
 import android.os.Bundle
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -131,35 +128,31 @@ class BoJiAccessibilityService : AccessibilityService() {
   /** Writes text to the active app's reply field without sending it. */
   suspend fun fillActiveReplyField(text: String): Boolean {
     var root = externalApplicationRoot() ?: return false
-    var editor = findFirstNode(root) { it.isEditable && it.isEnabled }
+    val targetPackage = root.packageName?.toString() ?: return false
     root.recycle()
-    if (editor == null) {
-      val metrics = resources.displayMetrics
-      val path = Path().apply {
-        moveTo(metrics.widthPixels * 0.45f, metrics.heightPixels * 0.87f)
-      }
-      dispatchGesture(
-        GestureDescription.Builder()
-          .addStroke(GestureDescription.StrokeDescription(path, 0, 80))
-          .build(),
-        null,
-        null,
-      )
-      delay(350)
-      root = externalApplicationRoot() ?: return false
-      editor = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-        ?: findFirstNode(root) { it.isEditable && it.isEnabled }
-      root.recycle()
+    val metrics = resources.displayMetrics
+    val path = Path().apply {
+      moveTo(metrics.widthPixels * 0.45f, metrics.heightPixels * 0.87f)
     }
+    dispatchGesture(
+      GestureDescription.Builder()
+        .addStroke(GestureDescription.StrokeDescription(path, 0, 80))
+        .build(),
+      null,
+      null,
+    )
+    delay(450)
+    root = applicationRoot(targetPackage) ?: return false
+    val editor = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+      ?: findFirstNode(root) { it.isEditable && it.isEnabled && it.isFocused }
+    root.recycle()
     if (editor == null) return false
     editor.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
-    val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    clipboard.setPrimaryClip(ClipData.newPlainText("Bonio suggestion", text))
-    val pasted = editor.performAction(AccessibilityNodeInfo.ACTION_PASTE)
-    if (!pasted) setTextOnNode(editor, text)
+    val accepted = setTextOnNode(editor, text)
     editor.recycle()
+    if (!accepted) return false
     delay(250)
-    val verifiedRoot = externalApplicationRoot() ?: return false
+    val verifiedRoot = applicationRoot(targetPackage) ?: return false
     val verifiedEditor = verifiedRoot.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
       ?: findFirstNode(verifiedRoot) { it.isEditable && it.isEnabled }
     verifiedRoot.recycle()
@@ -240,6 +233,15 @@ class BoJiAccessibilityService : AccessibilityService() {
         if (candidate.type != AccessibilityWindowInfo.TYPE_APPLICATION) return@firstNotNullOfOrNull null
         candidate.root?.takeIf { it.packageName?.toString() != packageName }
       } ?: rootInActiveWindow
+  }
+
+  private fun applicationRoot(targetPackage: String): AccessibilityNodeInfo? {
+    return windows
+      .sortedByDescending { it.layer }
+      .firstNotNullOfOrNull { candidate ->
+        if (candidate.type != AccessibilityWindowInfo.TYPE_APPLICATION) return@firstNotNullOfOrNull null
+        candidate.root?.takeIf { it.packageName?.toString() == targetPackage }
+      }
   }
 
   /**
