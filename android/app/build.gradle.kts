@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "ai.axiomaster.boji"
+    namespace = "ai.axiomaster.bonio"
     compileSdk = 36
     
     defaultConfig {
-        applicationId = "ai.axiomaster.boji"
+        applicationId = "ai.axiomaster.bonio"
         minSdk = 31
         targetSdk = 36
         versionCode = 1

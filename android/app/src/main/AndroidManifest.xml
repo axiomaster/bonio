@@ -41,7 +41,7 @@
         android:required="false" />
 
     <application
-        android:name=".BoJiApp"
+        android:name=".BonioApp"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -90,7 +90,7 @@
         </service>
 
         <service
-            android:name=".remote.node.BoJiAccessibilityService"
+            android:name=".remote.node.BonioAccessibilityService"
             android:exported="false"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
