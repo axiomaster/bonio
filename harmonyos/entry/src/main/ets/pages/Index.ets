@@ -16,7 +16,7 @@ struct Index {
   @State showChat: boolean = false;
 
   @State manualHost: string = "";
-  @State manualPort: string = "18789";
+  @State manualPort: string = "10724";
   @State manualToken: string = "";
   @State manualTls: boolean = false;
   
@@ -42,9 +42,9 @@ struct Index {
       if (this.runtime) {
         this.deviceId = this.runtime.prefs.getInstanceId() || 'Unknown';
         this.message = this.runtime.statusText;
-        this.manualHost = this.runtime.prefs.getManualHost() || "192.168.43.4";
-        this.manualPort = this.runtime.prefs.getManualPort().toString() || "18789";
-        this.manualToken = this.runtime.prefs.getGatewayToken() || "lism";
+        this.manualHost = this.runtime.prefs.getManualHost() || "127.0.0.1";
+        this.manualPort = this.runtime.prefs.getManualPort().toString() || "10724";
+        this.manualToken = this.runtime.prefs.getGatewayToken() || "bonio-local-token";
         this.manualTls = this.runtime.prefs.getManualTls();
         
         // Simple polling for status updates to avoid large reactivity refactor in NodeRuntime for Phase 1
@@ -103,7 +103,7 @@ struct Index {
           .margin({ bottom: 30 })
 
         if (!this.isConnected) {
-          TextInput({ placeholder: '192.168.1.x', text: this.manualHost })
+          TextInput({ placeholder: '127.0.0.1', text: this.manualHost })
             .width('80%')
             .margin({ bottom: 10 })
             .onChange((value: string) => {

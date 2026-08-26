@@ -69,10 +69,11 @@ class BridgeService {
       },
     );
 
-    // Register the bridge tool when configured (ctx.tools is injected).
+    // Register the bridge tool + local hiclaw-parity tools (ctx.tools injected).
     if (this.config.tools !== 'none') {
       try {
         driver.registerBridgeTool(defineTool, (def) => this.ctx.tools.register(def));
+        driver.registerLocalTools(defineTool, (def) => this.ctx.tools.register(def));
       } catch (error) {
         console.error('[bonio-bridge] tool registration failed:', error instanceof Error ? error.message : error);
       }

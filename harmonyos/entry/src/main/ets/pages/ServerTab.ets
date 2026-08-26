@@ -5,7 +5,7 @@ export struct ServerTab {
   runtime: NodeRuntime | undefined = undefined;
 
   @State manualHost: string = '';
-  @State manualPort: string = '18789';
+  @State manualPort: string = '10724';
   @State manualToken: string = '';
   @State manualTls: boolean = false;
   @State isConnected: boolean = false;
@@ -17,7 +17,7 @@ export struct ServerTab {
   aboutToAppear() {
     if (this.runtime) {
       this.manualHost = this.runtime.prefs.getManualHost() || '';
-      this.manualPort = this.runtime.prefs.getManualPort().toString() || '18789';
+      this.manualPort = this.runtime.prefs.getManualPort().toString() || '10724';
       this.manualToken = this.runtime.prefs.getGatewayToken() || '';
       this.manualTls = this.runtime.prefs.getManualTls();
       this.refreshStatus();

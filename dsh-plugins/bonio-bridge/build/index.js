@@ -40,6 +40,8 @@ class BridgeService {
     if (this.config.tools !== 'none') {
       try {
         driver.registerBridgeTool(defineTool, (def) => this.ctx.tools.register(def));
+        // hiclaw-parity local tools that run entirely inside dsh (memo, device info).
+        driver.registerLocalTools(defineTool, (def) => this.ctx.tools.register(def));
       } catch (error) {
         console.error('[bonio-bridge] tool registration failed:', error instanceof Error ? error.message : error);
       }

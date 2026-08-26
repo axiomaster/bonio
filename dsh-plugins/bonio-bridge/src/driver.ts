@@ -6,6 +6,9 @@ import type { Context } from '@deepseek-ai/cordis';
 import { randomUUID } from 'node:crypto';
 import { createUserMessage } from '@deepseek-ai/dsh-llm';
 import { SessionId } from '@deepseek-ai/dsh-session';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import os from 'node:os';
 import { SessionRegistry } from './sessions.js';
 
 export interface ChatEventSink {
@@ -164,6 +167,7 @@ export class AgentDriver {
       const events = agent.session.events ?? [];
       let text = '';
       let reason: unknown;
+      const toolResults: string[] = [];
       for (const e of events) {
         if (e.seq < firstSeq) continue;
         if (e.type === 'assistant/message') {
@@ -174,7 +178,28 @@ export class AgentDriver {
           if (joined !== '') text = joined;
         }
         if (e.type === 'turn/end') reason = e.data?.reason;
+        if (e.type === 'tool/result') {
+          const blocks = e.data?.message?.content ?? [];
+          for (const b of blocks) {
+            if (b.type === 'tool-result' && typeof b.content === 'string') {
+              try {
+                const parsed = JSON.parse(b.content) as { value?: { memos?: Array<{ title?: string; content?: string }> } };
+                const value = parsed?.value;
+                if (value && Array.isArray(value.memos)) {
+                  if (value.memos.length === 0) toolResults.push('没有保存的备忘。');
+                  else toolResults.push('共有 ' + value.memos.length + ' 条备忘:\n' + value.memos.map((m) => '- ' + (m.title || '') + ': ' + (m.content || '')).join('\n'));
+                } else {
+                  toolResults.push(b.content);
+                }
+              } catch {
+                toolResults.push(b.content);
+              }
+            }
+          }
+        }
       }
+      // DeepSeek may end the turn right after a tool call without a text reply.
+      if (text === '' && toolResults.length > 0) text = toolResults.join('\n');
 
       await sessions.flush(agent.session);
       this.runs.delete(runId);
@@ -223,8 +248,7 @@ export class AgentDriver {
       },
       output: {
         schema: { type: 'object', additionalProperties: true, description: 'The device result payload returned by the node session.' },
-        render(result: { value?: unknown }) {
-          const value = result.value;
+        render(args: Record<string, unknown>, value: unknown) {
           if (value && typeof value === 'object' && (value as Record<string, unknown>).error) {
             return 'device tool error: ' + String((value as Record<string, unknown>).error);
           }
@@ -232,16 +256,221 @@ export class AgentDriver {
           catch { return String(value); }
         },
       },
-      async execute(exec: { arguments: { command: string; arguments?: Record<string, unknown>; timeoutMs?: number } }) {
-        const { command, arguments: args = {}, timeoutMs = INVOKE_TIMEOUT_MS } = exec.arguments;
+      async execute(args: { command: string; arguments?: Record<string, unknown>; timeoutMs?: number }, exec: unknown) {
+        const { command, arguments: cmdArgs = {}, timeoutMs = INVOKE_TIMEOUT_MS } = args ?? {};
         const node = bridge.registry.getNode();
         if (!node) return { isError: true, error: { message: 'no node session connected to the bonio bridge' } };
         const callId = randomUUID();
-        const result = await bridge.forwardInvoke(callId, command, args, timeoutMs);
+        const result = await bridge.forwardInvoke(callId, command, cmdArgs, timeoutMs);
         if (result.ok) return { isError: false, value: result.payload ?? {} };
         return { isError: true, error: { message: result.error?.message ?? 'device tool failed' } };
       },
     });
     return register(def);
+  }
+
+  /** hiclaw-parity local tools running entirely inside dsh (memo, device info). */
+  registerLocalTools(defineTool: (def: Record<string, unknown>) => unknown, register: (def: unknown) => () => void): () => void {
+    const memoDir = (): string => {
+      const home = process.env.DSH_HOME || process.env.HOME || '/data/local/home';
+      if (home !== '/root') return path.join(home, '.bonio', 'memos');
+      return '/data/local/home/.bonio/memos';
+    };
+    const disposers: Array<() => void> = [];
+
+    disposers.push(register(defineTool({
+      name: 'memo_save',
+      description: 'Save a memo/note. Use when the user asks to remember, save, or note something from the screen or conversation.',
+      parameters: {
+        title: { type: 'string', required: true, description: 'Short title for the memo.' },
+        content: { type: 'string', required: true, description: 'The content to save.' },
+        source: { type: 'string', description: 'Source of the memo (e.g. screen, voice).' },
+      },
+      output: {
+        schema: { type: 'object', additionalProperties: true },
+        render(args: Record<string, unknown>, value: unknown) {
+          const v = value as { id?: string; title?: string } | undefined;
+          return v && v.id ? `saved memo ${v.id}: ${v.title}` : JSON.stringify(value);
+        },
+      },
+      async execute(args: { title: string; content: string; source?: string }, exec: unknown) {
+        const { title, content, source } = args ?? {};
+        const dir = memoDir();
+        await fs.mkdir(dir, { recursive: true });
+        const id = `${Date.now()}`;
+        await fs.writeFile(path.join(dir, `${id}.json`), JSON.stringify({ id, title, content, source: source || 'dsh', createdAt: Date.now() }, null, 2));
+        return { isError: false, value: { id, title } };
+      },
+    })));
+
+    disposers.push(register(defineTool({
+      name: 'memo_list',
+      description: 'List saved memos/notes. Returns recent memos with title, content, and timestamp.',
+      parameters: { limit: { type: 'number', description: 'Max number of memos to return; default 20.' } },
+      output: {
+        schema: { type: 'object', additionalProperties: true },
+        render(args: Record<string, unknown>, value: unknown) {
+          try {
+            if (value && typeof value === 'object' && typeof (value as { text?: unknown }).text === 'string') {
+              return (value as { text: string }).text;
+            }
+            return JSON.stringify(value);
+          } catch { return JSON.stringify(value); }
+        },
+      },
+      async execute(args: { limit?: number }, exec: unknown) {
+        const limit = args?.limit ?? 20;
+        const dir = memoDir();
+        let files: string[] = [];
+        try { files = await fs.readdir(dir); } catch { /* none yet */ }
+        const memos = [];
+        for (const f of files.filter((n) => n.endsWith('.json')).sort().reverse().slice(0, limit)) {
+          try { memos.push(JSON.parse(await fs.readFile(path.join(dir, f), 'utf8'))); } catch { /* skip */ }
+        }
+        if (memos.length === 0) return { isError: false, value: { text: '没有保存的备忘。', memos: [] } };
+        const lines = memos.map((m: any) => `- ${m.title}: ${m.content}`).join('\n');
+        return { isError: false, value: { text: '共有 ' + memos.length + ' 条备忘:\n' + lines, memos } };
+      },
+    })));
+
+    disposers.push(register(defineTool({
+      name: 'device_info',
+      description: 'Report information about this device and runtime (HarmonyOS, dsh/bridge versions, architecture).',
+      parameters: {},
+      output: {
+        schema: { type: 'object', additionalProperties: true },
+        render(args: Record<string, unknown>, value: unknown) { return JSON.stringify(value); },
+      },
+      async execute() {
+        return { isError: false, value: { platform: process.platform, arch: process.arch, node: process.versions.node, dsh: 'bonio-bridge 0.1', os: process.env.OS || 'HarmonyOS/OpenHarmony' } };
+      },
+    })));
+
+    // ── cron tools (file-persisted scheduler) ────────────────────────────────
+    const cronDir = (): string => {
+      const home = process.env.DSH_HOME || process.env.HOME || '/data/local/home';
+      if (home !== '/root') return path.join(home, '.bonio', 'cron');
+      return '/data/local/home/.bonio/cron';
+    };
+    const cronFile = (): string => path.join(cronDir(), 'jobs.json');
+    const loadCronJobs = async (): Promise<Record<string, any>> => {
+      try { return JSON.parse(await fs.readFile(cronFile(), 'utf8')); } catch { return {}; }
+    };
+    const saveCronJobs = async (jobs: Record<string, any>): Promise<void> => {
+      await fs.mkdir(cronDir(), { recursive: true });
+      await fs.writeFile(cronFile(), JSON.stringify(jobs, null, 2));
+    };
+    const parseSchedule = (schedule: string): { type: string; ms?: number; expr?: string } | null => {
+      const s = String(schedule || '').trim();
+      const every = s.match(/^every\s+(\d+)\s*(s|m|h|d)?$/i);
+      if (every) {
+        const n = parseInt(every[1], 10);
+        const unit = (every[2] || 'm').toLowerCase();
+        const mult: Record<string, number> = { s: 1000, m: 60000, h: 3600000, d: 86400000 };
+        return { type: 'interval', ms: n * (mult[unit] || 60000) };
+      }
+      const at = s.match(/^at\s+\+(\d+)\s*(s|m|h|d)?$/i);
+      if (at) {
+        const n = parseInt(at[1], 10);
+        const unit = (at[2] || 'm').toLowerCase();
+        const mult: Record<string, number> = { s: 1000, m: 60000, h: 3600000, d: 86400000 };
+        return { type: 'oneshot', ms: n * (mult[unit] || 60000) };
+      }
+      const cron = s.match(/^cron\s+(.+)$/i);
+      if (cron) return { type: 'cron', expr: cron[1].trim() };
+      return null;
+    };
+
+    disposers.push(register(defineTool({
+      name: 'cron_add',
+      description: 'Schedule a recurring or one-time task. Supports "every 5m" (interval), "at +30m" (one-shot), or "cron 0 9 * * *" (5-field cron expression).',
+      parameters: {
+        schedule: { type: 'string', required: true, description: "Schedule: 'every <duration>', 'at +<duration>', or 'cron <expr>'." },
+        prompt: { type: 'string', required: true, description: 'The message/prompt to send to the agent when the task fires.' },
+        maxCount: { type: 'number', description: 'Maximum number of times to run (0 = unlimited).' },
+      },
+      output: { schema: { type: 'object', additionalProperties: true }, render(args, value) { return JSON.stringify(value); } },
+      async execute(args: { schedule: string; prompt: string; maxCount?: number }, exec: unknown) {
+        const { schedule, prompt, maxCount } = args ?? {};
+        const parsed = parseSchedule(schedule);
+        if (!parsed) return { isError: true, error: { message: `unsupported schedule: ${schedule}` } };
+        const jobs = await loadCronJobs();
+        const jobId = `cron-${Date.now()}`;
+        jobs[jobId] = { id: jobId, schedule, parsed, prompt, maxCount: maxCount ?? 0, runs: 0, createdAt: Date.now(), enabled: true };
+        await saveCronJobs(jobs);
+        return { isError: false, value: { id: jobId, schedule, prompt } };
+      },
+    })));
+
+    disposers.push(register(defineTool({
+      name: 'cron_list',
+      description: 'List all scheduled cron jobs with their status and run counts.',
+      parameters: {},
+      output: { schema: { type: 'object', additionalProperties: true }, render(args, value) { return JSON.stringify(value); } },
+      async execute(args: Record<string, never>, exec: unknown) {
+        const jobs = await loadCronJobs();
+        const list = Object.values(jobs).map((j: any) => ({ id: j.id, schedule: j.schedule, prompt: String(j.prompt).slice(0, 60), runs: j.runs, enabled: j.enabled }));
+        return { isError: false, value: { jobs: list } };
+      },
+    })));
+
+    disposers.push(register(defineTool({
+      name: 'cron_remove',
+      description: 'Remove a scheduled cron job by its ID.',
+      parameters: { jobId: { type: 'string', required: true, description: 'The ID of the cron job to remove.' } },
+      output: { schema: { type: 'object', additionalProperties: true }, render(args, value) { return JSON.stringify(value); } },
+      async execute(args: { jobId: string }, exec: unknown) {
+        const { jobId } = args ?? {};
+        const jobs = await loadCronJobs();
+        if (!jobs[jobId]) return { isError: true, error: { message: `cron job not found: ${jobId}` } };
+        delete jobs[jobId];
+        await saveCronJobs(jobs);
+        return { isError: false, value: { removed: jobId } };
+      },
+    })));
+
+    disposers.push(register(defineTool({
+      name: 'cron_runs',
+      description: 'Get recent execution history for a cron job.',
+      parameters: { jobId: { type: 'string', required: true, description: 'The ID of the cron job to inspect.' } },
+      output: { schema: { type: 'object', additionalProperties: true }, render(args, value) { return JSON.stringify(value); } },
+      async execute(args: { jobId: string }, exec: unknown) {
+        const { jobId } = args ?? {};
+        const jobs = await loadCronJobs();
+        const job = jobs[jobId];
+        if (!job) return { isError: true, error: { message: `cron job not found: ${jobId}` } };
+        return { isError: false, value: { id: jobId, runs: job.runs, lastRunAt: job.lastRunAt, schedule: job.schedule } };
+      },
+    })));
+
+    const tickCron = async (): Promise<void> => {
+      try {
+        const jobs = await loadCronJobs();
+        const now = Date.now();
+        let changed = false;
+        for (const j of Object.values(jobs) as any[]) {
+          if (!j.enabled) continue;
+          const due = j.parsed.type === 'oneshot'
+            ? (j.createdAt + j.parsed.ms <= now)
+            : (j.parsed.type === 'interval' ? ((j.lastRunAt || j.createdAt) + j.parsed.ms <= now) : false);
+          if (!due) continue;
+          if (j.maxCount > 0 && j.runs >= j.maxCount) { j.enabled = false; changed = true; continue; }
+          j.runs += 1;
+          j.lastRunAt = now;
+          changed = true;
+          console.log('[bonio-bridge] cron firing', j.id, j.prompt);
+          void this.runChat({ text: String(j.prompt), sessionKey: `cron-${j.id}` }).catch(() => {});
+        }
+        if (changed) await saveCronJobs(jobs);
+      } catch (e) {
+        console.log('[bonio-bridge] cron tick error:', e instanceof Error ? e.message : String(e));
+      }
+    };
+    const cronTimer = setInterval(() => { void tickCron(); }, 30000);
+
+    return () => {
+      clearInterval(cronTimer);
+      for (const dispose of disposers) dispose();
+    };
   }
 }

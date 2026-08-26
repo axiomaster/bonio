@@ -2,6 +2,9 @@
 import { randomUUID } from 'node:crypto';
 import { createUserMessage } from '@deepseek-ai/dsh-llm';
 import { SessionId } from '@deepseek-ai/dsh-session';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import os from 'node:os';
 
 export const INVOKE_TIMEOUT_MS = 300000;
 
@@ -159,6 +162,7 @@ export class AgentDriver {
       const events = agent.session.events ?? [];
       let text = '';
       let reason;
+      const toolResults = [];
       for (const e of events) {
         if (e.seq < firstSeq) continue;
         if (e.type === 'assistant/message') {
@@ -169,6 +173,31 @@ export class AgentDriver {
           if (joined !== '') text = joined;
         }
         if (e.type === 'turn/end') reason = e.data?.reason;
+        if (e.type === 'tool/result') {
+          const blocks = e.data?.message?.content ?? [];
+          for (const b of blocks) {
+            if (b.type === 'tool-result' && typeof b.content === 'string') {
+              // Prefer a human-readable line; fall back to the raw payload.
+              try {
+                const parsed = JSON.parse(b.content);
+                const value = parsed?.value;
+                if (value && Array.isArray(value.memos)) {
+                  if (value.memos.length === 0) toolResults.push('没有保存的备忘。');
+                  else toolResults.push('共有 ' + value.memos.length + ' 条备忘:\n' + value.memos.map((m) => '- ' + (m.title || '') + ': ' + (m.content || '')).join('\n'));
+                } else {
+                  toolResults.push(b.content);
+                }
+              } catch {
+                toolResults.push(b.content);
+              }
+            }
+          }
+        }
+      }
+      // DeepSeek may end the turn right after a tool call without a text reply;
+      // surface the tool output so the client always sees a result.
+      if (text === '' && toolResults.length > 0) {
+        text = toolResults.join('\n');
       }
 
       await sessions.flush(agent.session);
@@ -216,8 +245,7 @@ export class AgentDriver {
       },
       output: {
         schema: { type: 'object', additionalProperties: true, description: 'The device result payload returned by the node session.' },
-        render(result) {
-          const value = result.value;
+        render(args, value) {
           if (value && typeof value === 'object' && value.error) {
             return 'device tool error: ' + String(value.error);
           }
@@ -225,18 +253,298 @@ export class AgentDriver {
           catch { return String(value); }
         },
       },
-      async execute(exec) {
-        const { command, arguments: args = {}, timeoutMs = INVOKE_TIMEOUT_MS } = exec.arguments;
+      async execute(args, exec) {
+        const { command, arguments: cmdArgs = {}, timeoutMs = INVOKE_TIMEOUT_MS } = args ?? {};
         const node = bridge.registry.getNode();
         if (!node) {
           return { isError: true, error: { message: 'no node session connected to the bonio bridge' } };
         }
         const callId = randomUUID();
-        const result = await bridge.forwardInvoke(callId, command, args, timeoutMs);
+        const result = await bridge.forwardInvoke(callId, command, cmdArgs, timeoutMs);
         if (result.ok) return { isError: false, value: result.payload ?? {} };
         return { isError: true, error: { message: result.error?.message ?? 'device tool failed' } };
       },
     });
     return register(def);
+  }
+
+  /**
+   * Register hiclaw-parity local tools that run entirely inside dsh:
+   *   memo.save / memo.list  — file-based memos (~/.bonio/memos, same layout as hiclaw)
+   *   device.info            — device/bridge identity
+   */
+  registerLocalTools(defineTool, register) {
+    const bridge = this;
+    const memoDir = () => {
+      // Prefer the DSH home (daemon sets HOME=/data/local/home); fall back to
+      // a fixed device path so memo files survive across restarts regardless
+      // of the shell's hardcoded HOME=/root.
+      const home = process.env.DSH_HOME || process.env.HOME || '/data/local/home';
+      if (home !== '/root') return path.join(home, '.bonio', 'memos');
+      return '/data/local/home/.bonio/memos';
+    };
+
+    const registrations = [];
+
+    registrations.push(register(defineTool({
+      name: 'memo_save',
+      description:
+        'Save a memo/note. Use when the user asks to remember, save, or note something from the screen or conversation. Stores to the on-device memo store.',
+      parameters: {
+        title: { type: 'string', required: true, description: 'Short title for the memo.' },
+        content: { type: 'string', required: true, description: 'The content to save.' },
+        source: { type: 'string', description: 'Source of the memo (e.g. screen, voice).' },
+      },
+      output: {
+        schema: { type: 'object', additionalProperties: true },
+        render(args, value) {
+          const v = value;
+          return v && v.id ? `saved memo ${v.id}: ${v.title}` : JSON.stringify(v);
+        },
+      },
+      async execute(args, exec) {
+        const { title, content, source } = args ?? {};
+        const dir = memoDir();
+        await fs.mkdir(dir, { recursive: true });
+        const id = `${Date.now()}`;
+        const file = path.join(dir, `${id}.json`);
+        const memo = {
+          id,
+          title,
+          content,
+          source: source || 'dsh',
+          createdAt: Date.now(),
+        };
+        await fs.writeFile(file, JSON.stringify(memo, null, 2));
+        return { isError: false, value: { id, title } };
+      },
+    })));
+
+    registrations.push(register(defineTool({
+      name: 'memo_list',
+      description:
+        'List saved memos/notes. Returns recent memos with title, content, and timestamp.',
+      parameters: {
+        limit: { type: 'number', description: 'Max number of memos to return; default 20.' },
+      },
+      output: {
+        schema: { type: 'object', additionalProperties: true },
+        render(args, value) {
+          try {
+            if (value && typeof value === 'object' && typeof value.text === 'string') return value.text;
+            return JSON.stringify(value);
+          } catch { return JSON.stringify(value); }
+        },
+      },
+      async execute(args, exec) {
+        const limit = args?.limit ?? 20;
+        const dir = memoDir();
+        let files = [];
+        try { files = await fs.readdir(dir); } catch { /* no memos yet */ }
+        const memos = [];
+        for (const f of files.filter((n) => n.endsWith('.json')).sort().reverse().slice(0, limit)) {
+          try {
+            const raw = await fs.readFile(path.join(dir, f), 'utf8');
+            memos.push(JSON.parse(raw));
+          } catch { /* skip corrupt */ }
+        }
+        // Return a human-readable value so the model sees clear text.
+        if (memos.length === 0) return { isError: false, value: { text: '没有保存的备忘。', memos: [] } };
+        const lines = memos.map((m) => `- ${m.title}: ${m.content}`).join('\n');
+        return { isError: false, value: { text: '共有 ' + memos.length + ' 条备忘:\n' + lines, memos } };
+      },
+    })));
+
+    registrations.push(register(defineTool({
+      name: 'device_info',
+      description:
+        'Report information about this device and runtime (HarmonyOS, dsh/bridge versions, architecture).',
+      parameters: {},
+      output: {
+        schema: { type: 'object', additionalProperties: true },
+        render(args, value) {
+          return JSON.stringify(value);
+        },
+      },
+      async execute(args, exec) {
+        return {
+          isError: false,
+          value: {
+            platform: process.platform,
+            arch: process.arch,
+            node: process.versions.node,
+            dsh: 'bonio-bridge 0.1',
+            os: process.env.OS || 'HarmonyOS/OpenHarmony',
+          },
+        };
+      },
+    })));
+
+    // ── cron tools (file-persisted scheduler) ────────────────────────────────
+    const cronDir = () => {
+      const home = process.env.DSH_HOME || process.env.HOME || '/data/local/home';
+      if (home !== '/root') return path.join(home, '.bonio', 'cron');
+      return '/data/local/home/.bonio/cron';
+    };
+    const cronFile = () => path.join(cronDir(), 'jobs.json');
+    let cronTimer = null;
+
+    const loadCronJobs = async () => {
+      try {
+        const raw = await fs.readFile(cronFile(), 'utf8');
+        return JSON.parse(raw);
+      } catch { return {}; }
+    };
+    const saveCronJobs = async (jobs) => {
+      await fs.mkdir(cronDir(), { recursive: true });
+      await fs.writeFile(cronFile(), JSON.stringify(jobs, null, 2));
+    };
+    /** Parse 'every 5m' / 'at +30m' / 'cron 0 9 * * *' into { type, ms?, expr? }. */
+    const parseSchedule = (schedule) => {
+      const s = String(schedule || '').trim();
+      const every = s.match(/^every\s+(\d+)\s*(s|m|h|d)?$/i);
+      if (every) {
+        const n = parseInt(every[1], 10);
+        const unit = (every[2] || 'm').toLowerCase();
+        const mult = { s: 1000, m: 60000, h: 3600000, d: 86400000 }[unit] || 60000;
+        return { type: 'interval', ms: n * mult };
+      }
+      const at = s.match(/^at\s+\+(\d+)\s*(s|m|h|d)?$/i);
+      if (at) {
+        const n = parseInt(at[1], 10);
+        const unit = (at[2] || 'm').toLowerCase();
+        const mult = { s: 1000, m: 60000, h: 3600000, d: 86400000 }[unit] || 60000;
+        return { type: 'oneshot', ms: n * mult };
+      }
+      const cron = s.match(/^cron\s+(.+)$/i);
+      if (cron) return { type: 'cron', expr: cron[1].trim() };
+      return null;
+    };
+
+    registrations.push(register(defineTool({
+      name: 'cron_add',
+      description:
+        'Schedule a recurring or one-time task. Supports "every 5m" (interval), "at +30m" (one-shot), or "cron 0 9 * * *" (5-field cron expression). When a job fires, the bridge re-runs the agent with the job prompt.',
+      parameters: {
+        schedule: { type: 'string', required: true, description: "Schedule: 'every <duration>' (e.g. every 5m), 'at +<duration>' (e.g. at +30m), or 'cron <expr>' (e.g. cron 0 9 * * *)." },
+        prompt: { type: 'string', required: true, description: 'The message/prompt to send to the agent when the task fires.' },
+        maxCount: { type: 'number', description: 'Maximum number of times to run (0 = unlimited).' },
+      },
+      output: {
+        schema: { type: 'object', additionalProperties: true },
+        render(args, value) { return JSON.stringify(value); },
+      },
+      async execute(args, exec) {
+        const { schedule, prompt, maxCount } = args ?? {};
+        const parsed = parseSchedule(schedule);
+        if (!parsed) return { isError: true, error: { message: `unsupported schedule: ${schedule}` } };
+        const jobs = await loadCronJobs();
+        const jobId = `cron-${Date.now()}`;
+        jobs[jobId] = {
+          id: jobId,
+          schedule,
+          parsed,
+          prompt,
+          maxCount: maxCount ?? 0,
+          runs: 0,
+          createdAt: Date.now(),
+          enabled: true,
+        };
+        await saveCronJobs(jobs);
+        return { isError: false, value: { id: jobId, schedule, prompt } };
+      },
+    })));
+
+    registrations.push(register(defineTool({
+      name: 'cron_list',
+      description: 'List all scheduled cron jobs with their status and run counts.',
+      parameters: {},
+      output: {
+        schema: { type: 'object', additionalProperties: true },
+        render(args, value) { return JSON.stringify(value); },
+      },
+      async execute(args, exec) {
+        const jobs = await loadCronJobs();
+        const list = Object.values(jobs).map((j) => ({
+          id: j.id,
+          schedule: j.schedule,
+          prompt: String(j.prompt).slice(0, 60),
+          runs: j.runs,
+          enabled: j.enabled,
+        }));
+        return { isError: false, value: { jobs: list } };
+      },
+    })));
+
+    registrations.push(register(defineTool({
+      name: 'cron_remove',
+      description: 'Remove a scheduled cron job by its ID.',
+      parameters: {
+        jobId: { type: 'string', required: true, description: 'The ID of the cron job to remove.' },
+      },
+      output: {
+        schema: { type: 'object', additionalProperties: true },
+        render(args, value) { return JSON.stringify(value); },
+      },
+      async execute(args, exec) {
+        const { jobId } = args ?? {};
+        const jobs = await loadCronJobs();
+        if (!jobs[jobId]) return { isError: true, error: { message: `cron job not found: ${jobId}` } };
+        delete jobs[jobId];
+        await saveCronJobs(jobs);
+        return { isError: false, value: { removed: jobId } };
+      },
+    })));
+
+    registrations.push(register(defineTool({
+      name: 'cron_runs',
+      description: 'Get recent execution history for a cron job.',
+      parameters: {
+        jobId: { type: 'string', required: true, description: 'The ID of the cron job to inspect.' },
+      },
+      output: {
+        schema: { type: 'object', additionalProperties: true },
+        render(args, value) { return JSON.stringify(value); },
+      },
+      async execute(args, exec) {
+        const { jobId } = args ?? {};
+        const jobs = await loadCronJobs();
+        const job = jobs[jobId];
+        if (!job) return { isError: true, error: { message: `cron job not found: ${jobId}` } };
+        return { isError: false, value: { id: jobId, runs: job.runs, lastRunAt: job.lastRunAt, schedule: job.schedule } };
+      },
+    })));
+
+    // Start the scheduler tick (check jobs every 30s). Firing re-runs the agent
+    // via this driver's runChat with a dedicated session key.
+    const tickCron = async () => {
+      try {
+        const jobs = await loadCronJobs();
+        const now = Date.now();
+        let changed = false;
+        for (const j of Object.values(jobs)) {
+          if (!j.enabled) continue;
+          const due = j.parsed.type === 'oneshot'
+            ? (j.createdAt + j.parsed.ms <= now)
+            : (j.parsed.type === 'interval' ? ((j.lastRunAt || j.createdAt) + j.parsed.ms <= now) : false);
+          if (!due) continue;
+          if (j.maxCount > 0 && j.runs >= j.maxCount) { j.enabled = false; changed = true; continue; }
+          j.runs += 1;
+          j.lastRunAt = now;
+          changed = true;
+          console.log('[bonio-bridge] cron firing', j.id, j.prompt);
+          void bridge.runChat({ text: String(j.prompt), sessionKey: `cron-${j.id}` }).catch(() => {});
+        }
+        if (changed) await saveCronJobs(jobs);
+      } catch (e) {
+        console.log('[bonio-bridge] cron tick error:', e && e.message);
+      }
+    };
+    cronTimer = setInterval(() => { void tickCron(); }, 30000);
+
+    return () => {
+      if (cronTimer) clearInterval(cronTimer);
+      for (const dispose of registrations) dispose();
+    };
   }
 }

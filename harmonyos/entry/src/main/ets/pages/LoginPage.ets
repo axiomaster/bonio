@@ -9,9 +9,9 @@ struct LoginPage {
   @State deviceId: string = 'Unknown';
   @State isConnecting: boolean = false;
 
-  @State manualHost: string = "192.168.43.4";
-  @State manualPort: string = "18789";
-  @State manualToken: string = "lism";
+  @State manualHost: string = "127.0.0.1";
+  @State manualPort: string = "10724";
+  @State manualToken: string = "bonio-local-token";
   @State manualTls: boolean = false;
 
   private runtime: NodeRuntime | undefined = undefined;
@@ -31,9 +31,9 @@ struct LoginPage {
 
       if (this.runtime) {
         this.deviceId = this.runtime.prefs.getInstanceId() || 'Unknown';
-        this.manualHost = this.runtime.prefs.getManualHost() || "192.168.43.4";
-        this.manualPort = this.runtime.prefs.getManualPort().toString() || "18789";
-        this.manualToken = this.runtime.prefs.getGatewayToken() || "lism";
+        this.manualHost = this.runtime.prefs.getManualHost() || "127.0.0.1";
+        this.manualPort = this.runtime.prefs.getManualPort().toString() || "10724";
+        this.manualToken = this.runtime.prefs.getGatewayToken() || "bonio-local-token";
         this.manualTls = this.runtime.prefs.getManualTls();
 
         // Poll for connection status
