@@ -13,6 +13,15 @@ avatar ⇄（同进程）⇄ bonio-app ⇄（WebSocket hiclaw 协议）⇄ dsh �
 - **operator session**：聊天（`chat.send` → dsh agent，流式 `agent` 事件 + 最终 `chat` 事件）
 - **node session**：设备工具调用（dsh 工具 `bonio_node_invoke` → `node.invoke.request` → node session 执行 → `node.invoke.result` 回填）
 
+## 已实现 dsh 工具
+
+| 工具 | 用途 | 执行位置 |
+|---|---|---|
+| `bonio_node_invoke` | 设备能力（相机/屏幕/定位/短信/输入等）→ node session | dsh 路由 |
+| `memo_save` / `memo_list` | 记忆系统（`~/.bonio/memos` JSON 存储） | dsh 本地 |
+| `cron_add` / `cron_list` / `cron_remove` / `cron_runs` | 定时任务（`~/.bonio/cron/jobs.json`，every/at/cron 表达式，30s 触发） | dsh 本地 |
+| `device_info` | 设备/运行时信息 | dsh 本地 |
+
 ## 已实现协议方法
 
 | 方法/事件 | 状态 | 说明 |

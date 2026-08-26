@@ -146,14 +146,32 @@ bonio-bridge 在 `127.0.0.1:10724` 暴露 hiclaw 兼容 WebSocket 协议：
 - 单 operator session（多客户端连接时后者覆盖）
 - bonio-app UI 在多次强杀/重连后有状态显示抖动（客户端生命周期问题）
 
-## 9. 阶段 2 待办
+## 9. 阶段 2 完成情况
 
-- 双轨对照后**删除 hiclaw**（server/）
-- 微信通道（wechat_adapter/wecom/ilink）→ dsh 插件
-- cron/健康提醒/意图路由 → dsh 插件或客户端
-- 记忆系统 → dsh storage
+> 决策：**不删除 hiclaw 代码**，仅移除 harmonyos 平台对 hiclaw 的依赖（mac/pc/android 后续逐步迁移）。
+
+### 9.1 已完成 ✅
+
+| 工作 | 实现 |
+|---|---|
+| 移除 harmonyos UI 对 hiclaw 端点引用 | `ServerTab/LoginPage/Index` 默认值改为 `127.0.0.1:10724` + `bonio-local-token` |
+| 记忆系统 → dsh | `memo_save`/`memo_list` 工具（`~/.bonio/memos` JSON 存储，与 hiclaw 同布局）；修复设备 `HOME=/root` 问题 |
+| 定时任务 → dsh | `cron_add`/`cron_list`/`cron_remove`/`cron_runs` 工具（`~/.bonio/cron/jobs.json` 持久化调度器，支持 every/at/cron 表达式，30s tick 触发 agent 运行） |
+| 设备信息 | `device_info` 工具（平台/架构/版本） |
+| 工具契约修复 | `output.render(args, value)` 与 `execute(args, exec)` 签名对齐 dsh ToolRuntime；DeepSeek 工具调用后可能直接 turn/end，工具结果回退为最终文本 |
+
+### 9.2 实测验证
+
+- ✅ memo_save 保存"会议提醒/购物清单"2 条 → memo_list 读取并格式化"共有 1 条备忘: - 会议提醒: 明天下午3点开会"
+- ✅ cron_add "every 1m" → jobs.json 持久化 → 60s 后调度器触发（`cron firing` + runs 计数）
+- ✅ 基础聊天流式正常（修复后回归）
+
+### 9.3 待后续（不阻塞 HarmonyOS 使用）
+
+- 意图路由/健康提醒/通知处理：需 bonio-app 客户端新功能（系统 API），标记为增强项
+- 微信通道（wechat/wecom/ilink）：保留 hiclaw 侧实现，HarmonyOS 场景暂不迁移（需独立 dsh 插件）
 - bonio-app 历史 UI 接 dsh session 持久层
-- Android/桌面端接入
+- Android/桌面端接入（mac/pc/android 后续按同样模式迁移）
 
 ## 10. 参考
 
