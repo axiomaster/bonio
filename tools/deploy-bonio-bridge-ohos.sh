@@ -34,28 +34,31 @@ log "Extracting into dsh node_modules"
   find build -name '._*' -delete
 "
 
-log "Creating bonio profile"
-"$HDC" shell "
-  mkdir -p $DEVICE_HOME/.dsh/profiles/bonio/node_modules/@bonio
-  cp -r $DSH_NM/@bonio/dsh-bonio-bridge $DEVICE_HOME/.dsh/profiles/bonio/node_modules/@bonio/
-  cat > $DEVICE_HOME/.dsh/profiles/bonio/package.json << PKGEOF
+log "Creating bonio profile (locally, then pushing)"
+PROFILE_DIR="$(mktemp -d)"
+mkdir -p "$PROFILE_DIR/bonio/node_modules/@bonio"
+cp -r "$BRIDGE_DIR" "$PROFILE_DIR/bonio/node_modules/@bonio/dsh-bonio-bridge"
+rm -rf "$PROFILE_DIR/bonio/node_modules/@bonio/dsh-bonio-bridge/src" \
+       "$PROFILE_DIR/bonio/node_modules/@bonio/dsh-bonio-bridge/test" \
+       "$PROFILE_DIR/bonio/node_modules/@bonio/dsh-bonio-bridge/tsconfig.json"
+cat > "$PROFILE_DIR/bonio/package.json" << PKGEOF
 {
-  \"name\": \"dsh-profile-bonio\",
-  \"private\": true,
-  \"dependencies\": {},
-  \"dsh\": {
-    \"profile\": {
-      \"bundles\": [
-        \"@deepseek-ai/dsh-base\",
-        \"@deepseek-ai/dsh-web-app\",
-        \"@bonio/dsh-bonio-bridge\"
+  "name": "dsh-profile-bonio",
+  "private": true,
+  "dependencies": {},
+  "dsh": {
+    "profile": {
+      "bundles": [
+        "@deepseek-ai/dsh-base",
+        "@deepseek-ai/dsh-web-app",
+        "@bonio/dsh-bonio-bridge"
       ]
     }
   }
 }
 PKGEOF
-  printf '[]\n' > $DEVICE_HOME/.dsh/profiles/bonio/cordis.yml
-  cat > $DEVICE_HOME/.dsh/profiles/bonio/cordis.patch.yml << PATCHEOF
+printf '[]\n' > "$PROFILE_DIR/bonio/cordis.yml"
+cat > "$PROFILE_DIR/bonio/cordis.patch.yml" << PATCHEOF
 # bonio profile patch layer.
 - id: bonio-bridge
   config:
@@ -63,46 +66,27 @@ PKGEOF
     token: $TOKEN
     tools: route
 PATCHEOF
+tar -czf /tmp/bonio-profile.tgz -C "$PROFILE_DIR" bonio
+"$HDC" file send /tmp/bonio-profile.tgz /data/local/bonio-profile.tgz
+"$HDC" shell "
+  rm -rf $DEVICE_HOME/.dsh/profiles/bonio
+  mkdir -p $DEVICE_HOME/.dsh/profiles
+  cd $DEVICE_HOME/.dsh/profiles
+  tar -xzf /data/local/bonio-profile.tgz
 "
+rm -rf "$PROFILE_DIR"
 
 log "Installing daemon script"
+"$HDC" file send "$SCRIPT_DIR/dsh-daemon.sh" /data/local/bin/dsh-daemon.sh
+"$HDC" shell "chmod 755 /data/local/bin/dsh-daemon.sh"
+
+log "Restarting daemon (self-healing loop)"
+"$HDC" shell "pkill -f 'bin.js --profile bonio' 2>/dev/null; pkill -f 'dsh-daemon.sh' 2>/dev/null; sleep 1; rm -f /data/local/dsh-daemon.pid; true"
 "$HDC" shell "
-  mkdir -p /data/local/bin
-  cat > /data/local/bin/dsh-daemon.sh << DAEMONEOF
-#!/bin/sh
-export HOME=$DEVICE_HOME
-export LD_LIBRARY_PATH=/usr/local/lib
-LOG=/data/local/dsh-daemon.log
-PIDFILE=/data/local/dsh-daemon.pid
-is_running() { [ -f \"\$PIDFILE\" ] && kill -0 \"\$(cat \$PIDFILE)\" 2>/dev/null; }
-start_dsh() {
-  echo \"[\$(date)] starting dsh bonio\" >> \$LOG
-  nohup /usr/local/bin/dsh --profile bonio --port $WEB_PORT --no-open >> \$LOG 2>&1 &
-  echo \$! > \$PIDFILE
-}
-stop_dsh() {
-  if [ -f \"\$PIDFILE\" ]; then
-    kill \"\$(cat \$PIDFILE)\" 2>/dev/null; sleep 3; kill -9 \"\$(cat \$PIDFILE)\" 2>/dev/null
-    rm -f \$PIDFILE
-  fi
-}
-case \"\$1\" in
-  start) start_dsh ;;
-  stop) stop_dsh ;;
-  restart) stop_dsh; sleep 1; start_dsh ;;
-  status) if is_running; then echo \"dsh running (pid \$(cat \$PIDFILE))\"; else echo \"dsh stopped\"; fi ;;
-  *) while true; do if ! is_running; then start_dsh; fi; sleep 15; done ;;
-esac
-DAEMONEOF
-  chmod 755 /data/local/bin/dsh-daemon.sh
+  HOME=$DEVICE_HOME LD_LIBRARY_PATH=/usr/local/lib nohup /data/local/bin/dsh-daemon.sh > /dev/null 2>&1 &
 "
 
-log "Restarting daemon"
-"$HDC" shell "
-  HOME=$DEVICE_HOME LD_LIBRARY_PATH=/usr/local/lib nohup /data/local/bin/dsh-daemon.sh restart > /dev/null 2>&1 &
-"
-
-sleep 20
+sleep 25
 log "Verifying gateway"
 "$HDC" shell "netstat -tlnp 2>/dev/null | grep -E '10724|$WEB_PORT' | head -3"
 
