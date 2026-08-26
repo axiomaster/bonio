@@ -85,23 +85,32 @@ $HDC shell "HOME=/data/local/home LD_LIBRARY_PATH=/usr/local/lib nohup /data/loc
 
 ## bonio-app 连接配置
 
-- Host：`127.0.0.1`
-- Port：`10724`
+- Host：`127.0.0.1`（默认值已改，见 `SecurePrefs.ets`）
+- Port：`10724`（默认值已改）
 - TLS：关闭
 - Token：与 profile `cordis.patch.yml` 的 `token` 一致（默认 `bonio-local-token`）
+
+bonio-app 侧改动（已提交）：
+- `SecurePrefs.ets`：默认网关地址改为 `127.0.0.1:10724`
+- `ChatController.ets`：`handleGatewayEvent` 增加 `avatar.command` 分支，暴露 `onAvatarCommand` 回调
+- `FloatWindowPage.ets`：消费 `avatar.command`（setBubble 气泡 / setState / clearBubble）
+
+> 构建部署 HAP 需要签名证书（build-profile.json5 当前指向 Windows 路径）；
+> 有签名环境后构建安装即可，客户端代码无需再改。
 
 ## 测试
 
 ```bash
 # 从 Mac（需先 hdc fport tcp:10724 tcp:10724）
 cd dsh-plugins/bonio-bridge/test
-BRIDGE_TOKEN=bonio-local-token node smoke-client.mjs chat       # 纯聊天
+BRIDGE_TOKEN=bonio-local-token node smoke-client.mjs chat       # 纯聊天（含多轮+历史）
 BRIDGE_TOKEN=bonio-local-token node smoke-tool.mjs              # 工具调用
+BRIDGE_TOKEN=bonio-local-token node smoke-avatar.mjs            # 事件流
 ```
 
 ## 已知限制（阶段 1）
 
-- `chat.history` / `sessions.list` 返回空（会话历史持久化在 dsh session 存储中，客户端历史 UI 待接 dsh 原生 API）
+- `chat.history` 返回**当前进程内**的 dsh 会话历史（dsh 进程重启后丢失；持久化历史待接 dsh session 持久层）
 - 认证为 token 简化（未实现 Ed25519 验签）
 - `voicewake` 空实现（唤醒词未同步）
 - 单 operator session（多个客户端连接时后者覆盖前者）
