@@ -96,7 +96,8 @@ export class SecurePrefs {
   }
 
   public getManualEnabled(): boolean {
-    return this.getSyncValue('gateway.manual.enabled', false);
+    // DSH refactor: on-device gateway is on by default.
+    return this.getSyncValue('gateway.manual.enabled', true);
   }
 
   public setManualEnabled(value: boolean): void {
@@ -130,7 +131,8 @@ export class SecurePrefs {
   }
 
   public getGatewayToken(): string {
-    return this.getSyncValue('gateway.manual.token', '');
+    // DSH refactor: default token matches the bridge profile's default.
+    return this.getSyncValue('gateway.manual.token', 'bonio-local-token');
   }
 
   public setGatewayToken(value: string): void {

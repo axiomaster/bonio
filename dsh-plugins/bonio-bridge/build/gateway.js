@@ -85,9 +85,14 @@ export function startGateway(ctx, config, registry, driver) {
       // The client may pass its own sessionKey; prefer it over the connection one.
       const key = typeof params.sessionKey === 'string' && params.sessionKey
         ? params.sessionKey : sessionKey;
+      // bonio-app sends idempotencyKey = its own runId; reuse it so agent/chat
+      // events match the client's pendingRuns filter.
+      const runId = typeof params.idempotencyKey === 'string' && params.idempotencyKey
+        ? params.idempotencyKey : undefined;
 
-      const result = await driver.runChat({ text, sessionKey: key });
+      const result = await driver.runChat({ text, sessionKey: key, runId });
       if (result.error) return send(resErr(frame.id, 'CHAT_FAILED', result.error));
+      // Respond immediately with the runId; agent events stream afterwards.
       send(resOk(frame.id, { runId: result.runId }));
     };
 

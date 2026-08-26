@@ -110,9 +110,21 @@ export class AgentDriver {
     }
     await ctx.get('loader')?.await?.();
 
-    const runId = randomUUID();
+    // bonio-app sends idempotencyKey as its own runId; reuse it so its
+    // pendingRuns filter matches our agent/chat events immediately.
+    const runId = params.runId || randomUUID();
     const controller = new AbortController();
 
+    // Fire-and-forget: return the runId right away; agent events stream as
+    // they happen and the chat final arrives when the run completes.
+    void this._run(runId, params, controller);
+    return { runId };
+  }
+
+  async _run(runId, params, controller) {
+    const ctx = this.ctx;
+    const agents = ctx.get('agents');
+    const sessions = ctx.get('sessions');
     try {
       const agent = await this.getOrCreateAgent(params.sessionKey);
       if (!agent) return { runId: '', error: 'dsh agent services unavailable' };
@@ -120,12 +132,18 @@ export class AgentDriver {
 
       const firstSeq = agent.session.seq;
       // session/event carries (subject, event); filter to this agent's session.
+      // bonio-app's handleAgentEvent REPLACES streamingAssistantText with
+      // data.text, so we must send cumulative text, not per-chunk deltas.
+      let cumulative = '';
       const onEvent = (subject, event) => {
         if (subject !== agent.session) return;
         if (event.type === 'assistant/chunk') {
           const chunk = event.data?.chunk;
           const text = chunk && chunk.type === 'text-delta' ? (chunk.text ?? '') : '';
-          if (text) this.sink.agentDelta(runId, params.sessionKey, text);
+          if (text) {
+            cumulative += text;
+            this.sink.agentDelta(runId, params.sessionKey, cumulative);
+          }
         }
       };
       const off = ctx.on('session/event', onEvent);
@@ -167,7 +185,6 @@ export class AgentDriver {
       this.runs.delete(runId);
       const message = error instanceof Error ? error.message : String(error);
       this.sink.chatFinal(runId, params.sessionKey, { text: '', state: 'error', errorMessage: message, done: true });
-      return { runId, error: message };
     }
   }
 

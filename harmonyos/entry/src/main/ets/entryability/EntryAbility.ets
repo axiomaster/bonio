@@ -67,6 +67,20 @@ export default class EntryAbility extends UIAbility {
       }
       hilog.info(DOMAIN, 'testTag', 'Succeeded in loading the content.');
     });
+
+    // DSH refactor: auto-connect to the on-device dsh bonio-bridge so the
+    // avatar/chat work without manual button taps.
+    const runtime = AppStorage.get<NodeRuntime>('nodeRuntime');
+    if (runtime && runtime.prefs.getManualEnabled()) {
+      hilog.info(DOMAIN, 'testTag', 'Auto-connecting to gateway (manual endpoint)');
+      setTimeout(() => {
+        try { runtime.connectManual(); } catch (e) {
+          hilog.error(DOMAIN, 'testTag', 'Auto-connect failed: %{public}s', e instanceof Error ? e.message : String(e));
+        }
+      }, 500);
+    } else {
+      hilog.info(DOMAIN, 'testTag', 'Manual endpoint disabled; skipping auto-connect');
+    }
   }
 
   onWindowStageDestroy(): void {
