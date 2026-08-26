@@ -1,0 +1,8 @@
+# bonio-bridge bundle patch: mounts the hiclaw-compatible gateway inside dsh.
+- insert:
+    - id: bonio-bridge
+      name: "@bonio/dsh-bonio-bridge"
+      config:
+        port: 10724
+        token: !!js process.env.BONIO_BRIDGE_TOKEN
+        tools: route
