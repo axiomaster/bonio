@@ -55,7 +55,7 @@ export function startGateway(ctx, config, registry, driver) {
       const requestedRole = typeof params.role === 'string' ? params.role : 'operator';
       role = requestedRole === 'node' ? 'node' : 'operator';
       roleByConn.set(connId, role);
-      sessionKey = role === 'operator' ? `main-${randomUUID()}` : undefined;
+      sessionKey = role === 'operator' ? 'main' : undefined;
 
       registry.attach({
         connId,
@@ -64,20 +64,29 @@ export function startGateway(ctx, config, registry, driver) {
         sessionKey,
       });
 
+      // hiclaw connect response shape (see bonio-app GatewaySession.ets):
+      //   payload.server.host, payload.snapshot.sessionDefaults.mainSessionKey
       send(resOk(frame.id, {
-        serverName: 'dsh-bonio-bridge',
-        mainSessionKey: sessionKey,
-        protocol: 3,
+        server: { host: 'dsh-bonio-bridge' },
+        snapshot: {
+          sessionDefaults: { mainSessionKey: sessionKey ?? 'main' },
+        },
       }));
     };
 
     const handleChatSend = async (frame) => {
       if (!authenticated) return send(resErr(frame.id, 'AUTH_REQUIRED', 'connect first'));
       const params = frame.params ?? {};
-      const text = typeof params.text === 'string' ? params.text : '';
+      // bonio-app sends `message`; the smoke client uses `text` — accept both.
+      const text = typeof params.message === 'string' ? params.message
+        : typeof params.text === 'string' ? params.text
+        : '';
       if (!text) return send(resErr(frame.id, 'BAD_PARAMS', 'missing text'));
+      // The client may pass its own sessionKey; prefer it over the connection one.
+      const key = typeof params.sessionKey === 'string' && params.sessionKey
+        ? params.sessionKey : sessionKey;
 
-      const result = await driver.runChat({ text, sessionKey });
+      const result = await driver.runChat({ text, sessionKey: key });
       if (result.error) return send(resErr(frame.id, 'CHAT_FAILED', result.error));
       send(resOk(frame.id, { runId: result.runId }));
     };
@@ -114,15 +123,13 @@ export function startGateway(ctx, config, registry, driver) {
     };
 
     const handleChatHistory = (frame) => {
-      send(resOk(frame.id, {
-        messages: [],
-        sessionId: sessionKey,
-        thinkingLevel: undefined,
-      }));
+      const params = frame.params ?? {};
+      const key = typeof params.sessionKey === 'string' ? params.sessionKey : sessionKey;
+      send(resOk(frame.id, driver.getHistory(key)));
     };
 
     const handleSessionsList = (frame) => {
-      send(resOk(frame.id, { sessions: [] }));
+      send(resOk(frame.id, driver.listSessions()));
     };
 
     const handleVoiceWakeGet = (frame) => {

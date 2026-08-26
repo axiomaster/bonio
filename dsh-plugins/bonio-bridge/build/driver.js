@@ -12,28 +12,110 @@ export class AgentDriver {
     this.sink = sink;
     this.forwardInvoke = forwardInvoke;
     this.runs = new Map();
+    // sessionKey -> live agent (multi-turn continuity within one operator session)
+    this.agentsByKey = new Map();
+  }
+
+  /** Create (or reuse) the dsh agent bound to a hiclaw sessionKey. */
+  async getOrCreateAgent(sessionKey) {
+    if (sessionKey && this.agentsByKey.has(sessionKey)) {
+      return this.agentsByKey.get(sessionKey);
+    }
+    const ctx = this.ctx;
+    const agents = ctx.get('agents');
+    const defaultModel = ctx.get('agentDefaultModel');
+    if (!agents || !defaultModel) return null;
+
+    const selection = defaultModel.currentSelection();
+    const agentId = `session-${randomUUID()}`;
+    const { agent } = await agents.create({
+      sessionId: SessionId(agentId),
+      meta: { cwd: process.cwd() },
+      agentOptions: { provider: selection.provider, model: selection.model },
+    });
+    if (sessionKey) this.agentsByKey.set(sessionKey, agent);
+    return agent;
+  }
+
+  /** Read chat history for a sessionKey from its dsh session log. */
+  getHistory(sessionKey) {
+    const agent = sessionKey && this.agentsByKey.get(sessionKey);
+    if (!agent) {
+      return { messages: [], sessionId: sessionKey, thinkingLevel: undefined };
+    }
+    const events = agent.session?.events ?? [];
+    const messages = [];
+    for (const e of events) {
+      let msg = null;
+      if (e.type === 'user/message') {
+        msg = e.data;
+      } else if (e.type === 'assistant/message') {
+        msg = e.data?.message;
+      }
+      if (!msg) continue;
+      const content = (msg.content ?? []).map((b) => {
+        const out = { type: b.type ?? 'text' };
+        if (typeof b.text === 'string') out.text = b.text;
+        if (typeof b.mimeType === 'string') out.mimeType = b.mimeType;
+        if (typeof b.fileName === 'string') out.fileName = b.fileName;
+        // base64-style payloads use `content` in hiclaw; dsh uses image/bytes
+        if (b.image != null) out.content = b.image;
+        return out;
+      });
+      messages.push({
+        role: msg.role ?? 'user',
+        content,
+        timestamp: e.time ?? Date.now(),
+      });
+    }
+    return {
+      messages,
+      sessionId: sessionKey,
+      thinkingLevel: undefined,
+    };
+  }
+
+  /** List active operator sessions (sessionKey + last message preview). */
+  listSessions() {
+    const sessions = [];
+    for (const [key, agent] of this.agentsByKey) {
+      const events = agent.session?.events ?? [];
+      let displayName = key;
+      let updatedAt = agent.session?.seq != null ? Date.now() : Date.now();
+      // find last user text as the session title
+      for (let i = events.length - 1; i >= 0; i--) {
+        const e = events[i];
+        if (e.type === 'user/message') {
+          const texts = (e.data?.content ?? [])
+            .filter((b) => b.type === 'text' && typeof b.text === 'string')
+            .map((b) => b.text);
+          if (texts.length > 0) {
+            displayName = texts[0].slice(0, 30);
+            updatedAt = e.time ?? updatedAt;
+            break;
+          }
+        }
+      }
+      sessions.push({ key, updatedAt, displayName });
+    }
+    return { sessions };
   }
 
   async runChat(params) {
     const ctx = this.ctx;
     const agents = ctx.get('agents');
-    const defaultModel = ctx.get('agentDefaultModel');
     const sessions = ctx.get('sessions');
-    if (!agents || !defaultModel || !sessions) {
+    if (!agents || !sessions) {
       return { runId: '', error: 'dsh agent services unavailable' };
     }
     await ctx.get('loader')?.await?.();
 
-    const selection = defaultModel.currentSelection();
     const runId = randomUUID();
     const controller = new AbortController();
 
     try {
-      const { agent } = await agents.create({
-        sessionId: SessionId(`session-${runId}`),
-        meta: { cwd: process.cwd() },
-        agentOptions: { provider: selection.provider, model: selection.model },
-      });
+      const agent = await this.getOrCreateAgent(params.sessionKey);
+      if (!agent) return { runId: '', error: 'dsh agent services unavailable' };
       this.runs.set(runId, { agent, controller });
 
       const firstSeq = agent.session.seq;
@@ -116,11 +198,7 @@ export class AgentDriver {
         timeoutMs: { type: 'number', description: 'Timeout in milliseconds; default 300000.' },
       },
       output: {
-        schema: {
-          type: 'object',
-          additionalProperties: true,
-          description: 'The device result payload returned by the node session.',
-        },
+        schema: { type: 'object', additionalProperties: true, description: 'The device result payload returned by the node session.' },
         render(result) {
           const value = result.value;
           if (value && typeof value === 'object' && value.error) {

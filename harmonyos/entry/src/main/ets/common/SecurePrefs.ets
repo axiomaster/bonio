@@ -104,7 +104,8 @@ export class SecurePrefs {
   }
 
   public getManualHost(): string {
-    return this.getSyncValue('gateway.manual.host', '192.168.43.4');
+    // DSH refactor: default to the on-device dsh bonio-bridge (localhost).
+    return this.getSyncValue('gateway.manual.host', '127.0.0.1');
   }
 
   public setManualHost(value: string): void {
@@ -112,7 +113,8 @@ export class SecurePrefs {
   }
 
   public getManualPort(): number {
-    return this.getSyncValue('gateway.manual.port', 18789);
+    // DSH refactor: bonio-bridge listens on hiclaw-compatible port 10724.
+    return this.getSyncValue('gateway.manual.port', 10724);
   }
 
   public setManualPort(value: number): void {

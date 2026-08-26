@@ -10,6 +10,8 @@ const TAG = 'FloatWindowPage';
 struct FloatWindowPage {
   @State agentState: string = 'idle';
   @State blinkMarker: boolean = false;
+  @State bubbleText: string = '';
+  private bubbleTimer: number = -1;
   private runtime: NodeRuntime | undefined = undefined;
   private statusTimer: number = -1;
   private blinkTimer: number = -1;
@@ -31,10 +33,39 @@ struct FloatWindowPage {
           }
         }
       }, 1000);
+
+      // DSH refactor: consume server-driven avatar.command events.
+      if (this.runtime.chatController) {
+        this.runtime.chatController.onAvatarCommand = (payloadJson: string) => {
+          this.handleAvatarCommand(payloadJson);
+        };
+      }
     }
     this.blinkTimer = setInterval(() => {
       this.blinkMarker = !this.blinkMarker;
     }, 1200);
+  }
+
+  private handleAvatarCommand(payloadJson: string) {
+    try {
+      const cmd = JSON.parse(payloadJson) as Record<string, Object>;
+      const action = cmd.action as string | undefined;
+      const params = (cmd.params as Record<string, Object>) || {};
+      if (action === 'setBubble' && params.text) {
+        this.bubbleText = params.text as string;
+        if (this.bubbleTimer !== -1) clearTimeout(this.bubbleTimer);
+        this.bubbleTimer = setTimeout(() => {
+          this.bubbleText = '';
+          this.bubbleTimer = -1;
+        }, 5000);
+      } else if (action === 'clearBubble') {
+        this.bubbleText = '';
+      } else if (action === 'setState' && params.state) {
+        this.agentState = params.state as string;
+      }
+    } catch (e) {
+      hilog.warn(DOMAIN, TAG, 'avatar.command parse failed: %{public}s', e instanceof Error ? e.message : String(e));
+    }
   }
 
   aboutToDisappear() {
@@ -91,6 +122,21 @@ struct FloatWindowPage {
   @Builder
   NativeCatAvatar() {
     Stack() {
+      // DSH refactor: server-driven speech bubble (avatar.command setBubble).
+      if (this.bubbleText !== '') {
+        Text(this.bubbleText)
+          .fontSize(13)
+          .fontColor('#3D2D18')
+          .backgroundColor('#FFFFFF')
+          .borderRadius(10)
+          .padding(8)
+          .maxLines(3)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .width(170)
+          .margin({ top: -4 })
+          .position({ x: 15, y: 0 })
+      }
+
       Circle()
         .width(118)
         .height(118)

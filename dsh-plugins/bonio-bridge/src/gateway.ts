@@ -106,19 +106,25 @@ export function startGateway(
       });
 
       send(resOk(frame.id, {
-        serverName: 'dsh-bonio-bridge',
-        mainSessionKey: sessionKey,
-        protocol: 3,
+        server: { host: 'dsh-bonio-bridge' },
+        snapshot: {
+          sessionDefaults: { mainSessionKey: sessionKey ?? 'main' },
+        },
       }));
     };
 
     const handleChatSend = async (frame: ReqFrame): Promise<void> => {
       if (!requireAuth()) return send(resErr(frame.id, 'AUTH_REQUIRED', 'connect first'));
       const params = (frame.params ?? {}) as Record<string, unknown>;
-      const text = typeof params.text === 'string' ? params.text : '';
+      // bonio-app sends `message`; accept `text` too for the smoke client.
+      const text = typeof params.message === 'string' ? params.message
+        : typeof params.text === 'string' ? params.text
+        : '';
       if (!text) return send(resErr(frame.id, 'BAD_PARAMS', 'missing text'));
+      const key = typeof params.sessionKey === 'string' && params.sessionKey
+        ? params.sessionKey : sessionKey;
 
-      const result = await driver.runChat({ text, sessionKey });
+      const result = await driver.runChat({ text, sessionKey: key });
       if (result.error) return send(resErr(frame.id, 'CHAT_FAILED', result.error));
       send(resOk(frame.id, { runId: result.runId }));
     };
@@ -150,6 +156,42 @@ export function startGateway(
       send(resOk(frame.id, { pong: Date.now() }));
     };
 
+    const handleHealth = (frame: ReqFrame): void => {
+      send(resOk(frame.id, { ok: true, ts: Date.now() }));
+    };
+
+    const handleChatHistory = (frame: ReqFrame): void => {
+      const params = (frame.params ?? {}) as Record<string, unknown>;
+      const key = typeof params.sessionKey === 'string' ? params.sessionKey : sessionKey;
+      send(resOk(frame.id, driver.getHistory(key)));
+    };
+
+    const handleSessionsList = (frame: ReqFrame): void => {
+      send(resOk(frame.id, driver.listSessions()));
+    };
+
+    const handleVoiceWakeGet = (frame: ReqFrame): void => {
+      send(resOk(frame.id, { triggers: [] }));
+    };
+
+    const handleVoiceWakeSet = (frame: ReqFrame): void => {
+      send(resOk(frame.id, { saved: true }));
+    };
+
+    const handleNodeEvent = (frame: ReqFrame): void => {
+      // chat.subscribe etc. — accepted, no-op for now.
+      send(resOk(frame.id, { received: true }));
+    };
+
+    const handleConfigGet = (frame: ReqFrame): void => {
+      send(resOk(frame.id, {
+        default_model: 'deepseek',
+        models: [],
+        gateway: { enabled: true, host: '127.0.0.1', port },
+        providers: [],
+      }));
+    };
+
     ws.on('message', (data: Buffer) => {
       const text = data.toString();
       const frame = parseFrame(text);
@@ -166,8 +208,29 @@ export function startGateway(
         case 'chat.abort':
           handleChatAbort(req);
           break;
+        case 'chat.history':
+          handleChatHistory(req);
+          break;
         case 'node.invoke.result':
           handleNodeInvokeResult(req);
+          break;
+        case 'node.event':
+          handleNodeEvent(req);
+          break;
+        case 'sessions.list':
+          handleSessionsList(req);
+          break;
+        case 'health':
+          handleHealth(req);
+          break;
+        case 'voicewake.get':
+          handleVoiceWakeGet(req);
+          break;
+        case 'voicewake.set':
+          handleVoiceWakeSet(req);
+          break;
+        case 'config.get':
+          handleConfigGet(req);
           break;
         case 'ping':
         case 'tick':

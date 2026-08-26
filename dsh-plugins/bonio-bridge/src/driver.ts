@@ -22,8 +22,16 @@ export type InvokeForwarder = (
 
 export const INVOKE_TIMEOUT_MS = 300_000;
 
+interface HistoryMessage {
+  role: string;
+  content: Array<Record<string, unknown>>;
+  timestamp: number;
+}
+
 export class AgentDriver {
   private runs = new Map<string, { agent: any; controller: AbortController }>();
+  /** sessionKey -> live agent (multi-turn continuity within one operator session). */
+  private agentsByKey = new Map<string, any>();
 
   constructor(
     private ctx: Context,
@@ -32,26 +40,88 @@ export class AgentDriver {
     private forwardInvoke: InvokeForwarder,
   ) {}
 
+  /** Create (or reuse) the dsh agent bound to a hiclaw sessionKey. */
+  private async getOrCreateAgent(sessionKey: string | undefined): Promise<any | null> {
+    if (sessionKey && this.agentsByKey.has(sessionKey)) {
+      return this.agentsByKey.get(sessionKey);
+    }
+    const agents = this.ctx.get('agents');
+    const defaultModel = this.ctx.get('agentDefaultModel');
+    if (!agents || !defaultModel) return null;
+
+    const selection = defaultModel.currentSelection();
+    const { agent } = await agents.create({
+      sessionId: SessionId(`session-${randomUUID()}`),
+      meta: { cwd: process.cwd() },
+      agentOptions: { provider: selection.provider, model: selection.model },
+    });
+    if (sessionKey) this.agentsByKey.set(sessionKey, agent);
+    return agent;
+  }
+
+  /** Read chat history for a sessionKey from its dsh session log. */
+  getHistory(sessionKey: string | undefined): { messages: HistoryMessage[]; sessionId?: string; thinkingLevel?: string } {
+    const agent = sessionKey && this.agentsByKey.get(sessionKey);
+    if (!agent) return { messages: [], sessionId: sessionKey, thinkingLevel: undefined };
+
+    const events = agent.session?.events ?? [];
+    const messages: HistoryMessage[] = [];
+    for (const e of events) {
+      let msg: any = null;
+      if (e.type === 'user/message') msg = e.data;
+      else if (e.type === 'assistant/message') msg = e.data?.message;
+      if (!msg) continue;
+      const content = (msg.content ?? []).map((b: any) => {
+        const out: Record<string, unknown> = { type: b.type ?? 'text' };
+        if (typeof b.text === 'string') out.text = b.text;
+        if (typeof b.mimeType === 'string') out.mimeType = b.mimeType;
+        if (typeof b.fileName === 'string') out.fileName = b.fileName;
+        if (b.image != null) out.content = b.image;
+        return out;
+      });
+      messages.push({ role: msg.role ?? 'user', content, timestamp: e.time ?? Date.now() });
+    }
+    return { messages, sessionId: sessionKey, thinkingLevel: undefined };
+  }
+
+  /** List active operator sessions (sessionKey + last message preview). */
+  listSessions(): { sessions: Array<{ key: string; updatedAt: number; displayName: string }> } {
+    const sessions = [];
+    for (const [key, agent] of this.agentsByKey) {
+      const events = agent.session?.events ?? [];
+      let displayName = key;
+      let updatedAt = Date.now();
+      for (let i = events.length - 1; i >= 0; i--) {
+        const e = events[i];
+        if (e.type === 'user/message') {
+          const texts = (e.data?.content ?? [])
+            .filter((b: any) => b.type === 'text' && typeof b.text === 'string')
+            .map((b: any) => b.text);
+          if (texts.length > 0) {
+            displayName = texts[0].slice(0, 30);
+            updatedAt = e.time ?? updatedAt;
+            break;
+          }
+        }
+      }
+      sessions.push({ key, updatedAt, displayName });
+    }
+    return { sessions };
+  }
+
   async runChat(params: { text: string; sessionKey?: string }): Promise<{ runId: string; error?: string }> {
     const ctx = this.ctx;
     const agents = ctx.get('agents');
-    const defaultModel = ctx.get('agentDefaultModel');
     const sessions = ctx.get('sessions');
-    if (!agents || !defaultModel || !sessions) {
-      return { runId: '', error: 'dsh agent services unavailable' };
-    }
+    if (!agents || !sessions) return { runId: '', error: 'dsh agent services unavailable' };
     await ctx.get('loader')?.await?.();
 
-    const selection = defaultModel.currentSelection();
     const runId = randomUUID();
     const controller = new AbortController();
 
     try {
-      const { agent } = await agents.create({
-        sessionId: SessionId(`session-${runId}`),
-        meta: { cwd: process.cwd() },
-        agentOptions: { provider: selection.provider, model: selection.model },
-      });
+      const agent = await this.getOrCreateAgent(params.sessionKey);
+      if (!agent) return { runId: '', error: 'dsh agent services unavailable' };
       this.runs.set(runId, { agent, controller });
 
       const firstSeq = agent.session.seq;
@@ -148,9 +218,7 @@ export class AgentDriver {
       async execute(exec: { arguments: { command: string; arguments?: Record<string, unknown>; timeoutMs?: number } }) {
         const { command, arguments: args = {}, timeoutMs = INVOKE_TIMEOUT_MS } = exec.arguments;
         const node = bridge.registry.getNode();
-        if (!node) {
-          return { isError: true, error: { message: 'no node session connected to the bonio bridge' } };
-        }
+        if (!node) return { isError: true, error: { message: 'no node session connected to the bonio bridge' } };
         const callId = randomUUID();
         const result = await bridge.forwardInvoke(callId, command, args, timeoutMs);
         if (result.ok) return { isError: false, value: result.payload ?? {} };

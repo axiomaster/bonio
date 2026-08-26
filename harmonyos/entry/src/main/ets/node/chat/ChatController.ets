@@ -197,8 +197,15 @@ export class ChatController {
       case "agent":
         if (payloadJson) this.handleAgentEvent(payloadJson);
         break;
+      case "avatar.command":
+        // Server-driven avatar choreography (setState/moveTo/setBubble/tts...).
+        if (payloadJson && this.onAvatarCommand) this.onAvatarCommand(payloadJson);
+        break;
     }
   }
+
+  // DSH refactor: server-driven avatar.command events (payload JSON string).
+  public onAvatarCommand: ((payloadJson: string) => void) | undefined = undefined;
 
   private async bootstrap(forceHealth: boolean) {
     this.errorText = undefined;
