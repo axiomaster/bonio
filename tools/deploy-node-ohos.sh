@@ -23,7 +23,8 @@
 #   6. Ships musl libgcc_s/libstdc++ (from Alpine) into /usr/local/lib
 #   7. Cross-compiles node-pty's pty.node with the OHOS NDK when musl
 #      prebuilds are unavailable
-#   8. Installs a /usr/local/bin/dsh-ohos launcher
+#   8. Installs a HOME-aware /usr/local/bin/dsh launcher (wraps HOME,
+#      LD_LIBRARY_PATH and --expose-internals)
 #
 # Usage: ./deploy-node-ohos.sh
 # =============================================================================
@@ -122,17 +123,23 @@ else
   log "  OHOS NDK not found; pty.node must be provided separately"
 fi
 
-log "Installing dsh-ohos launcher"
+log "Installing HOME-aware dsh launcher (replaces the npm symlink)"
+# Device shells hardcode HOME=/root, which is read-only/nonexistent on the
+# erofs root; the wrapper redirects DSH state to the writable device home.
 "$HDC" shell "
-  cat > $NODE_PREFIX/bin/dsh-ohos << 'EOF'
+  rm -f $NODE_PREFIX/bin/dsh
+  cat > $NODE_PREFIX/bin/dsh << 'EOF'
 #!/bin/sh
-export HOME=$DEVICE_HOME
+# DeepSeek Harness launcher for HarmonyOS/OpenHarmony (musl).
+export HOME=\"\${DSH_HOME:-$DEVICE_HOME}\"
 export LD_LIBRARY_PATH=$NODE_PREFIX/lib
 exec $NODE_BIN --expose-internals $DSH_DIR/lib/bin.js \"\$@\"
 EOF
-  chmod 755 $NODE_PREFIX/bin/dsh-ohos
+  chmod 755 $NODE_PREFIX/bin/dsh
 "
 
 log "Done. Verify with:"
-log "  $HDC shell $NODE_PREFIX/bin/dsh-ohos --version"
-log "  $HDC shell \"HOME=$DEVICE_HOME LD_LIBRARY_PATH=$NODE_PREFIX/lib $NODE_BIN --expose-internals $DSH_DIR/lib/bin.js --profile headless 'hello'\""
+log "  $HDC shell $NODE_PREFIX/bin/dsh --version"
+log "  $HDC shell \"$NODE_PREFIX/bin/dsh --profile headless 'hello'\""
+log "  $HDC shell \"nohup $NODE_PREFIX/bin/dsh web --port 13080 --no-open &\""
+log "  $HDC fport tcp:13080 tcp:13080   # then browse http://127.0.0.1:13080 on the host"
