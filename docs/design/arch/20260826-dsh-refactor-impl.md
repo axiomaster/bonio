@@ -180,7 +180,7 @@ bonio-app 聊天历史**跨 dsh 重启持久化**：
 ### 9.4 待后续（不阻塞 HarmonyOS 使用）
 
 - ~~意图路由/健康提醒/通知处理~~（阶段 4 已实现，见 §10）
-- 微信通道（wechat/wecom/ilink）：保留 hiclaw 侧实现，HarmonyOS 场景暂不迁移（需独立 dsh 插件）
+- ~~微信通道~~（阶段 5 已实现，见 §11）
 - Android/桌面端接入（mac/pc/android 后续按同样模式迁移）
 
 ## 10. 阶段 4：功能类需求（已完成 ✅）
@@ -197,7 +197,31 @@ bonio-app 客户端本地功能（`harmonyos/entry/src/main/ets/intent/`），�
 
 **构建**：DevEco hvigor 编译通过（`BUILD SUCCESSFUL`），HAP 含全部功能。
 
-## 11. 特权 API 清单（需隔离环境系统签名）
+## 11. 微信通道移植（已完成 ✅）
+
+hiclaw 的 WeChatAdapter 移植为 dsh 插件（`dsh-plugins/bonio-wechat/`），在 HarmonyOS 平台 dsh 进程内运行：
+
+| 通道 | 实现 | 协议 |
+|---|---|---|
+| **WeCom**（企业微信智能机器人） | `WecomWsClient` | `wss://openws.work.weixin.qq.com` — aibot_subscribe / aibot_msg_callback / aibot_respond_msg（流式分块），自动重连 + ping 保活 |
+| **Weixin**（个人微信） | `IlinkHttpClient` | `POST {base}/ilink/bot/getupdates` 长轮询（cursor 持久化、context-token 缓存、会话过期暂停）+ sendmessage 回复 |
+
+**消息流转**：微信消息 → 插件接收 → `dsh agent runChat`（与 gateway 聊天同管道）→ agent final 回复 → 经原通道回传（wecom 回复 / ilink 发消息）。含去重（5 分钟 TTL）和 allow_from 白名单。
+
+**配置**（环境变量注入 dsh profile）：
+- `BONIO_WECHAT_MODE` = `wecom` | `weixin`
+- wecom：`WECOM_BOT_ID` + `WECOM_BOT_SECRET`
+- weixin：`WEIXIN_TOKEN` + `WEIXIN_BASE_URL`（可选，默认 `https://ilinkai.weixin.qq.com`）
+
+**部署**：`tools/deploy-bonio-wechat-ohos.sh` 一键部署（打包→推送→profile 注册→daemon 重启）。
+
+**端到端验证**（mock 服务器，设备上）：
+- ✅ ilink：消息"你好，请用一句话介绍你自己" → agent → 完整回复经 sendmessage 回传
+- ✅ wecom：subscribe → aibot_msg_callback 收到消息 → aibot_respond_msg 回复收到
+
+> 提示：真实微信服务需在隔离环境配置有效的 bot 凭证（bot_id/secret 或 token），当前环境用 mock 验证了完整协议链路。
+
+## 12. 特权 API 清单（需隔离环境系统签名）
 
 > bonio-app 将在隔离机器开发，具备全部 HarmonyOS 特权 API 权限。以下功能**已实现代码框架 + 注释标记**，需在隔离环境补齐系统签名后启用：
 
@@ -214,7 +238,7 @@ bonio-app 客户端本地功能（`harmonyos/entry/src/main/ets/intent/`），�
 3. 在 `NotificationHandler` 接入 `notificationManager.on('notification')` 系统订阅
 4. 重新构建部署
 
-## 12. 参考
+## 13. 参考
 
 - 架构方案：`docs/design/arch/20260826-dsh-refactor-arch.md`
 - bridge 详细文档：`dsh-plugins/bonio-bridge/README.md`
