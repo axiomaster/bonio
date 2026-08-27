@@ -1,0 +1,13 @@
+# bonio-wechat bundle patch: mounts the WeChat channel bridge inside dsh.
+- insert:
+    - id: bonio-wechat
+      name: "@bonio/dsh-bonio-wechat"
+      config:
+        mode: !!js process.env.BONIO_WECHAT_MODE
+        wecom:
+          bot_id: !!js process.env.WECOM_BOT_ID
+          bot_secret: !!js process.env.WECOM_BOT_SECRET
+        weixin:
+          token: !!js process.env.WEIXIN_TOKEN
+          base_url: !!js process.env.WEIXIN_BASE_URL
+        allow_from: []

@@ -1,0 +1,15 @@
+{
+  "name": "@bonio/dsh-bonio-wechat",
+  "description": "WeChat (WeCom + ilink) channel bridge for DeepSeek Harness on HarmonyOS",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "build/index.js",
+  "exports": { ".": { "default": "./build/index.js" } },
+  "files": ["build", "cordis.patch.yml"],
+  "license": "MIT",
+  "dependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "ws": "^8.18.0"
+  },
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
+}
