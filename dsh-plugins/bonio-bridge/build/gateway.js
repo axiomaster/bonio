@@ -127,14 +127,16 @@ export function startGateway(ctx, config, registry, driver) {
       send(resOk(frame.id, { ok: true, ts: Date.now() }));
     };
 
-    const handleChatHistory = (frame) => {
+    const handleChatHistory = async (frame) => {
       const params = frame.params ?? {};
       const key = typeof params.sessionKey === 'string' ? params.sessionKey : sessionKey;
-      send(resOk(frame.id, driver.getHistory(key)));
+      const history = await driver.getHistory(key);
+      send(resOk(frame.id, history));
     };
 
-    const handleSessionsList = (frame) => {
-      send(resOk(frame.id, driver.listSessions()));
+    const handleSessionsList = async (frame) => {
+      const sessions = await driver.listSessions();
+      send(resOk(frame.id, sessions));
     };
 
     const handleVoiceWakeGet = (frame) => {
@@ -167,10 +169,10 @@ export function startGateway(ctx, config, registry, driver) {
         case 'connect': void handleConnect(frame); break;
         case 'chat.send': void handleChatSend(frame); break;
         case 'chat.abort': handleChatAbort(frame); break;
-        case 'chat.history': handleChatHistory(frame); break;
+        case 'chat.history': void handleChatHistory(frame); break;
         case 'node.invoke.result': handleNodeInvokeResult(frame); break;
         case 'node.event': handleNodeEvent(frame); break;
-        case 'sessions.list': handleSessionsList(frame); break;
+        case 'sessions.list': void handleSessionsList(frame); break;
         case 'health': handleHealth(frame); break;
         case 'voicewake.get': handleVoiceWakeGet(frame); break;
         case 'voicewake.set': handleVoiceWakeSet(frame); break;

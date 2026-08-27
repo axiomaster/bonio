@@ -165,14 +165,14 @@ export function startGateway(
       send(resOk(frame.id, { ok: true, ts: Date.now() }));
     };
 
-    const handleChatHistory = (frame: ReqFrame): void => {
+    const handleChatHistory = async (frame: ReqFrame): Promise<void> => {
       const params = (frame.params ?? {}) as Record<string, unknown>;
       const key = typeof params.sessionKey === 'string' ? params.sessionKey : sessionKey;
-      send(resOk(frame.id, driver.getHistory(key)));
+      send(resOk(frame.id, await driver.getHistory(key)));
     };
 
-    const handleSessionsList = (frame: ReqFrame): void => {
-      send(resOk(frame.id, driver.listSessions()));
+    const handleSessionsList = async (frame: ReqFrame): Promise<void> => {
+      send(resOk(frame.id, await driver.listSessions()));
     };
 
     const handleVoiceWakeGet = (frame: ReqFrame): void => {
@@ -214,7 +214,7 @@ export function startGateway(
           handleChatAbort(req);
           break;
         case 'chat.history':
-          handleChatHistory(req);
+          void handleChatHistory(req);
           break;
         case 'node.invoke.result':
           handleNodeInvokeResult(req);
@@ -223,7 +223,7 @@ export function startGateway(
           handleNodeEvent(req);
           break;
         case 'sessions.list':
-          handleSessionsList(req);
+          void handleSessionsList(req);
           break;
         case 'health':
           handleHealth(req);

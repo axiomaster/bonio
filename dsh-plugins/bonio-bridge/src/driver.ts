@@ -35,6 +35,26 @@ export class AgentDriver {
   private runs = new Map<string, { agent: any; controller: AbortController }>();
   /** sessionKey -> live agent (multi-turn continuity within one operator session). */
   private agentsByKey = new Map<string, any>();
+  /** sessionKey -> durable dsh sessionId, persisted across dsh restarts. */
+  private readonly sessionMapFile = (): string => {
+    const home = process.env.DSH_HOME || process.env.HOME || '/data/local/home';
+    const base = home !== '/root' ? home : '/data/local/home';
+    return path.join(base, '.bonio', 'session-map.json');
+  };
+
+  private async loadSessionMap(): Promise<Record<string, string>> {
+    try {
+      const raw = await fs.readFile(this.sessionMapFile(), 'utf8');
+      return JSON.parse(raw);
+    } catch { return {}; }
+  }
+
+  private async saveSessionMap(map: Record<string, string>): Promise<void> {
+    try {
+      await fs.mkdir(path.dirname(this.sessionMapFile()), { recursive: true });
+      await fs.writeFile(this.sessionMapFile(), JSON.stringify(map, null, 2));
+    } catch (e) { console.log('[bonio-bridge] session-map save failed:', e instanceof Error ? e.message : String(e)); }
+  }
 
   constructor(
     private ctx: Context,
@@ -53,21 +73,40 @@ export class AgentDriver {
     if (!agents || !defaultModel) return null;
 
     const selection = defaultModel.currentSelection();
+    // Resume a persisted session when this sessionKey has one.
+    if (sessionKey) {
+      const map = await this.loadSessionMap();
+      const persistedId = map[sessionKey];
+      if (persistedId && typeof agents.resume === 'function') {
+        try {
+          const { agent } = await agents.resume({
+            resumeSessionId: SessionId(persistedId),
+            agentOptions: { provider: selection.provider, model: selection.model },
+          });
+          this.agentsByKey.set(sessionKey, agent);
+          return agent;
+        } catch (e) {
+          console.log('[bonio-bridge] resume failed for', sessionKey, ':', e instanceof Error ? e.message : String(e));
+        }
+      }
+    }
+    const agentId = `session-${randomUUID()}`;
     const { agent } = await agents.create({
-      sessionId: SessionId(`session-${randomUUID()}`),
+      sessionId: SessionId(agentId),
       meta: { cwd: process.cwd() },
       agentOptions: { provider: selection.provider, model: selection.model },
     });
-    if (sessionKey) this.agentsByKey.set(sessionKey, agent);
+    if (sessionKey) {
+      this.agentsByKey.set(sessionKey, agent);
+      const map = await this.loadSessionMap();
+      map[sessionKey] = agentId;
+      await this.saveSessionMap(map);
+    }
     return agent;
   }
 
-  /** Read chat history for a sessionKey from its dsh session log. */
-  getHistory(sessionKey: string | undefined): { messages: HistoryMessage[]; sessionId?: string; thinkingLevel?: string } {
-    const agent = sessionKey && this.agentsByKey.get(sessionKey);
-    if (!agent) return { messages: [], sessionId: sessionKey, thinkingLevel: undefined };
-
-    const events = agent.session?.events ?? [];
+  /** Build hiclaw messages from dsh session events. */
+  private messagesFromEvents(events: any[]): HistoryMessage[] {
     const messages: HistoryMessage[] = [];
     for (const e of events) {
       let msg: any = null;
@@ -84,12 +123,45 @@ export class AgentDriver {
       });
       messages.push({ role: msg.role ?? 'user', content, timestamp: e.time ?? Date.now() });
     }
-    return { messages, sessionId: sessionKey, thinkingLevel: undefined };
+    return messages;
   }
 
-  /** List active operator sessions (sessionKey + last message preview). */
-  listSessions(): { sessions: Array<{ key: string; updatedAt: number; displayName: string }> } {
-    const sessions = [];
+  /** Read chat history for a sessionKey from the live agent or durable store. */
+  async getHistory(sessionKey: string | undefined): Promise<{ messages: HistoryMessage[]; sessionId?: string; thinkingLevel?: string }> {
+    const agent = sessionKey && this.agentsByKey.get(sessionKey);
+    if (agent) {
+      return {
+        messages: this.messagesFromEvents(agent.session?.events ?? []),
+        sessionId: sessionKey,
+        thinkingLevel: undefined,
+      };
+    }
+    if (sessionKey) {
+      const map = await this.loadSessionMap();
+      const persistedId = map[sessionKey];
+      if (persistedId) {
+        try {
+          const persistence = this.ctx.get('sessionPersistence');
+          if (persistence && typeof persistence.load === 'function') {
+            const { events } = await persistence.load(persistedId);
+            return {
+              messages: this.messagesFromEvents(events ?? []),
+              sessionId: sessionKey,
+              thinkingLevel: undefined,
+            };
+          }
+        } catch (e) {
+          console.log('[bonio-bridge] history load failed for', sessionKey, ':', e instanceof Error ? e.message : String(e));
+        }
+      }
+    }
+    return { messages: [], sessionId: sessionKey, thinkingLevel: undefined };
+  }
+
+  /** List active + persisted operator sessions. */
+  async listSessions(): Promise<{ sessions: Array<{ key: string; updatedAt: number; displayName: string }> }> {
+    const sessions: Array<{ key: string; updatedAt: number; displayName: string }> = [];
+    const seen = new Set<string>();
     for (const [key, agent] of this.agentsByKey) {
       const events = agent.session?.events ?? [];
       let displayName = key;
@@ -107,6 +179,33 @@ export class AgentDriver {
           }
         }
       }
+      sessions.push({ key, updatedAt, displayName });
+      seen.add(key);
+    }
+    const map = await this.loadSessionMap();
+    for (const [key, sessionId] of Object.entries(map)) {
+      if (seen.has(key)) continue;
+      let displayName = key;
+      let updatedAt = Date.now();
+      try {
+        const persistence = this.ctx.get('sessionPersistence');
+        if (persistence && typeof persistence.load === 'function') {
+          const { events } = await persistence.load(sessionId);
+          for (let i = (events ?? []).length - 1; i >= 0; i--) {
+            const e = events[i];
+            if (e.type === 'user/message') {
+              const texts = (e.data?.content ?? [])
+                .filter((b: any) => b.type === 'text' && typeof b.text === 'string')
+                .map((b: any) => b.text);
+              if (texts.length > 0) {
+                displayName = texts[0].slice(0, 30);
+                updatedAt = e.time ?? updatedAt;
+                break;
+              }
+            }
+          }
+        }
+      } catch { /* skip */ }
       sessions.push({ key, updatedAt, displayName });
     }
     return { sessions };
