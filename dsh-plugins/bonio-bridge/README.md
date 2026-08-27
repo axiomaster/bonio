@@ -32,7 +32,7 @@ avatar ⇄（同进程）⇄ bonio-app ⇄（WebSocket hiclaw 协议）⇄ dsh �
 | `agent` (event) | ✅ | 流式 assistant 增量（`stream:'assistant', data:{text}`） |
 | `chat` (event) | ✅ | 最终状态（`state:'final'/'error'`） |
 | `chat.abort` (req) | ✅ | 取消运行 |
-| `chat.history` (req) | ✅ | 返回空历史（阶段 1） |
+| `chat.history` (req) | ✅ | 从 dsh session 日志读取（含持久层恢复） |
 | `sessions.list` (req) | ✅ | 返回空列表（阶段 1） |
 | `node.invoke.request` (event) | ✅ | 工具调用路由到 node session |
 | `node.invoke.result` (req) | ✅ | 工具结果回填 agent |
@@ -119,7 +119,7 @@ BRIDGE_TOKEN=bonio-local-token node smoke-avatar.mjs            # 事件流
 
 ## 已知限制（阶段 1）
 
-- `chat.history` 返回**当前进程内**的 dsh 会话历史（dsh 进程重启后丢失；持久化历史待接 dsh session 持久层）
+- ~~历史持久化~~（阶段 3 已解决：`~/.bonio/session-map.json` 映射 + dsh JSONL 持久层，重启后历史恢复）
 - 认证为 token 简化（未实现 Ed25519 验签）
 - `voicewake` 空实现（唤醒词未同步）
 - 单 operator session（多个客户端连接时后者覆盖前者）

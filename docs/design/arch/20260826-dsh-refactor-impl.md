@@ -166,11 +166,21 @@ bonio-bridge 在 `127.0.0.1:10724` 暴露 hiclaw 兼容 WebSocket 协议：
 - ✅ cron_add "every 1m" → jobs.json 持久化 → 60s 后调度器触发（`cron firing` + runs 计数）
 - ✅ 基础聊天流式正常（修复后回归）
 
-### 9.3 待后续（不阻塞 HarmonyOS 使用）
+### 9.3 阶段 3：历史持久化（已完成 ✅）
+
+bonio-app 聊天历史**跨 dsh 重启持久化**：
+
+- dsh session 持久层：JSONL 后端（`~/.dsh/sessions/--root--/<id>/session.jsonl.zstd`），dsh-base 默认启用
+- bridge：`sessionKey → dsh sessionId` 映射持久化到 `~/.bonio/session-map.json`
+- `getOrCreateAgent`：有持久化映射时用 `agents.resume()` 恢复（保留多轮上下文），否则新建并记录映射
+- `getHistory`：无活跃 agent 时从 `sessionPersistence.load()` 恢复事件 → hiclaw 消息
+- `listSessions`：合并活跃 agent + 持久化 session-map 条目
+- 实测：发"1+1" → 重启 dsh → 历史返回原对话 → 追问"刚才的问题答案"→ 回答"2"（会话连续）
+
+### 9.4 待后续（不阻塞 HarmonyOS 使用）
 
 - 意图路由/健康提醒/通知处理：需 bonio-app 客户端新功能（系统 API），标记为增强项
 - 微信通道（wechat/wecom/ilink）：保留 hiclaw 侧实现，HarmonyOS 场景暂不迁移（需独立 dsh 插件）
-- bonio-app 历史 UI 接 dsh session 持久层
 - Android/桌面端接入（mac/pc/android 后续按同样模式迁移）
 
 ## 10. 参考
