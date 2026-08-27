@@ -139,6 +139,14 @@ export class SecurePrefs {
     this.putSyncValue('gateway.manual.token', value);
   }
 
+  public getHealthNagEnabled(): boolean {
+    return this.getSyncValue('health.nagEnabled', true);
+  }
+
+  public setHealthNagEnabled(value: boolean): void {
+    this.putSyncValue('health.nagEnabled', value);
+  }
+
   public getWakeWords(): string[] {
     const raw = this.getSyncValue('voiceWake.triggerWords', JSON.stringify(SecurePrefs.DEFAULT_WAKE_WORDS));
     try {

@@ -40,6 +40,11 @@ struct FloatWindowPage {
           this.handleAvatarCommand(payloadJson);
         };
       }
+
+      // Phase 4: consume on-device feature avatar commands (health/notifications).
+      this.runtime.avatarCommandSink = (payloadJson: string) => {
+        this.handleAvatarCommand(payloadJson);
+      };
     }
     this.blinkTimer = setInterval(() => {
       this.blinkMarker = !this.blinkMarker;
@@ -51,6 +56,15 @@ struct FloatWindowPage {
       const cmd = JSON.parse(payloadJson) as Record<string, Object>;
       const action = cmd.action as string | undefined;
       const params = (cmd.params as Record<string, Object>) || {};
+
+      if (action === 'sequence') {
+        const steps = params.steps as Object[] | undefined;
+        if (Array.isArray(steps)) {
+          this.runSequence(steps);
+        }
+        return;
+      }
+
       if (action === 'setBubble' && params.text) {
         this.bubbleText = params.text as string;
         if (this.bubbleTimer !== -1) clearTimeout(this.bubbleTimer);
@@ -62,9 +76,27 @@ struct FloatWindowPage {
         this.bubbleText = '';
       } else if (action === 'setState' && params.state) {
         this.agentState = params.state as string;
+      } else if (action === 'moveTo' && params.x !== undefined && params.y !== undefined) {
+        FloatWindowManager.getInstance().moveWindowTo(params.x as number, params.y as number);
       }
+      // playSound / tts accepted; sound handled by the host app when present.
     } catch (e) {
       hilog.warn(DOMAIN, TAG, 'avatar.command parse failed: %{public}s', e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  private runSequence(steps: Object[]) {
+    let delay = 0;
+    for (const step of steps) {
+      const s = step as Record<string, Object>;
+      const stepAction = s.action as string | undefined;
+      const stepParams = (s.params as Record<string, Object>) || {};
+      const stepDelay = (s.delayMs as number) || 0;
+      delay += stepDelay;
+      setTimeout(() => {
+        const payload = JSON.stringify({ action: stepAction, params: stepParams });
+        this.handleAvatarCommand(payload);
+      }, delay);
     }
   }
 

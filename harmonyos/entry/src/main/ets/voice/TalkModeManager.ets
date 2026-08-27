@@ -3,6 +3,8 @@ import { GatewaySession } from '../gateway/GatewaySession';
 import { TalkDirectiveParser, TalkDirective } from './TalkDirectiveParser';
 import { http } from '@kit.NetworkKit';
 import { util } from '@kit.ArkTS';
+import { NodeRuntime } from '../node/NodeRuntime';
+import { Intent } from '../intent/IntentRouter';
 
 /**
  * TalkModeManager — Full duplex talk mode with speech-to-text + TTS.
@@ -201,6 +203,18 @@ export class TalkModeManager {
     this.lastTranscript = '';
     this.lastHeardAtMs = undefined;
     this.notifyStateChange();
+
+    // Phase 4: classify intent locally (Chat / ScreenCapture / Summarize).
+    const runtime = AppStorage.get<NodeRuntime>('nodeRuntime');
+    const featureManager = runtime?.featureManager;
+    if (featureManager) {
+      const intent = featureManager.intentRouter.classify(transcript);
+      if (intent !== Intent.Chat) {
+        if (featureManager.onNonChatIntent) featureManager.onNonChatIntent(intent, transcript);
+        if (this._isEnabled) this.startInternal();
+        return;
+      }
+    }
 
     await this.reloadConfig();
     const prompt = this.buildPrompt(transcript);

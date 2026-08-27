@@ -26,6 +26,10 @@ import { ScreenHandlerImpl } from './handlers/ScreenHandlerImpl';
 import { A2UIHandlerImpl } from './handlers/A2UIHandlerImpl';
 import { ChatController } from './chat/ChatController';
 import { VoiceWakeManager } from '../voice/VoiceWakeManager';
+import { FeatureManager } from '../intent/FeatureManager';
+import { Intent } from '../intent/IntentRouter';
+import { HealthScheduler } from '../intent/HealthScheduler';
+import { AvatarStep, paramsOf, stepOf, sequencePayload } from '../intent/AvatarCommand';
 import { TalkModeManager } from '../voice/TalkModeManager';
 import { WakeWords } from '../common/WakeWords';
 
@@ -59,6 +63,12 @@ export class NodeRuntime {
   
   public chatController: ChatController;
   public onChatUpdate: (() => void) | undefined = undefined;
+
+  // Phase 4: on-device feature coordination (intent / health / notifications).
+  public featureManager: FeatureManager;
+  public healthScheduler: HealthScheduler;
+  /** Sink for avatar.command payloads produced by features (set by FloatWindowPage). */
+  public avatarCommandSink: ((payloadJson: string) => void) | undefined = undefined;
   
   // Real Handlers
   public canvas = new CanvasController();
@@ -154,6 +164,29 @@ export class NodeRuntime {
       this.operatorSession,
       () => this.isConnected
     );
+
+    // Phase 4: on-device features (intent routing / health / notifications).
+    this.featureManager = new FeatureManager();
+    this.featureManager.onChatRequest = (text: string) => {
+      void this.chatController.sendMessage(text, 'low', []);
+    };
+    this.featureManager.onNonChatIntent = (intent: Intent, text: string) => {
+      hilog.info(NodeRuntime.DOMAIN, 'NodeRuntime', 'non-chat intent: %{public}s text=%{public}s', intent, text);
+      if (intent === Intent.ScreenCapture || intent === Intent.Summarize) {
+        this.handleCaptureIntent(intent, text);
+      }
+    };
+    this.featureManager.onAvatarCommand = (payloadJson: string) => {
+      if (this.avatarCommandSink) this.avatarCommandSink(payloadJson);
+    };
+
+    // Phase 4: health scheduler (screen-time nags) — driven by foreground state.
+    this.healthScheduler = new HealthScheduler(
+      this.featureManager,
+      this.prefs,
+      () => this.isForeground,
+    );
+    this.healthScheduler.start();
 
     this.voiceWakeManager.onStateChange = () => {
       this.updateStatus();
@@ -253,6 +286,39 @@ export class NodeRuntime {
   private showLocalCanvasOnDisconnect() {
     this.lastAutoA2uiUrl = undefined;
     this.canvas.navigate("");
+  }
+
+  /**
+   * Handle a ScreenCapture / Summarize voice intent.
+   *
+   * NOTE (privileged API): full-screen capture requires a system-signed app
+   * with the `ohos.permission.CAPTURE_SCREEN` privileged permission and the
+   * screen capture extension ability. In the current (unsigned) environment
+   * we only log and show an avatar bubble; the privileged capture flow below
+   * must be completed in the isolated build environment that holds those
+   * permissions (see docs/design/arch/20260826-dsh-refactor-impl.md §11).
+   */
+  private async handleCaptureIntent(intent: Intent, text: string): Promise<void> {
+    // Avatar feedback: let the user know the request was understood.
+    if (this.featureManager.onAvatarCommand) {
+      const steps: AvatarStep[] = [
+        stepOf('setState', paramsOf(['state'], ['thinking']), 0),
+        stepOf('setBubble', paramsOf(['text'], [intent === Intent.ScreenCapture ? '截图中…' : '总结中…']), 0),
+      ];
+      this.featureManager.onAvatarCommand(sequencePayload(steps));
+    }
+
+    // ── PRIVILEGED API: full-screen capture ────────────────────────────────
+    // In the isolated environment (system-signed), capture the screen here,
+    // e.g. via the screen capture extension ability (media.AVScreenCapture +
+    // privileged CAPTURE_SCREEN) or the accessibility-based screenshot API.
+    // Expected flow:
+    //   1. startCapture -> bitmap/base64 image
+    //   2. ScreenCapture: feed the image to the agent (chat.send with
+    //      attachment) for "记一下/截图" actions
+    //   3. Summarize: feed the image to the agent with a summarize prompt
+    hilog.info(NodeRuntime.DOMAIN, 'NodeRuntime',
+      'capture intent %{public}s requires privileged CAPTURE_SCREEN (TODO in isolated env), text=%{public}s', intent, text);
   }
 
   public connectManual() {

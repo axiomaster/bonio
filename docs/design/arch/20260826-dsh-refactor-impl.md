@@ -179,11 +179,42 @@ bonio-app 聊天历史**跨 dsh 重启持久化**：
 
 ### 9.4 待后续（不阻塞 HarmonyOS 使用）
 
-- 意图路由/健康提醒/通知处理：需 bonio-app 客户端新功能（系统 API），标记为增强项
+- ~~意图路由/健康提醒/通知处理~~（阶段 4 已实现，见 §10）
 - 微信通道（wechat/wecom/ilink）：保留 hiclaw 侧实现，HarmonyOS 场景暂不迁移（需独立 dsh 插件）
 - Android/桌面端接入（mac/pc/android 后续按同样模式迁移）
 
-## 10. 参考
+## 10. 阶段 4：功能类需求（已完成 ✅）
+
+bonio-app 客户端本地功能（`harmonyos/entry/src/main/ets/intent/`），替代 hiclaw 服务器端子系统的功能决策：
+
+| 功能 | 实现 | 状态 |
+|---|---|---|
+| 语音意图路由 | `IntentRouter.ets` — STT 转录本地分类（Chat/截屏/总结，中英文关键词） | ✅ 已实现并接入 TalkModeManager |
+| 健康提醒 | `HealthMonitor.ets` + `HealthScheduler.ets` — 屏幕时间累积 + 深夜检测 + 分级提醒（gentle/strong，avatar.command 序列） | ✅ 已实现并接入 NodeRuntime |
+| 通知处理 | `NotificationHandler.ets` — 重要通知（微信/短信/钉钉等）→ avatar 反应 | ✅ handler 已实现，系统订阅待特权权限 |
+| avatar 命令增强 | `AvatarCommand.ets`（共享类型）+ FloatWindowPage `sequence`/`moveTo` 支持 | ✅ |
+| 协调器 | `FeatureManager.ets` — 统一接入 NodeRuntime/TalkModeManager | ✅ |
+
+**构建**：DevEco hvigor 编译通过（`BUILD SUCCESSFUL`），HAP 含全部功能。
+
+## 11. 特权 API 清单（需隔离环境系统签名）
+
+> bonio-app 将在隔离机器开发，具备全部 HarmonyOS 特权 API 权限。以下功能**已实现代码框架 + 注释标记**，需在隔离环境补齐系统签名后启用：
+
+| 功能 | 所需特权能力 | 位置 | 状态 |
+|---|---|---|---|
+| 全屏截图（截屏/总结意图动作） | `ohos.permission.CAPTURE_SCREEN`（系统签名）+ 截屏扩展能力 | `NodeRuntime.ets handleCaptureIntent()`（注释标记 PRIVILEGED API） | 框架就绪，待特权签名 |
+| 系统通知监听 | `ohos.permission.NOTIFICATION_CONTROLLER`（系统签名）或通知订阅能力 | `NotificationHandler.ets onNotificationChanged()` | handler 就绪，订阅接入待特权 |
+| 悬浮窗增强 | 悬浮窗显示权限（系统签名） | `FloatWindowManager.ets` | 已有基础实现 |
+| 无障碍屏幕读取 | `ohos.permission.READ_SCREEN_CONTENT`（辅助功能） | 截屏/总结可选路径 | 待评估 |
+
+**迁移指引**：在隔离环境（DevEco + 系统签名）：
+1. 配置 `build-profile.json5` 的签名材料（当前文件已 revert 避免泄露密码）
+2. 在 `handleCaptureIntent()` 的 PRIVILEGED 标记处实现实际截图（AVScreenCapture 或无障碍）
+3. 在 `NotificationHandler` 接入 `notificationManager.on('notification')` 系统订阅
+4. 重新构建部署
+
+## 12. 参考
 
 - 架构方案：`docs/design/arch/20260826-dsh-refactor-arch.md`
 - bridge 详细文档：`dsh-plugins/bonio-bridge/README.md`
