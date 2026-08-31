@@ -6,7 +6,7 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 const DOMAIN = 0x3D00;
 const TAG = 'FloatWindowManager';
 const FLOAT_WINDOW_NAME = 'CatSystemFloatWindow';
-const FLOAT_WINDOW_SIZE = 200;
+const FLOAT_WINDOW_SIZE_PX = 200;
 const INITIAL_WINDOW_X = 100;
 const INITIAL_WINDOW_Y = 100;
 
@@ -53,7 +53,7 @@ export class FloatWindowManager {
       hilog.info(DOMAIN, TAG, 'System float window created successfully');
 
       await this.tryConfigureWindow('resize', async () => {
-        await this.floatWindow?.resize(FLOAT_WINDOW_SIZE, FLOAT_WINDOW_SIZE);
+        await this.floatWindow?.resize(FLOAT_WINDOW_SIZE_PX, FLOAT_WINDOW_SIZE_PX);
       });
       await this.tryConfigureWindow('setWindowFocusable', async () => {
         await this.floatWindow?.setWindowFocusable(false);

@@ -17,6 +17,7 @@ import { FloatWindowManager } from '../common/FloatWindowManager';
 const DOMAIN = 0x3D00;
 const TAG = 'FloatWindowPage';
 const AVATAR_SIZE = 200;
+const AVATAR_SIZE_PX = `${AVATAR_SIZE}px`;
 const STATE_OVERRIDE_MS = 8000;
 
 @Entry
@@ -115,7 +116,7 @@ struct FloatWindowPage {
       this.loadedAsset = asset;
       this.catAnimation.addEventListener('DOMLoaded', () => {
         if (!this.disposed && this.loadedAsset === asset) {
-          this.catAnimation?.resize(AVATAR_SIZE, AVATAR_SIZE);
+          this.catAnimation?.resize();
           this.catAnimation?.play();
         }
       });
@@ -164,7 +165,7 @@ struct FloatWindowPage {
     ctx.fill();
     ctx.stroke();
     ctx.fillStyle = '#3D2D18';
-    ctx.font = '12vp sans-serif';
+    ctx.font = '12px sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.fillText(text, x + 10, y + 19);
@@ -235,8 +236,8 @@ struct FloatWindowPage {
   build() {
     Stack() {
       Canvas(this.catCanvasContext)
-        .width(AVATAR_SIZE)
-        .height(AVATAR_SIZE)
+        .width(AVATAR_SIZE_PX)
+        .height(AVATAR_SIZE_PX)
         .onReady(() => {
           this.catCanvasReady = true;
           this.catCanvasContext.imageSmoothingEnabled = true;
@@ -245,17 +246,17 @@ struct FloatWindowPage {
         })
 
       Canvas(this.bubbleCanvasContext)
-        .width(AVATAR_SIZE)
-        .height(AVATAR_SIZE)
+        .width(AVATAR_SIZE_PX)
+        .height(AVATAR_SIZE_PX)
         .onReady(() => {
           this.bubbleCanvasReady = true;
           this.renderBubble();
         })
     }
-    .width(AVATAR_SIZE)
-    .height(AVATAR_SIZE)
+    .width(AVATAR_SIZE_PX)
+    .height(AVATAR_SIZE_PX)
     .backgroundColor('#FFF7E4')
-    .borderRadius(24)
+    .borderRadius('24px')
     .clip(true)
     .onTouch((event: TouchEvent) => this.handleDrag(event))
   }
