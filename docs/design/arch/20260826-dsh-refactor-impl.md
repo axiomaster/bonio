@@ -221,22 +221,39 @@ hiclaw 的 WeChatAdapter 移植为 dsh 插件（`dsh-plugins/bonio-wechat/`）�
 
 > 提示：真实微信服务需在隔离环境配置有效的 bot 凭证（bot_id/secret 或 token），当前环境用 mock 验证了完整协议链路。
 
-## 12. 特权 API 清单（需隔离环境系统签名）
+## 12. 特权 API 清单
 
-> bonio-app 将在隔离机器开发，具备全部 HarmonyOS 特权 API 权限。以下功能**已实现代码框架 + 注释标记**，需在隔离环境补齐系统签名后启用：
+### 12.1 system_core 签名（已验证 ✅，本机设备可用）
+
+**结论**：`tools/hapsigner` 用 OpenHarmony SDK 测试证书按 **Release + system_core + os_integration** 签名，在 OpenHarmony 设备（HUAWEI Mate X7, `const.product.name=ohos`）上**安装成功**，`appPrivilegeLevel=system_core`、`isSystemApp=true`、`SYSTEM_FLOAT_WINDOW` 授予，TYPE_FLOAT 悬浮窗**真实显示**（WMS 窗口 `CatSystemFloatWindow` type 2106，bounds 100,100,200,200）。
+
+**正确流程（必须从模板派生，勿自建结构）**：
+1. 复制 `tools/hapsigner/dist/UnsgnedReleasedProfileTemplate.json`，**只改**：
+   - `bundle-info.bundle-name` = 待签名 HAP 的 bundle（`com.example.msdpdemo`）
+   - `bundle-info.apl` = `system_core`（或 normal/system_basic）
+   - `bundle-info.app-feature` = `hos_system_app`
+   - `acls.allowed-acls` = `["ohos.permission.SYSTEM_FLOAT_WINDOW"]`
+   - `uuid` 换新；`validity` 换成有效窗口（模板自带日期已过期）
+   - 其余字段（`app-distribution-type: os_integration`、`issuer: pki_internal`、`developer-id: OpenHarmony`、`distribution-certificate` 叶子证书、`permissions.restricted-permissions`）**保持模板原值**
+2. sign-profile（keyAlias `openharmony application profile release`，profileCertFile `dist/OpenHarmonyProfileRelease.pem`）→ p7b
+3. sign-app（keyAlias `openharmony application release`，appCertFile `dist/OpenHarmonyApplication.pem`，inFile `entry-default-unsigned.hap`）→ signed.hap（本工具版本无需 `-signCode`）
+
+**教训**：之前自建 profile（缺 `app-distribution-type`、permissions 结构为 `{}`、developer-id/issuer 大小写不一致、distribution-certificate 内嵌整条链）导致设备安装报 `9568322 signature verification failed due to not trusted app source`；改为模板派生后一次通过。设备信任分析：`/system/etc/security/trusted_root_ca.json` 信任 `OpenHarmony Application Root CA`；`trusted_cert_path.json` 授权 OpenHarmony profile(debug) 与 Application Release 证书路径。
+
+### 12.2 尚未启用（仍需隔离环境）
 
 | 功能 | 所需特权能力 | 位置 | 状态 |
 |---|---|---|---|
-| 全屏截图（截屏/总结意图动作） | `ohos.permission.CAPTURE_SCREEN`（系统签名）+ 截屏扩展能力 | `NodeRuntime.ets handleCaptureIntent()`（注释标记 PRIVILEGED API） | 框架就绪，待特权签名 |
-| 系统通知监听 | `ohos.permission.NOTIFICATION_CONTROLLER`（系统签名）或通知订阅能力 | `NotificationHandler.ets onNotificationChanged()` | handler 就绪，订阅接入待特权 |
-| 悬浮窗增强 | 悬浮窗显示权限（系统签名） | `FloatWindowManager.ets` | 已有基础实现 |
+| 全屏截图（截屏/总结意图动作） | `ohos.permission.CAPTURE_SCREEN`（system_core ACL）+ 截屏扩展能力 | `NodeRuntime.ets handleCaptureIntent()`（注释标记 PRIVILEGED API） | 框架就绪，ACL 可随 12.1 流程加入 profile 后再实现 |
+| 系统通知监听 | `ohos.permission.NOTIFICATION_CONTROLLER`（system_core ACL）或通知订阅能力 | `NotificationHandler.ets onNotificationChanged()` | handler 就绪，订阅接入待 ACL 授予 |
+| 悬浮窗增强 | 悬浮窗显示权限（system_core ACL） | `FloatWindowManager.ets` | ✅ 已验证（12.1） |
 | 无障碍屏幕读取 | `ohos.permission.READ_SCREEN_CONTENT`（辅助功能） | 截屏/总结可选路径 | 待评估 |
 
-**迁移指引**：在隔离环境（DevEco + 系统签名）：
-1. 配置 `build-profile.json5` 的签名材料（当前文件已 revert 避免泄露密码）
+**隔离环境迁移指引**：
+1. 在 12.1 流程的 `allowed-acls` 中加入 `ohos.permission.CAPTURE_SCREEN` / `ohos.permission.NOTIFICATION_CONTROLLER`，并在 `module.json5` 声明后重签安装
 2. 在 `handleCaptureIntent()` 的 PRIVILEGED 标记处实现实际截图（AVScreenCapture 或无障碍）
 3. 在 `NotificationHandler` 接入 `notificationManager.on('notification')` 系统订阅
-4. 重新构建部署
+4. 配置 `build-profile.json5` 的签名材料（当前文件已 revert 避免泄露密码）
 
 ## 13. 参考
 
