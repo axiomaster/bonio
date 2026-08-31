@@ -20,3 +20,5 @@ design
 AGENTS.md
 CLAUDE.md
 MIGRATION_PROGRESS.md
+# Private signing keys
+*.p12
