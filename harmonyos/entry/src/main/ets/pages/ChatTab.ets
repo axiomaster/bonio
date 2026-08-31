@@ -6,19 +6,9 @@ import { fileIo as fs } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
-import lottie from '@ohos/lottie';
 
 const DOMAIN = 0x3D00;
 const TAG = 'ChatTab';
-
-// Agent states mirroring Android AgentState
-enum AgentState {
-  Idle,
-  Listening,
-  Thinking,
-  Speaking,
-  Working
-}
 
 @Component
 export struct ChatTab {
@@ -36,14 +26,9 @@ export struct ChatTab {
   @State showAttachmentMenu: boolean = false;
   @State pendingAttachments: OutgoingAttachment[] = [];
   @State isSpeakerEnabled: boolean = true;
-  @State agentState: AgentState = AgentState.Idle;
   @State pendingRunCount: number = 0;
 
   private scroller: Scroller = new Scroller();
-  private catCanvasSettings: RenderingContextSettings = new RenderingContextSettings(true);
-  private catCanvasContext: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.catCanvasSettings);
-  private currentLottieAnim: string = 'cat_anim';
-  private lastLoadedAsset: string = '';
 
   aboutToAppear() {
     const ctrl = this.runtime?.chatController;
@@ -54,12 +39,6 @@ export struct ChatTab {
       };
       ctrl.refresh();
     }
-  }
-
-  aboutToDisappear() {
-    try {
-      lottie.destroy(this.currentLottieAnim);
-    } catch (_e) { /* ignore */ }
   }
 
   private syncFromController(ctrl: ChatController) {
@@ -82,34 +61,6 @@ export struct ChatTab {
       case 'high': return 'High';
       default: return 'Off';
     }
-  }
-
-  private getLottieAsset(): string {
-    switch (this.agentState) {
-      case AgentState.Idle: return 'cat-idle.json';
-      case AgentState.Listening: return 'cat-listening.json';
-      case AgentState.Thinking: return 'cat-thinking.json';
-      case AgentState.Speaking: return 'cat-speaking.json';
-      case AgentState.Working: return 'cat-working.json';
-      default: return 'cat-idle.json';
-    }
-  }
-
-  private loadCatAnimation() {
-    const asset = this.getLottieAsset();
-    if (asset === this.lastLoadedAsset) return;
-    this.lastLoadedAsset = asset;
-    try {
-      lottie.destroy(this.currentLottieAnim);
-    } catch (_e) { /* ignore if not loaded yet */ }
-    lottie.loadAnimation({
-      container: this.catCanvasContext,
-      renderer: 'canvas',
-      loop: true,
-      autoplay: true,
-      name: this.currentLottieAnim,
-      path: asset,
-    });
   }
 
   private async selectImages() {
@@ -192,27 +143,6 @@ export struct ChatTab {
     this.runtime?.chatController?.sendMessage(msg, this.thinkingLevel, atts);
   }
 
-  private onCatPress() {
-    if (this.pendingRunCount === 0) {
-      this.agentState = AgentState.Listening;
-      this.loadCatAnimation();
-    }
-  }
-
-  private onCatRelease() {
-    if (this.agentState === AgentState.Listening) {
-      this.agentState = AgentState.Thinking;
-      this.loadCatAnimation();
-      // Send voice message (simulated)
-      this.runtime?.chatController?.sendMessage('[Voice Message]', this.thinkingLevel, []);
-      // After a delay, return to Idle
-      setTimeout(() => {
-        this.agentState = AgentState.Idle;
-        this.loadCatAnimation();
-      }, 3000);
-    }
-  }
-
   build() {
     Column() {
       // ── Session Header Bar ──
@@ -284,44 +214,6 @@ export struct ChatTab {
 
       // ── Composer Area ──
       Column() {
-        // Cat Voice Avatar (above controls, 192vp, left-aligned)
-        Row() {
-          Column() {
-            // Lottie animation via Canvas
-            Canvas(this.catCanvasContext)
-              .width(192)
-              .height(192)
-              .onReady(() => {
-                this.loadCatAnimation();
-              })
-
-            // Status overlay
-            if (this.agentState === AgentState.Listening) {
-              Text('Listening...')
-                .fontSize(11)
-                .fontColor('#0A59F7')
-                .margin({ top: -20 })
-            } else if (this.agentState === AgentState.Thinking) {
-              Text('Thinking...')
-                .fontSize(11)
-                .fontColor('#999999')
-                .margin({ top: -20 })
-            }
-          }
-          .gesture(
-            LongPressGesture({ repeat: false, duration: 300 })
-              .onAction(() => {
-                this.onCatPress();
-              })
-              .onActionEnd(() => {
-                this.onCatRelease();
-              })
-          )
-        }
-        .width('100%')
-        .padding({ left: 8 })
-        .justifyContent(FlexAlign.Start)
-
         // Control Row: Continue/Stop (merged) + Thinking level
         Row() {
           // Dynamic Continue/Stop button
@@ -394,41 +286,19 @@ export struct ChatTab {
           .width('100%')
         }
 
-        // Input row with waveform or text
+        // Input row
         Row() {
-          if (this.agentState === AgentState.Listening) {
-            // Waveform visualization during recording
-            Row() {
-              ForEach([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] as number[], (i: number) => {
-                Column()
-                  .width(4)
-                  .height(8 + (i % 3) * 8)
-                  .borderRadius(2)
-                  .backgroundColor('#0A59F7')
-                  .margin({ left: 2, right: 2 })
-              })
-            }
+          // Normal text input
+          TextInput({ text: this.inputText, placeholder: 'Ask anything...' })
             .layoutWeight(1)
             .height(36)
-            .justifyContent(FlexAlign.SpaceEvenly)
-            .alignItems(VerticalAlign.Center)
-            .padding({ left: 12, right: 12 })
             .borderRadius(12)
             .backgroundColor(Color.White)
             .border({ width: 1, color: '#E0E0E0' })
-          } else {
-            // Normal text input
-            TextInput({ text: this.inputText, placeholder: 'Ask anything...' })
-              .layoutWeight(1)
-              .height(36)
-              .borderRadius(12)
-              .backgroundColor(Color.White)
-              .border({ width: 1, color: '#E0E0E0' })
-              .fontSize(14)
-              .padding({ left: 12, right: 12 })
-              .onChange((val: string) => { this.inputText = val; })
-              .onSubmit(() => this.send())
-          }
+            .fontSize(14)
+            .padding({ left: 12, right: 12 })
+            .onChange((val: string) => { this.inputText = val; })
+            .onSubmit(() => this.send())
 
           // Dynamic +/Send button
           Button() {

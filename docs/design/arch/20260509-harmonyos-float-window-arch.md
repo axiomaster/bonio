@@ -1,7 +1,12 @@
 # HarmonyOS 系统级悬浮窗 root 实验方案
 
 > 版本: 2026年5月9日
-> 状态: 实验验证通过
+> 状态: **已废弃（2026-08-31）** — 该 root/hack 方案已被 system_core 签名方案取代：
+> 用 `tools/hapsigner` + 模板派生 profile（apl=system_core, app-feature=hos_system_app,
+> SYSTEM_FLOAT_WINDOW ACL）签名后，应用可直接申请 `ohos.permission.SYSTEM_FLOAT_WINDOW`
+> 并创建 TYPE_FLOAT 系统悬浮窗（真机已验证）。本文引用的
+> `harmonyos/scripts/float-window-root.ps1`、`float_window_patch.py` 等 hack 文件已删除。
+> 现行方案见 `docs/design/arch/20260826-dsh-refactor-impl.md` §12.1。
 > 适用范围: 自有、已 root 的 HarmonyOS 设备。本文方案不面向普通用户分发。
 
 ---

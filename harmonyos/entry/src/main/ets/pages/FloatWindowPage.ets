@@ -1,25 +1,46 @@
+/**
+ * FloatWindowPage — the global avatar host.
+ *
+ * With system_core signing (SYSTEM_FLOAT_WINDOW ACL) the pet lives in a real
+ * system float window (TYPE_FLOAT) on top of every app. The page plays the
+ * lottie cat animations (resources/rawfile/cat-*.json) driven by:
+ *   - avatar.command events from the server (setState/setBubble/moveTo/sequence)
+ *   - on-device feature commands (health nags, notifications) via
+ *     NodeRuntime.avatarCommandSink
+ *   - chat activity (pending run -> thinking, streaming -> speaking)
+ *   - connection status (disconnected -> working)
+ */
+
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { NodeRuntime } from '../node/NodeRuntime';
 import { FloatWindowManager } from '../common/FloatWindowManager';
+import lottie from '@ohos/lottie';
 
 const DOMAIN = 0x3D00;
 const TAG = 'FloatWindowPage';
+/** avatar.command setState overrides the derived state for this long. */
+const STATE_OVERRIDE_MS = 8000;
 
 @Entry
 @Component
 struct FloatWindowPage {
   @State agentState: string = 'idle';
-  @State blinkMarker: boolean = false;
   @State bubbleText: string = '';
   private bubbleTimer: number = -1;
   private runtime: NodeRuntime | undefined = undefined;
   private statusTimer: number = -1;
-  private blinkTimer: number = -1;
+  private stateOverrideUntil: number = 0;
   private isDragging: boolean = false;
   private dragStartScreenX: number = 0;
   private dragStartScreenY: number = 0;
   private dragStartWindowX: number = 0;
   private dragStartWindowY: number = 0;
+
+  // Lottie cat animation rendered into a Canvas (same pattern as the old ChatTab avatar)
+  private catCanvasSettings: RenderingContextSettings = new RenderingContextSettings(true);
+  private catCanvasContext: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.catCanvasSettings);
+  private currentLottieAnim: string = 'float_cat_anim';
+  private lastLoadedAsset: string = '';
 
   aboutToAppear() {
     hilog.info(DOMAIN, TAG, 'Float window page appearing');
@@ -27,10 +48,7 @@ struct FloatWindowPage {
     if (this.runtime) {
       this.statusTimer = setInterval(() => {
         if (this.runtime) {
-          const state = this.runtime.isConnected ? 'idle' : 'working';
-          if (this.agentState !== state) {
-            this.agentState = state;
-          }
+          this.tickState();
         }
       }, 1000);
 
@@ -46,9 +64,26 @@ struct FloatWindowPage {
         this.handleAvatarCommand(payloadJson);
       };
     }
-    this.blinkTimer = setInterval(() => {
-      this.blinkMarker = !this.blinkMarker;
-    }, 1200);
+  }
+
+  /** Derive the avatar state from chat activity / connection unless overridden. */
+  private tickState(): void {
+    if (Date.now() < this.stateOverrideUntil) return;
+    const r = this.runtime;
+    if (!r) return;
+    const c = r.chatController;
+    let next: string;
+    if (c && c.pendingRunCount > 0) {
+      next = 'thinking';
+    } else if (c && c.streamingAssistantText !== undefined && c.streamingAssistantText.length > 0) {
+      next = 'speaking';
+    } else {
+      next = r.isConnected ? 'idle' : 'working';
+    }
+    if (next !== this.agentState) {
+      this.agentState = next;
+      this.loadCatAnimation();
+    }
   }
 
   private handleAvatarCommand(payloadJson: string) {
@@ -76,6 +111,8 @@ struct FloatWindowPage {
         this.bubbleText = '';
       } else if (action === 'setState' && params.state) {
         this.agentState = params.state as string;
+        this.stateOverrideUntil = Date.now() + STATE_OVERRIDE_MS;
+        this.loadCatAnimation();
       } else if (action === 'moveTo' && params.x !== undefined && params.y !== undefined) {
         FloatWindowManager.getInstance().moveWindowTo(params.x as number, params.y as number);
       }
@@ -100,21 +137,71 @@ struct FloatWindowPage {
     }
   }
 
+  private getLottieAsset(): string {
+    switch (this.agentState) {
+      case 'idle': return 'cat-idle.json';
+      case 'listening': return 'cat-listening.json';
+      case 'thinking': return 'cat-thinking.json';
+      case 'speaking': return 'cat-speaking.json';
+      case 'working': return 'cat-working.json';
+      default: return 'cat-idle.json';
+    }
+  }
+
+  private loadCatAnimation() {
+    const asset = this.getLottieAsset();
+    if (asset === this.lastLoadedAsset) return;
+    this.lastLoadedAsset = asset;
+    try {
+      lottie.destroy(this.currentLottieAnim);
+    } catch (_e) { /* ignore if not loaded yet */ }
+    lottie.loadAnimation({
+      container: this.catCanvasContext,
+      renderer: 'canvas',
+      loop: true,
+      autoplay: true,
+      name: this.currentLottieAnim,
+      path: asset,
+    });
+    hilog.info(DOMAIN, TAG, 'avatar animation -> %{public}s', asset);
+  }
+
   aboutToDisappear() {
     hilog.info(DOMAIN, TAG, 'Float window page disappearing');
     if (this.statusTimer !== -1) {
       clearInterval(this.statusTimer);
       this.statusTimer = -1;
     }
-    if (this.blinkTimer !== -1) {
-      clearInterval(this.blinkTimer);
-      this.blinkTimer = -1;
-    }
+    try {
+      lottie.destroy(this.currentLottieAnim);
+    } catch (_e) { /* ignore */ }
+    this.lastLoadedAsset = '';
   }
 
   build() {
     Stack() {
-      this.NativeCatAvatar()
+      // Lottie cat animation, driven by agentState (global avatar host)
+      Canvas(this.catCanvasContext)
+        .width(200)
+        .height(200)
+        .onReady(() => {
+          this.loadCatAnimation();
+        })
+
+      // Speech bubble (avatar.command setBubble)
+      if (this.bubbleText !== '') {
+        Text(this.bubbleText)
+          .fontSize(13)
+          .fontColor('#3D2D18')
+          .backgroundColor('#FFFFFF')
+          .borderRadius(10)
+          .padding(8)
+          .maxLines(3)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .width(170)
+          .margin({ top: -4 })
+          .position({ x: 15, y: 0 })
+      }
     }
     .width(200)
     .height(200)
@@ -149,92 +236,5 @@ struct FloatWindowPage {
         this.isDragging = false;
       }
     })
-  }
-
-  @Builder
-  NativeCatAvatar() {
-    Stack() {
-      // DSH refactor: server-driven speech bubble (avatar.command setBubble).
-      if (this.bubbleText !== '') {
-        Text(this.bubbleText)
-          .fontSize(13)
-          .fontColor('#3D2D18')
-          .backgroundColor('#FFFFFF')
-          .borderRadius(10)
-          .padding(8)
-          .maxLines(3)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .width(170)
-          .margin({ top: -4 })
-          .position({ x: 15, y: 0 })
-      }
-
-      Circle()
-        .width(118)
-        .height(118)
-        .fill('#F9D27D')
-        .stroke('#6A4A1F')
-        .strokeWidth(4)
-        .margin({ top: 42 })
-
-      Row() {
-        this.CatEar(28)
-        Blank().width(54)
-        this.CatEar(-28)
-      }
-      .width(140)
-      .height(80)
-      .justifyContent(FlexAlign.Center)
-      .margin({ top: 22 })
-
-      Column() {
-        Row() {
-          Text(this.blinkMarker ? '-' : 'o')
-            .fontSize(22)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#3D2D18')
-            .width(34)
-            .textAlign(TextAlign.Center)
-          Text(this.blinkMarker ? '-' : 'o')
-            .fontSize(22)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#3D2D18')
-            .width(34)
-            .textAlign(TextAlign.Center)
-        }
-        .justifyContent(FlexAlign.Center)
-        .margin({ top: 74 })
-
-        Text('w')
-          .fontSize(24)
-          .fontWeight(FontWeight.Bold)
-          .fontColor('#3D2D18')
-          .margin({ top: -2 })
-
-        Text(this.agentState === 'working' ? '...' : '')
-          .fontSize(18)
-          .fontWeight(FontWeight.Bold)
-          .fontColor('#3D2D18')
-          .height(18)
-          .margin({ top: -8 })
-      }
-      .width(140)
-      .height(150)
-      .alignItems(HorizontalAlign.Center)
-    }
-    .width(200)
-    .height(200)
-    .backgroundColor('#FFF7E4')
-  }
-
-  @Builder
-  CatEar(angle: number) {
-    Column()
-      .width(40)
-      .height(52)
-      .backgroundColor('#F9D27D')
-      .border({ width: 4, color: '#6A4A1F' })
-      .borderRadius({ topLeft: 24, topRight: 24, bottomLeft: 6, bottomRight: 6 })
-      .rotate({ angle: angle })
   }
 }
