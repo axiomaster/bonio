@@ -147,6 +147,19 @@ export class SecurePrefs {
     this.putSyncValue('health.nagEnabled', value);
   }
 
+  public getAvatarSkin(): string {
+    const skin = this.getSyncValue<string>('avatar.skin', 'cat');
+    return skin === 'kun' ? 'kun' : 'cat';
+  }
+
+  public setAvatarSkin(skin: string): void {
+    this.putSyncValue('avatar.skin', skin === 'kun' ? 'kun' : 'cat');
+  }
+
+  public setAvatarLastMemoryAt(timestampMs: number): void {
+    this.putSyncValue('avatar.lastMemoryAt', timestampMs);
+  }
+
   public getWakeWords(): string[] {
     const raw = this.getSyncValue('voiceWake.triggerWords', JSON.stringify(SecurePrefs.DEFAULT_WAKE_WORDS));
     try {

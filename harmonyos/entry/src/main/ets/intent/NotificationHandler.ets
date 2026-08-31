@@ -3,7 +3,7 @@
  *
  * Port of hiclaw's notification_handler.cpp into ArkTS. Filters notifications
  * from important apps/categories (WeChat, SMS, DingTalk, calls, emails...) and
- * triggers an avatar.command sequence (watching + bubble + sound) so the pet
+ * triggers an avatar.command sequence (watching + bubble) so the pet
  * reacts to what matters without a hiclaw backend.
  */
 
@@ -74,7 +74,6 @@ export class NotificationHandler {
       const steps: AvatarStep[] = [
         stepOf('setState', paramsOf(['state', 'temporary'], ['watching', true]), 0),
         stepOf('setBubble', paramsOf(['text'], [`💡 ${display}`]), 0),
-        stepOf('playSound', paramsOf(['type'], ['notification']), 0),
       ];
       this.cb(sequencePayload(steps));
       return true;

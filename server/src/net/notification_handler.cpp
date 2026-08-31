@@ -89,8 +89,6 @@ bool NotificationHandler::on_notification_changed(const std::string& payload_jso
     std::vector<json> steps;
     steps.push_back(avatar_cmd::step("setState", {{"state", "watching"}, {"temporary", true}}, 0));
     steps.push_back(avatar_cmd::step("setBubble", {{"text", "\xf0\x9f\x92\xa1 " + display}}, 0));
-    // 💡
-    steps.push_back(avatar_cmd::step("playSound", {{"type", "notification"}}, 0));
     avatar_cmd::send(event_callback_, avatar_cmd::sequence(steps));
 
     return true;

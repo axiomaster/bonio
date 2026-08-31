@@ -14,6 +14,7 @@ export struct SettingsTab {
   onDisconnect: (() => void) | undefined = undefined;
 
   @State isFloatingWindowEnabled: boolean = false;
+  @State avatarSkin: string = 'cat';
 
   @State locationMode: LocationMode = LocationMode.Off;
   @State voiceWakeMode: VoiceWakeMode = VoiceWakeMode.Off;
@@ -41,6 +42,7 @@ export struct SettingsTab {
       this.cameraEnabled = prefs.getCameraEnabled();
       this.screenRecordEnabled = prefs.getScreenRecordEnabled();
       this.manualTls = prefs.getManualTls();
+      this.avatarSkin = prefs.getAvatarSkin();
     }
   }
 
@@ -113,7 +115,7 @@ export struct SettingsTab {
         ListItem() { this.SectionHeader("Floating Window") }
         ListItem() {
           Row() {
-            Text("Enable Cat Overlay")
+            Text("Enable Avatar Overlay")
               .fontSize(14)
               .fontColor('#333333')
             Blank()
@@ -125,6 +127,13 @@ export struct SettingsTab {
           }
           .width('100%')
           .padding({ left: 16, right: 16, top: 8, bottom: 8 })
+        }
+        ListItem() { this.SectionHeader("Avatar Skin") }
+        ListItem() {
+          this.SkinChoice('cat', 'Cat', 'Lottie cat avatar')
+        }
+        ListItem() {
+          this.SkinChoice('kun', 'Kun', 'Pixel-art Kun avatar')
         }
 
         // Permissions Section
@@ -263,6 +272,35 @@ export struct SettingsTab {
     .height(56)
     .padding({ left: 16, right: 16 })
     .backgroundColor(Color.White)
+  }
+
+  @Builder SkinChoice(value: string, title: string, subtitle: string) {
+    Row() {
+      Column() {
+        Text(title).fontSize(15).fontColor('#333333')
+        Text(subtitle).fontSize(12).fontColor('#999999').margin({ top: 2 })
+      }
+      .alignItems(HorizontalAlign.Start)
+      .layoutWeight(1)
+
+      Radio({ value: value, group: 'avatarSkin' })
+        .checked(this.avatarSkin === value)
+        .onChange((isChecked: boolean) => {
+          if (isChecked) this.selectAvatarSkin(value);
+        })
+    }
+    .width('100%')
+    .height(56)
+    .padding({ left: 16, right: 16 })
+    .backgroundColor(Color.White)
+    .onClick(() => this.selectAvatarSkin(value))
+  }
+
+  private selectAvatarSkin(skin: string): void {
+    const normalized = skin === 'kun' ? 'kun' : 'cat';
+    this.avatarSkin = normalized;
+    this.runtime?.prefs.setAvatarSkin(normalized);
+    AppStorage.setOrCreate<string>('avatarSkin', normalized);
   }
 
   private async toggleFloatingWindow(isOn: boolean) {

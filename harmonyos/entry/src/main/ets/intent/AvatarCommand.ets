@@ -4,7 +4,7 @@
  * ArkTS forbids untyped object literals, so every avatar command payload is
  * built from these explicitly declared interfaces. `sequence` carries ordered
  * steps; each step applies one action (setState / setBubble / clearBubble /
- * moveTo / playSound / tts) after `delayMs`.
+ * moveTo / tts) after `delayMs`.
  */
 
 export interface AvatarStep {

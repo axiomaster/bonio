@@ -49,9 +49,11 @@ export class ChatController {
   public streamingAssistantText: string | undefined = undefined;
   public pendingToolCalls: ChatPendingToolCall[] = [];
   public sessions: ChatSessionEntry[] = [];
+  public avatarAgentState: string = 'idle';
 
   private pendingRuns = new Set<string>();
   private lastHealthPollAtMs: number | undefined = undefined;
+  private avatarStateTimer: number = -1;
   
   // Callback for UI updates since we are not using a full reactive framework in this class currently
   public onChatUpdate: (() => void) | undefined = undefined;
@@ -76,6 +78,7 @@ export class ChatController {
     this.pendingToolCalls = [];
     this.streamingAssistantText = undefined;
     this.sessionId = undefined;
+    this.setAvatarAgentState('idle');
     if (this.onChatUpdate) { this.onChatUpdate(); };
   }
 
@@ -143,6 +146,7 @@ export class ChatController {
     this.pendingRunCount = this.pendingRuns.size;
     this.errorText = undefined;
     this.streamingAssistantText = undefined;
+    this.setAvatarAgentState('thinking');
     if (this.onChatUpdate) { this.onChatUpdate(); };
 
     try {
@@ -178,6 +182,7 @@ export class ChatController {
       this.pendingRuns.delete(runId);
       this.pendingRunCount = this.pendingRuns.size;
       this.errorText = err instanceof Error ? err.message : String(err);
+      this.setAvatarAgentState('failed', 4000, 'waiting');
       if (this.onChatUpdate) { this.onChatUpdate(); };
     }
   }
@@ -291,6 +296,11 @@ export class ChatController {
     if (state === "final" || state === "aborted" || state === "error") {
       if (state === "error") {
         this.errorText = (payload.errorMessage as string | undefined) || "Chat failed";
+        this.setAvatarAgentState('failed', 4000, 'waiting');
+      } else if (state === "final") {
+        this.setAvatarAgentState('completed', 4000, 'waiting');
+      } else {
+        this.setAvatarAgentState('waiting');
       }
       if (runId) this.pendingRuns.delete(runId);
       this.pendingRunCount = this.pendingRuns.size;
@@ -335,8 +345,12 @@ export class ChatController {
         };
         this.pendingToolCalls.push(call);
         this.pendingToolCalls.sort((a, b) => a.startedAtMs - b.startedAtMs);
+        this.setAvatarAgentState('working');
       } else if (phase === "result") {
         this.pendingToolCalls = this.pendingToolCalls.filter(t => t.toolCallId !== toolCallId);
+        if (this.pendingToolCalls.length === 0 && this.pendingRunCount > 0) {
+          this.setAvatarAgentState('thinking');
+        }
       }
       this.notifyUpdate();
     }
@@ -377,6 +391,22 @@ export class ChatController {
   private clearPendingRuns() {
     this.pendingRuns.clear();
     this.pendingRunCount = 0;
+  }
+
+  private setAvatarAgentState(state: string, durationMs: number = 0, nextState: string = 'idle'): void {
+    if (this.avatarStateTimer !== -1) {
+      clearTimeout(this.avatarStateTimer);
+      this.avatarStateTimer = -1;
+    }
+    this.avatarAgentState = state;
+    if (durationMs > 0) {
+      this.avatarStateTimer = setTimeout(() => {
+        this.avatarStateTimer = -1;
+        this.avatarAgentState = nextState;
+        this.notifyUpdate();
+      }, durationMs);
+    }
+    this.notifyUpdate();
   }
 
   private normalizeThinking(raw: string): string {

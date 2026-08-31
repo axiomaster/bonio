@@ -21,6 +21,7 @@ export default class EntryAbility extends UIAbility {
         // Initialize core storage before NodeRuntime
         const prefs = SecurePrefs.getInstance();
         await prefs.init(this.context);
+        AppStorage.setOrCreate<string>('avatarSkin', prefs.getAvatarSkin());
         const identityStore = new DeviceIdentityStore(this.context);
         await identityStore.loadOrCreate();
 

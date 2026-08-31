@@ -6,7 +6,6 @@
 #include "hiclaw/net/context_classifier.hpp"
 #include "hiclaw/net/gateway.hpp"
 #include "hiclaw/net/health_monitor.hpp"
-#include "hiclaw/net/idle_manager.hpp"
 #include "hiclaw/net/intent_router.hpp"
 #include "hiclaw/net/notification_handler.hpp"
 #include "hiclaw/net/tool_router.hpp"
@@ -515,7 +514,6 @@ struct WsppSession {
   std::unique_ptr<AsyncAgentManager> agent_manager;
   std::unique_ptr<CallHandler> call_handler;
   std::unique_ptr<HealthMonitor> health_monitor;
-  std::unique_ptr<IdleManager> idle_manager;
   std::unique_ptr<IntentRouter> intent_router;
   std::unique_ptr<NotificationHandler> notification_handler;
   std::shared_ptr<ToolRouter> tool_router;
@@ -715,7 +713,6 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
     sessions[hdl].agent_manager = std::make_unique<AsyncAgentManager>(config, event_callback, sessions[hdl].session_store, sessions[hdl].tool_router);
     sessions[hdl].call_handler = std::make_unique<CallHandler>(event_callback);
     sessions[hdl].health_monitor = std::make_unique<HealthMonitor>(event_callback);
-    sessions[hdl].idle_manager = std::make_unique<IdleManager>(event_callback);
     sessions[hdl].intent_router = std::make_unique<IntentRouter>(event_callback);
     sessions[hdl].notification_handler = std::make_unique<NotificationHandler>(event_callback);
 
@@ -1973,9 +1970,6 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
       } else if (event_name == "device.status") {
         if (it->second.health_monitor) {
           it->second.health_monitor->on_device_status(event_payload);
-        }
-        if (it->second.idle_manager) {
-          it->second.idle_manager->on_device_status(event_payload);
         }
       } else if (event_name == "stt.final_result") {
         if (it->second.call_handler && it->second.call_handler->is_handling()) {

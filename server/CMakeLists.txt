@@ -157,7 +157,6 @@ set(HICLAW_SOURCES
   src/net/call_handler.cpp
   src/net/gateway.cpp
   src/net/health_monitor.cpp
-  src/net/idle_manager.cpp
   src/net/intent_router.cpp
   src/net/notification_handler.cpp
   src/net/http_client.cpp

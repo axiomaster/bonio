@@ -71,12 +71,6 @@ inline nlohmann::json stop_tts() {
   return make("stopTts");
 }
 
-inline nlohmann::json play_sound(const std::string& type = "notification") {
-  nlohmann::json p;
-  p["type"] = type;
-  return make("playSound", p);
-}
-
 inline nlohmann::json set_color_filter(int64_t color) {
   nlohmann::json p;
   p["color"] = color;
