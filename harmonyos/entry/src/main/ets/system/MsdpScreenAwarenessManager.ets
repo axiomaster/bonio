@@ -3,7 +3,8 @@ import { BusinessError } from '@kit.BasicServicesKit';
 
 const MAX_CONTEXT_TEXT_LENGTH = 12000;
 const MAX_SMART_EDGE_PAYLOAD_LENGTH = 16000;
-const SMART_EDGE_CAPABILITY: onScreen.OnscreenAwarenessCap = { capList: ['SmartEdge'] };
+// SmartEdge is an MSDP capability group, not an individual capability name.
+const SMART_EDGE_CAPABILITY: onScreen.OnscreenAwarenessCap = { groupId: 'SmartEdge' };
 
 export interface ScreenParagraph {
   hookId?: number;
@@ -105,6 +106,12 @@ export class MsdpScreenAwarenessManager {
     this.subscribeSmartEdge();
     try {
       const result = await onScreen.trigger(SMART_EDGE_CAPABILITY);
+      if (result.resultCode !== 0) {
+        throw new MsdpScreenAwarenessError(
+          'SMART_EDGE_RESULT_FAILED',
+          `MSDP SmartEdge returned resultCode ${result.resultCode}`,
+        );
+      }
       return this.toSmartEdgeSnapshot(result);
     } catch (error) {
       throw this.toAwarenessError(error);

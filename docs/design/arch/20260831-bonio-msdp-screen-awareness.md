@@ -31,8 +31,8 @@ Avatar 或 DSH，避免系统权限与原始页面内容跨越应用层的用户
 - `getPageContent()`：按需取得当前页的 bundle、窗口、标题、内容、链接与段落。
 - `sendControlEvent(SCROLL_TO_HOOK)`：仅在同一次上下文中返回的段落 hook 上滚动。
 - `onReadingScreenPermissionListener()`：观察系统是否允许读取当前屏幕。
-- `subscribe({capList: ['SmartEdge']})`：在本地观察前台应用和页面切换。
-- `trigger({capList: ['SmartEdge']})`：在用户双击 Avatar 时采集一次当前页的结构化结果。
+- `subscribe({groupId: 'SmartEdge'})`：在本地观察前台应用和页面切换。
+- `trigger({groupId: 'SmartEdge'})`：在用户双击 Avatar 时采集一次当前页的结构化结果。
 
 该 API **不提供全局原始点击、手势或键盘监听**。对用户在目标应用中的交互，MSDP
 可提供的是页面/实体/段落上下文变化，以及受限的 hook 滚动；任何更广泛的输入监听需
