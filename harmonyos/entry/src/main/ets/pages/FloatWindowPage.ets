@@ -1,7 +1,7 @@
 /**
  * Global system-float avatar host. Cat uses Lottie rawfiles; Kun uses the
- * supplied 8x9 WebP spritesheet. All window/content dimensions are px because
- * Window APIs use physical pixels and vp would crop this 300px float window.
+ * supplied 8x9 WebP spritesheet. The bubble occupies a separate top strip so
+ * it never overlays the avatar. All window/content dimensions are physical px.
  */
 
 import { common } from '@kit.AbilityKit';
@@ -15,6 +15,10 @@ const DOMAIN = 0x3D00;
 const TAG = 'FloatWindowPage';
 const AVATAR_SIZE = 300;
 const AVATAR_SIZE_PX = `${AVATAR_SIZE}px`;
+const BUBBLE_AREA_HEIGHT = 48;
+const FLOAT_WINDOW_HEIGHT = AVATAR_SIZE + BUBBLE_AREA_HEIGHT;
+const BUBBLE_AREA_HEIGHT_PX = `${BUBBLE_AREA_HEIGHT}px`;
+const FLOAT_WINDOW_HEIGHT_PX = `${FLOAT_WINDOW_HEIGHT}px`;
 const COMMAND_OVERRIDE_MS = 8000;
 const INTERACTION_MS = 2400;
 const LONG_PRESS_MS = 500;
@@ -68,14 +72,11 @@ struct FloatWindowPage {
 
   private catCanvasSettings: RenderingContextSettings = new RenderingContextSettings(true);
   private catCanvasContext: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.catCanvasSettings);
-  private bubbleCanvasSettings: RenderingContextSettings = new RenderingContextSettings(true);
-  private bubbleCanvasContext: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.bubbleCanvasSettings);
   private catAnimation: AnimationItem | undefined = undefined;
   private readonly animationName: string = 'float_cat_animation';
   private requestedAsset: string = '';
   private loadedAsset: string = '';
   private catCanvasReady: boolean = false;
-  private bubbleCanvasReady: boolean = false;
   private disposed: boolean = false;
   private runtime: NodeRuntime | undefined = undefined;
   private statusTimer: number = -1;
@@ -254,32 +255,10 @@ struct FloatWindowPage {
     return `${-this.getKunAnimation().row * AVATAR_SIZE}px`;
   }
 
-  private renderBubble(): void {
-    if (!this.bubbleCanvasReady) return;
-    const ctx = this.bubbleCanvasContext;
-    ctx.clearRect(0, 0, AVATAR_SIZE, AVATAR_SIZE);
-    if (this.bubbleText === '') return;
-    const text = this.bubbleText.length > 24 ? `${this.bubbleText.slice(0, 23)}...` : this.bubbleText;
-    const width = Math.min(190, 24 + text.length * 8);
-    const x = 10;
-    const y = 4;
-    ctx.fillStyle = '#FFFFFF'; ctx.strokeStyle = '#CCCCCC'; ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(x + 8, y); ctx.lineTo(x + width - 8, y);
-    ctx.quadraticCurveTo(x + width, y, x + width, y + 8);
-    ctx.lineTo(x + width, y + 30); ctx.quadraticCurveTo(x + width, y + 38, x + width - 8, y + 38);
-    ctx.lineTo(x + 8, y + 38); ctx.quadraticCurveTo(x, y + 38, x, y + 30);
-    ctx.lineTo(x, y + 8); ctx.quadraticCurveTo(x, y, x + 8, y);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#3D2D18'; ctx.font = '12px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    ctx.fillText(text, x + 10, y + 19);
-  }
-
   private setStatusBubble(text: string): void {
     if (this.bubbleTimer !== -1) clearTimeout(this.bubbleTimer);
     this.bubbleTimer = -1;
     this.bubbleText = text;
-    this.renderBubble();
   }
 
   private setTransientBubble(text: string, durationMs: number = INTERACTION_MS): void {
@@ -288,9 +267,7 @@ struct FloatWindowPage {
     this.bubbleTimer = setTimeout(() => {
       this.bubbleTimer = -1;
       this.bubbleText = getAgentBubble(this.baseAgentState) || getAgentBubble('idle') || '';
-      this.renderBubble();
     }, durationMs);
-    this.renderBubble();
   }
 
   private beginInteraction(state: string, bubble: string, durationMs: number = INTERACTION_MS): void {
@@ -349,37 +326,56 @@ struct FloatWindowPage {
   }
 
   build() {
-    Stack({ alignContent: Alignment.TopStart }) {
-      if (this.avatarSkin === 'cat') {
-        Canvas(this.catCanvasContext)
+    Column() {
+      Row() {
+        if (this.bubbleText !== '') {
+          Text(this.bubbleText)
+            .fontSize('12px')
+            .fontColor('#3D2D18')
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .constraintSize({ maxWidth: '260px' })
+            .padding({ left: '10px', right: '10px', top: '10px', bottom: '10px' })
+            .backgroundColor('#FFFFFFFF')
+            .border({ width: '1px', color: '#CCCCCC' })
+            .borderRadius('8px')
+        }
+      }
+        .width(AVATAR_SIZE_PX)
+        .height(BUBBLE_AREA_HEIGHT_PX)
+        .justifyContent(FlexAlign.Start)
+        .alignItems(VerticalAlign.Center)
+        .padding({ left: '10px', right: '10px' })
+      Stack({ alignContent: Alignment.TopStart }) {
+        if (this.avatarSkin === 'cat') {
+          Canvas(this.catCanvasContext)
+            .width(AVATAR_SIZE_PX)
+            .height(AVATAR_SIZE_PX)
+            .onReady(() => {
+              this.catCanvasReady = true;
+              this.catCanvasContext.imageSmoothingEnabled = true;
+              this.catCanvasContext.imageSmoothingQuality = 'high';
+              void this.loadCatAnimation();
+            })
+        } else {
+          Stack({ alignContent: Alignment.TopStart }) {
+            Image($rawfile('kun-spritesheet.webp'))
+              .width(`${KUN_SHEET_WIDTH}px`)
+              .height(`${KUN_SHEET_HEIGHT}px`)
+              .objectFit(ImageFit.Fill)
+              .position({ x: this.kunImageX(), y: this.kunImageY() })
+              .interpolation(ImageInterpolation.None)
+          }
           .width(AVATAR_SIZE_PX)
           .height(AVATAR_SIZE_PX)
-          .onReady(() => {
-            this.catCanvasReady = true;
-            this.catCanvasContext.imageSmoothingEnabled = true;
-            this.catCanvasContext.imageSmoothingQuality = 'high';
-            void this.loadCatAnimation();
-          })
-      } else {
-        Stack({ alignContent: Alignment.TopStart }) {
-          Image($rawfile('kun-spritesheet.webp'))
-            .width(`${KUN_SHEET_WIDTH}px`)
-            .height(`${KUN_SHEET_HEIGHT}px`)
-            .objectFit(ImageFit.Fill)
-            .position({ x: this.kunImageX(), y: this.kunImageY() })
-            .interpolation(ImageInterpolation.None)
+          .clip(true)
         }
-        .width(AVATAR_SIZE_PX)
-        .height(AVATAR_SIZE_PX)
-        .clip(true)
       }
-      Canvas(this.bubbleCanvasContext)
-        .width(AVATAR_SIZE_PX)
-        .height(AVATAR_SIZE_PX)
-        .onReady(() => { this.bubbleCanvasReady = true; this.renderBubble(); })
+      .width(AVATAR_SIZE_PX)
+      .height(AVATAR_SIZE_PX)
     }
     .width(AVATAR_SIZE_PX)
-    .height(AVATAR_SIZE_PX)
+    .height(FLOAT_WINDOW_HEIGHT_PX)
     .backgroundColor(Color.Transparent)
     .clip(true)
     .onTouch((event: TouchEvent) => this.handleTouch(event))
