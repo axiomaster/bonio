@@ -95,8 +95,9 @@ struct FloatWindowPage {
   private isDragging: boolean = false;
   private longPressTriggered: boolean = false;
   private talkModeStartedByAvatar: boolean = false;
-  private dragStartScreenX: number = 0;
-  private dragStartScreenY: number = 0;
+  private dragStartDisplayX: number = 0;
+  private dragStartDisplayY: number = 0;
+  private dragVpToPxScale: number = 1;
   private dragStartWindowX: number = 0;
   private dragStartWindowY: number = 0;
   private lastTapAtMs: number = 0;
@@ -390,7 +391,9 @@ struct FloatWindowPage {
       const touch = event.touches[0];
       const position = manager.getWindowPosition();
       this.isTouchActive = true; this.isDragging = false; this.longPressTriggered = false;
-      this.dragStartScreenX = touch.screenX; this.dragStartScreenY = touch.screenY;
+      this.dragStartDisplayX = touch.globalDisplayX ?? touch.displayX;
+      this.dragStartDisplayY = touch.globalDisplayY ?? touch.displayY;
+      this.dragVpToPxScale = this.getUIContext().vp2px(1);
       this.dragStartWindowX = position[0]; this.dragStartWindowY = position[1];
       if (this.longPressTimer !== -1) clearTimeout(this.longPressTimer);
       this.longPressTimer = setTimeout(() => this.startVoiceInteraction(), LONG_PRESS_MS);
@@ -398,15 +401,17 @@ struct FloatWindowPage {
     }
     if (event.type === TouchType.Move && this.isTouchActive && event.touches.length > 0) {
       const touch = event.touches[0];
-      const deltaX = touch.screenX - this.dragStartScreenX;
-      const deltaY = touch.screenY - this.dragStartScreenY;
+      const displayX = touch.globalDisplayX ?? touch.displayX;
+      const displayY = touch.globalDisplayY ?? touch.displayY;
+      const deltaX = (displayX - this.dragStartDisplayX) * this.dragVpToPxScale;
+      const deltaY = (displayY - this.dragStartDisplayY) * this.dragVpToPxScale;
       if (!this.isDragging && (Math.abs(deltaX) >= DRAG_THRESHOLD_PX || Math.abs(deltaY) >= DRAG_THRESHOLD_PX)) {
         this.isDragging = true;
         if (this.longPressTimer !== -1) clearTimeout(this.longPressTimer);
         this.longPressTimer = -1;
       }
       if (this.isDragging) {
-        this.beginInteraction(deltaX < 0 ? 'dragLeft' : 'dragRight', '呜哇~ 别拽我！', 1000);
+        this.updateDragVisual(deltaX);
         void manager.moveWindowTo(this.dragStartWindowX + deltaX, this.dragStartWindowY + deltaY);
       }
       return;
@@ -420,6 +425,15 @@ struct FloatWindowPage {
       if (wasLongPress) this.stopVoiceInteraction();
       if (!wasDragging && !wasLongPress && event.type === TouchType.Up) this.handleTap();
     }
+  }
+
+  private updateDragVisual(deltaX: number): void {
+    const nextState = deltaX < 0 ? 'dragLeft' : 'dragRight';
+    if (this.interactionState !== nextState) {
+      this.beginInteraction(nextState, '呜哇~ 别拽我！', 1000);
+      return;
+    }
+    this.interactionUntil = Date.now() + 1000;
   }
 
   private startVoiceInteraction(): void {
