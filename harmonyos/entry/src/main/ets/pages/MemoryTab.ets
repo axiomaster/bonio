@@ -11,9 +11,7 @@ export struct MemoryTab {
   @State selectedTag: string = '';
   @State selectedMemory: BonioMemory | undefined = undefined;
   @State isLoading: boolean = false;
-  @State isCapturing: boolean = false;
   @State errorText: string = '';
-  @State captureStatus: string = '';
 
   aboutToAppear() {
     void this.refresh();
@@ -70,25 +68,6 @@ export struct MemoryTab {
 
   private sourceName(memory: BonioMemory): string {
     return memory.pageTitle || memory.sourceApp || memory.source || '屏幕内容';
-  }
-
-  private async captureCurrentPage() {
-    if (!this.runtime || this.isCapturing) return;
-    this.isCapturing = true;
-    this.errorText = '';
-    this.captureStatus = 'Bonio 正在整理当前内容…';
-    try {
-      await this.runtime.captureCurrentScreenMemory();
-      setTimeout(() => {
-        void this.refresh();
-        this.captureStatus = '已请求保存，整理完成后会出现在这里';
-        this.isCapturing = false;
-      }, 2500);
-    } catch (error) {
-      this.errorText = error instanceof Error ? error.message : '当前内容保存失败';
-      this.captureStatus = '';
-      this.isCapturing = false;
-    }
   }
 
   private async deleteSelectedMemory() {
@@ -341,13 +320,6 @@ export struct MemoryTab {
             .width('100%')
             .padding({ left: 16, right: 16, top: 4 })
         }
-        if (this.captureStatus) {
-          Text(this.captureStatus)
-            .fontSize(12)
-            .fontColor('#0A59F7')
-            .width('100%')
-            .padding({ left: 16, right: 16, top: 4 })
-        }
         if (this.isLoading) {
           Column() {
             LoadingProgress().width(28).height(28)
@@ -362,7 +334,7 @@ export struct MemoryTab {
               .fontSize(16)
               .fontColor('#667085')
               .margin({ top: 10 })
-            Text(this.memories.length === 0 ? '在想保存的页面点击“记下当前内容”' : '换个关键词或标签试试')
+            Text(this.memories.length === 0 ? '通过聊天或 Bonio 保存的内容会显示在这里' : '换个关键词或标签试试')
               .fontSize(13)
               .fontColor('#98A2B3')
               .margin({ top: 4 })
@@ -378,16 +350,6 @@ export struct MemoryTab {
           .layoutWeight(1)
           .padding({ left: 16, right: 16 })
         }
-        Button(this.isCapturing ? '整理中…' : '＋ 记下当前内容')
-          .type(ButtonType.Capsule)
-          .enabled(!this.isCapturing && !!this.runtime?.isConnected)
-          .height(46)
-          .fontSize(14)
-          .fontWeight(FontWeight.Medium)
-          .fontColor('#FFFFFF')
-          .backgroundColor('#0A59F7')
-          .margin({ left: 16, right: 16, top: 10, bottom: 10 })
-          .onClick(() => { void this.captureCurrentPage(); })
       }
       .width('100%')
       .height('100%')
