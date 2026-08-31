@@ -11,6 +11,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { SessionRegistry } from './sessions.js';
+import { listMemos, saveMemo } from './memo_store.js';
 
 export interface ChatEventSink {
   agentDelta(runId: string, sessionKey: string | undefined, delta: string): void;
@@ -378,11 +379,6 @@ export class AgentDriver {
 
   /** hiclaw-parity local tools running entirely inside dsh (memo, device info). */
   registerLocalTools(defineTool: (def: Record<string, unknown>) => unknown, register: (def: unknown) => () => void): () => void {
-    const memoDir = (): string => {
-      const home = process.env.DSH_HOME || process.env.HOME || '/data/local/home';
-      if (home !== '/root') return path.join(home, '.bonio', 'memos');
-      return '/data/local/home/.bonio/memos';
-    };
     const disposers: Array<() => void> = [];
 
     disposers.push(register(defineTool({
@@ -392,6 +388,10 @@ export class AgentDriver {
         title: { type: 'string', required: true, description: 'Short title for the memo.' },
         content: { type: 'string', required: true, description: 'The content to save.' },
         source: { type: 'string', description: 'Source of the memo (e.g. screen, voice).' },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Up to three concise category tags.' },
+        sourceApp: { type: 'string', description: 'Source application or bundle name.' },
+        pageTitle: { type: 'string', description: 'Title of the source page.' },
+        pageLink: { type: 'string', description: 'Canonical source page link when available.' },
       },
       output: {
         schema: { type: 'object', additionalProperties: true },
@@ -400,13 +400,9 @@ export class AgentDriver {
           return v && v.id ? `saved memo ${v.id}: ${v.title}` : JSON.stringify(value);
         },
       },
-      async execute(args: { title: string; content: string; source?: string }, exec: unknown) {
-        const { title, content, source } = args ?? {};
-        const dir = memoDir();
-        await fs.mkdir(dir, { recursive: true });
-        const id = `${Date.now()}`;
-        await fs.writeFile(path.join(dir, `${id}.json`), JSON.stringify({ id, title, content, source: source || 'dsh', createdAt: Date.now() }, null, 2));
-        return { isError: false, value: { id, title } };
+      async execute(args: { title: string; content: string; source?: string; tags?: string[]; sourceApp?: string; pageTitle?: string; pageLink?: string }, exec: unknown) {
+        const memo = await saveMemo(args ?? { title: '', content: '' });
+        return { isError: false, value: { id: memo.id, title: memo.title } };
       },
     })));
 
@@ -426,14 +422,7 @@ export class AgentDriver {
         },
       },
       async execute(args: { limit?: number }, exec: unknown) {
-        const limit = args?.limit ?? 20;
-        const dir = memoDir();
-        let files: string[] = [];
-        try { files = await fs.readdir(dir); } catch { /* none yet */ }
-        const memos = [];
-        for (const f of files.filter((n) => n.endsWith('.json')).sort().reverse().slice(0, limit)) {
-          try { memos.push(JSON.parse(await fs.readFile(path.join(dir, f), 'utf8'))); } catch { /* skip */ }
-        }
+        const memos = await listMemos(args?.limit ?? 20);
         if (memos.length === 0) return { isError: false, value: { text: '没有保存的备忘。', memos: [] } };
         const lines = memos.map((m: any) => `- ${m.title}: ${m.content}`).join('\n');
         return { isError: false, value: { text: '共有 ' + memos.length + ' 条备忘:\n' + lines, memos } };

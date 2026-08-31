@@ -32,6 +32,7 @@ import { HealthScheduler } from '../intent/HealthScheduler';
 import { AvatarStep, paramsOf, stepOf, sequencePayload } from '../intent/AvatarCommand';
 import { TalkModeManager } from '../voice/TalkModeManager';
 import { WakeWords } from '../common/WakeWords';
+import { MemoryService } from './MemoryService';
 
 class ScreenMemoryChatParams {
   sessionKey: string = 'system:screen-memory';
@@ -70,6 +71,7 @@ export class NodeRuntime {
   public talkModeManager: TalkModeManager;
   
   public chatController: ChatController;
+  public memoryService: MemoryService;
   public onChatUpdate: (() => void) | undefined = undefined;
 
   // Phase 4: on-device feature coordination (intent / health / notifications).
@@ -168,6 +170,7 @@ export class NodeRuntime {
     this.chatController = new ChatController(this.operatorSession, true, () => {
       if (this.onChatUpdate) this.onChatUpdate();
     });
+    this.memoryService = new MemoryService(this.operatorSession);
 
     this.voiceWakeManager = new VoiceWakeManager(async (command) => {
       hilog.info(NodeRuntime.DOMAIN, 'NodeRuntime', 'Voice wake command: %{public}s', command);
@@ -302,39 +305,36 @@ export class NodeRuntime {
     this.canvas.navigate("");
   }
 
-  /** Called by avatar double tap: capture the SmartEdge group and save it through DSH. */
+  /** Called by avatar double tap: save the current screen through the shared memory flow. */
   public async captureAvatarMemory(): Promise<void> {
+    await this.captureCurrentScreenMemory();
+  }
+
+  /** Save a user-approved summary of the currently visible page as a structured DSH memory. */
+  public async captureCurrentScreenMemory(): Promise<void> {
     if (!this.isConnected) {
       throw new Error('DSH is not connected');
     }
 
-    const capture = await this.screenHandler.handleSmartEdgeMemoryCapture();
+    const capture = await this.screenHandler.handleScreenContext(JSON.stringify({ maxTextLength: 12000 }));
     if (!capture.ok || !capture.payloadJson) {
       throw new Error(`${capture.error?.code || 'SCREEN_AWARENESS_FAILED'}: ${capture.error?.message || 'SmartEdge screen capture failed'}`);
     }
 
     const params = new ScreenMemoryChatParams();
     params.idempotencyKey = `screen-memory-${Date.now()}`;
-    params.message = this.buildSmartEdgeMemoryPrompt(capture.payloadJson);
+    params.message = this.buildScreenMemoryPrompt(capture.payloadJson);
     await this.operatorSession.request('chat.send', params);
     this.prefs.setAvatarLastMemoryAt(Date.now());
-    hilog.info(NodeRuntime.DOMAIN, 'NodeRuntime', 'SmartEdge memory capture sent to DSH');
+    hilog.info(NodeRuntime.DOMAIN, 'NodeRuntime', 'Screen-context memory capture sent to DSH');
   }
 
   private buildScreenMemoryPrompt(snapshotJson: string): string {
-    return 'The user explicitly double-tapped the Bonio avatar to save a memory from the current screen. '
-      + 'Review the SmartEdge structured result below. Extract only durable, user-useful context; never store passwords, '
-      + 'verification codes, financial identifiers, or complete private messages. Use memo_save exactly once when there is '
-      + 'a useful memory, with source "msdp_smart_edge". If there is nothing durable to remember, do not save a memo. '
-      + 'Reply with a concise Chinese status.\n\nSmartEdge result:\n' + snapshotJson;
-  }
-
-  private buildSmartEdgeMemoryPrompt(snapshotJson: string): string {
-    return 'The user explicitly double-tapped the Bonio avatar to save a memory from the current screen. '
-      + 'Review the complete SmartEdge result below. Extract only durable, user-useful context; never store passwords, '
-      + 'verification codes, financial identifiers, or complete private messages. Use memo_save exactly once when there is '
-      + 'a useful memory, with source "msdp_smart_edge". If there is nothing durable to remember, do not save a memo. '
-      + 'Reply with a concise Chinese status.\n\nSmartEdge result:\n' + snapshotJson;
+    return '用户明确要求把当前看到的页面保存为记忆。阅读下面的屏幕上下文后，调用 memo_save 恰好一次。'
+      + '只保存持久且有用的信息；绝不保存密码、验证码、金融标识或完整私信。'
+      + 'memo_save 的 title 使用干净简短的页面标题，content 写 1 到 3 句中文摘要，tags 给 1 到 3 个简短分类，'
+      + 'source 固定为 "screen_context"，并传入 sourceApp、pageTitle、pageLink（没有则省略）。'
+      + '如果内容没有可保存价值，也不要调用工具，只用一句中文说明原因。工具调用后用一句中文确认。\n\n屏幕上下文：\n' + snapshotJson;
   }
 
   /**

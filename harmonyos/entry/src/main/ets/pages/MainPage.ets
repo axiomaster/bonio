@@ -1,7 +1,7 @@
 import { NodeRuntime } from '../node/NodeRuntime';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { ChatTab } from './ChatTab';
-import { CanvasTab } from './CanvasTab';
+import { MemoryTab } from './MemoryTab';
 import { ServerTab } from './ServerTab';
 import { SettingsTab } from './SettingsTab';
 
@@ -75,9 +75,9 @@ struct MainPage {
         .tabBar(this.TabBarIcon($r('app.media.ic_tab_chat'), 0))
 
         TabContent() {
-          CanvasTab({ runtime: this.runtime, serverName: this.serverName, statusText: this.statusText })
+          MemoryTab({ runtime: this.runtime })
         }
-        .tabBar(this.TabBarIcon($r('app.media.ic_tab_screen'), 1))
+        .tabBar(this.TabBarIcon($r('app.media.ic_tab_memory'), 1))
 
         TabContent() {
           ServerTab({ runtime: this.runtime })

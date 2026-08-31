@@ -12,6 +12,7 @@ import {
   type ReqFrame, type EventFrame,
 } from './protocol.js';
 import { SessionRegistry } from './sessions.js';
+import { deleteMemo, getMemo, listMemos } from './memo_store.js';
 
 const DEFAULT_PORT = 10724;
 const INVOKE_TIMEOUT_MS = 300_000; // 5 min, mirror hiclaw tool call timeout
@@ -177,6 +178,31 @@ export function startGateway(
       send(resOk(frame.id, await driver.listSessions()));
     };
 
+    const handleMemoList = async (frame: ReqFrame): Promise<void> => {
+      if (!requireAuth()) return send(resErr(frame.id, 'AUTH_REQUIRED', 'connect first'));
+      const params = (frame.params ?? {}) as Record<string, unknown>;
+      const rawLimit = typeof params.limit === 'number' ? params.limit : 100;
+      const memos = await listMemos(rawLimit);
+      send(resOk(frame.id, { memos, total: memos.length }));
+    };
+
+    const handleMemoGet = async (frame: ReqFrame): Promise<void> => {
+      if (!requireAuth()) return send(resErr(frame.id, 'AUTH_REQUIRED', 'connect first'));
+      const id = typeof frame.params?.id === 'string' ? frame.params.id : '';
+      const memo = await getMemo(id);
+      if (!memo) return send(resErr(frame.id, 'MEMO_NOT_FOUND', 'memory not found'));
+      send(resOk(frame.id, { memo }));
+    };
+
+    const handleMemoDelete = async (frame: ReqFrame): Promise<void> => {
+      if (!requireAuth()) return send(resErr(frame.id, 'AUTH_REQUIRED', 'connect first'));
+      const id = typeof frame.params?.id === 'string' ? frame.params.id : '';
+      if (!id) return send(resErr(frame.id, 'BAD_PARAMS', 'missing memory id'));
+      const deleted = await deleteMemo(id);
+      if (!deleted) return send(resErr(frame.id, 'MEMO_NOT_FOUND', 'memory not found'));
+      send(resOk(frame.id, { deleted: true }));
+    };
+
     const handleVoiceWakeGet = (frame: ReqFrame): void => {
       send(resOk(frame.id, { triggers: [] }));
     };
@@ -226,6 +252,15 @@ export function startGateway(
           break;
         case 'sessions.list':
           void handleSessionsList(req);
+          break;
+        case 'memo.list':
+          void handleMemoList(req);
+          break;
+        case 'memo.get':
+          void handleMemoGet(req);
+          break;
+        case 'memo.delete':
+          void handleMemoDelete(req);
           break;
         case 'health':
           handleHealth(req);
