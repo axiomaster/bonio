@@ -227,6 +227,8 @@ hiclaw 的 WeChatAdapter 移植为 dsh 插件（`dsh-plugins/bonio-wechat/`）�
 
 **结论**：`tools/hapsigner` 用 OpenHarmony SDK 测试证书按 **Release + system_core + os_integration** 签名，在 OpenHarmony 设备（HUAWEI Mate X7, `const.product.name=ohos`）上**安装成功**，`appPrivilegeLevel=system_core`、`isSystemApp=true`、`SYSTEM_FLOAT_WINDOW` 授予，TYPE_FLOAT 悬浮窗**真实显示**（WMS 窗口 `CatSystemFloatWindow` type 2106，bounds 100,100,200,200）。
 
+**悬浮窗内 avatar 渲染（重要：不能用 @ohos/lottie）**：实测 @ohos/lottie 2.0.29/2.0.33 的 canvas 渲染器在本 SDK 的悬浮窗中**无法渲染**（动画数据加载正常、帧循环/clearRect 正常，但路径 fill 不产生任何像素；普通 `fillRect`/路径绘制与 setTimeout 回调绘制均正常，属 lottie 渲染器与子窗口的不兼容）。因此 `FloatWindowPage` 用**纯 ArkUI 组件自绘猫 + JS 定时器驱动 @State 正弦动画**（呼吸/眨眼/尾巴/说话张嘴/思考垂耳/工作摆动），组件渲染与状态更新在子窗口 100% 可靠，已验证动画持续运动。`@ohos/lottie` 依赖已从 `oh-package.json5` 移除。
+
 **正确流程（必须从模板派生，勿自建结构）**：
 1. 复制 `tools/hapsigner/dist/UnsgnedReleasedProfileTemplate.json`，**只改**：
    - `bundle-info.bundle-name` = 待签名 HAP 的 bundle（`com.example.msdpdemo`）
