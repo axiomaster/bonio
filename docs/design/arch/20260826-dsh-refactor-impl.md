@@ -240,20 +240,29 @@ hiclaw 的 WeChatAdapter 移植为 dsh 插件（`dsh-plugins/bonio-wechat/`）�
 
 **教训**：之前自建 profile（缺 `app-distribution-type`、permissions 结构为 `{}`、developer-id/issuer 大小写不一致、distribution-certificate 内嵌整条链）导致设备安装报 `9568322 signature verification failed due to not trusted app source`；改为模板派生后一次通过。设备信任分析：`/system/etc/security/trusted_root_ca.json` 信任 `OpenHarmony Application Root CA`；`trusted_cert_path.json` 授权 OpenHarmony profile(debug) 与 Application Release 证书路径。
 
-### 12.2 尚未启用（仍需隔离环境）
+### 12.2 已授予与尚未启用
+
+**真机 ACL 授权实测（2026-08-31，系统签名 HAP）**：profile `allowed-acls` 加入 `CAPTURE_SCREEN` + `NOTIFICATION_CONTROLLER` 后重签安装，启动自检（`abilityAccessCtrl.verifyAccessTokenSync`）确认三个 system_core ACL 权限**全部授予（0=GRANTED）**：
+- `ohos.permission.SYSTEM_FLOAT_WINDOW` ✅
+- `ohos.permission.CAPTURE_SCREEN` ✅
+- `ohos.permission.NOTIFICATION_CONTROLLER` ✅
+
+**SDK API 现实（DevEco 6.0.x / HarmonyOS NEXT）——功能实现需按此调整**：
+- 无 `AVScreenCapture` API；应用层截图 API 为 `@ohos.screenshot.capture()`，要求 **`CUSTOM_SCREEN_CAPTURE`**（normal 级 user_grant，需运行时用户授权对话框），而非 CAPTURE_SCREEN
+- `notificationManager` 已无经典 `subscribe()`；本地通知监听走 `NotificationSubscriberExtensionAbility` + `notificationExtensionSubscription.subscribe()`（需 `SUBSCRIBE_NOTIFICATION`，system_basic 可 ACL），或轮询 `getActiveNotifications()`（无需权限）
+- `NOTIFICATION_CONTROLLER` 解锁 `commonEventManager` 的通知槽位变更事件订阅
 
 | 功能 | 所需特权能力 | 位置 | 状态 |
 |---|---|---|---|
-| 全屏截图（截屏/总结意图动作） | `ohos.permission.CAPTURE_SCREEN`（system_core ACL）+ 截屏扩展能力 | `NodeRuntime.ets handleCaptureIntent()`（注释标记 PRIVILEGED API） | 框架就绪，ACL 可随 12.1 流程加入 profile 后再实现 |
-| 系统通知监听 | `ohos.permission.NOTIFICATION_CONTROLLER`（system_core ACL）或通知订阅能力 | `NotificationHandler.ets onNotificationChanged()` | handler 就绪，订阅接入待 ACL 授予 |
-| 悬浮窗增强 | 悬浮窗显示权限（system_core ACL） | `FloatWindowManager.ets` | ✅ 已验证（12.1） |
+| 全屏截图（截屏/总结意图动作） | `CAPTURE_SCREEN` 已授予；但 SDK 应用层截图走 `CUSTOM_SCREEN_CAPTURE`（user_grant） | `NodeRuntime.ets handleCaptureIntent()`（注释标记 PRIVILEGED API） | 权限已授予，API 路径待按 SDK 现实实现 |
+| 系统通知监听 | `NOTIFICATION_CONTROLLER` 已授予；监听 API 需 `SUBSCRIBE_NOTIFICATION` 或轮询 | `NotificationHandler.ets onNotificationChanged()` | 权限已授予，订阅/轮询接入待实现 |
+| 悬浮窗增强 | `SYSTEM_FLOAT_WINDOW`（system_core ACL） | `FloatWindowManager.ets` | ✅ 已验证（12.1） |
 | 无障碍屏幕读取 | `ohos.permission.READ_SCREEN_CONTENT`（辅助功能） | 截屏/总结可选路径 | 待评估 |
 
 **隔离环境迁移指引**：
-1. 在 12.1 流程的 `allowed-acls` 中加入 `ohos.permission.CAPTURE_SCREEN` / `ohos.permission.NOTIFICATION_CONTROLLER`，并在 `module.json5` 声明后重签安装
-2. 在 `handleCaptureIntent()` 的 PRIVILEGED 标记处实现实际截图（AVScreenCapture 或无障碍）
-3. 在 `NotificationHandler` 接入 `notificationManager.on('notification')` 系统订阅
-4. 配置 `build-profile.json5` 的签名材料（当前文件已 revert 避免泄露密码）
+1. 截屏功能：按 SDK 现实选型——`@ohos.screenshot.capture()`（用户授权弹窗，普通应用即可）或系统级截屏扩展；在 `handleCaptureIntent()` 的 PRIVILEGED 标记处实现
+2. 通知反应：接入 `NotificationSubscriberExtensionAbility`（manifest 增加 extensionAbilities，需 `SUBSCRIBE_NOTIFICATION` 加入 profile ACL），或在 `NodeRuntime` 定时轮询 `getActiveNotifications()` 喂给 `NotificationHandler`
+3. 配置 `build-profile.json5` 的签名材料（当前文件已 revert 避免泄露密码）
 
 ## 13. 参考
 

@@ -259,7 +259,7 @@ export class GatewaySession {
           'Host': endpoint.host,
           'Origin': origin,
           'User-Agent': nativeUA,
-          'X-Requested-With': 'com.axiomaster.bonio'
+          'X-Requested-With': 'com.example.msdpdemo'
         }
       };
       await this.ws.connect(url, options);

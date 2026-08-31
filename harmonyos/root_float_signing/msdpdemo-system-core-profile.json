@@ -17,7 +17,9 @@
  },
  "acls": {
   "allowed-acls": [
-   "ohos.permission.SYSTEM_FLOAT_WINDOW"
+   "ohos.permission.SYSTEM_FLOAT_WINDOW",
+   "ohos.permission.CAPTURE_SCREEN",
+   "ohos.permission.NOTIFICATION_CONTROLLER"
   ]
  },
  "permissions": {

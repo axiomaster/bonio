@@ -1,4 +1,4 @@
-import { AbilityConstant, ConfigurationConstant, UIAbility, Want, wantAgent } from '@kit.AbilityKit';
+import { AbilityConstant, ConfigurationConstant, UIAbility, Want, wantAgent, abilityAccessCtrl, Permissions } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
 import { NodeRuntime } from '../node/NodeRuntime';
@@ -14,7 +14,7 @@ export default class EntryAbility extends UIAbility {
   private isBackgroundRunning: boolean = false;
 
   async onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): Promise<void> {
-    hilog.info(DOMAIN, 'testTag', '!!! EntryAbility onCreate - com.axiomaster.bonio STARTING !!!');
+    hilog.info(DOMAIN, 'testTag', '!!! EntryAbility onCreate - com.example.msdpdemo STARTING !!!');
 
     this.initPromise = (async () => {
       try {
@@ -31,6 +31,24 @@ export default class EntryAbility extends UIAbility {
 
         FloatWindowManager.getInstance().setAbilityContext(this.context);
         hilog.info(DOMAIN, 'testTag', 'FloatWindowManager initialized');
+
+        // ACL self-check: log grant state of system_core ACL permissions
+        // (0 = PERMISSION_GRANTED). Proves the hapsigner system_core profile
+        // really granted CAPTURE_SCREEN / NOTIFICATION_CONTROLLER on-device.
+        const atManager = abilityAccessCtrl.createAtManager();
+        const aclPerms: string[] = [
+          'ohos.permission.SYSTEM_FLOAT_WINDOW',
+          'ohos.permission.CAPTURE_SCREEN',
+          'ohos.permission.NOTIFICATION_CONTROLLER',
+        ];
+        for (const perm of aclPerms) {
+          try {
+            const grant = atManager.verifyAccessTokenSync(this.context.applicationInfo.accessTokenId, perm as Permissions);
+            hilog.info(DOMAIN, 'testTag', 'ACL grant check %{public}s -> %{public}d (0=GRANTED)', perm, grant);
+          } catch (e) {
+            hilog.error(DOMAIN, 'testTag', 'ACL check failed for %{public}s: %{public}s', perm, JSON.stringify(e));
+          }
+        }
       } catch (e) {
         hilog.error(DOMAIN, 'testTag', 'Failed to initialize NodeRuntime: %{public}s', JSON.stringify(e));
         // Even if it fails, we should resolve so loadContent can proceed and show the error in UI
@@ -117,7 +135,7 @@ export default class EntryAbility extends UIAbility {
       const wantAgentInfo: wantAgent.WantAgentInfo = {
         wants: [
           {
-            bundleName: 'com.axiomaster.bonio',
+            bundleName: 'com.example.msdpdemo',
             abilityName: 'EntryAbility'
           }
         ],

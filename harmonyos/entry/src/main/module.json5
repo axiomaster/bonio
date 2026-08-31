@@ -56,6 +56,12 @@
       },
       {
         "name": "ohos.permission.KEEP_BACKGROUND_RUNNING"
+      },
+      {
+        "name": "ohos.permission.CAPTURE_SCREEN"
+      },
+      {
+        "name": "ohos.permission.NOTIFICATION_CONTROLLER"
       }
     ],
     "abilities": [
