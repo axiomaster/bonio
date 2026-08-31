@@ -72,8 +72,9 @@ class BridgeService {
     // Register the bridge tool + local hiclaw-parity tools (ctx.tools injected).
     if (this.config.tools !== 'none') {
       try {
-        driver.registerBridgeTool(defineTool, (def) => this.ctx.tools.register(def));
-        driver.registerLocalTools(defineTool, (def) => this.ctx.tools.register(def));
+        const defineBridgeTool = defineTool as unknown as (def: Record<string, unknown>) => unknown;
+        driver.registerBridgeTool(defineBridgeTool, (def) => this.ctx.tools.register(def as never));
+        driver.registerLocalTools(defineBridgeTool, (def) => this.ctx.tools.register(def as never));
       } catch (error) {
         console.error('[bonio-bridge] tool registration failed:', error instanceof Error ? error.message : error);
       }
@@ -83,7 +84,7 @@ class BridgeService {
     const { dispose, broadcaster } = startGateway(this.ctx, this.config, registry, driver);
     this.broadcaster = broadcaster;
 
-    this.ctx.on('dispose', () => {
+    (this.ctx as any).on('dispose', () => {
       this.broadcaster = null;
       dispose();
     });

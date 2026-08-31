@@ -4,6 +4,7 @@
  */
 import type { Context } from '@deepseek-ai/cordis';
 import { randomUUID } from 'node:crypto';
+import { installModelSelection } from '@deepseek-ai/dsh-agent';
 import { createUserMessage } from '@deepseek-ai/dsh-llm';
 import { SessionId } from '@deepseek-ai/dsh-session';
 import fs from 'node:fs/promises';
@@ -73,6 +74,9 @@ export class AgentDriver {
     if (!agents || !defaultModel) return null;
 
     const selection = defaultModel.currentSelection();
+    const setup = (agentCtx: Context) => {
+      installModelSelection(agentCtx, { current: selection, assembled: undefined });
+    };
     // Resume a persisted session when this sessionKey has one.
     if (sessionKey) {
       const map = await this.loadSessionMap();
@@ -82,6 +86,7 @@ export class AgentDriver {
           const { agent } = await agents.resume({
             resumeSessionId: SessionId(persistedId),
             agentOptions: { provider: selection.provider, model: selection.model },
+            setup,
           });
           this.agentsByKey.set(sessionKey, agent);
           return agent;
@@ -95,6 +100,7 @@ export class AgentDriver {
       sessionId: SessionId(agentId),
       meta: { cwd: process.cwd() },
       agentOptions: { provider: selection.provider, model: selection.model },
+      setup,
     });
     if (sessionKey) {
       this.agentsByKey.set(sessionKey, agent);
@@ -231,11 +237,15 @@ export class AgentDriver {
 
   private async _run(runId: string, params: { text: string; sessionKey?: string }, controller: AbortController): Promise<void> {
     const ctx = this.ctx;
-    const agents = ctx.get('agents');
     const sessions = ctx.get('sessions');
     try {
+      if (!sessions) {
+        throw new Error('dsh session service unavailable');
+      }
       const agent = await this.getOrCreateAgent(params.sessionKey);
-      if (!agent) return { runId: '', error: 'dsh agent services unavailable' };
+      if (!agent) {
+        throw new Error('dsh agent services unavailable');
+      }
       this.runs.set(runId, { agent, controller });
 
       const firstSeq = agent.session.seq;
@@ -303,15 +313,13 @@ export class AgentDriver {
       await sessions.flush(agent.session);
       this.runs.delete(runId);
 
-      this.sink.chatFinal(runId, params.sessionKey, {
-        text,
-        state: 'final',
-        done: true,
-        error: reason && (reason as { kind?: string }).kind === 'error'
-          ? ((reason as { error?: { code?: string; message?: string } }).error?.message ?? 'agent error')
-          : undefined,
-      });
-      return { runId };
+      const errorMessage = reason && (reason as { kind?: string }).kind === 'error'
+        ? ((reason as { error?: { code?: string; message?: string } }).error?.message ?? 'agent error')
+        : undefined;
+      this.sink.chatFinal(runId, params.sessionKey, errorMessage
+        ? { state: 'error', errorMessage, done: true }
+        : { text, state: 'final', done: true });
+      return;
     } catch (error) {
       this.runs.delete(runId);
       const message = error instanceof Error ? error.message : String(error);
@@ -488,7 +496,7 @@ export class AgentDriver {
         prompt: { type: 'string', required: true, description: 'The message/prompt to send to the agent when the task fires.' },
         maxCount: { type: 'number', description: 'Maximum number of times to run (0 = unlimited).' },
       },
-      output: { schema: { type: 'object', additionalProperties: true }, render(args, value) { return JSON.stringify(value); } },
+      output: { schema: { type: 'object', additionalProperties: true }, render(_args: unknown, value: unknown) { return JSON.stringify(value); } },
       async execute(args: { schedule: string; prompt: string; maxCount?: number }, exec: unknown) {
         const { schedule, prompt, maxCount } = args ?? {};
         const parsed = parseSchedule(schedule);
@@ -505,7 +513,7 @@ export class AgentDriver {
       name: 'cron_list',
       description: 'List all scheduled cron jobs with their status and run counts.',
       parameters: {},
-      output: { schema: { type: 'object', additionalProperties: true }, render(args, value) { return JSON.stringify(value); } },
+      output: { schema: { type: 'object', additionalProperties: true }, render(_args: unknown, value: unknown) { return JSON.stringify(value); } },
       async execute(args: Record<string, never>, exec: unknown) {
         const jobs = await loadCronJobs();
         const list = Object.values(jobs).map((j: any) => ({ id: j.id, schedule: j.schedule, prompt: String(j.prompt).slice(0, 60), runs: j.runs, enabled: j.enabled }));
@@ -517,7 +525,7 @@ export class AgentDriver {
       name: 'cron_remove',
       description: 'Remove a scheduled cron job by its ID.',
       parameters: { jobId: { type: 'string', required: true, description: 'The ID of the cron job to remove.' } },
-      output: { schema: { type: 'object', additionalProperties: true }, render(args, value) { return JSON.stringify(value); } },
+      output: { schema: { type: 'object', additionalProperties: true }, render(_args: unknown, value: unknown) { return JSON.stringify(value); } },
       async execute(args: { jobId: string }, exec: unknown) {
         const { jobId } = args ?? {};
         const jobs = await loadCronJobs();
@@ -532,7 +540,7 @@ export class AgentDriver {
       name: 'cron_runs',
       description: 'Get recent execution history for a cron job.',
       parameters: { jobId: { type: 'string', required: true, description: 'The ID of the cron job to inspect.' } },
-      output: { schema: { type: 'object', additionalProperties: true }, render(args, value) { return JSON.stringify(value); } },
+      output: { schema: { type: 'object', additionalProperties: true }, render(_args: unknown, value: unknown) { return JSON.stringify(value); } },
       async execute(args: { jobId: string }, exec: unknown) {
         const { jobId } = args ?? {};
         const jobs = await loadCronJobs();

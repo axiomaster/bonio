@@ -25,9 +25,11 @@ export interface BridgeConfig {
 
 interface AgentDriver {
   /** create a fresh agent, send the user message, and stream assistant events. */
-  runChat(params: { text: string; sessionKey?: string }): Promise<{ runId: string; error?: string }>;
+  runChat(params: { text: string; sessionKey?: string; runId?: string }): Promise<{ runId: string; error?: string }>;
   /** cancel a running chat run. */
   abort(runId: string): void;
+  getHistory(sessionKey?: string): Promise<Record<string, unknown>>;
+  listSessions(): Promise<Record<string, unknown>>;
 }
 
 /** Broadcast a frame to a specific role's socket (operator or node). */
@@ -96,7 +98,7 @@ export function startGateway(
       const requestedRole = typeof params.role === 'string' ? params.role : 'operator';
       role = requestedRole === 'node' ? 'node' : 'operator';
       roleByConn.set(connId, role);
-      sessionKey = role === 'operator' ? `main-${randomUUID()}` : undefined;
+      sessionKey = role === 'operator' ? 'main' : undefined;
 
       registry.attach({
         connId,
@@ -258,7 +260,7 @@ export function startGateway(
     broadcaster.sendToRole('operator', eventFrame('tick', { ts: Date.now() }));
   }, TICK_INTERVAL_MS);
 
-  ctx.on('dispose', () => {
+  (ctx as any).on('dispose', () => {
     clearInterval(tickTimer);
     registry.cancelAll();
     wss.close();
