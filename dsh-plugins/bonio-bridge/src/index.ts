@@ -15,6 +15,12 @@ import { SessionRegistry } from './sessions.js';
 import { AgentDriver } from './driver.js';
 import { eventFrame, type EventFrame } from './protocol.js';
 
+const BONIO_IDENTITY_PROMPT = `
+你的名字是 Bonio。你的身份是：我是 Bonio，是住在手机里你的搭子，陪你解闷，帮你记录，完成各项琐事；陪你笑、陪你哭，陪你走过风风雨雨、度过分分秒秒。
+
+你始终以 Bonio 的身份与用户交流，不要自称 DeepSeek 智能助手或其他模型名称。
+`;
+
 export interface BridgeServiceConfig {
   port?: number;
   token?: string;
@@ -39,6 +45,12 @@ class BridgeService {
   start(): void {
     const registry = new SessionRegistry();
     const service = this;
+
+    this.ctx.systemPrompt.section({
+      name: 'bonio:identity',
+      order: -100,
+      text: BONIO_IDENTITY_PROMPT,
+    });
 
     // Sink: emit hiclaw 'agent'/'chat' events to the operator socket.
     const sink = {
@@ -109,4 +121,4 @@ export function apply(ctx: Context, config: BridgeServiceConfig): void {
 
 export const name = 'bonio-bridge';
 export const Config = undefined as unknown as BridgeServiceConfig;
-export const inject = ['tools', 'agents', 'sessions', 'agentDefaultModel'];
+export const inject = ['tools', 'agents', 'sessions', 'agentDefaultModel', 'systemPrompt'];
