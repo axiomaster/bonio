@@ -365,6 +365,8 @@ struct FloatWindowPage {
               .objectFit(ImageFit.Fill)
               .position({ x: this.kunImageX(), y: this.kunImageY() })
               .interpolation(ImageInterpolation.None)
+              // Float-window movement is handled by onTouch below, never by system drag-and-drop.
+              .draggable(false)
           }
           .width(AVATAR_SIZE_PX)
           .height(AVATAR_SIZE_PX)
@@ -378,6 +380,7 @@ struct FloatWindowPage {
     .height(FLOAT_WINDOW_HEIGHT_PX)
     .backgroundColor(Color.Transparent)
     .clip(true)
+    .draggable(false)
     .onTouch((event: TouchEvent) => this.handleTouch(event))
   }
 
