@@ -5,6 +5,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 请你永远永远记住，
 1. 每次修改完成代码后都编译一下，确保代码可以正常编译通过；
 2. 每次开发完一个功能，都git提交一下，确保不会丢失；
+3. HarmonyOS HAP 任务完成后，必须进行全量编译，使用 `tools/hapsigner` 进行 system_core 签名，并通过 HDC 安装到已连接设备；若设备不可用，明确报告安装阻塞原因。
 
 ## Project Overview
 
