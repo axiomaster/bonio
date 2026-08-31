@@ -1,11 +1,14 @@
 import onScreen from '@ohos.multimodalAwareness.onScreen';
 import { BusinessError } from '@kit.BasicServicesKit';
+import { hilog } from '@kit.PerformanceAnalysisKit';
 
 const MAX_CONTEXT_TEXT_LENGTH = 12000;
 // SmartEdge is an MSDP capability group, not an individual capability name.
 const SMART_EDGE_CAPABILITY: onScreen.OnscreenAwarenessCap = { groupId: 'SmartEdge' };
+// capture() accepts concrete capabilities; Screenshot is exposed by the device MSDP service.
+const SCREENSHOT_CAPTURE_CAPABILITY: onScreen.OnscreenAwarenessCap = { capList: ['Screenshot'] };
 
-export type SmartEdgeResultSource = 'subscribe' | 'trigger';
+export type SmartEdgeResultSource = 'subscribe' | 'trigger' | 'capture';
 
 export interface ScreenParagraph {
   hookId?: number;
@@ -54,6 +57,8 @@ export class MsdpScreenAwarenessError extends Error {
  * the background: data is read only after the user enabled it in Settings.
  */
 export class MsdpScreenAwarenessManager {
+  private static readonly DOMAIN = 0x3D00;
+  private static readonly TAG = 'MsdpScreenAwareness';
   private readonly readingListener = (status: onScreen.ReadingScreenPermissionStatus): void => {
     this.readingState = status.readingState;
   };
@@ -126,6 +131,28 @@ export class MsdpScreenAwarenessManager {
     }
   }
 
+  /** Capture the foreground screenshot and its related on-screen information. */
+  public async captureScreenshot(): Promise<SmartEdgeSnapshot> {
+    this.assertEnabled();
+    try {
+      const results = await onScreen.capture(SCREENSHOT_CAPTURE_CAPABILITY);
+      this.reportSmartEdgeResult('capture', results);
+      if (results.length === 0) {
+        throw new MsdpScreenAwarenessError('SCREEN_CAPTURE_EMPTY_RESULT', 'MSDP Screenshot capture returned no result');
+      }
+      const failed = results.find((result: onScreen.OnscreenAwarenessInfo): boolean => result.resultCode !== 0);
+      if (failed) {
+        throw new MsdpScreenAwarenessError(
+          'SCREEN_CAPTURE_RESULT_FAILED',
+          `MSDP Screenshot capture returned resultCode ${failed.resultCode}`,
+        );
+      }
+      return this.toSmartEdgeSnapshot(results[0], JSON.stringify(results));
+    } catch (error) {
+      throw this.toAwarenessError(error);
+    }
+  }
+
   public async scrollToHook(paramsJson: string | undefined): Promise<void> {
     this.assertEnabled();
     const hookId = this.parseHookId(paramsJson);
@@ -165,12 +192,53 @@ export class MsdpScreenAwarenessManager {
   }
 
   private reportSmartEdgeResult(source: SmartEdgeResultSource, result: Object): void {
-    if (!this.onSmartEdgeResult) return;
     try {
-      this.onSmartEdgeResult(source, JSON.stringify(result));
+      const payloadJson = JSON.stringify(result);
+      hilog.info(
+        MsdpScreenAwarenessManager.DOMAIN,
+        MsdpScreenAwarenessManager.TAG,
+        '%{public}s result shape: %{public}s',
+        source,
+        this.describeResultShape(result, payloadJson),
+      );
+      if (this.onSmartEdgeResult) this.onSmartEdgeResult(source, payloadJson);
     } catch (_) {
       // Diagnostic rendering must never affect MSDP subscription or capture.
     }
+  }
+
+  private describeResultShape(result: Object, payloadJson: string): string {
+    const rows = Array.isArray(result) ? result as onScreen.OnscreenAwarenessInfo[] : [result as onScreen.OnscreenAwarenessInfo];
+    const topLevelKeys = rows.length > 0 ? Object.keys(rows[0]) : [];
+    const itemCount = rows.reduce((count: number, row: onScreen.OnscreenAwarenessInfo): number =>
+      count + (row.items?.length || 0), 0);
+    const entityCount = rows.reduce((count: number, row: onScreen.OnscreenAwarenessInfo): number =>
+      count + (row.entityInfo?.length || 0), 0);
+    const itemKeys = rows.flatMap((row: onScreen.OnscreenAwarenessInfo): string[] =>
+      row.items?.flatMap((item: onScreen.AwarenessItem): string[] => Object.keys(item.itemInfo)) || []);
+    const entityKeys = rows.flatMap((row: onScreen.OnscreenAwarenessInfo): string[] =>
+      row.entityInfo?.flatMap((entity: onScreen.EntityInfo): string[] => Object.keys(entity.entityInfo)) || []);
+    const imagePattern = /(pixelmap|screenshot|screen.?shot|bitmap|image.?data|base64)/i;
+    const candidateKeys = topLevelKeys.concat(itemKeys, entityKeys)
+      .filter((key: string): boolean => imagePattern.test(key));
+    return JSON.stringify({
+      count: rows.length,
+      topLevelKeys: this.uniqueStrings(topLevelKeys),
+      itemCount: itemCount,
+      itemKeys: this.uniqueStrings(itemKeys),
+      entityCount: entityCount,
+      entityKeys: this.uniqueStrings(entityKeys),
+      screenshotCandidateKeys: this.uniqueStrings(candidateKeys),
+      payloadLength: payloadJson.length,
+    });
+  }
+
+  private uniqueStrings(values: string[]): string[] {
+    const unique: string[] = [];
+    values.forEach((value: string) => {
+      if (!unique.includes(value)) unique.push(value);
+    });
+    return unique;
   }
 
   private parseMaxTextLength(paramsJson: string | undefined): number {
@@ -220,8 +288,7 @@ export class MsdpScreenAwarenessManager {
     };
   }
 
-  private toSmartEdgeSnapshot(result: onScreen.OnscreenAwarenessInfo): SmartEdgeSnapshot {
-    const payloadJson = JSON.stringify(result);
+  private toSmartEdgeSnapshot(result: onScreen.OnscreenAwarenessInfo, payloadJson?: string): SmartEdgeSnapshot {
     return {
       resultCode: result.resultCode,
       timestamp: result.timestamp,
@@ -230,7 +297,7 @@ export class MsdpScreenAwarenessManager {
       pageId: result.pageId,
       collectStrategy: result.collectStrategy,
       pageTags: result.pageTags,
-      payloadJson: payloadJson,
+      payloadJson: payloadJson || JSON.stringify(result),
       truncated: false,
     };
   }

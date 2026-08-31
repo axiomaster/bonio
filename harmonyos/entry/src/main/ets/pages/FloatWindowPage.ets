@@ -22,7 +22,8 @@ const FLOAT_WINDOW_HEIGHT_PX = `${FLOAT_WINDOW_HEIGHT}px`;
 const COMMAND_OVERRIDE_MS = 8000;
 const INTERACTION_MS = 2400;
 const LONG_PRESS_MS = 500;
-const DOUBLE_TAP_MS = 320;
+// HarmonyOS uitest and the system gesture recognizer emit double taps at about 330 ms.
+const DOUBLE_TAP_MS = 400;
 const DRAG_THRESHOLD_PX = 8;
 const KUN_FRAME_WIDTH = 192 * AVATAR_SIZE / 208;
 const KUN_SHEET_WIDTH = KUN_FRAME_WIDTH * 8;
@@ -458,7 +459,7 @@ struct FloatWindowPage {
     if (now - this.lastTapAtMs <= DOUBLE_TAP_MS) {
       if (this.clickTimer !== -1) clearTimeout(this.clickTimer);
       this.clickTimer = -1; this.lastTapAtMs = 0;
-      this.beginInteraction('thinking', '正在读取当前页面…', 30000);
+      this.beginInteraction('thinking', '正在采集当前页面…', 30000);
       void this.captureCurrentScreenMemory();
       return;
     }
@@ -473,13 +474,13 @@ struct FloatWindowPage {
     try {
       if (!this.runtime) throw new Error('Bonio runtime is unavailable');
       await this.runtime.captureAvatarMemory();
-      this.beginInteraction('completed', '已交给 Bonio 整理记忆~', 4000);
+      this.beginInteraction('completed', '当前页面采集完成~', 4000);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const bubble = message.includes('SCREEN_AWARENESS_DISABLED')
         ? '请先在设置开启屏幕感知~'
         : '当前页面暂时无法读取~';
-      hilog.warn(DOMAIN, TAG, 'SmartEdge memory capture failed: %{public}s', message);
+      hilog.warn(DOMAIN, TAG, 'Screenshot capture failed: %{public}s', message);
       this.beginInteraction('failed', bubble, 4000);
     }
   }

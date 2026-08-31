@@ -305,9 +305,30 @@ export class NodeRuntime {
     this.canvas.navigate("");
   }
 
-  /** Called by avatar double tap: save the current screen through the shared memory flow. */
+  /** Called by avatar double tap: capture the foreground page through MSDP Screenshot. */
   public async captureAvatarMemory(): Promise<void> {
-    await this.captureCurrentScreenMemory();
+    if (!this.isConnected) {
+      throw new Error('DSH is not connected');
+    }
+
+    const capture = await this.screenHandler.handleScreenshotCapture();
+    if (!capture.ok || !capture.payloadJson) {
+      throw new Error(`${capture.error?.code || 'SCREEN_AWARENESS_FAILED'}: ${capture.error?.message || 'Screenshot capture failed'}`);
+    }
+
+    const params = new ScreenMemoryChatParams();
+    params.idempotencyKey = `screenshot-capture-${Date.now()}`;
+    params.message = this.buildScreenshotCapturePrompt(capture.payloadJson);
+    await this.operatorSession.request('chat.send', params);
+    this.prefs.setAvatarLastMemoryAt(Date.now());
+    hilog.info(NodeRuntime.DOMAIN, 'NodeRuntime', 'Screenshot capture metadata sent to DSH');
+  }
+
+  private buildScreenshotCapturePrompt(snapshotJson: string): string {
+    return '用户双击 Bonio，明确要求采集当前页面。以下是 MSDP Screenshot capture 返回的元数据数组。'
+      + '检查 items、entityInfo 和其他页面字段，提取持久且有用的信息；绝不保存密码、验证码、金融标识或完整私信。'
+      + '有保存价值时调用 memo_save 恰好一次，source 固定为 "msdp_capture"；没有价值则不要调用工具。'
+      + '用一句中文说明结果。\n\nScreenshot capture：\n' + snapshotJson;
   }
 
   /** Save a user-approved summary of the currently visible page as a structured DSH memory. */
