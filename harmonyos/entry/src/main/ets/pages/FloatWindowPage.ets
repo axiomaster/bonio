@@ -331,7 +331,7 @@ struct FloatWindowPage {
       Row() {
         if (this.bubbleText !== '') {
           Text(this.bubbleText)
-            .fontSize('12px')
+            .fontSize('24px')
             .fontColor('#3D2D18')
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
