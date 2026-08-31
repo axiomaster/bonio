@@ -27,6 +27,8 @@ export interface LocationHandler {
 
 export interface ScreenHandler {
   handleScreenRecord(paramsJson: string | undefined): Promise<InvokeResult>;
+  handleScreenContext(paramsJson: string | undefined): Promise<InvokeResult>;
+  handleScreenScrollToHook(paramsJson: string | undefined): Promise<InvokeResult>;
 }
 
 export interface SmsHandler {
@@ -181,6 +183,12 @@ export class InvokeDispatcher {
 
         case OpenClawScreenCommand.Record:
           return await this.screenHandler.handleScreenRecord(paramsJson);
+
+        case OpenClawScreenCommand.Context:
+          return await this.screenHandler.handleScreenContext(paramsJson);
+
+        case OpenClawScreenCommand.ScrollToHook:
+          return await this.screenHandler.handleScreenScrollToHook(paramsJson);
 
         case OpenClawSmsCommand.Send:
           return await this.smsHandler.handleSmsSend(paramsJson);

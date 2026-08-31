@@ -108,6 +108,10 @@ export class ConnectionManager {
     if (this.prefs.getScreenRecordEnabled()) {
       list.push(OpenClawScreenCommand.Record);
     }
+    if (this.prefs.getScreenAwarenessEnabled()) {
+      list.push(OpenClawScreenCommand.Context);
+      list.push(OpenClawScreenCommand.ScrollToHook);
+    }
     
     if (this.cameraEnabled()) {
       list.push(OpenClawCameraCommand.Snap);

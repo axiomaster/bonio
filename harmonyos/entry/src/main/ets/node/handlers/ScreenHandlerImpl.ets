@@ -4,6 +4,7 @@ import { common, abilityAccessCtrl } from '@kit.AbilityKit';
 import { ScreenRecordManager, RecordPayload } from '../ScreenRecordManager';
 import { fileIo } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
+import { MsdpScreenAwarenessError, MsdpScreenAwarenessManager } from '../../system/MsdpScreenAwarenessManager';
 
 interface ScreenRecordPayload {
   format: string;
@@ -17,10 +18,13 @@ interface ScreenRecordPayload {
 export class ScreenHandlerImpl implements ScreenHandler {
   private context: common.Context;
   private screenManager: ScreenRecordManager;
+  private screenAwareness: MsdpScreenAwarenessManager;
 
-  constructor(context: common.Context) {
+  constructor(context: common.Context, isScreenAwarenessEnabled: () => boolean) {
     this.context = context;
     this.screenManager = new ScreenRecordManager(context);
+    this.screenAwareness = new MsdpScreenAwarenessManager(isScreenAwarenessEnabled);
+    this.screenAwareness.start();
   }
 
   private base64 = new util.Base64Helper();
@@ -70,6 +74,24 @@ export class ScreenHandlerImpl implements ScreenHandler {
     }
   }
 
+  async handleScreenContext(paramsJson: string | undefined): Promise<InvokeResult> {
+    try {
+      const context = await this.screenAwareness.captureContext(paramsJson);
+      return { ok: true, payloadJson: JSON.stringify(context) };
+    } catch (error) {
+      return this.makeAwarenessError(error);
+    }
+  }
+
+  async handleScreenScrollToHook(paramsJson: string | undefined): Promise<InvokeResult> {
+    try {
+      await this.screenAwareness.scrollToHook(paramsJson);
+      return { ok: true, payloadJson: JSON.stringify({ scrolled: true }) };
+    } catch (error) {
+      return this.makeAwarenessError(error);
+    }
+  }
+
   private async ensureMicPermission(): Promise<void> {
     const atManager = abilityAccessCtrl.createAtManager();
     const tokenID = this.context.applicationInfo.accessTokenId;
@@ -94,5 +116,12 @@ export class ScreenHandlerImpl implements ScreenHandler {
   private makeError(code: string, message: string): InvokeResult {
     const err: InvokeError = { code: code, message: message };
     return { ok: false, error: err };
+  }
+
+  private makeAwarenessError(error: Error): InvokeResult {
+    if (error instanceof MsdpScreenAwarenessError) {
+      return this.makeError(error.code, error.message);
+    }
+    return this.makeError('SCREEN_AWARENESS_FAILED', error instanceof Error ? error.message : String(error));
   }
 }

@@ -91,7 +91,7 @@ export class NodeRuntime {
     this.smsHandler = new SmsHandlerImpl(context);
     this.locationHandler = new LocationHandlerImpl(context);
     this.cameraHandler = new CameraHandlerImpl(context);
-    this.screenHandler = new ScreenHandlerImpl(context);
+    this.screenHandler = new ScreenHandlerImpl(context, () => this.prefs.getScreenAwarenessEnabled());
 
     this.connectionManager = new ConnectionManager(
       this.prefs,
@@ -382,4 +382,3 @@ function makeDummyResult(): InvokeResult {
 class DummyAppUpdate implements AppUpdateHandler {
   async handleUpdate(paramsJson: string | undefined): Promise<InvokeResult> { return makeDummyResult(); }
 }
-

@@ -61,6 +61,22 @@
         "name": "ohos.permission.CAPTURE_SCREEN"
       },
       {
+        "name": "ohos.permission.GET_SCREEN_CONTENT"
+      },
+      {
+        "name": "ohos.permission.ONSCREEN_AWARENESS",
+        "reason": "$string:reason_screen_awareness",
+        "usedScene": {
+          "abilities": [
+            "EntryAbility"
+          ],
+          "when": "inuse"
+        }
+      },
+      {
+        "name": "ohos.permission.SIMULATE_USER_INPUT"
+      },
+      {
         "name": "ohos.permission.NOTIFICATION_CONTROLLER"
       }
     ],

@@ -20,6 +20,7 @@ export struct SettingsTab {
   @State voiceWakeMode: VoiceWakeMode = VoiceWakeMode.Off;
   @State cameraEnabled: boolean = false;
   @State screenRecordEnabled: boolean = false;
+  @State screenAwarenessEnabled: boolean = false;
   @State manualTls: boolean = false;
   @State serverName: string = '';
   @State remoteAddress: string = '';
@@ -41,6 +42,7 @@ export struct SettingsTab {
       this.voiceWakeMode = prefs.getVoiceWakeMode();
       this.cameraEnabled = prefs.getCameraEnabled();
       this.screenRecordEnabled = prefs.getScreenRecordEnabled();
+      this.screenAwarenessEnabled = prefs.getScreenAwarenessEnabled();
       this.manualTls = prefs.getManualTls();
       this.avatarSkin = prefs.getAvatarSkin();
     }
@@ -204,6 +206,20 @@ export struct SettingsTab {
               } else {
                 this.screenRecordEnabled = false;
                 this.runtime?.prefs.setScreenRecordEnabled(false);
+              }
+            })
+        }
+        ListItem() {
+          this.ToggleRow("Screen Awareness", "Allow on-demand reading of the current page",
+            this.screenAwarenessEnabled,
+            async (enabled: boolean) => {
+              if (enabled) {
+                const granted = await this.requestPermission("ohos.permission.ONSCREEN_AWARENESS" as Permissions);
+                this.screenAwarenessEnabled = granted;
+                this.runtime?.prefs.setScreenAwarenessEnabled(granted);
+              } else {
+                this.screenAwarenessEnabled = false;
+                this.runtime?.prefs.setScreenAwarenessEnabled(false);
               }
             })
         }

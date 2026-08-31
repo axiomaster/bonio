@@ -33,6 +33,10 @@
       "value": "Used to capture audio for videos and voice wake word listening"
     },
     {
+      "name": "reason_screen_awareness",
+      "value": "Used to read the current page when you request screen assistance"
+    },
+    {
       "name": "reason_storage",
       "value": "Used to save captured media files temporarily"
     },

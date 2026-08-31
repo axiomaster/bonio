@@ -14,4 +14,12 @@ export class DummyScreenHandler implements ScreenHandler {
   async handleScreenRecord(paramsJson: string | undefined): Promise<InvokeResult> {
     return { ok: false, error: { code: "NOT_IMPLEMENTED", message: "Screen Record not ported yet" } };
   }
+
+  async handleScreenContext(paramsJson: string | undefined): Promise<InvokeResult> {
+    return { ok: false, error: { code: "NOT_IMPLEMENTED", message: "Screen Awareness not ported yet" } };
+  }
+
+  async handleScreenScrollToHook(paramsJson: string | undefined): Promise<InvokeResult> {
+    return { ok: false, error: { code: "NOT_IMPLEMENTED", message: "Screen Awareness not ported yet" } };
+  }
 }

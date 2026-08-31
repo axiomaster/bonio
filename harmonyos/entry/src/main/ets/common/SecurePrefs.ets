@@ -86,6 +86,14 @@ export class SecurePrefs {
     this.putSyncValue('screenRecord.enabled', value);
   }
 
+  public getScreenAwarenessEnabled(): boolean {
+    return this.getSyncValue('screenAwareness.enabled', false);
+  }
+
+  public setScreenAwarenessEnabled(value: boolean): void {
+    this.putSyncValue('screenAwareness.enabled', value);
+  }
+
   public getLocationMode(): LocationMode {
     const raw = this.getSyncValue('location.enabledMode', 'off');
     return locationModeFromRaw(raw);

@@ -1,0 +1,169 @@
+import onScreen from '@ohos.multimodalAwareness.onScreen';
+import { BusinessError } from '@kit.BasicServicesKit';
+
+const MAX_CONTEXT_TEXT_LENGTH = 12000;
+
+export interface ScreenParagraph {
+  hookId?: number;
+  chapterId?: number;
+  title?: string;
+  text?: string;
+}
+
+/** Data exposed to DSH only after an explicit screen-context request. */
+export interface ScreenContextSnapshot {
+  windowId: number;
+  sessionId: number;
+  bundleName: string;
+  scenario?: number;
+  title?: string;
+  content?: string;
+  pageLink?: string;
+  paragraphs?: ScreenParagraph[];
+  truncated: boolean;
+}
+
+export class MsdpScreenAwarenessError extends Error {
+  public readonly code: string;
+
+  constructor(code: string, message: string) {
+    super(message);
+    this.code = code;
+  }
+}
+
+/**
+ * Boundary around the system-only MSDP on-screen API. It does not collect in
+ * the background: data is read only after the user enabled it in Settings.
+ */
+export class MsdpScreenAwarenessManager {
+  private readonly readingListener = (status: onScreen.ReadingScreenPermissionStatus): void => {
+    this.readingState = status.readingState;
+  };
+  private listening: boolean = false;
+  private readingState: number | undefined = undefined;
+  private lastSnapshot: ScreenContextSnapshot | undefined = undefined;
+  private readonly isEnabled: () => boolean;
+
+  constructor(isEnabled: () => boolean) {
+    this.isEnabled = isEnabled;
+  }
+
+  public start(): void {
+    if (this.listening) return;
+    try {
+      onScreen.onReadingScreenPermissionListener(this.readingListener);
+      this.listening = true;
+    } catch (_) {
+      // Capture reports the concrete MSDP service error after a user request.
+    }
+  }
+
+  public async captureContext(paramsJson: string | undefined): Promise<ScreenContextSnapshot> {
+    this.assertEnabled();
+    const maxTextLength = this.parseMaxTextLength(paramsJson);
+    try {
+      const page = await onScreen.getPageContent({
+        contentUnderstand: true,
+        pageLink: true,
+        textOnly: true,
+      });
+      const snapshot = this.toSnapshot(page, maxTextLength);
+      this.lastSnapshot = snapshot;
+      return snapshot;
+    } catch (error) {
+      throw this.toAwarenessError(error);
+    }
+  }
+
+  public async scrollToHook(paramsJson: string | undefined): Promise<void> {
+    this.assertEnabled();
+    const hookId = this.parseHookId(paramsJson);
+    const snapshot = this.lastSnapshot;
+    if (!snapshot) {
+      throw new MsdpScreenAwarenessError('SCREEN_CONTEXT_REQUIRED', 'capture screen.context before screen.scrollToHook');
+    }
+    if (!snapshot.paragraphs?.some((paragraph: ScreenParagraph) => paragraph.hookId === hookId)) {
+      throw new MsdpScreenAwarenessError('UNKNOWN_SCREEN_HOOK', 'hookId is not present in the latest screen context');
+    }
+    try {
+      await onScreen.sendControlEvent({
+        windowId: snapshot.windowId,
+        sessionId: snapshot.sessionId,
+        eventType: onScreen.EventType.SCROLL_TO_HOOK,
+        hookId: hookId,
+      });
+    } catch (error) {
+      throw this.toAwarenessError(error);
+    }
+  }
+
+  private assertEnabled(): void {
+    if (!this.isEnabled()) {
+      throw new MsdpScreenAwarenessError('SCREEN_AWARENESS_DISABLED', 'enable Screen Awareness in Bonio settings first');
+    }
+  }
+
+  private parseMaxTextLength(paramsJson: string | undefined): number {
+    if (!paramsJson) return MAX_CONTEXT_TEXT_LENGTH;
+    try {
+      const params = JSON.parse(paramsJson) as Record<string, number>;
+      const requested = params.maxTextLength;
+      if (typeof requested === 'number' && Number.isFinite(requested)) {
+        return Math.max(1, Math.min(Math.floor(requested), MAX_CONTEXT_TEXT_LENGTH));
+      }
+    } catch (_) {
+      throw new MsdpScreenAwarenessError('INVALID_REQUEST', 'screen.context params must be valid JSON');
+    }
+    return MAX_CONTEXT_TEXT_LENGTH;
+  }
+
+  private parseHookId(paramsJson: string | undefined): number {
+    if (!paramsJson) {
+      throw new MsdpScreenAwarenessError('INVALID_REQUEST', 'screen.scrollToHook requires hookId');
+    }
+    try {
+      const params = JSON.parse(paramsJson) as Record<string, number>;
+      if (typeof params.hookId === 'number' && Number.isInteger(params.hookId)) return params.hookId;
+    } catch (_) {
+      // The public error below is clearer than a JSON parser error to DSH.
+    }
+    throw new MsdpScreenAwarenessError('INVALID_REQUEST', 'screen.scrollToHook requires an integer hookId');
+  }
+
+  private toSnapshot(page: onScreen.PageContent, maxTextLength: number): ScreenContextSnapshot {
+    const content = page.content;
+    return {
+      windowId: page.windowId,
+      sessionId: page.sessionId,
+      bundleName: page.bundleName,
+      scenario: page.scenario,
+      title: page.title,
+      content: this.truncate(content, maxTextLength),
+      pageLink: page.pageLink,
+      paragraphs: page.paragraphs?.map((paragraph: onScreen.Paragraph): ScreenParagraph => ({
+        hookId: paragraph.hookId,
+        chapterId: paragraph.chapterId,
+        title: paragraph.title,
+        text: this.truncate(paragraph.text, maxTextLength),
+      })),
+      truncated: content !== undefined && content.length > maxTextLength,
+    };
+  }
+
+  private truncate(value: string | undefined, maxLength: number): string | undefined {
+    return value === undefined || value.length <= maxLength ? value : value.substring(0, maxLength);
+  }
+
+  private toAwarenessError(error: Error): MsdpScreenAwarenessError {
+    const businessError = error as BusinessError;
+    const code = businessError?.code;
+    if (code === 201) return new MsdpScreenAwarenessError('SCREEN_PERMISSION_DENIED', 'GET_SCREEN_CONTENT permission was denied');
+    if (code === 801) return new MsdpScreenAwarenessError('SCREEN_AWARENESS_UNSUPPORTED', 'MSDP on-screen awareness is unavailable on this device');
+    if (code === 34000002) return new MsdpScreenAwarenessError('SCREEN_PAGE_UNSUPPORTED', 'the current page does not expose MSDP screen context');
+    if (code === 34000003) return new MsdpScreenAwarenessError('SCREEN_WINDOW_INVALID', 'the current screen window is not available');
+    if (code === 34000004) return new MsdpScreenAwarenessError('SCREEN_PAGE_NOT_READY', 'the current page is not ready for screen context');
+    if (code === 34000006) return new MsdpScreenAwarenessError('SCREEN_CONTEXT_TIMEOUT', 'MSDP timed out while reading the current screen');
+    return new MsdpScreenAwarenessError('SCREEN_AWARENESS_FAILED', businessError?.message || String(error));
+  }
+}

@@ -34,6 +34,8 @@ export const CameraCommandNamespacePrefix = "camera.";
 
 export enum OpenClawScreenCommand {
   Record = "screen.record",
+  Context = "screen.context",
+  ScrollToHook = "screen.scrollToHook",
 }
 
 export const ScreenCommandNamespacePrefix = "screen.";

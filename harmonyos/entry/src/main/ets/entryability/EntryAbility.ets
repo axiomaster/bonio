@@ -40,6 +40,8 @@ export default class EntryAbility extends UIAbility {
         const aclPerms: string[] = [
           'ohos.permission.SYSTEM_FLOAT_WINDOW',
           'ohos.permission.CAPTURE_SCREEN',
+          'ohos.permission.GET_SCREEN_CONTENT',
+          'ohos.permission.SIMULATE_USER_INPUT',
           'ohos.permission.NOTIFICATION_CONTROLLER',
         ];
         for (const perm of aclPerms) {
