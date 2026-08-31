@@ -6,7 +6,7 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 const DOMAIN = 0x3D00;
 const TAG = 'FloatWindowManager';
 const FLOAT_WINDOW_NAME = 'CatSystemFloatWindow';
-const FLOAT_WINDOW_SIZE_PX = 200;
+const FLOAT_WINDOW_SIZE_PX = 300;
 const INITIAL_WINDOW_X = 100;
 const INITIAL_WINDOW_Y = 100;
 
@@ -58,9 +58,6 @@ export class FloatWindowManager {
       await this.tryConfigureWindow('setWindowFocusable', async () => {
         await this.floatWindow?.setWindowFocusable(false);
       });
-      await this.tryConfigureWindow('setWindowBackgroundColor', () => {
-        this.floatWindow?.setWindowBackgroundColor('#FFF7E4');
-      });
       await this.tryConfigureWindow('setWindowTouchable', async () => {
         await this.floatWindow?.setWindowTouchable(true);
       });
@@ -68,6 +65,9 @@ export class FloatWindowManager {
 
       await this.floatWindow.setUIContent('pages/FloatWindowPage');
       hilog.info(DOMAIN, TAG, 'System float window UI content loaded');
+      await this.tryConfigureWindow('setWindowBackgroundColor', () => {
+        this.floatWindow?.setWindowBackgroundColor('#00000000');
+      });
       await this.floatWindow.showWindow();
       hilog.info(DOMAIN, TAG, 'System float window shown successfully');
       return true;

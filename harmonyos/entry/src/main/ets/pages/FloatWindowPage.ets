@@ -4,7 +4,7 @@
  * The cat animations live in resources/rawfile. Lottie paths cannot resolve
  * rawfile resources, so the page reads each JSON file with ResourceManager and
  * supplies it as animationData. The 500x500 source composition and Contain
- * mode keep the whole avatar visible in the 200x200 float window.
+ * mode keep the whole avatar visible in the 300x300 float window.
  */
 
 import { common } from '@kit.AbilityKit';
@@ -16,7 +16,7 @@ import { FloatWindowManager } from '../common/FloatWindowManager';
 
 const DOMAIN = 0x3D00;
 const TAG = 'FloatWindowPage';
-const AVATAR_SIZE = 200;
+const AVATAR_SIZE = 300;
 const AVATAR_SIZE_PX = `${AVATAR_SIZE}px`;
 const STATE_OVERRIDE_MS = 8000;
 
@@ -255,8 +255,7 @@ struct FloatWindowPage {
     }
     .width(AVATAR_SIZE_PX)
     .height(AVATAR_SIZE_PX)
-    .backgroundColor('#FFF7E4')
-    .borderRadius('24px')
+    .backgroundColor(Color.Transparent)
     .clip(true)
     .onTouch((event: TouchEvent) => this.handleDrag(event))
   }
