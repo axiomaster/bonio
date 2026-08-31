@@ -33,6 +33,14 @@ import { AvatarStep, paramsOf, stepOf, sequencePayload } from '../intent/AvatarC
 import { TalkModeManager } from '../voice/TalkModeManager';
 import { WakeWords } from '../common/WakeWords';
 
+class ScreenMemoryChatParams {
+  sessionKey: string = 'system:screen-memory';
+  message: string = '';
+  thinking: string = 'low';
+  timeoutMs: number = 30000;
+  idempotencyKey: string = '';
+}
+
 export class NodeRuntime {
   private static readonly DOMAIN = 0x3D00;
   public prefs: SecurePrefs;
@@ -286,6 +294,33 @@ export class NodeRuntime {
   private showLocalCanvasOnDisconnect() {
     this.lastAutoA2uiUrl = undefined;
     this.canvas.navigate("");
+  }
+
+  /** Called by avatar double tap: an explicit SmartEdge snapshot becomes a DSH memory request. */
+  public async captureAvatarMemory(): Promise<void> {
+    if (!this.isConnected) {
+      throw new Error('DSH is not connected');
+    }
+
+    const capture = await this.screenHandler.handleSmartEdgeMemoryCapture();
+    if (!capture.ok || !capture.payloadJson) {
+      throw new Error(`${capture.error?.code || 'SCREEN_AWARENESS_FAILED'}: ${capture.error?.message || 'SmartEdge screen capture failed'}`);
+    }
+
+    const params = new ScreenMemoryChatParams();
+    params.idempotencyKey = `screen-memory-${Date.now()}`;
+    params.message = this.buildScreenMemoryPrompt(capture.payloadJson);
+    await this.operatorSession.request('chat.send', params);
+    this.prefs.setAvatarLastMemoryAt(Date.now());
+    hilog.info(NodeRuntime.DOMAIN, 'NodeRuntime', 'SmartEdge memory capture sent to DSH');
+  }
+
+  private buildScreenMemoryPrompt(snapshotJson: string): string {
+    return 'The user explicitly double-tapped the Bonio avatar to save a memory from the current screen. '
+      + 'Review the SmartEdge structured result below. Extract only durable, user-useful context; never store passwords, '
+      + 'verification codes, financial identifiers, or complete private messages. Use memo_save exactly once when there is '
+      + 'a useful memory, with source "msdp_smart_edge". If there is nothing durable to remember, do not save a memo. '
+      + 'Reply with a concise Chinese status.\n\nSmartEdge result:\n' + snapshotJson;
   }
 
   /**

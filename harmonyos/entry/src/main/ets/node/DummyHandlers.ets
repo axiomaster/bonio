@@ -22,4 +22,8 @@ export class DummyScreenHandler implements ScreenHandler {
   async handleScreenScrollToHook(paramsJson: string | undefined): Promise<InvokeResult> {
     return { ok: false, error: { code: "NOT_IMPLEMENTED", message: "Screen Awareness not ported yet" } };
   }
+
+  async handleSmartEdgeMemoryCapture(): Promise<InvokeResult> {
+    return { ok: false, error: { code: "NOT_IMPLEMENTED", message: "SmartEdge capture not ported yet" } };
+  }
 }

@@ -92,6 +92,15 @@ export class ScreenHandlerImpl implements ScreenHandler {
     }
   }
 
+  async handleSmartEdgeMemoryCapture(): Promise<InvokeResult> {
+    try {
+      const snapshot = await this.screenAwareness.triggerSmartEdge();
+      return { ok: true, payloadJson: JSON.stringify(snapshot) };
+    } catch (error) {
+      return this.makeAwarenessError(error);
+    }
+  }
+
   private async ensureMicPermission(): Promise<void> {
     const atManager = abilityAccessCtrl.createAtManager();
     const tokenID = this.context.applicationInfo.accessTokenId;

@@ -2,6 +2,8 @@ import onScreen from '@ohos.multimodalAwareness.onScreen';
 import { BusinessError } from '@kit.BasicServicesKit';
 
 const MAX_CONTEXT_TEXT_LENGTH = 12000;
+const MAX_SMART_EDGE_PAYLOAD_LENGTH = 16000;
+const SMART_EDGE_CAPABILITY: onScreen.OnscreenAwarenessCap = { capList: ['SmartEdge'] };
 
 export interface ScreenParagraph {
   hookId?: number;
@@ -23,6 +25,19 @@ export interface ScreenContextSnapshot {
   truncated: boolean;
 }
 
+/** Structured SmartEdge output for an explicit avatar memory capture. */
+export interface SmartEdgeSnapshot {
+  resultCode: number;
+  timestamp: number;
+  bundleName?: string;
+  appName?: string;
+  pageId?: string;
+  collectStrategy?: number;
+  pageTags?: string[];
+  payloadJson: string;
+  truncated: boolean;
+}
+
 export class MsdpScreenAwarenessError extends Error {
   public readonly code: string;
 
@@ -40,9 +55,14 @@ export class MsdpScreenAwarenessManager {
   private readonly readingListener = (status: onScreen.ReadingScreenPermissionStatus): void => {
     this.readingState = status.readingState;
   };
+  private readonly smartEdgeListener = (results: onScreen.OnscreenAwarenessInfo[]): void => {
+    this.lastSmartEdgeChangeAtMs = results.length > 0 ? Date.now() : this.lastSmartEdgeChangeAtMs;
+  };
   private listening: boolean = false;
+  private smartEdgeSubscribed: boolean = false;
   private readingState: number | undefined = undefined;
   private lastSnapshot: ScreenContextSnapshot | undefined = undefined;
+  private lastSmartEdgeChangeAtMs: number | undefined = undefined;
   private readonly isEnabled: () => boolean;
 
   constructor(isEnabled: () => boolean) {
@@ -76,6 +96,21 @@ export class MsdpScreenAwarenessManager {
     }
   }
 
+  /**
+   * SmartEdge subscribes to foreground-app/page changes. The subscription is
+   * local only; a result is sent to DSH exclusively for an avatar double tap.
+   */
+  public async triggerSmartEdge(): Promise<SmartEdgeSnapshot> {
+    this.assertEnabled();
+    this.subscribeSmartEdge();
+    try {
+      const result = await onScreen.trigger(SMART_EDGE_CAPABILITY);
+      return this.toSmartEdgeSnapshot(result);
+    } catch (error) {
+      throw this.toAwarenessError(error);
+    }
+  }
+
   public async scrollToHook(paramsJson: string | undefined): Promise<void> {
     this.assertEnabled();
     const hookId = this.parseHookId(paramsJson);
@@ -101,6 +136,16 @@ export class MsdpScreenAwarenessManager {
   private assertEnabled(): void {
     if (!this.isEnabled()) {
       throw new MsdpScreenAwarenessError('SCREEN_AWARENESS_DISABLED', 'enable Screen Awareness in Bonio settings first');
+    }
+  }
+
+  private subscribeSmartEdge(): void {
+    if (this.smartEdgeSubscribed) return;
+    try {
+      onScreen.subscribe(SMART_EDGE_CAPABILITY, this.smartEdgeListener);
+      this.smartEdgeSubscribed = true;
+    } catch (_) {
+      // trigger() below reports service errors for the user-initiated capture.
     }
   }
 
@@ -148,6 +193,21 @@ export class MsdpScreenAwarenessManager {
         text: this.truncate(paragraph.text, maxTextLength),
       })),
       truncated: content !== undefined && content.length > maxTextLength,
+    };
+  }
+
+  private toSmartEdgeSnapshot(result: onScreen.OnscreenAwarenessInfo): SmartEdgeSnapshot {
+    const payloadJson = JSON.stringify(result);
+    return {
+      resultCode: result.resultCode,
+      timestamp: result.timestamp,
+      bundleName: result.bundleName,
+      appName: result.appName,
+      pageId: result.pageId,
+      collectStrategy: result.collectStrategy,
+      pageTags: result.pageTags,
+      payloadJson: this.truncate(payloadJson, MAX_SMART_EDGE_PAYLOAD_LENGTH) || '{}',
+      truncated: payloadJson.length > MAX_SMART_EDGE_PAYLOAD_LENGTH,
     };
   }
 

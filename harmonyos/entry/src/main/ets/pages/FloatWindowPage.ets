@@ -458,8 +458,8 @@ struct FloatWindowPage {
     if (now - this.lastTapAtMs <= DOUBLE_TAP_MS) {
       if (this.clickTimer !== -1) clearTimeout(this.clickTimer);
       this.clickTimer = -1; this.lastTapAtMs = 0;
-      this.runtime?.prefs.setAvatarLastMemoryAt(now);
-      this.beginInteraction('recording', '记下啦~');
+      this.beginInteraction('thinking', '正在读取当前页面…', 30000);
+      void this.captureCurrentScreenMemory();
       return;
     }
     this.lastTapAtMs = now;
@@ -467,5 +467,20 @@ struct FloatWindowPage {
       this.clickTimer = -1; this.lastTapAtMs = 0;
       this.beginInteraction('interacting', '诶嘿~');
     }, DOUBLE_TAP_MS);
+  }
+
+  private async captureCurrentScreenMemory(): Promise<void> {
+    try {
+      if (!this.runtime) throw new Error('Bonio runtime is unavailable');
+      await this.runtime.captureAvatarMemory();
+      this.beginInteraction('completed', '已交给 Bonio 整理记忆~', 4000);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const bubble = message.includes('SCREEN_AWARENESS_DISABLED')
+        ? '请先在设置开启屏幕感知~'
+        : '当前页面暂时无法读取~';
+      hilog.warn(DOMAIN, TAG, 'SmartEdge memory capture failed: %{public}s', message);
+      this.beginInteraction('failed', bubble, 4000);
+    }
   }
 }

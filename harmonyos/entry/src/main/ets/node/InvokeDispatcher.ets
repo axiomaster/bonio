@@ -29,6 +29,7 @@ export interface ScreenHandler {
   handleScreenRecord(paramsJson: string | undefined): Promise<InvokeResult>;
   handleScreenContext(paramsJson: string | undefined): Promise<InvokeResult>;
   handleScreenScrollToHook(paramsJson: string | undefined): Promise<InvokeResult>;
+  handleSmartEdgeMemoryCapture(): Promise<InvokeResult>;
 }
 
 export interface SmsHandler {
