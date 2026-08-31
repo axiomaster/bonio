@@ -1,46 +1,23 @@
 /**
- * FloatWindowPage — the global avatar host.
+ * FloatWindowPage - the global system-float avatar host.
  *
- * With system_core signing (SYSTEM_FLOAT_WINDOW ACL) the pet lives in a real
- * system float window (TYPE_FLOAT) on top of every app.
- *
- * Rendering constraints discovered on this SDK's float windows:
- *  - @ohos/lottie canvas renderer cannot draw inside subwindow canvases
- *    (frame loop runs, clearRect works, path fills produce no pixels)
- *  - positioned/offset/margined ArkUI components are not visible in the
- *    subwindow, and even default-layout components (Circle/Text/Shape) get
- *    laid out unpredictably (pushed outside the visible area)
- *  - the ONLY reliable drawing path is a Canvas component + CanvasRendering
- *    Context2D calls (fillRect/arc/path fills verified pixel-perfect aligned
- *    to the window)
- *
- * Therefore the cat is hand-drawn on a 200x200 Canvas with 2D API calls and
- * re-rendered every 50ms by a JS timer (sine-wave animation: breathing,
- * blinking, tail sway, speaking mouth, working sway, thinking ear-drop).
- * The canvas is transparent; the yellow rounded background is the Stack.
- *
- * The avatar state is driven by:
- *   - avatar.command events from the server (setState/setBubble/moveTo/sequence)
- *   - on-device feature commands (health nags, notifications) via
- *     NodeRuntime.avatarCommandSink
- *   - chat activity (pending run -> thinking, streaming -> speaking)
- *   - connection status (disconnected -> working)
+ * The cat animations live in resources/rawfile. Lottie paths cannot resolve
+ * rawfile resources, so the page reads each JSON file with ResourceManager and
+ * supplies it as animationData. The 500x500 source composition and Contain
+ * mode keep the whole avatar visible in the 200x200 float window.
  */
 
+import { common } from '@kit.AbilityKit';
+import { util } from '@kit.ArkTS';
 import { hilog } from '@kit.PerformanceAnalysisKit';
-import { display } from '@kit.ArkUI';
+import lottie, { AnimationItem } from '@ohos/lottie';
 import { NodeRuntime } from '../node/NodeRuntime';
 import { FloatWindowManager } from '../common/FloatWindowManager';
 
 const DOMAIN = 0x3D00;
 const TAG = 'FloatWindowPage';
-/** avatar.command setState overrides the derived state for this long. */
+const AVATAR_SIZE = 200;
 const STATE_OVERRIDE_MS = 8000;
-
-// Palette (mirrors the lottie cat design)
-const BODY_COLOR = '#F9D27D';
-const OUTLINE_COLOR = '#6A4A1F';
-const INNER_EAR_COLOR = '#F5A9B8';
 
 @Entry
 @Component
@@ -50,210 +27,135 @@ struct FloatWindowPage {
 
   private catCanvasSettings: RenderingContextSettings = new RenderingContextSettings(true);
   private catCanvasContext: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.catCanvasSettings);
+  private bubbleCanvasSettings: RenderingContextSettings = new RenderingContextSettings(true);
+  private bubbleCanvasContext: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.bubbleCanvasSettings);
+  private catAnimation: AnimationItem | undefined = undefined;
+  private readonly animationName: string = 'float_cat_animation';
+  private requestedAsset: string = '';
+  private loadedAsset: string = '';
+  private catCanvasReady: boolean = false;
+  private bubbleCanvasReady: boolean = false;
+  private disposed: boolean = false;
+
   private bubbleTimer: number = -1;
   private runtime: NodeRuntime | undefined = undefined;
   private statusTimer: number = -1;
   private stateOverrideUntil: number = 0;
-  private animTimer: number = -1;
   private isDragging: boolean = false;
   private dragStartScreenX: number = 0;
   private dragStartScreenY: number = 0;
   private dragStartWindowX: number = 0;
   private dragStartWindowY: number = 0;
 
-  aboutToAppear() {
+  aboutToAppear(): void {
+    this.disposed = false;
     hilog.info(DOMAIN, TAG, 'Float window page appearing');
     this.runtime = AppStorage.get<NodeRuntime>('nodeRuntime');
     if (this.runtime) {
-      this.statusTimer = setInterval(() => {
-        if (this.runtime) {
-          this.tickState();
-        }
-      }, 1000);
-
-      // DSH refactor: consume server-driven avatar.command events.
-      if (this.runtime.chatController) {
-        this.runtime.chatController.onAvatarCommand = (payloadJson: string) => {
-          this.handleAvatarCommand(payloadJson);
-        };
-      }
-
-      // Phase 4: consume on-device feature avatar commands (health/notifications).
+      this.statusTimer = setInterval(() => this.tickState(), 1000);
+      this.runtime.chatController.onAvatarCommand = (payloadJson: string) => {
+        this.handleAvatarCommand(payloadJson);
+      };
       this.runtime.avatarCommandSink = (payloadJson: string) => {
         this.handleAvatarCommand(payloadJson);
       };
     }
   }
 
-  /** Start the redraw loop once the canvas is ready. */
-  private startDrawLoop(): void {
-    if (this.animTimer !== -1) return;
-    this.animTimer = setInterval(() => {
-      this.drawCat();
-    }, 50);
-    hilog.info(DOMAIN, TAG, 'avatar canvas draw loop started');
+  private tickState(): void {
+    if (Date.now() < this.stateOverrideUntil || !this.runtime) return;
+    const chat = this.runtime.chatController;
+    const next = chat.pendingRunCount > 0
+      ? 'thinking'
+      : chat.streamingAssistantText !== undefined && chat.streamingAssistantText.length > 0
+        ? 'speaking'
+        : this.runtime.isConnected ? 'idle' : 'working';
+    if (next !== this.agentState) this.setAgentState(next);
   }
 
-  /** Hand-draw the cat on the 200x200 canvas (transparent bg, yellow Stack behind). */
-  private drawCat(): void {
-    const ctx = this.catCanvasContext;
-    const t = Date.now();
-    const st = this.agentState;
-    // Canvas content is rendered at device dpr scale (1vp -> dpr px), so the
-    // 200x200 design is scaled back to fill the window exactly.
-    const dpr = display.getDefaultDisplaySync().densityPixels;
-    ctx.save();
-    ctx.scale(1 / dpr, 1 / dpr);
+  private setAgentState(state: string): void {
+    this.agentState = state;
+    hilog.info(DOMAIN, TAG, 'avatar state -> %{public}s', state);
+    void this.loadCatAnimation();
+  }
 
-    // ---- animation params (sine waves) ----
-    const breath = 1 + 0.03 * Math.sin((t / 800) * Math.PI);            // ~1.6s breathing
-    const tailSwing = (st === 'idle' || st === 'listening')
-      ? 8 * Math.sin((t / 1100) * Math.PI) : 0;                          // tail sway
-    const bodySwing = (st === 'working' || st === 'speaking')
-      ? 2.5 * Math.sin((t / 210) * Math.PI) : 0;                         // body sway
-    const mouthOpen = (st === 'speaking') ? Math.max(0, Math.sin((t / 160) * Math.PI)) : 0;
-    const earDrop = st === 'thinking' ? 9 : 0;
-    const blinkPhase = (t % 3200) / 3200;                                // blink every 3.2s
-    const eyeOpen = (blinkPhase < 0.05) ? 0.15 : 1;                      // 160ms blink
-
-    ctx.clearRect(0, 0, 200, 200);
-
-    // breathing scale around the body center (100, 112)
-    ctx.save();
-    ctx.translate(100, 112);
-    ctx.scale(breath, breath);
-    ctx.translate(-100, -112);
-    // body sway around the feet
-    ctx.translate(100, 165);
-    ctx.rotate((bodySwing * Math.PI) / 180);
-    ctx.translate(-100, -165);
-
-    // ---- tail (behind body) ----
-    ctx.save();
-    ctx.translate(158, 140);
-    ctx.rotate(((tailSwing + 26) * Math.PI) / 180);
-    ctx.fillStyle = BODY_COLOR;
-    ctx.strokeStyle = OUTLINE_COLOR;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(0, -18, 9, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-
-    // ---- ears (behind head) ----
-    this.drawEar(ctx, 55, 52, -20 - earDrop);
-    this.drawEar(ctx, 145, 52, 20 + earDrop);
-
-    // ---- head ----
-    ctx.fillStyle = BODY_COLOR;
-    ctx.strokeStyle = OUTLINE_COLOR;
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.ellipse(100, 108, 66, 56, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // ---- eyes ----
-    ctx.fillStyle = '#3D2D18';
-    ctx.beginPath();
-    ctx.ellipse(80, 100, 6, 7 * eyeOpen, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(120, 100, 6, 7 * eyeOpen, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // ---- blush ----
-    ctx.fillStyle = INNER_EAR_COLOR;
-    ctx.globalAlpha = 0.55;
-    ctx.beginPath();
-    ctx.ellipse(62, 118, 10, 5.5, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(138, 118, 10, 5.5, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-
-    // ---- nose ----
-    ctx.fillStyle = OUTLINE_COLOR;
-    ctx.beginPath();
-    ctx.ellipse(100, 120, 4, 3, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // ---- mouth ----
-    ctx.strokeStyle = OUTLINE_COLOR;
-    ctx.lineWidth = 2;
-    if (mouthOpen > 0.15) {
-      // open mouth while speaking
-      ctx.fillStyle = '#C97B4A';
-      ctx.beginPath();
-      ctx.ellipse(100, 130, 9, 6 * mouthOpen, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-    } else {
-      // closed 'w' mouth
-      ctx.beginPath();
-      ctx.moveTo(88, 128);
-      ctx.quadraticCurveTo(94, 133, 100, 128);
-      ctx.quadraticCurveTo(106, 133, 112, 128);
-      ctx.stroke();
+  private getLottieAsset(): string {
+    switch (this.agentState) {
+      case 'listening': return 'cat-listening.json';
+      case 'thinking': return 'cat-thinking.json';
+      case 'speaking': return 'cat-speaking.json';
+      case 'working': return 'cat-working.json';
+      default: return 'cat-idle.json';
     }
+  }
 
-    // ---- whiskers ----
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(40, 112);
-    ctx.lineTo(20, 106);
-    ctx.moveTo(40, 120);
-    ctx.lineTo(20, 124);
-    ctx.moveTo(160, 112);
-    ctx.lineTo(180, 106);
-    ctx.moveTo(160, 120);
-    ctx.lineTo(180, 124);
-    ctx.stroke();
+  private async loadCatAnimation(): Promise<void> {
+    if (!this.catCanvasReady || this.disposed) return;
+    const asset = this.getLottieAsset();
+    if (asset === this.loadedAsset || asset === this.requestedAsset) return;
+    this.requestedAsset = asset;
 
-    ctx.restore();
+    try {
+      const context = getContext(this) as common.UIAbilityContext;
+      const data = await context.resourceManager.getRawFileContent(asset);
+      if (this.disposed || !this.catCanvasReady || this.requestedAsset !== asset) return;
 
-    // ---- speech bubble (canvas-drawn; Text component not reliable here) ----
-    if (this.bubbleText !== '') {
-      this.drawBubble(ctx, this.bubbleText);
+      const decoder = new util.TextDecoder('utf-8');
+      const animationData = JSON.parse(decoder.decode(data)) as Object;
+      this.destroyCatAnimation();
+      this.catAnimation = lottie.loadAnimation({
+        container: this.catCanvasContext,
+        renderer: 'canvas',
+        loop: true,
+        autoplay: false,
+        name: this.animationName,
+        contentMode: 'Contain',
+        animationData: animationData,
+      });
+      this.loadedAsset = asset;
+      this.catAnimation.addEventListener('DOMLoaded', () => {
+        if (!this.disposed && this.loadedAsset === asset) {
+          this.catAnimation?.resize(AVATAR_SIZE, AVATAR_SIZE);
+          this.catAnimation?.play();
+        }
+      });
+      hilog.info(DOMAIN, TAG, 'loaded complete Lottie animation %{public}s', asset);
+    } catch (err) {
+      if (this.requestedAsset === asset) this.requestedAsset = '';
+      hilog.error(DOMAIN, TAG, 'failed to load Lottie %{public}s: %{public}s', asset,
+        err instanceof Error ? err.message : String(err));
     }
-    ctx.restore();
   }
 
-  private drawEar(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number): void {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate((angle * Math.PI) / 180);
-    ctx.fillStyle = BODY_COLOR;
-    ctx.strokeStyle = OUTLINE_COLOR;
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.ellipse(0, -16, 13, 18, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = INNER_EAR_COLOR;
-    ctx.beginPath();
-    ctx.ellipse(0, -16, 7, 10, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
+  private destroyCatAnimation(): void {
+    try {
+      lottie.destroy(this.animationName);
+    } catch (_) {
+      // No animation has been attached yet.
+    }
+    this.catAnimation = undefined;
+    this.loadedAsset = '';
   }
 
-  private drawBubble(ctx: CanvasRenderingContext2D, text: string): void {
-    ctx.save();
-    const w = Math.min(180, 24 + text.length * 7);
+  private renderBubble(): void {
+    if (!this.bubbleCanvasReady) return;
+    const ctx = this.bubbleCanvasContext;
+    ctx.clearRect(0, 0, AVATAR_SIZE, AVATAR_SIZE);
+    if (this.bubbleText === '') return;
+
+    const text = this.bubbleText.length > 24 ? `${this.bubbleText.slice(0, 23)}...` : this.bubbleText;
+    const width = Math.min(180, 24 + text.length * 7);
     const x = 10;
     const y = 4;
     ctx.fillStyle = '#FFFFFF';
     ctx.strokeStyle = '#CCCCCC';
     ctx.lineWidth = 1;
-    // rounded rect
     ctx.beginPath();
     ctx.moveTo(x + 8, y);
-    ctx.lineTo(x + w - 8, y);
-    ctx.quadraticCurveTo(x + w, y, x + w, y + 8);
-    ctx.lineTo(x + w, y + 30);
-    ctx.quadraticCurveTo(x + w, y + 38, x + w - 8, y + 38);
+    ctx.lineTo(x + width - 8, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + 8);
+    ctx.lineTo(x + width, y + 30);
+    ctx.quadraticCurveTo(x + width, y + 38, x + width - 8, y + 38);
     ctx.lineTo(x + 8, y + 38);
     ctx.quadraticCurveTo(x, y + 38, x, y + 30);
     ctx.lineTo(x, y + 8);
@@ -265,138 +167,120 @@ struct FloatWindowPage {
     ctx.font = '12vp sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.fillText(text.length > 24 ? text.slice(0, 23) + '...' : text, x + 10, y + 19);
-    ctx.restore();
+    ctx.fillText(text, x + 10, y + 19);
   }
 
-  /** Derive the avatar state from chat activity / connection unless overridden. */
-  private tickState(): void {
-    if (Date.now() < this.stateOverrideUntil) return;
-    const r = this.runtime;
-    if (!r) return;
-    const c = r.chatController;
-    let next: string;
-    if (c && c.pendingRunCount > 0) {
-      next = 'thinking';
-    } else if (c && c.streamingAssistantText !== undefined && c.streamingAssistantText.length > 0) {
-      next = 'speaking';
-    } else {
-      next = r.isConnected ? 'idle' : 'working';
-    }
-    if (next !== this.agentState) {
-      this.setAgentState(next);
-    }
+  private setBubble(text: string): void {
+    this.bubbleText = text;
+    if (this.bubbleTimer !== -1) clearTimeout(this.bubbleTimer);
+    this.bubbleTimer = setTimeout(() => {
+      this.bubbleText = '';
+      this.bubbleTimer = -1;
+      this.renderBubble();
+    }, 5000);
+    this.renderBubble();
   }
 
-  private setAgentState(state: string): void {
-    this.agentState = state;
-    hilog.info(DOMAIN, TAG, 'avatar state -> %{public}s', state);
-  }
-
-  private handleAvatarCommand(payloadJson: string) {
+  private handleAvatarCommand(payloadJson: string): void {
     try {
       const cmd = JSON.parse(payloadJson) as Record<string, Object>;
       const action = cmd.action as string | undefined;
       const params = (cmd.params as Record<string, Object>) || {};
-
       if (action === 'sequence') {
         const steps = params.steps as Object[] | undefined;
-        if (Array.isArray(steps)) {
-          this.runSequence(steps);
-        }
+        if (Array.isArray(steps)) this.runSequence(steps);
         return;
       }
-
       if (action === 'setBubble' && params.text) {
-        this.bubbleText = params.text as string;
-        if (this.bubbleTimer !== -1) clearTimeout(this.bubbleTimer);
-        this.bubbleTimer = setTimeout(() => {
-          this.bubbleText = '';
-          this.bubbleTimer = -1;
-        }, 5000);
+        this.setBubble(params.text as string);
       } else if (action === 'clearBubble') {
         this.bubbleText = '';
+        this.renderBubble();
       } else if (action === 'setState' && params.state) {
-        this.setAgentState(params.state as string);
         this.stateOverrideUntil = Date.now() + STATE_OVERRIDE_MS;
+        this.setAgentState(params.state as string);
       } else if (action === 'moveTo' && params.x !== undefined && params.y !== undefined) {
-        FloatWindowManager.getInstance().moveWindowTo(params.x as number, params.y as number);
+        void FloatWindowManager.getInstance().moveWindowTo(params.x as number, params.y as number);
       }
-      // playSound / tts accepted; sound handled by the host app when present.
-    } catch (e) {
-      hilog.warn(DOMAIN, TAG, 'avatar.command parse failed: %{public}s', e instanceof Error ? e.message : String(e));
+    } catch (err) {
+      hilog.warn(DOMAIN, TAG, 'avatar.command parse failed: %{public}s',
+        err instanceof Error ? err.message : String(err));
     }
   }
 
-  private runSequence(steps: Object[]) {
+  private runSequence(steps: Object[]): void {
     let delay = 0;
     for (const step of steps) {
-      const s = step as Record<string, Object>;
-      const stepAction = s.action as string | undefined;
-      const stepParams = (s.params as Record<string, Object>) || {};
-      const stepDelay = (s.delayMs as number) || 0;
-      delay += stepDelay;
+      const item = step as Record<string, Object>;
+      delay += (item.delayMs as number) || 0;
       setTimeout(() => {
-        const payload = JSON.stringify({ action: stepAction, params: stepParams });
-        this.handleAvatarCommand(payload);
+        this.handleAvatarCommand(JSON.stringify({
+          action: item.action as string | undefined,
+          params: (item.params as Record<string, Object>) || {},
+        }));
       }, delay);
     }
   }
 
-  aboutToDisappear() {
-    hilog.info(DOMAIN, TAG, 'Float window page disappearing');
-    if (this.statusTimer !== -1) {
-      clearInterval(this.statusTimer);
-      this.statusTimer = -1;
-    }
-    if (this.animTimer !== -1) {
-      clearInterval(this.animTimer);
-      this.animTimer = -1;
-    }
+  aboutToDisappear(): void {
+    this.disposed = true;
+    if (this.statusTimer !== -1) clearInterval(this.statusTimer);
+    if (this.bubbleTimer !== -1) clearTimeout(this.bubbleTimer);
+    this.statusTimer = -1;
+    this.bubbleTimer = -1;
+    this.requestedAsset = '';
+    this.destroyCatAnimation();
   }
 
   build() {
     Stack() {
-      // Canvas-drawn cat (transparent; yellow rounded bg on the Stack)
       Canvas(this.catCanvasContext)
-        .width(200)
-        .height(200)
+        .width(AVATAR_SIZE)
+        .height(AVATAR_SIZE)
         .onReady(() => {
-          this.startDrawLoop();
+          this.catCanvasReady = true;
+          this.catCanvasContext.imageSmoothingEnabled = true;
+          this.catCanvasContext.imageSmoothingQuality = 'high';
+          void this.loadCatAnimation();
+        })
+
+      Canvas(this.bubbleCanvasContext)
+        .width(AVATAR_SIZE)
+        .height(AVATAR_SIZE)
+        .onReady(() => {
+          this.bubbleCanvasReady = true;
+          this.renderBubble();
         })
     }
-    .width(200)
-    .height(200)
+    .width(AVATAR_SIZE)
+    .height(AVATAR_SIZE)
     .backgroundColor('#FFF7E4')
     .borderRadius(24)
-    .onTouch((event: TouchEvent) => {
-      if (event.touches.length === 0) {
-        this.isDragging = false;
-        return;
-      }
+    .clip(true)
+    .onTouch((event: TouchEvent) => this.handleDrag(event))
+  }
 
-      const touch = event.touches[0];
-      const manager = FloatWindowManager.getInstance();
-      if (event.type === TouchType.Down) {
-        const position = manager.getWindowPosition();
-        this.isDragging = true;
-        this.dragStartScreenX = touch.screenX;
-        this.dragStartScreenY = touch.screenY;
-        this.dragStartWindowX = position[0];
-        this.dragStartWindowY = position[1];
-        return;
-      }
-
-      if (event.type === TouchType.Move && this.isDragging) {
-        const targetX = this.dragStartWindowX + touch.screenX - this.dragStartScreenX;
-        const targetY = this.dragStartWindowY + touch.screenY - this.dragStartScreenY;
-        manager.moveWindowTo(targetX, targetY);
-        return;
-      }
-
-      if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-        this.isDragging = false;
-      }
-    })
+  private handleDrag(event: TouchEvent): void {
+    if (event.touches.length === 0) {
+      this.isDragging = false;
+      return;
+    }
+    const touch = event.touches[0];
+    const manager = FloatWindowManager.getInstance();
+    if (event.type === TouchType.Down) {
+      const position = manager.getWindowPosition();
+      this.isDragging = true;
+      this.dragStartScreenX = touch.screenX;
+      this.dragStartScreenY = touch.screenY;
+      this.dragStartWindowX = position[0];
+      this.dragStartWindowY = position[1];
+    } else if (event.type === TouchType.Move && this.isDragging) {
+      void manager.moveWindowTo(
+        this.dragStartWindowX + touch.screenX - this.dragStartScreenX,
+        this.dragStartWindowY + touch.screenY - this.dragStartScreenY,
+      );
+    } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+      this.isDragging = false;
+    }
   }
 }
