@@ -34,7 +34,7 @@ export struct ChatSheet {
         }
       };
       
-      this.controller.refresh();
+      if (this.controller.healthOk) void this.controller.refresh();
     }
   }
 

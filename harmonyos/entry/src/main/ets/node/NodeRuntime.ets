@@ -99,7 +99,13 @@ export class NodeRuntime {
     this.smsHandler = new SmsHandlerImpl(context);
     this.locationHandler = new LocationHandlerImpl(context);
     this.cameraHandler = new CameraHandlerImpl(context);
-    this.screenHandler = new ScreenHandlerImpl(context, () => this.prefs.getScreenAwarenessEnabled());
+    this.screenHandler = new ScreenHandlerImpl(
+      context,
+      () => this.prefs.getScreenAwarenessEnabled(),
+      (source: string, payloadJson: string) => {
+        this.chatController.appendMsdpDebugResult(source, payloadJson);
+      },
+    );
 
     this.connectionManager = new ConnectionManager(
       this.prefs,
@@ -142,7 +148,7 @@ export class NodeRuntime {
         this.applyMainSessionKey(mainKey);
         this.updateStatus();
         this.gatewayEventHandler.refreshWakeWordsFromGateway();
-        this.chatController.applyMainSessionKey(mainKey || "main");
+        this.chatController.onGatewayConnected(mainKey);
       },
       (message) => {
         this.operatorConnected = false;
@@ -296,7 +302,7 @@ export class NodeRuntime {
     this.canvas.navigate("");
   }
 
-  /** Called by avatar double tap: an explicit SmartEdge snapshot becomes a DSH memory request. */
+  /** Called by avatar double tap: capture the SmartEdge group and save it through DSH. */
   public async captureAvatarMemory(): Promise<void> {
     if (!this.isConnected) {
       throw new Error('DSH is not connected');
@@ -309,7 +315,7 @@ export class NodeRuntime {
 
     const params = new ScreenMemoryChatParams();
     params.idempotencyKey = `screen-memory-${Date.now()}`;
-    params.message = this.buildScreenMemoryPrompt(capture.payloadJson);
+    params.message = this.buildSmartEdgeMemoryPrompt(capture.payloadJson);
     await this.operatorSession.request('chat.send', params);
     this.prefs.setAvatarLastMemoryAt(Date.now());
     hilog.info(NodeRuntime.DOMAIN, 'NodeRuntime', 'SmartEdge memory capture sent to DSH');
@@ -318,6 +324,14 @@ export class NodeRuntime {
   private buildScreenMemoryPrompt(snapshotJson: string): string {
     return 'The user explicitly double-tapped the Bonio avatar to save a memory from the current screen. '
       + 'Review the SmartEdge structured result below. Extract only durable, user-useful context; never store passwords, '
+      + 'verification codes, financial identifiers, or complete private messages. Use memo_save exactly once when there is '
+      + 'a useful memory, with source "msdp_smart_edge". If there is nothing durable to remember, do not save a memo. '
+      + 'Reply with a concise Chinese status.\n\nSmartEdge result:\n' + snapshotJson;
+  }
+
+  private buildSmartEdgeMemoryPrompt(snapshotJson: string): string {
+    return 'The user explicitly double-tapped the Bonio avatar to save a memory from the current screen. '
+      + 'Review the complete SmartEdge result below. Extract only durable, user-useful context; never store passwords, '
       + 'verification codes, financial identifiers, or complete private messages. Use memo_save exactly once when there is '
       + 'a useful memory, with source "msdp_smart_edge". If there is nothing durable to remember, do not save a memo. '
       + 'Reply with a concise Chinese status.\n\nSmartEdge result:\n' + snapshotJson;

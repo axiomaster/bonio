@@ -4,7 +4,11 @@ import { common, abilityAccessCtrl } from '@kit.AbilityKit';
 import { ScreenRecordManager, RecordPayload } from '../ScreenRecordManager';
 import { fileIo } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
-import { MsdpScreenAwarenessError, MsdpScreenAwarenessManager } from '../../system/MsdpScreenAwarenessManager';
+import {
+  MsdpScreenAwarenessError,
+  MsdpScreenAwarenessManager,
+  SmartEdgeResultSource,
+} from '../../system/MsdpScreenAwarenessManager';
 
 interface ScreenRecordPayload {
   format: string;
@@ -20,10 +24,14 @@ export class ScreenHandlerImpl implements ScreenHandler {
   private screenManager: ScreenRecordManager;
   private screenAwareness: MsdpScreenAwarenessManager;
 
-  constructor(context: common.Context, isScreenAwarenessEnabled: () => boolean) {
+  constructor(
+    context: common.Context,
+    isScreenAwarenessEnabled: () => boolean,
+    onSmartEdgeResult?: (source: SmartEdgeResultSource, payloadJson: string) => void,
+  ) {
     this.context = context;
     this.screenManager = new ScreenRecordManager(context);
-    this.screenAwareness = new MsdpScreenAwarenessManager(isScreenAwarenessEnabled);
+    this.screenAwareness = new MsdpScreenAwarenessManager(isScreenAwarenessEnabled, onSmartEdgeResult);
     this.screenAwareness.start();
   }
 
@@ -95,7 +103,7 @@ export class ScreenHandlerImpl implements ScreenHandler {
   async handleSmartEdgeMemoryCapture(): Promise<InvokeResult> {
     try {
       const snapshot = await this.screenAwareness.triggerSmartEdge();
-      return { ok: true, payloadJson: JSON.stringify(snapshot) };
+      return { ok: true, payloadJson: snapshot.payloadJson };
     } catch (error) {
       return this.makeAwarenessError(error);
     }

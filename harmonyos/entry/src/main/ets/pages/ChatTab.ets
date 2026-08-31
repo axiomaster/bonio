@@ -37,7 +37,7 @@ export struct ChatTab {
       ctrl.onChatUpdate = () => {
         this.syncFromController(ctrl);
       };
-      ctrl.refresh();
+      if (this.runtime?.isConnected) void ctrl.refresh();
     }
   }
 

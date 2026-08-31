@@ -52,6 +52,7 @@ export class ChatController {
   public avatarAgentState: string = 'idle';
 
   private pendingRuns = new Set<string>();
+  private localDebugMessages: ChatMessage[] = [];
   private lastHealthPollAtMs: number | undefined = undefined;
   private avatarStateTimer: number = -1;
   
@@ -90,6 +91,30 @@ export class ChatController {
 
   public async refresh() {
     await this.bootstrap(true);
+  }
+
+  /** Restore the active conversation as soon as the operator session is ready. */
+  public onGatewayConnected(mainSessionKey: string | undefined) {
+    const key = mainSessionKey?.trim();
+    if (this.sessionKey === 'main' && key) this.sessionKey = key;
+    void this.bootstrap(true);
+  }
+
+  /** Keep device-only diagnostics visible when remote history is refreshed. */
+  public appendMsdpDebugResult(source: string, payloadJson: string): void {
+    const destination = source === 'trigger' ? 'sent to DSH' : 'local subscription event';
+    const message: ChatMessage = {
+      id: this.generateUuid(),
+      role: 'user',
+      content: [{
+        type: 'text',
+        text: `[MSDP SmartEdge: ${source}, ${destination}]\n${payloadJson}`,
+      }],
+      timestampMs: Date.now(),
+    };
+    this.localDebugMessages.push(message);
+    this.messages.push(message);
+    this.notifyUpdate();
   }
 
   public async setThinkingLevel(level: string) {
@@ -235,7 +260,7 @@ export class ChatController {
       const historyPayloadJSON = historyRes.payloadJSON || (historyRes.payload ? JSON.stringify(historyRes.payload) : undefined);
       if (!historyPayloadJSON) throw new Error("No history payload");
       const history = this.parseHistory(historyPayloadJSON, key);
-      this.messages = history.messages;
+      this.messages = [...history.messages, ...this.localDebugMessages];
       this.sessionId = history.sessionId;
       if (history.thinkingLevel) this.thinkingLevel = history.thinkingLevel;
 

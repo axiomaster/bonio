@@ -2,9 +2,10 @@ import onScreen from '@ohos.multimodalAwareness.onScreen';
 import { BusinessError } from '@kit.BasicServicesKit';
 
 const MAX_CONTEXT_TEXT_LENGTH = 12000;
-const MAX_SMART_EDGE_PAYLOAD_LENGTH = 16000;
 // SmartEdge is an MSDP capability group, not an individual capability name.
 const SMART_EDGE_CAPABILITY: onScreen.OnscreenAwarenessCap = { groupId: 'SmartEdge' };
+
+export type SmartEdgeResultSource = 'subscribe' | 'trigger';
 
 export interface ScreenParagraph {
   hookId?: number;
@@ -58,6 +59,7 @@ export class MsdpScreenAwarenessManager {
   };
   private readonly smartEdgeListener = (results: onScreen.OnscreenAwarenessInfo[]): void => {
     this.lastSmartEdgeChangeAtMs = results.length > 0 ? Date.now() : this.lastSmartEdgeChangeAtMs;
+    this.reportSmartEdgeResult('subscribe', results);
   };
   private listening: boolean = false;
   private smartEdgeSubscribed: boolean = false;
@@ -65,9 +67,14 @@ export class MsdpScreenAwarenessManager {
   private lastSnapshot: ScreenContextSnapshot | undefined = undefined;
   private lastSmartEdgeChangeAtMs: number | undefined = undefined;
   private readonly isEnabled: () => boolean;
+  private readonly onSmartEdgeResult: ((source: SmartEdgeResultSource, payloadJson: string) => void) | undefined;
 
-  constructor(isEnabled: () => boolean) {
+  constructor(
+    isEnabled: () => boolean,
+    onSmartEdgeResult?: (source: SmartEdgeResultSource, payloadJson: string) => void,
+  ) {
     this.isEnabled = isEnabled;
+    this.onSmartEdgeResult = onSmartEdgeResult;
   }
 
   public start(): void {
@@ -106,6 +113,7 @@ export class MsdpScreenAwarenessManager {
     this.subscribeSmartEdge();
     try {
       const result = await onScreen.trigger(SMART_EDGE_CAPABILITY);
+      this.reportSmartEdgeResult('trigger', result);
       if (result.resultCode !== 0) {
         throw new MsdpScreenAwarenessError(
           'SMART_EDGE_RESULT_FAILED',
@@ -153,6 +161,15 @@ export class MsdpScreenAwarenessManager {
       this.smartEdgeSubscribed = true;
     } catch (_) {
       // trigger() below reports service errors for the user-initiated capture.
+    }
+  }
+
+  private reportSmartEdgeResult(source: SmartEdgeResultSource, result: Object): void {
+    if (!this.onSmartEdgeResult) return;
+    try {
+      this.onSmartEdgeResult(source, JSON.stringify(result));
+    } catch (_) {
+      // Diagnostic rendering must never affect MSDP subscription or capture.
     }
   }
 
@@ -213,8 +230,8 @@ export class MsdpScreenAwarenessManager {
       pageId: result.pageId,
       collectStrategy: result.collectStrategy,
       pageTags: result.pageTags,
-      payloadJson: this.truncate(payloadJson, MAX_SMART_EDGE_PAYLOAD_LENGTH) || '{}',
-      truncated: payloadJson.length > MAX_SMART_EDGE_PAYLOAD_LENGTH,
+      payloadJson: payloadJson,
+      truncated: false,
     };
   }
 

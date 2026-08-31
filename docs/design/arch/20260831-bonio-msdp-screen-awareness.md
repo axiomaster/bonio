@@ -53,6 +53,10 @@ Avatar 双击是另一条显式链路：Bonio App 调用 SmartEdge `trigger`，�
 密码、验证码、金融标识或完整私信的内容时调用 `memo_save`（`source=msdp_smart_edge`）。
 页面切换订阅不会自动上传或自动创建记忆。
 
+调试期间，Bonio 会把 SmartEdge `subscribe` 和 `trigger` 返回的完整原始 JSON
+作为本地 Chat 调试消息显示。只有 Avatar 双击触发的结果会随记忆请求发送给 DSH；
+订阅事件仍不会自动上传。
+
 ## 权限与签名
 
 - `ohos.permission.GET_SCREEN_CONTENT`：MSDP 读取页面内容，`system_core` ACL。
