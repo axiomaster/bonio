@@ -4,6 +4,13 @@ import { MemoryService, SaveBonioMemory } from './MemoryService';
 
 export const COMPANION_MEMORY_SESSION_KEY = 'system:companion-memory';
 
+const IGNORED_BUNDLE_NAMES: string[] = [
+  'com.example.msdpdemo',
+  'com.huawei.hmos.vassistant.launcher',
+  'com.ohos.sceneboard',
+];
+const IGNORED_APP_NAMES: string[] = ['bonio', '大桌面'];
+
 class CompanionChatParams {
   sessionKey: string = COMPANION_MEMORY_SESSION_KEY;
   message: string = '';
@@ -54,12 +61,14 @@ export class CompanionMemoryController {
 
   enqueue(source: string, payloadJson: string): void {
     if (!payloadJson.trim()) return;
+    const filteredPayload = this.filterIgnoredApplications(source, payloadJson);
+    if (!filteredPayload) return;
     const previous = this.queue.length > 0 ? this.queue[this.queue.length - 1] : this.activeInput;
-    if (previous?.source === source && previous.payloadJson === payloadJson) return;
+    if (previous?.source === source && previous.payloadJson === filteredPayload) return;
     const input = new CompanionMemoryInput();
     input.sequence = this.nextInputSequence++;
     input.source = source;
-    input.payloadJson = payloadJson;
+    input.payloadJson = filteredPayload;
     input.receivedAt = Date.now();
     if (this.queue.length >= CompanionMemoryController.MAX_QUEUE_SIZE) {
       this.queue.shift();
@@ -68,6 +77,37 @@ export class CompanionMemoryController {
     }
     this.queue.push(input);
     this.processNext();
+  }
+
+  private filterIgnoredApplications(source: string, payloadJson: string): string | undefined {
+    try {
+      const parsed = JSON.parse(payloadJson) as Object;
+      if (Array.isArray(parsed)) {
+        const rows = parsed as Object[];
+        const filtered = rows.filter((row: Object): boolean => !this.isIgnoredApplication(row));
+        if (filtered.length === rows.length) return payloadJson;
+        hilog.info(CompanionMemoryController.DOMAIN, CompanionMemoryController.TAG,
+          'ignored %{public}d/%{public}d %{public}s result(s) from Bonio or launcher',
+          rows.length - filtered.length, rows.length, source);
+        return filtered.length > 0 ? JSON.stringify(filtered) : undefined;
+      }
+      if (!this.isIgnoredApplication(parsed)) return payloadJson;
+      hilog.info(CompanionMemoryController.DOMAIN, CompanionMemoryController.TAG,
+        'ignored %{public}s result from Bonio or launcher', source);
+      return undefined;
+    } catch (_) {
+      return payloadJson;
+    }
+  }
+
+  private isIgnoredApplication(value: Object): boolean {
+    if (value === null || typeof value !== 'object') return false;
+    const row = value as Record<string, Object>;
+    const bundleValue = row['bundleName'];
+    const appValue = row['appName'];
+    const bundleName = typeof bundleValue === 'string' ? bundleValue.trim().toLowerCase() : '';
+    const appName = typeof appValue === 'string' ? appValue.trim().toLowerCase() : '';
+    return IGNORED_BUNDLE_NAMES.includes(bundleName) || IGNORED_APP_NAMES.includes(appName);
   }
 
   onConnected(): void {
