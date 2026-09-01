@@ -30,6 +30,7 @@ export struct ChatTab {
   @State pendingRunCount: number = 0;
 
   private scroller: Scroller = new Scroller();
+  private sessionScroller: Scroller = new Scroller();
 
   aboutToAppear() {
     const ctrl = this.runtime?.chatController;
@@ -160,19 +161,32 @@ export struct ChatTab {
     Column() {
       // ── Session Header Bar ──
       Row() {
-        // Session button (left)
-        Button(this.sessionLabel)
-          .type(ButtonType.Normal)
-          .backgroundColor('#E8ECF0')
-          .fontColor('#333333')
-          .fontSize(13)
-          .height(28)
-          .borderRadius(8)
-          .padding({ left: 10, right: 10 })
-          .bindMenu([
-            { value: 'chat', action: () => { void this.selectSession('chat'); } },
-            { value: 'memory', action: () => { void this.selectSession('memory'); } },
-          ])
+        Scroll(this.sessionScroller) {
+          Row({ space: 6 }) {
+            Button('chat')
+              .type(ButtonType.Normal)
+              .backgroundColor(this.sessionLabel === 'chat' ? '#0A59F7' : '#E8ECF0')
+              .fontColor(this.sessionLabel === 'chat' ? Color.White : '#333333')
+              .fontSize(13)
+              .height(28)
+              .borderRadius(14)
+              .padding({ left: 12, right: 12 })
+              .onClick(() => { void this.selectSession('chat'); })
+
+            Button('memory')
+              .type(ButtonType.Normal)
+              .backgroundColor(this.sessionLabel === 'memory' ? '#0A59F7' : '#E8ECF0')
+              .fontColor(this.sessionLabel === 'memory' ? Color.White : '#333333')
+              .fontSize(13)
+              .height(28)
+              .borderRadius(14)
+              .padding({ left: 12, right: 12 })
+              .onClick(() => { void this.selectSession('memory'); })
+          }
+        }
+        .scrollable(ScrollDirection.Horizontal)
+        .scrollBar(BarState.Off)
+        .constraintSize({ maxWidth: 140 })
 
         // Connection status pill
         Row() {
