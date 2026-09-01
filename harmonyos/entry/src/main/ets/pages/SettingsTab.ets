@@ -14,17 +14,23 @@ export struct SettingsTab {
   onDisconnect: (() => void) | undefined = undefined;
 
   @State isFloatingWindowEnabled: boolean = false;
-  @State avatarSkin: string = 'cat';
+
+  // Connection form (migrated from ServerTab)
+  @State manualHost: string = '';
+  @State manualPort: string = '10724';
+  @State manualToken: string = '';
+  @State manualTls: boolean = false;
+  @State isConnected: boolean = false;
+  @State statusText: string = 'Offline';
+  @State isConnecting: boolean = false;
 
   @State locationMode: LocationMode = LocationMode.Off;
   @State voiceWakeMode: VoiceWakeMode = VoiceWakeMode.Off;
   @State cameraEnabled: boolean = false;
   @State screenRecordEnabled: boolean = false;
   @State screenAwarenessEnabled: boolean = false;
-  @State manualTls: boolean = false;
   @State serverName: string = '';
   @State remoteAddress: string = '';
-  @State statusText: string = '';
 
   private statusTimer: number = -1;
 
@@ -43,8 +49,10 @@ export struct SettingsTab {
       this.cameraEnabled = prefs.getCameraEnabled();
       this.screenRecordEnabled = prefs.getScreenRecordEnabled();
       this.screenAwarenessEnabled = prefs.getScreenAwarenessEnabled();
+      this.manualHost = prefs.getManualHost() || '';
+      this.manualPort = prefs.getManualPort().toString() || '10724';
+      this.manualToken = prefs.getGatewayToken() || '';
       this.manualTls = prefs.getManualTls();
-      this.avatarSkin = prefs.getAvatarSkin();
     }
   }
 
@@ -87,7 +95,29 @@ export struct SettingsTab {
       this.serverName = this.runtime.serverName || '';
       this.remoteAddress = this.runtime.remoteAddress || `${this.runtime.prefs.getManualHost()}:${this.runtime.prefs.getManualPort()}`;
       this.statusText = this.runtime.statusText;
+      this.isConnected = this.runtime.isConnected;
+      if (this.isConnecting && (this.isConnected || this.statusText.toLowerCase().includes('fail') || this.statusText.toLowerCase().includes('error'))) {
+        this.isConnecting = false;
+      }
     }
+  }
+
+  private doConnect() {
+    if (!this.runtime) return;
+    this.runtime.prefs.setManualHost(this.manualHost);
+    this.runtime.prefs.setManualPort(parseInt(this.manualPort, 10));
+    this.runtime.prefs.setGatewayToken(this.manualToken);
+    this.runtime.prefs.setManualTls(this.manualTls);
+    this.runtime.connectManual();
+    this.isConnecting = true;
+  }
+
+  private doDisconnect() {
+    if (!this.runtime) return;
+    this.runtime.disconnect();
+    this.isConnected = false;
+    this.statusText = 'Disconnected';
+    if (this.onDisconnect) this.onDisconnect();
   }
 
   async requestPermission(permission: Permissions): Promise<boolean> {
@@ -107,6 +137,86 @@ export struct SettingsTab {
   build() {
     Column() {
       List({ space: 0 }) {
+        // Gateway Connection Section (migrated from ServerTab)
+        ListItem() { this.SectionHeader("Gateway Connection") }
+        ListItem() {
+          Column() {
+            Text(`Status: ${this.statusText}`)
+              .fontSize(13)
+              .fontColor(this.isConnected ? '#2ECC71' : '#333333')
+              .width('100%')
+              .margin({ bottom: 12 })
+
+            TextInput({ placeholder: 'Gateway Host', text: this.manualHost })
+              .width('100%')
+              .height(44)
+              .borderRadius(8)
+              .margin({ bottom: 10 })
+              .backgroundColor('#F5F5F5')
+              .fontColor('#333333')
+              .placeholderColor('#999999')
+              .onChange((value: string) => { this.manualHost = value; })
+
+            TextInput({ placeholder: 'Port', text: this.manualPort })
+              .width('100%')
+              .height(44)
+              .borderRadius(8)
+              .type(InputType.Number)
+              .margin({ bottom: 10 })
+              .backgroundColor('#F5F5F5')
+              .fontColor('#333333')
+              .placeholderColor('#999999')
+              .onChange((value: string) => { this.manualPort = value; })
+
+            TextInput({ placeholder: 'Token', text: this.manualToken })
+              .width('100%')
+              .height(44)
+              .borderRadius(8)
+              .type(InputType.Password)
+              .margin({ bottom: 10 })
+              .backgroundColor('#F5F5F5')
+              .fontColor('#333333')
+              .placeholderColor('#999999')
+              .onChange((value: string) => { this.manualToken = value; })
+
+            Row() {
+              Text('Enable TLS')
+                .fontSize(14)
+                .fontColor('#333333')
+                .fontWeight(FontWeight.Medium)
+              Blank()
+              Toggle({ type: ToggleType.Switch, isOn: this.manualTls })
+                .selectedColor('#0A59F7')
+                .onChange((isOn: boolean) => { this.manualTls = isOn; })
+            }
+            .width('100%')
+            .height(40)
+            .margin({ bottom: 12 })
+
+            Button(this.isConnected ? 'Disconnect' : (this.isConnecting ? 'Connecting...' : 'Connect'))
+              .width('100%')
+              .height(44)
+              .borderRadius(12)
+              .fontSize(16)
+              .fontWeight(FontWeight.Bold)
+              .backgroundColor(this.isConnected ? '#E53935' : '#0A59F7')
+              .fontColor(Color.White)
+              .enabled(!this.isConnecting)
+              .onClick(() => {
+                if (this.isConnected) {
+                  this.doDisconnect();
+                } else {
+                  this.doConnect();
+                }
+              })
+          }
+          .width('100%')
+          .padding(16)
+          .borderRadius(16)
+          .backgroundColor(Color.White)
+          .border({ width: 1, color: '#E0E0E0' })
+        }
+
         // Node Info Section
         ListItem() { this.SectionHeader("Node Info") }
         ListItem() { this.InfoRow("Device", `${deviceInfo.marketName || deviceInfo.productModel}`) }
@@ -129,13 +239,6 @@ export struct SettingsTab {
           }
           .width('100%')
           .padding({ left: 16, right: 16, top: 8, bottom: 8 })
-        }
-        ListItem() { this.SectionHeader("Avatar Skin") }
-        ListItem() {
-          this.SkinChoice('cat', 'Cat', 'Lottie cat avatar')
-        }
-        ListItem() {
-          this.SkinChoice('kun', 'Kun', 'Pixel-art Kun avatar')
         }
 
         // Permissions Section
@@ -223,17 +326,6 @@ export struct SettingsTab {
               }
             })
         }
-
-        // Display Section
-        ListItem() { this.SectionHeader("Connection") }
-        ListItem() {
-          this.ToggleRow("Require TLS", "Pin certificate on first connect",
-            this.manualTls,
-            (enabled: boolean) => {
-              this.manualTls = enabled;
-              this.runtime?.prefs.setManualTls(this.manualTls);
-            })
-        }
       }
       .layoutWeight(1)
       .width('100%')
@@ -288,35 +380,6 @@ export struct SettingsTab {
     .height(56)
     .padding({ left: 16, right: 16 })
     .backgroundColor(Color.White)
-  }
-
-  @Builder SkinChoice(value: string, title: string, subtitle: string) {
-    Row() {
-      Column() {
-        Text(title).fontSize(15).fontColor('#333333')
-        Text(subtitle).fontSize(12).fontColor('#999999').margin({ top: 2 })
-      }
-      .alignItems(HorizontalAlign.Start)
-      .layoutWeight(1)
-
-      Radio({ value: value, group: 'avatarSkin' })
-        .checked(this.avatarSkin === value)
-        .onChange((isChecked: boolean) => {
-          if (isChecked) this.selectAvatarSkin(value);
-        })
-    }
-    .width('100%')
-    .height(56)
-    .padding({ left: 16, right: 16 })
-    .backgroundColor(Color.White)
-    .onClick(() => this.selectAvatarSkin(value))
-  }
-
-  private selectAvatarSkin(skin: string): void {
-    const normalized = skin === 'kun' ? 'kun' : 'cat';
-    this.avatarSkin = normalized;
-    this.runtime?.prefs.setAvatarSkin(normalized);
-    AppStorage.setOrCreate<string>('avatarSkin', normalized);
   }
 
   private async toggleFloatingWindow(isOn: boolean) {

@@ -2,7 +2,7 @@ import { NodeRuntime } from '../node/NodeRuntime';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { ChatTab } from './ChatTab';
 import { MemoryTab } from './MemoryTab';
-import { ServerTab } from './ServerTab';
+import { SkillsTab } from './SkillsTab';
 import { SettingsTab } from './SettingsTab';
 
 @Entry
@@ -80,9 +80,9 @@ struct MainPage {
         .tabBar(this.TabBarIcon($r('app.media.ic_tab_memory'), 1))
 
         TabContent() {
-          ServerTab({ runtime: this.runtime })
+          SkillsTab({ runtime: this.runtime })
         }
-        .tabBar(this.TabBarIcon($r('app.media.ic_tab_server'), 2))
+        .tabBar(this.TabBarIcon($r('app.media.ic_tab_screen'), 2))
 
         TabContent() {
           SettingsTab({ runtime: this.runtime, onDisconnect: () => {
