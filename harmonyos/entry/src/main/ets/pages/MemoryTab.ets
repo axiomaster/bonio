@@ -80,6 +80,10 @@ export struct MemoryTab {
     return memory.source.startsWith('msdp_');
   }
 
+  private coverDataUrl(memory: BonioMemory): string {
+    return `data:image/jpeg;base64,${memory.coverImage}`;
+  }
+
   private async deleteSelectedMemory() {
     if (!this.runtime || !this.selectedMemory) return;
     try {
@@ -145,16 +149,25 @@ export struct MemoryTab {
 
   @Builder MemoryRow(memory: BonioMemory) {
     Row() {
-      Text(this.isMsdpMemory(memory) ? '◇' : '▤')
-        .fontSize(22)
-        .fontColor('#0A59F7')
-        .width(50)
-        .height(50)
-        .textAlign(TextAlign.Center)
-        .padding({ top: 12 })
-        .backgroundColor('#E8F1FF')
-        .borderRadius(6)
-        .margin({ right: 12 })
+      if (memory.coverImage) {
+        Image(this.coverDataUrl(memory))
+          .width(50)
+          .height(50)
+          .objectFit(ImageFit.Cover)
+          .borderRadius(6)
+          .margin({ right: 12 })
+      } else {
+        Text(this.isMsdpMemory(memory) ? '◇' : '▤')
+          .fontSize(22)
+          .fontColor('#0A59F7')
+          .width(50)
+          .height(50)
+          .textAlign(TextAlign.Center)
+          .padding({ top: 12 })
+          .backgroundColor('#E8F1FF')
+          .borderRadius(6)
+          .margin({ right: 12 })
+      }
       Column() {
         Row() {
           Text(memory.title)
@@ -241,6 +254,14 @@ export struct MemoryTab {
             .fontColor('#98A2B3')
             .width('100%')
             .margin({ top: 4 })
+          if (memory.coverImage) {
+            Image(this.coverDataUrl(memory))
+              .width('100%')
+              .height(180)
+              .objectFit(ImageFit.Cover)
+              .borderRadius(6)
+              .margin({ top: 16 })
+          }
           if (memory.tags.length > 0) {
             Flex({ wrap: FlexWrap.Wrap }) {
               ForEach(memory.tags, (tag: string) => {

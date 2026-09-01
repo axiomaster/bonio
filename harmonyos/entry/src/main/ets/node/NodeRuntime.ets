@@ -98,8 +98,8 @@ export class NodeRuntime {
     this.screenHandler = new ScreenHandlerImpl(
       context,
       () => this.prefs.getScreenAwarenessEnabled(),
-      (source: string, payloadJson: string) => {
-        this.companionMemoryController.enqueue(source, payloadJson);
+      (source: string, payloadJson: string, coverImageBase64?: string) => {
+        this.companionMemoryController.enqueue(source, payloadJson, coverImageBase64);
       },
     );
 

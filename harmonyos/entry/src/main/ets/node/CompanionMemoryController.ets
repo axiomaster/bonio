@@ -18,12 +18,21 @@ class CompanionChatParams {
   thinking: string = 'low';
   timeoutMs: number = 30000;
   idempotencyKey: string = '';
+  attachments: CompanionAttachmentPayload[] | undefined = undefined;
+}
+
+class CompanionAttachmentPayload {
+  type: string = 'image';
+  mimeType: string = 'image/jpeg';
+  fileName: string = 'msdp-screen.jpg';
+  content: string = '';
 }
 
 class CompanionMemoryInput {
   sequence: number = 0;
   source: string = '';
   payloadJson: string = '';
+  coverImageBase64: string | undefined = undefined;
   receivedAt: number = 0;
 }
 
@@ -60,7 +69,7 @@ export class CompanionMemoryController {
     this.isConnected = isConnected;
   }
 
-  enqueue(source: string, payloadJson: string): void {
+  enqueue(source: string, payloadJson: string, coverImageBase64?: string): void {
     if (!payloadJson.trim()) return;
     const filteredPayload = this.filterIgnoredApplications(source, payloadJson);
     if (!filteredPayload) return;
@@ -70,6 +79,7 @@ export class CompanionMemoryController {
     input.sequence = this.nextInputSequence++;
     input.source = source;
     input.payloadJson = filteredPayload;
+    input.coverImageBase64 = coverImageBase64;
     input.receivedAt = Date.now();
     if (this.queue.length >= CompanionMemoryController.MAX_QUEUE_SIZE) {
       this.queue.shift();
@@ -167,6 +177,11 @@ export class CompanionMemoryController {
       const params = new CompanionChatParams();
       params.message = this.buildPrompt(input);
       params.idempotencyKey = `companion-memory-${input.receivedAt}-${input.sequence}`;
+      if (input.coverImageBase64) {
+        const attachment = new CompanionAttachmentPayload();
+        attachment.content = input.coverImageBase64;
+        params.attachments = [attachment];
+      }
       const response = await this.session.request('chat.send', params);
       if (generation !== this.connectionGeneration || this.activeInput !== input) return;
       const payload = response.payload as Record<string, Object> ||
@@ -201,6 +216,7 @@ export class CompanionMemoryController {
         memory.sourceApp = summary.sourceApp?.trim() || '';
         memory.pageTitle = summary.pageTitle?.trim() || '';
         memory.pageLink = summary.pageLink?.trim() || '';
+        memory.coverImage = input.coverImageBase64 || '';
         await this.memoryService.save(memory);
         hilog.info(CompanionMemoryController.DOMAIN, CompanionMemoryController.TAG,
           'saved companion summary: %{public}s', memory.title);
@@ -234,7 +250,7 @@ export class CompanionMemoryController {
     const payload = this.payloadForDsh(input.payloadJson);
     return '你正在处理 Bonio 的后台伴随记忆，不是用户主对话。分析下面的 MSDP 屏幕感知结果，提取用户正在浏览的、未来可能有帮助的信息。'
       + '支付信息、账单、证件号等个人事务信息是高价值记忆，应记录关键内容。用户浏览过的文章、商品、美食、店铺、短视频，以及下单或购买过的商品也都是高价值记忆，应记录名称、关键信息和上下文。'
-      + '忽略密码、验证码、完整私信以及短暂无意义的界面状态。验证码是临时信息，不应记录。不要调用任何工具，不要输出 Markdown。'
+      + '忽略密码、验证码、完整私信以及短暂无意义的界面状态。验证码是临时信息，不应记录。若附有截图，请结合截图和结构化结果判断内容。不要调用任何工具，不要输出 Markdown。'
       + '只返回一个 JSON 对象：有价值时返回 {"shouldRemember":true,"title":"简短标题","content":"1到3句中文摘要",'
       + '"tags":["1到3个标签"],"sourceApp":"应用名","pageTitle":"页面标题","pageLink":"来源链接"}；'
       + '无价值时返回 {"shouldRemember":false}。输出必须能被标准 JSON.parse 解析；字符串正文中的英文双引号请改用中文引号或进行 JSON 转义。缺失字段使用空字符串或空数组。\n'

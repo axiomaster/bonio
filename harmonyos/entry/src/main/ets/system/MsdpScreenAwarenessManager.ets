@@ -1,8 +1,12 @@
 import onScreen from '@ohos.multimodalAwareness.onScreen';
 import { BusinessError } from '@kit.BasicServicesKit';
+import { image } from '@kit.ImageKit';
+import { util } from '@kit.ArkTS';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 
 const MAX_CONTEXT_TEXT_LENGTH = 12000;
+const MEMORY_COVER_MAX_EDGE = 480;
+const MEMORY_COVER_JPEG_QUALITY = 60;
 // SmartEdge is an MSDP capability group, not an individual capability name.
 const SMART_EDGE_CAPABILITY: onScreen.OnscreenAwarenessCap = { groupId: 'SmartEdge' };
 // capture() accepts concrete capabilities; Screenshot is exposed by the device MSDP service.
@@ -40,7 +44,13 @@ export interface SmartEdgeSnapshot {
   collectStrategy?: number;
   pageTags?: string[];
   payloadJson: string;
+  coverImageBase64?: string;
   truncated: boolean;
+}
+
+interface SmartEdgeReport {
+  payloadJson: string;
+  coverImageBase64?: string;
 }
 
 export class MsdpScreenAwarenessError extends Error {
@@ -61,17 +71,18 @@ export class MsdpScreenAwarenessManager {
   private static readonly TAG = 'MsdpScreenAwareness';
   private readonly smartEdgeListener = (results: onScreen.OnscreenAwarenessInfo[]): void => {
     this.lastSmartEdgeChangeAtMs = results.length > 0 ? Date.now() : this.lastSmartEdgeChangeAtMs;
-    this.reportSmartEdgeResult('subscribe', results);
+    void this.reportSmartEdgeResult('subscribe', results);
   };
   private smartEdgeSubscribed: boolean = false;
   private lastSnapshot: ScreenContextSnapshot | undefined = undefined;
   private lastSmartEdgeChangeAtMs: number | undefined = undefined;
   private readonly isEnabled: () => boolean;
-  private readonly onSmartEdgeResult: ((source: SmartEdgeResultSource, payloadJson: string) => void) | undefined;
+  private readonly onSmartEdgeResult: ((source: SmartEdgeResultSource, payloadJson: string,
+    coverImageBase64?: string) => void) | undefined;
 
   constructor(
     isEnabled: () => boolean,
-    onSmartEdgeResult?: (source: SmartEdgeResultSource, payloadJson: string) => void,
+    onSmartEdgeResult?: (source: SmartEdgeResultSource, payloadJson: string, coverImageBase64?: string) => void,
   ) {
     this.isEnabled = isEnabled;
     this.onSmartEdgeResult = onSmartEdgeResult;
@@ -121,14 +132,14 @@ export class MsdpScreenAwarenessManager {
     this.subscribeSmartEdge();
     try {
       const result = await onScreen.trigger(SMART_EDGE_CAPABILITY);
-      this.reportSmartEdgeResult('trigger', result);
+      const report = await this.reportSmartEdgeResult('trigger', result);
       if (result.resultCode !== 0) {
         throw new MsdpScreenAwarenessError(
           'SMART_EDGE_RESULT_FAILED',
           `MSDP SmartEdge returned resultCode ${result.resultCode}`,
         );
       }
-      return this.toSmartEdgeSnapshot(result);
+      return this.toSmartEdgeSnapshot(result, report.payloadJson, report.coverImageBase64);
     } catch (error) {
       throw this.toAwarenessError(error);
     }
@@ -149,8 +160,8 @@ export class MsdpScreenAwarenessManager {
           `MSDP Screenshot capture returned resultCode ${failed.resultCode}`,
         );
       }
-      this.reportSmartEdgeResult('capture', results);
-      return this.toSmartEdgeSnapshot(results[0], JSON.stringify(results));
+      const report = await this.reportSmartEdgeResult('capture', results);
+      return this.toSmartEdgeSnapshot(results[0], report.payloadJson, report.coverImageBase64);
     } catch (error) {
       throw this.toAwarenessError(error);
     }
@@ -194,23 +205,55 @@ export class MsdpScreenAwarenessManager {
     }
   }
 
-  private reportSmartEdgeResult(source: SmartEdgeResultSource, result: Object): void {
+  private async reportSmartEdgeResult(source: SmartEdgeResultSource, result: Object): Promise<SmartEdgeReport> {
+    const report: SmartEdgeReport = { payloadJson: '' };
     try {
-      const payloadJson = JSON.stringify(result);
+      report.payloadJson = JSON.stringify(result);
+      report.coverImageBase64 = await this.extractCoverImage(result);
       hilog.info(
         MsdpScreenAwarenessManager.DOMAIN,
         MsdpScreenAwarenessManager.TAG,
         '%{public}s result shape: %{public}s',
         source,
-        this.describeResultShape(result, payloadJson),
+        this.describeResultShape(result, report.payloadJson, report.coverImageBase64),
       );
-      if (this.onSmartEdgeResult) this.onSmartEdgeResult(source, payloadJson);
+      if (this.onSmartEdgeResult) this.onSmartEdgeResult(source, report.payloadJson, report.coverImageBase64);
     } catch (_) {
       // Diagnostic rendering must never affect MSDP subscription or capture.
     }
+    return report;
   }
 
-  private describeResultShape(result: Object, payloadJson: string): string {
+  private async extractCoverImage(result: Object): Promise<string | undefined> {
+    const rows = Array.isArray(result) ? result as onScreen.OnscreenAwarenessInfo[] : [result as onScreen.OnscreenAwarenessInfo];
+    for (const row of rows) {
+      for (const item of row.items || []) {
+        const imageValue = item.itemInfo['image'];
+        if (imageValue === undefined || imageValue === null || typeof imageValue !== 'object') continue;
+        try {
+          const pixelMap = imageValue as image.PixelMap;
+          const info = await pixelMap.getImageInfo();
+          const longestEdge = Math.max(info.size.width, info.size.height);
+          const scale = longestEdge > MEMORY_COVER_MAX_EDGE ? MEMORY_COVER_MAX_EDGE / longestEdge : 1;
+          const coverMap = scale < 1 ? await pixelMap.createScaledPixelMap(scale, scale) : pixelMap;
+          try {
+            const packed = await image.createImagePacker().packing(coverMap, {
+              format: 'image/jpeg', quality: MEMORY_COVER_JPEG_QUALITY,
+            });
+            return new util.Base64Helper().encodeToStringSync(new Uint8Array(packed));
+          } finally {
+            if (coverMap !== pixelMap) coverMap.release();
+          }
+        } catch (error) {
+          hilog.warn(MsdpScreenAwarenessManager.DOMAIN, MsdpScreenAwarenessManager.TAG,
+            'MSDP image is not a readable PixelMap: %{public}s', error instanceof Error ? error.message : String(error));
+        }
+      }
+    }
+    return undefined;
+  }
+
+  private describeResultShape(result: Object, payloadJson: string, coverImageBase64?: string): string {
     const rows = Array.isArray(result) ? result as onScreen.OnscreenAwarenessInfo[] : [result as onScreen.OnscreenAwarenessInfo];
     const topLevelKeys = rows.length > 0 ? Object.keys(rows[0]) : [];
     const itemCount = rows.reduce((count: number, row: onScreen.OnscreenAwarenessInfo): number =>
@@ -234,6 +277,7 @@ export class MsdpScreenAwarenessManager {
       entityKeys: this.uniqueStrings(entityKeys),
       pageTags: this.uniqueStrings(pageTags),
       screenshotCandidateKeys: this.uniqueStrings(candidateKeys),
+      memoryCoverBytes: coverImageBase64 ? Math.floor(coverImageBase64.length * 3 / 4) : 0,
       payloadLength: payloadJson.length,
     });
   }
@@ -293,7 +337,8 @@ export class MsdpScreenAwarenessManager {
     };
   }
 
-  private toSmartEdgeSnapshot(result: onScreen.OnscreenAwarenessInfo, payloadJson?: string): SmartEdgeSnapshot {
+  private toSmartEdgeSnapshot(result: onScreen.OnscreenAwarenessInfo, payloadJson?: string,
+    coverImageBase64?: string): SmartEdgeSnapshot {
     return {
       resultCode: result.resultCode,
       timestamp: result.timestamp,
@@ -303,6 +348,7 @@ export class MsdpScreenAwarenessManager {
       collectStrategy: result.collectStrategy,
       pageTags: result.pageTags,
       payloadJson: payloadJson || JSON.stringify(result),
+      coverImageBase64: coverImageBase64,
       truncated: false,
     };
   }

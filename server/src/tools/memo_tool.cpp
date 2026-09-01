@@ -73,6 +73,7 @@ json normalized_memo(json memo) {
   if (!memo.contains("sourceApp")) memo["sourceApp"] = "";
   if (!memo.contains("pageTitle")) memo["pageTitle"] = "";
   if (!memo.contains("pageLink")) memo["pageLink"] = "";
+  if (!memo.contains("coverImage")) memo["coverImage"] = "";
   return memo;
 }
 
@@ -109,6 +110,7 @@ types::ToolResult memo_save(const std::string& args_json) {
   memo["sourceApp"] = optional_string(params, "sourceApp");
   memo["pageTitle"] = optional_string(params, "pageTitle");
   memo["pageLink"] = optional_string(params, "pageLink");
+  memo["coverImage"] = optional_string(params, "coverImage");
   memo["tags"] = json::array();
   if (params.contains("tags") && params["tags"].is_array()) {
     for (const auto& tag : params["tags"]) {

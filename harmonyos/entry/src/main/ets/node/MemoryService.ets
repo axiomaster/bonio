@@ -10,6 +10,7 @@ export class BonioMemory {
   sourceApp: string = '';
   pageTitle: string = '';
   pageLink: string = '';
+  coverImage: string = '';
 }
 
 export class SaveBonioMemory {
@@ -20,6 +21,7 @@ export class SaveBonioMemory {
   sourceApp: string = '';
   pageTitle: string = '';
   pageLink: string = '';
+  coverImage: string = '';
 }
 
 class MemoListParams {
@@ -49,6 +51,7 @@ function toMemory(value: Object): BonioMemory {
   memory.sourceApp = stringValue(raw['sourceApp']);
   memory.pageTitle = stringValue(raw['pageTitle']);
   memory.pageLink = stringValue(raw['pageLink']);
+  memory.coverImage = stringValue(raw['coverImage']);
   const rawTags = raw['tags'];
   if (Array.isArray(rawTags)) {
     memory.tags = rawTags.filter((tag: Object): boolean => typeof tag === 'string') as string[];
