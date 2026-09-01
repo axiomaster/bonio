@@ -13,9 +13,8 @@ until the natural-language task is done. No PC-side control loop.
 
 - Built: `aarch64-linux-ohos` ELF from the local OHOS NDK (`/Users/ohci/tools/ohos-command-line-tools/sdk/default/openharmony/native`).
 - Deployed: `/data/local/bin/phone-use-harmonyos` on device `5MQ0125716000138`; `--help` verified.
-- Device config written to `/data/local/.phone-use-harmonyos/phone-use-harmonyos.conf` with the repo's
-  GLM key — **that key currently returns 401** (expired/invalid); replace with a valid key to run real tasks.
-- E2E smoke: screenshot + GLM request path works (got HTTP 401 only at auth).
+- Device config written to `/data/local/.phone-use-harmonyos/phone-use-harmonyos.conf` with a **valid** GLM key.
+- E2E verified: real UI task executed on device (screenshot → GLM 200 OK → tap/swipe actions); success path returns exit 0, step-limit exit 5.
 
 ## Files
 
