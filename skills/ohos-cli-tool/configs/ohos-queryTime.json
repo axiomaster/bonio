@@ -1,0 +1,309 @@
+{
+  "name": "ohos-queryTime",
+  "version": "1.0.0",
+  "description": "Query system time information including wall time, boot time, monotonic time, and time zone. Used for system time diagnostics and monitoring scenarios. Does not support setting or modifying system time.",
+  "executablePath": "/system/bin/cli_tool/executable/ohos-queryTime",
+  "requirePermissions": [],
+  "inputSchema": {
+    "type": "object",
+    "properties": {},
+    "required": []
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "type": {
+        "type": "string",
+        "enum": [
+          "result"
+        ]
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "success",
+          "failed"
+        ]
+      },
+      "data": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string"
+          }
+        }
+      },
+      "errCode": {
+        "type": "string"
+      },
+      "errMsg": {
+        "type": "string"
+      },
+      "suggestion": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "type",
+      "status"
+    ]
+  },
+  "eventTypes": [],
+  "eventSchemas": {},
+  "hasSubCommand": true,
+  "subcommands": {
+    "get-wall-time": {
+      "description": "Get wall time (UTC time in milliseconds from 1970-01-01 00:00:00). Used for obtaining the current system UTC timestamp. Does not support time format conversion.",
+      "requirePermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "result"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "time": {
+                "type": "integer",
+                "description": "Wall time in milliseconds"
+              },
+              "unit": {
+                "type": "string",
+                "description": "Time unit",
+                "enum": [
+                  "ms"
+                ]
+              }
+            },
+            "required": [
+              "time",
+              "unit"
+            ]
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "status"
+        ]
+      }
+    },
+    "get-boot-time": {
+      "description": "Get boot time (milliseconds since boot, including sleep time). Used for measuring system uptime including suspend periods. Does not provide high-precision timing for short intervals.",
+      "requirePermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "result"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "time": {
+                "type": "integer",
+                "description": "Boot time in milliseconds"
+              },
+              "unit": {
+                "type": "string",
+                "description": "Time unit",
+                "enum": [
+                  "ms"
+                ]
+              }
+            },
+            "required": [
+              "time",
+              "unit"
+            ]
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "status"
+        ]
+      }
+    },
+    "get-monotonic-time": {
+      "description": "Get monotonic time (milliseconds since boot, excluding sleep time). Used for precise interval timing that pauses during system suspend. Does not include time spent in sleep state.",
+      "requirePermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "result"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "time": {
+                "type": "integer",
+                "description": "Monotonic time in milliseconds"
+              },
+              "unit": {
+                "type": "string",
+                "description": "Time unit",
+                "enum": [
+                  "ms"
+                ]
+              }
+            },
+            "required": [
+              "time",
+              "unit"
+            ]
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "status"
+        ]
+      }
+    },
+    "get-time-zone": {
+      "description": "Get current time zone ID. Used for retrieving the system timezone setting. Does not support timezone conversion or DST calculation.",
+      "requirePermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "result"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "timezone": {
+                "type": "string",
+                "description": "Time zone ID (e.g., Asia/Shanghai)"
+              }
+            },
+            "required": [
+              "timezone"
+            ]
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "status"
+        ]
+      }
+    },
+    "--help": {
+      "description": "Show help message. Used for displaying command usage information. Does not execute any time query operations.",
+      "requirePermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "Help information output"
+          }
+        },
+        "required": [
+          "content"
+        ]
+      }
+    }
+  }
+}

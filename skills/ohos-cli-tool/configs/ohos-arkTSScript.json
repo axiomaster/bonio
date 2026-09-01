@@ -1,0 +1,53 @@
+{
+  "name": "ohos-arkTSScript",
+  "version": "1.0.0",
+  "description": "Run a specified function from an ArkTS script ABC file",
+  "executablePath": "/system/bin/cli_tool/executable/ohos-arkTSScript",
+  "requirePermissions": [],
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "abcPath": {
+        "type": "string",
+        "description": "ABC file path"
+      },
+      "scriptPath": {
+        "type": "string",
+        "description": "Optional script file or class name"
+      },
+      "functionName": {
+        "type": "string",
+        "description": "Function name to execute"
+      },
+      "args": {
+        "type": "string",
+        "description": "JSON object string for function arguments, for example {\"arg0\":10,\"arg1\":20}"
+      }
+    },
+    "required": [
+      "abcPath",
+      "functionName"
+    ]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "code": {
+        "type": "integer"
+      },
+      "result": {
+        "type": "object",
+        "properties": {}
+      },
+      "uri": {
+        "type": "string"
+      },
+      "flag": {
+        "type": "integer"
+      }
+    },
+    "required": [
+      "code"
+    ]
+  }
+}

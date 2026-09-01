@@ -1,0 +1,113 @@
+{
+  "name": "ohos-vibratorControl",
+  "version": "1.0.0",
+  "description": "Vibrator control utility for starting preset vibrations and checking effect support. Used for triggering device haptic feedback and querying vibration capability. Does not support custom vibration patterns.",
+  "executablePath": "/system/bin/cli_tool/executable/ohos-vibratorControl",
+  "requirePermissions": [
+    "ohos.permission.VIBRATE"
+  ],
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "command": {
+        "type": "string",
+        "description": "The subcommand to execute"
+      }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "type": {
+        "type": "string",
+        "description": "Response type"
+      },
+      "status": {
+        "type": "string",
+        "description": "Execution status"
+      }
+    }
+  },
+  "hasSubCommand": true,
+  "subcommands": {
+    "startVibrator": {
+      "description": "Start preset vibration effect",
+      "requirePermissions": [
+        "ohos.permission.VIBRATE"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "effectId": {
+            "type": "string",
+            "description": "The preset vibration effect ID",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "required": [
+          "effectId"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "effectId": {
+            "type": "string",
+            "description": "The effect ID that was started"
+          },
+          "status": {
+            "type": "string",
+            "description": "Vibration status",
+            "enum": [
+              "vibrating"
+            ]
+          }
+        },
+        "required": [
+          "effectId",
+          "status"
+        ]
+      }
+    },
+    "isSupportEffect": {
+      "description": "Check preset vibration effect ID to query",
+      "requirePermissions": [
+        ""
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "effectId": {
+            "type": "string",
+            "description": "The preset vibration effect ID to query (e.g., haptic.clock.timer)",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "required": [
+          "effectId"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "effectId": {
+            "type": "string",
+            "description": "The effect ID that was queried"
+          },
+          "isSupported": {
+            "type": "boolean",
+            "description": "Whether the effect is supported"
+          }
+        },
+        "required": [
+          "effectId",
+          "isSupported"
+        ]
+      }
+    }
+  },
+  "eventTypes": [],
+  "eventSchemas": {}
+}

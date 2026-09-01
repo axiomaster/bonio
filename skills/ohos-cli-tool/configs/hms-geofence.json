@@ -1,0 +1,180 @@
+{
+  "name": "hms-geofence",
+  "version": "1.0.0",
+  "description": "Geofence management tool for subscribing and unsubscribing geofence status. Used for location-based geofence event subscription scenarios. Does not support real-time location tracking or continuous monitoring.",
+  "executablePath": "/system/bin/cli_tool/executable/hms-geofence",
+  "requirePermissions": [
+    "ohos.permission.APPROXIMATELY_LOCATION"
+  ],
+  "hasSubCommand": true,
+  "inputSchema": {
+    "type": "object",
+    "properties": {},
+    "required": []
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {}
+  },
+  "subcommands": {
+    "subscribe": {
+      "description": "Subscribe to geofence status events. Used for registering geofence monitoring with specific location and scenario parameters. Does not support batch subscription or modification of existing subscriptions.",
+      "requirePermissions": [
+        "ohos.permission.APPROXIMATELY_LOCATION"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "description": "Session identifier for the subscription"
+          },
+          "ruleId": {
+            "type": "string",
+            "description": "Rule identifier for the subscription"
+          },
+          "bundleName": {
+            "type": "string",
+            "description": "Bundle name of the application"
+          },
+          "type": {
+            "type": "integer",
+            "description": "Location type (0: HOME, 1: COMPANY, 2: OTHERS)",
+            "minimum": 0,
+            "maximum": 2
+          },
+          "latitude": {
+            "type": "number",
+            "description": "Latitude coordinate (-90 to 90)",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "longitude": {
+            "type": "number",
+            "description": "Longitude coordinate (-180 to 180)",
+            "minimum": -180,
+            "maximum": 180
+          },
+          "status": {
+            "type": "integer",
+            "description": "Subscription status (0: ENTER, 1: EXIT, 2: ENTER_EXIT)",
+            "minimum": 0,
+            "maximum": 2
+          },
+          "code": {
+            "type": "integer",
+            "description": "Event reporter code"
+          },
+          "interfaceToken": {
+            "type": "string",
+            "description": "Interface token for event reporter"
+          },
+          "abilityName": {
+            "type": "string",
+            "description": "Ability name for event reporter"
+          }
+        },
+        "required": [
+          "sessionId",
+          "ruleId",
+          "bundleName",
+          "type",
+          "latitude",
+          "longitude",
+          "status",
+          "code",
+          "interfaceToken",
+          "abilityName"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "description": "Session identifier"
+          },
+          "ruleId": {
+            "type": "string",
+            "description": "Rule identifier"
+          },
+          "bundleName": {
+            "type": "string",
+            "description": "Bundle name"
+          },
+          "type": {
+            "type": "integer",
+            "description": "Location type"
+          },
+          "latitude": {
+            "type": "number",
+            "description": "Latitude coordinate"
+          },
+          "longitude": {
+            "type": "number",
+            "description": "Longitude coordinate"
+          },
+          "status": {
+            "type": "integer",
+            "description": "Subscription status"
+          },
+          "message": {
+            "type": "string",
+            "description": "Result message"
+          }
+        }
+      }
+    },
+    "unsubscribe": {
+      "description": "Unsubscribe from geofence status events. Used for removing geofence monitoring registration. Does not support partial unsubscription or unsubscription of non-existent sessions.",
+      "requirePermissions": [
+        "ohos.permission.APPROXIMATELY_LOCATION"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "description": "Session identifier to unsubscribe"
+          },
+          "ruleId": {
+            "type": "string",
+            "description": "Rule identifier to unsubscribe"
+          },
+          "bundleName": {
+            "type": "string",
+            "description": "Bundle name of the application"
+          }
+        },
+        "required": [
+          "sessionId",
+          "ruleId",
+          "bundleName"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "description": "Session identifier"
+          },
+          "ruleId": {
+            "type": "string",
+            "description": "Rule identifier"
+          },
+          "bundleName": {
+            "type": "string",
+            "description": "Bundle name"
+          },
+          "message": {
+            "type": "string",
+            "description": "Result message"
+          }
+        }
+      }
+    }
+  },
+  "eventTypes": [],
+  "eventSchemas": {}
+}

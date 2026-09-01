@@ -1,0 +1,684 @@
+{
+  "name": "ohos-bm",
+  "version": "1.0.0",
+  "description": "ohos-bm bundle management CLI tool",
+  "executablePath": "/system/bin/cli_tool/executable/ohos-bm",
+  "requirePermissions": [],
+  "hasSubCommand": true,
+  "inputSchema": {
+    "type": "object",
+    "description": "View information about ohos-bm subcommands",
+    "properties": {
+      "help": {
+        "type": "boolean",
+        "default": false
+      }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "description": "Execution result",
+    "properties": {
+      "type": {
+        "type": "string"
+      },
+      "status": {
+        "type": "string"
+      },
+      "data": {
+        "type": "object",
+        "properties": {}
+      },
+      "errCode": {
+        "type": "string"
+      },
+      "errMsg": {
+        "type": "string"
+      },
+      "suggestion": {
+        "type": "string"
+      }
+    }
+  },
+  "subcommands": {
+    "uninstall": {
+      "description": "Uninstall an application package",
+      "requirePermissions": [
+        "ohos.permission.cli.UNINSTALL_BUNDLE"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "help": {
+            "type": "boolean",
+            "default": false
+          },
+          "bundleName": {
+            "type": "string",
+            "description": "Bundle name to uninstall",
+            "default": ""
+          },
+          "keepData": {
+            "type": "boolean",
+            "default": false
+          },
+          "shared": {
+            "type": "boolean",
+            "default": false
+          },
+          "version": {
+            "type": "string",
+            "description": "Uninstall inter-application shared library by version code",
+            "default": ""
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Execution result",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "properties": {}
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "dump": {
+      "description": "View application package information",
+      "requirePermissions": [
+        "ohos.permission.cli.GET_BUNDLE_INFO_PRIVILEGED"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "help": {
+            "type": "boolean",
+            "default": false
+          },
+          "all": {
+            "type": "boolean",
+            "default": false
+          },
+          "debugBundle": {
+            "type": "boolean",
+            "default": false
+          },
+          "bundleName": {
+            "type": "string",
+            "description": "Specify bundle name",
+            "default": ""
+          },
+          "shortcutInfo": {
+            "type": "boolean",
+            "default": false
+          },
+          "deviceId": {
+            "type": "string",
+            "description": "Specify device ID",
+            "default": ""
+          },
+          "label": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Execution result",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "properties": {}
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "dump-dependencies": {
+      "description": "View dependency information of specified application and module",
+      "requirePermissions": [
+        "ohos.permission.cli.GET_BUNDLE_INFO_PRIVILEGED"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "help": {
+            "type": "boolean",
+            "default": false
+          },
+          "bundleName": {
+            "type": "string",
+            "description": "Specify bundle name",
+            "default": ""
+          },
+          "moduleName": {
+            "type": "string",
+            "description": "Specify module name",
+            "default": ""
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Execution result",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "properties": {}
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "dump-shared": {
+      "description": "View inter-application shared library information",
+      "requirePermissions": [
+        "ohos.permission.cli.GET_BUNDLE_INFO_PRIVILEGED"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "help": {
+            "type": "boolean",
+            "default": false
+          },
+          "all": {
+            "type": "boolean",
+            "default": false
+          },
+          "bundleName": {
+            "type": "string",
+            "description": "Specify bundle name",
+            "default": ""
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Execution result",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "properties": {}
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "clean": {
+      "description": "Clean application cache or data files",
+      "requirePermissions": [
+        "ohos.permission.cli.REMOVE_BUNDLE_DATA_AND_CACHE_FILES"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "help": {
+            "type": "boolean",
+            "default": false
+          },
+          "bundleName": {
+            "type": "string",
+            "description": "Specify bundle name",
+            "default": ""
+          },
+          "cache": {
+            "type": "boolean",
+            "default": false
+          },
+          "data": {
+            "type": "boolean",
+            "default": false
+          },
+          "appIndex": {
+            "type": "integer",
+            "description": "Specify application index",
+            "default": 0
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Execution result",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "properties": {}
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "set-disposed-rule": {
+      "description": "Set disposed rule for clone app to control component behavior",
+      "requirePermissions": [
+        "ohos.permission.cli.MANAGE_DISPOSED_APP_STATUS"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "required": [
+          "appId",
+          "priority",
+          "componentType",
+          "disposedType",
+          "controlType",
+          "wantBundleName",
+          "wantAbilityName"
+        ],
+        "properties": {
+          "help": {
+            "type": "boolean",
+            "default": false
+          },
+          "appId": {
+            "type": "string",
+            "description": "Application appId or appIdentifier"
+          },
+          "appIndex": {
+            "type": "integer",
+            "description": "Clone app index, a positive integer"
+          },
+          "priority": {
+            "type": "integer",
+            "description": "Disposed rule priority, non-negative integer, lower value means higher priority"
+          },
+          "componentType": {
+            "type": "string",
+            "description": "Component type to control: 1=UI_ABILITY, 2=UI_EXTENSION"
+          },
+          "disposedType": {
+            "type": "string",
+            "description": "Disposed type: 1=BLOCK_APPLICATION, 2=BLOCK_ABILITY, 3=NON_BLOCK"
+          },
+          "controlType": {
+            "type": "string",
+            "description": "Control type: 1=ALLOWED_LIST, 2=DISALLOWED_LIST"
+          },
+          "elements": {
+            "type": "array",
+            "description": "Controlled component element list, format: /bundleName/moduleName/abilityName, multiple elements allowed",
+            "items": {
+              "type": "string"
+            }
+          },
+          "wantBundleName": {
+            "type": "string",
+            "description": "Want redirection target bundleName"
+          },
+          "wantModuleName": {
+            "type": "string",
+            "description": "Want redirection target moduleName"
+          },
+          "wantAbilityName": {
+            "type": "string",
+            "description": "Want redirection target abilityName"
+          },
+          "wantParamsStrings": {
+            "type": "string",
+            "description": "Want string type additional parameters, format: Example: '{\"key1\":\"value1\",\"key2\":\"value2\"}'"
+          },
+          "wantParamsInts": {
+            "type": "string",
+            "description": "Want int type additional parameters, format: Example: '{\"key1\":100,\"key2\":101}'"
+          },
+          "wantParamsBools": {
+            "type": "string",
+            "description": "Want bool type additional parameters, format: Example: '{\"key1\":true,\"key2\":false}'"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Execution result",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "properties": {}
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "delete-disposed-rule": {
+      "description": "Delete disposed rule for clone app",
+      "requirePermissions": [
+        "ohos.permission.cli.MANAGE_DISPOSED_APP_STATUS"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "required": [
+          "appId"
+        ],
+        "properties": {
+          "help": {
+            "type": "boolean",
+            "default": false
+          },
+          "appId": {
+            "type": "string",
+            "description": "Application appId or appIdentifier"
+          },
+          "appIndex": {
+            "type": "integer",
+            "description": "Clone app index, a positive integer"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Execution result",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "properties": {}
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "get-recoverable-apps": {
+      "description": "Get recoverable (uninstalled pre-installed) applications info",
+      "requirePermissions": [
+        "ohos.permission.cli.GET_BUNDLE_INFO_PRIVILEGED"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "help": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Execution result",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "recoverableApps": {
+                "type": "array",
+                "description": "List of recoverable application bundle names",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "recover": {
+      "description": "Recover an uninstalled pre-installed application",
+      "requirePermissions": [
+        "ohos.permission.cli.INSTALL_BUNDLE",
+        "ohos.permission.RECOVER_BUNDLE"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "required": [
+          "bundleName"
+        ],
+        "properties": {
+          "help": {
+            "type": "boolean",
+            "default": false
+          },
+          "bundleName": {
+            "type": "string",
+            "description": "Bundle name to recover"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Execution result",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "properties": {}
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "create-cli-sandbox-app": {
+      "description": "Create an cli sandbox app",
+      "requirePermissions": [
+        "ohos.permission.MANAGE_SANDBOX_BUNDLE"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "required": [
+          "bundleName"
+        ],
+        "properties": {
+          "help": {
+            "type": "boolean",
+            "default": false
+          },
+          "bundleName": {
+            "type": "string",
+            "description": "Bundle name need to create sandbox app"
+          },
+          "creatorBundleName": {
+            "type": "string",
+            "description": "Bundle name to create sandbox app"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Execution result",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "properties": {}
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "destroy-cli-sandbox-app": {
+      "description": "Destroy an cli sandbox app",
+      "requirePermissions": [
+        "ohos.permission.MANAGE_SANDBOX_BUNDLE"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "required": [
+          "bundleName",
+          "appIndex"
+        ],
+        "properties": {
+          "help": {
+            "type": "boolean",
+            "default": false
+          },
+          "bundleName": {
+            "type": "string",
+            "description": "Bundle name need to destroy sandbox app"
+          },
+          "creatorBundleName": {
+            "type": "string",
+            "description": "Creator bundle name to destroy sandbox app"
+          },
+          "appIndex": {
+            "type": "integer",
+            "description": "AppIndex of the sandbox app to destroy"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Execution result",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "properties": {}
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

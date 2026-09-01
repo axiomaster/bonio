@@ -1,0 +1,226 @@
+{
+  "name": "ohos-aa",
+  "version": "1.0.0",
+  "description": "ohos-aa - Ability management utility for starting an ability or stopping an application on the system.",
+  "executablePath": "/system/bin/cli_tool/executable/ohos-aa",
+  "requirePermissions": [],
+  "inputSchema": {
+    "type": "object",
+    "description": "Sub-options of the ohos-aa command.",
+    "properties": {
+      "help": {
+        "type": "boolean",
+        "default": false
+      }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "description": "Execution result of the ohos-aa command.",
+    "properties": {
+      "type": {
+        "type": "string",
+        "enum": [
+          "result"
+        ]
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "success",
+          "failed"
+        ]
+      },
+      "data": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "errCode": {
+        "type": "string"
+      },
+      "errMsg": {
+        "type": "string"
+      },
+      "suggestion": {
+        "type": "string"
+      }
+    }
+  },
+  "hasSubCommand": true,
+  "subcommands": {
+    "start": {
+      "description": "ohos-aa start - Start an ability on the system",
+      "requirePermissions": [
+        "ohos.permission.cli.START_ABILITY"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "description": "Sub-options of the ohos-aa start command.",
+        "properties": {
+          "help": {
+            "type": "boolean",
+            "default": false
+          },
+          "abilityname": {
+            "type": "string",
+            "description": "abilityName"
+          },
+          "bundlename": {
+            "type": "string",
+            "description": "bundleName"
+          },
+          "deviceId": {
+            "type": "string",
+            "description": "deviceId"
+          },
+          "modulename": {
+            "type": "string",
+            "description": "moduleName"
+          },
+          "sandboxCloneIndex": {
+            "type": "integer",
+            "description": "Sandbox clone index for launching sandbox clone application (range: 2000-3000)"
+          },
+          "creatorBundle": {
+            "type": "string",
+            "description": "Creator bundle name for sandbox clone application"
+          },
+          "uri": {
+            "type": "string",
+            "description": "URI"
+          },
+          "action": {
+            "type": "string",
+            "description": "action"
+          },
+          "entity": {
+            "type": "string",
+            "description": "entity"
+          },
+          "type": {
+            "type": "string",
+            "description": "type"
+          },
+          "time": {
+            "type": "boolean",
+            "description": "time",
+            "default": false
+          },
+          "pi": {
+            "type": "string",
+            "description": "Parameter integer key-value pair map as JSON string. Example: '{\"key1\":100,\"key2\":101}'"
+          },
+          "pb": {
+            "type": "string",
+            "description": "Parameter boolean key-value pair map as JSON string. Example: '{\"key1\":true,\"key2\":false}'"
+          },
+          "ps": {
+            "type": "string",
+            "description": "Parameter string key-value pair map as JSON string. Example: '{\"key1\":\"value1\",\"key2\":\"value2\"}'"
+          },
+          "psn": {
+            "type": "string",
+            "description": "For the string-type value corresponding to an empty key."
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Execution result of the ohos-aa start command.",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "result"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "force-stop": {
+      "description": "ohos-aa force-stop - Stop an application on the system.",
+      "requirePermissions": [
+        "ohos.permission.cli.KILL_APP_PROCESSES"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "description": "Sub-options of the ohos-aa force-stop command.",
+        "properties": {
+          "help": {
+            "type": "boolean",
+            "default": false
+          },
+          "bundlename": {
+            "type": "string",
+            "description": "bundleName"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "description": "Execution result of the ohos-aa force-stop command.",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "result"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "eventSchemas": {}
+}

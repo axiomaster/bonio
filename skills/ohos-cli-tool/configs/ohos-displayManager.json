@@ -1,0 +1,137 @@
+{
+  "name": "ohos-displayManager",
+  "version": "1.0.0",
+  "description": "Display brightness management CLI tool for adjusting screen brightness. Used for system display configuration scenarios. Does not support advanced display features such as color calibration.",
+  "executablePath": "/system/bin/cli_tool/executable/ohos-displayManager",
+  "requirePermissions": [],
+  "hasSubCommand": true,
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "command": {
+        "type": "string",
+        "description": "Subcommand to execute. Used to select the specific display management operation. Only 'set-brightness' is supported."
+      }
+    },
+    "required": [
+      "command"
+    ]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "type": {
+        "type": "string",
+        "enum": [
+          "result"
+        ],
+        "description": "Response type, always 'result'."
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "success",
+          "failed"
+        ],
+        "description": "Execution result status: success or failed."
+      },
+      "data": {
+        "type": "object",
+        "description": "Response data on success, empty string on failure.",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Result message."
+          }
+        }
+      },
+      "errCode": {
+        "type": "string",
+        "description": "Error code when operation fails."
+      },
+      "errMsg": {
+        "type": "string",
+        "description": "Error description when operation fails."
+      },
+      "suggestion": {
+        "type": "string",
+        "description": "Suggested next operation for error recovery."
+      }
+    }
+  },
+  "subcommands": {
+    "set-brightness": {
+      "description": "Set the brightness level of a display device. Used for adjusting screen brightness in system management. Does not support brightness scheduling or automatic adjustment configuration.",
+      "requirePermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "integer",
+            "description": "Target brightness level to set. Used to specify desired screen brightness. Range: 0 (off) to 255 (maximum).",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "continuous": {
+            "type": "boolean",
+            "description": "Continuous brightness adjustment mode. Used for smooth brightness transitions. Does not affect discrete step adjustments.",
+            "default": false
+          }
+        },
+        "required": [
+          "value"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "result"
+            ],
+            "description": "Response type, always 'result'."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ],
+            "description": "Execution result status: success or failed."
+          },
+          "data": {
+            "type": "object",
+            "description": "Response data containing the set brightness value.",
+            "properties": {
+              "value": {
+                "type": "integer",
+                "description": "Brightness value that was set."
+              },
+              "continuous": {
+                "type": "boolean",
+                "description": "Whether continuous mode was enabled."
+              },
+              "message": {
+                "type": "string",
+                "description": "Result message."
+              }
+            }
+          },
+          "errCode": {
+            "type": "string",
+            "description": "Error code when operation fails."
+          },
+          "errMsg": {
+            "type": "string",
+            "description": "Error description when operation fails."
+          },
+          "suggestion": {
+            "type": "string",
+            "description": "Suggested next operation for error recovery."
+          }
+        }
+      }
+    }
+  }
+}

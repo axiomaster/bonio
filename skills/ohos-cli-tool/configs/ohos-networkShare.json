@@ -1,0 +1,290 @@
+{
+  "name": "ohos-networkShare",
+  "version": "1.0.0",
+  "description": "网络共享管理CLI工具。用于查询和控制系统网络共享状态（WiFi热点、USB tethering、蓝牙PAN）的启停和状态查询。仅限系统调用者使用，不支持普通应用调用。",
+  "executablePath": "/system/bin/cli_tool/executable/ohos-networkShare",
+  "requirePermissions": [
+    "ohos.permission.cli.GET_HOTSPOT",
+    "ohos.permission.cli.SET_HOTSPOT"
+  ],
+  "hasSubCommand": true,
+  "inputSchema": {
+    "type": "object",
+    "properties": {},
+    "required": []
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {}
+  },
+  "subcommands": {
+    "is-supported": {
+      "description": "Check if network sharing is supported on the device. Used for querying device capabilities. Only available on devices with network sharing hardware support.",
+      "requirePermissions": [
+        "ohos.permission.cli.GET_HOTSPOT"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "result"
+            ],
+            "description": "Event type, must be 'result'"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "supported": {
+                "type": "boolean",
+                "description": "Whether network sharing is supported on this device"
+              }
+            },
+            "required": [
+              "supported"
+            ]
+          },
+          "errCode": {
+            "type": "string",
+            "description": "Error code when operation failed"
+          },
+          "errMsg": {
+            "type": "string",
+            "description": "Error message when operation failed"
+          },
+          "suggestion": {
+            "type": "string",
+            "description": "Suggested next steps when operation failed"
+          }
+        },
+        "required": [
+          "type",
+          "status"
+        ]
+      }
+    },
+    "is-sharing": {
+      "description": "Check if network sharing is currently active. Used for querying current network sharing status. Only reflects WiFi/USB/Bluetooth sharing states.",
+      "requirePermissions": [
+        "ohos.permission.cli.GET_HOTSPOT"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "result"
+            ],
+            "description": "Event type, must be 'result'"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "sharing": {
+                "type": "boolean",
+                "description": "Whether network sharing is currently active"
+              }
+            },
+            "required": [
+              "sharing"
+            ]
+          },
+          "errCode": {
+            "type": "string",
+            "description": "Error code when operation failed"
+          },
+          "errMsg": {
+            "type": "string",
+            "description": "Error message when operation failed"
+          },
+          "suggestion": {
+            "type": "string",
+            "description": "Suggested next steps when operation failed"
+          }
+        },
+        "required": [
+          "type",
+          "status"
+        ]
+      }
+    },
+    "start": {
+      "description": "Start network sharing of specified type. Used for enabling network sharing. Requires CONNECTIVITY_INTERNAL permission and system caller privilege.",
+      "requirePermissions": [
+        "ohos.permission.cli.SET_HOTSPOT"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Sharing type to start",
+            "enum": [
+              "wifi",
+              "usb",
+              "bluetooth"
+            ]
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "result"
+            ],
+            "description": "Event type, must be 'result'"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string",
+                "description": "Operation result message"
+              },
+              "type": {
+                "type": "string",
+                "description": "The sharing type that was started"
+              }
+            },
+            "required": [
+              "message",
+              "type"
+            ]
+          },
+          "errCode": {
+            "type": "string",
+            "description": "Error code when operation failed"
+          },
+          "errMsg": {
+            "type": "string",
+            "description": "Error message when operation failed"
+          },
+          "suggestion": {
+            "type": "string",
+            "description": "Suggested next steps when operation failed"
+          }
+        },
+        "required": [
+          "type",
+          "status"
+        ]
+      }
+    },
+    "stop": {
+      "description": "Stop network sharing of specified type. Used for disabling network sharing. Requires CONNECTIVITY_INTERNAL permission and system caller privilege.",
+      "requirePermissions": [
+        "ohos.permission.cli.SET_HOTSPOT"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Sharing type to stop",
+            "enum": [
+              "wifi",
+              "usb",
+              "bluetooth"
+            ]
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "result"
+            ],
+            "description": "Event type, must be 'result'"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string",
+                "description": "Operation result message"
+              },
+              "type": {
+                "type": "string",
+                "description": "The sharing type that was stopped"
+              }
+            },
+            "required": [
+              "message",
+              "type"
+            ]
+          },
+          "errCode": {
+            "type": "string",
+            "description": "Error code when operation failed"
+          },
+          "errMsg": {
+            "type": "string",
+            "description": "Error message when operation failed"
+          },
+          "suggestion": {
+            "type": "string",
+            "description": "Suggested next steps when operation failed"
+          }
+        },
+        "required": [
+          "type",
+          "status"
+        ]
+      }
+    }
+  },
+  "eventTypes": [],
+  "eventSchemas": {}
+}

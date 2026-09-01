@@ -1,0 +1,73 @@
+{
+  "name": "ohos-nearlinkControl",
+  "version": "1.0.0",
+  "description": "NearLink control utility for enabling and disabling NearLink functionality. Used for NearLink device management scenarios. Does not support NearLink operations on non-NearLink capable devices.",
+  "executablePath": "/system/bin/cli_tool/executable/ohos-nearlinkControl",
+  "requirePermissions": [
+    "ohos.permission.ACCESS_NEARLINK",
+    "ohos.permission.MANAGE_NEARLINK"
+  ],
+  "hasSubCommand": true,
+  "inputSchema": {
+    "type": "object",
+    "properties": {}
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {}
+  },
+  "subcommands": {
+    "enable": {
+      "description": "Enable NearLink functionality with optional auto-connect policy. Used for activating NearLink adapter. Does not support enabling when NearLink is already enabled or device does not support NearLink.",
+      "requirePermissions": [
+        "ohos.permission.ACCESS_NEARLINK",
+        "ohos.permission.MANAGE_NEARLINK"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "autoConnPolicy": {
+            "type": "integer",
+            "description": "Auto-connect policy when NearLink is enabled (0: AUTO_CONN_GENERAL, 1: AUTO_CONN_EXCEPT_AUDIO_DEVICES, 2: AUTO_CONN_EXCEPT_USER_DISCONNECTED_DEVICES)",
+            "minimum": 0,
+            "maximum": 2,
+            "default": 0
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Success message"
+          },
+          "autoConnPolicy": {
+            "type": "integer",
+            "description": "Applied auto-connect policy"
+          }
+        }
+      }
+    },
+    "disable": {
+      "description": "Disable NearLink functionality. Used for deactivating NearLink adapter. Does not support disabling when NearLink is already disabled.",
+      "requirePermissions": [
+        "ohos.permission.ACCESS_NEARLINK",
+        "ohos.permission.MANAGE_NEARLINK"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Success message"
+          }
+        }
+      }
+    }
+  }
+}

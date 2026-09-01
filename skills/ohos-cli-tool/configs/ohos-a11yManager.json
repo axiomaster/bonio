@@ -1,0 +1,1195 @@
+{
+  "name": "ohos-a11yManager",
+  "version": "1.0.0",
+  "description": "OHOS Accessibility Manager - Command line tool for managing system accessibility features. Used for developer testing and system administrator configuration of accessibility settings. Not suitable for daily operations of ordinary users.",
+  "executablePath": "/system/bin/cli_tool/executable/ohos-a11yManager",
+  "requirePermissions": [
+    "ohos.permission.cli.WRITE_ACCESSIBILITY_CONFIG_VISION",
+    "ohos.permission.cli.WRITE_ACCESSIBILITY_CONFIG_HEARING",
+    "ohos.permission.cli.WRITE_ACCESSIBILITY_CONFIG_ACTION",
+    "ohos.permission.cli.READ_ACCESSIBILITY_CONFIG_VISION",
+    "ohos.permission.cli.READ_ACCESSIBILITY_CONFIG_HEARING",
+    "ohos.permission.cli.READ_ACCESSIBILITY_CONFIG_ACTION"
+  ],
+  "inputSchema": {
+    "type": "object",
+    "properties": {},
+    "required": []
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {},
+    "required": []
+  },
+  "hasSubCommand": true,
+  "subcommands": {
+    "state-is-screen-reader-enabled": {
+      "description": "Check if screen reader is enabled. Used to get the current enabled status of screen reader. Not applicable for modifying screen reader status.",
+      "requirePermissions": [
+        "ohos.permission.cli.READ_ACCESSIBILITY_CONFIG_VISION"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "description": "Screen reader enabled status"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "ability-enable-screen-reader": {
+      "description": "Enable screen reader function. Used to turn on screen reading service for visually impaired users. Not applicable when screen reader is already enabled.",
+      "requirePermissions": [
+        "ohos.permission.cli.WRITE_ACCESSIBILITY_CONFIG_VISION"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Screen reader name"
+              },
+              "capabilities": {
+                "type": "integer",
+                "description": "Screen reader capabilities"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "ability-disable-screen-reader": {
+      "description": "Disable screen reader function. Used to turn off screen reading service. Not applicable when screen reader is already disabled.",
+      "requirePermissions": [
+        "ohos.permission.cli.WRITE_ACCESSIBILITY_CONFIG_VISION"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Screen reader name"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "magnification-set-state": {
+      "description": "Set screen magnification state. Used to enable or disable screen magnification to assist users with poor vision. Not applicable for adjusting magnification level.",
+      "requirePermissions": [
+        "ohos.permission.cli.WRITE_ACCESSIBILITY_CONFIG_VISION"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "Screen magnification state",
+            "enum": [
+              "true",
+              "false"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "boolean",
+                "description": "Screen magnification state"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "magnification-get-state": {
+      "description": "Get screen magnification state. Used to query whether screen magnification is currently enabled. Not applicable for modifying screen magnification status.",
+      "requirePermissions": [
+        "ohos.permission.cli.READ_ACCESSIBILITY_CONFIG_VISION"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "boolean",
+                "description": "Screen magnification state"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "shortkey-set-state": {
+      "description": "Set shortcut key state. Used to enable or disable accessibility shortcut keys. Not applicable for setting specific shortcut key combinations.",
+      "requirePermissions": [
+        "ohos.permission.cli.WRITE_ACCESSIBILITY_CONFIG_VISION"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "Shortkey state",
+            "enum": [
+              "true",
+              "false"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "boolean",
+                "description": "Shortkey state"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "shortkey-get-state": {
+      "description": "Get shortcut key state. Used to query whether accessibility shortcut keys are currently enabled. Not applicable for modifying shortcut key status.",
+      "requirePermissions": [
+        "ohos.permission.cli.READ_ACCESSIBILITY_CONFIG_VISION"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "boolean",
+                "description": "Shortkey state"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "high-contrast-set-state": {
+      "description": "Set high contrast text state. Used to enable or disable high contrast text to improve text readability. Not applicable for adjusting contrast level.",
+      "requirePermissions": [
+        "ohos.permission.cli.WRITE_ACCESSIBILITY_CONFIG_VISION"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "High contrast text state",
+            "enum": [
+              "true",
+              "false"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "boolean",
+                "description": "High contrast text state"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "high-contrast-get-state": {
+      "description": "Get high contrast text state. Used to query whether high contrast text is currently enabled. Not applicable for modifying high contrast status.",
+      "requirePermissions": [
+        "ohos.permission.cli.READ_ACCESSIBILITY_CONFIG_VISION"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "boolean",
+                "description": "High contrast text state"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "invert-color-set-state": {
+      "description": "Set color inversion state. Used to enable or disable color inversion to assist users with color vision deficiency. Not applicable for adjusting inversion intensity.",
+      "requirePermissions": [
+        "ohos.permission.cli.WRITE_ACCESSIBILITY_CONFIG_VISION"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "Invert color state",
+            "enum": [
+              "true",
+              "false"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "boolean",
+                "description": "Invert color state"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "invert-color-get-state": {
+      "description": "Get color inversion state. Used to query whether color inversion is currently enabled. Not applicable for modifying color inversion status.",
+      "requirePermissions": [
+        "ohos.permission.cli.READ_ACCESSIBILITY_CONFIG_VISION"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "boolean",
+                "description": "Invert color state"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "animation-off-set-state": {
+      "description": "Set animation off state. Used to enable or disable system animation to reduce dynamic effect interference. Not applicable for adjusting animation speed.",
+      "requirePermissions": [
+        "ohos.permission.cli.WRITE_ACCESSIBILITY_CONFIG_VISION"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "Animation off state",
+            "enum": [
+              "true",
+              "false"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "boolean",
+                "description": "Animation off state"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "animation-off-get-state": {
+      "description": "Get animation off state. Used to query whether system animation is currently disabled. Not applicable for modifying animation settings.",
+      "requirePermissions": [
+        "ohos.permission.cli.READ_ACCESSIBILITY_CONFIG_VISION"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "boolean",
+                "description": "Animation off state"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "audio-set-mono": {
+      "description": "Set audio mono state. Used to enable or disable mono audio to assist users with single-sided hearing impairment. Not applicable for adjusting volume.",
+      "requirePermissions": [
+        "ohos.permission.cli.WRITE_ACCESSIBILITY_CONFIG_HEARING"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "Audio mono state",
+            "enum": [
+              "true",
+              "false"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "boolean",
+                "description": "Audio mono state"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "audio-get-mono": {
+      "description": "Get audio mono state. Used to query whether audio mono is currently enabled. Not applicable for modifying audio settings.",
+      "requirePermissions": [
+        "ohos.permission.cli.READ_ACCESSIBILITY_CONFIG_HEARING"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "boolean",
+                "description": "Audio mono state"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "audio-set-balance": {
+      "description": "Set audio left-right channel balance. Used to adjust the volume ratio between left and right channels to assist users with unbalanced binaural hearing. Not applicable for adjusting overall volume.",
+      "requirePermissions": [
+        "ohos.permission.cli.WRITE_ACCESSIBILITY_CONFIG_HEARING"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "balance": {
+            "type": "number",
+            "description": "Audio balance value (float)",
+            "minimum": -1.0,
+            "maximum": 1.0
+          }
+        },
+        "required": [
+          "balance"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "balance": {
+                "type": "number",
+                "description": "Audio balance value"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "audio-get-balance": {
+      "description": "Get audio left-right channel balance value. Used to query the current volume ratio between left and right channels. Not applicable for modifying audio balance settings.",
+      "requirePermissions": [
+        "ohos.permission.cli.READ_ACCESSIBILITY_CONFIG_HEARING"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "balance": {
+                "type": "number",
+                "description": "Audio balance value"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "daltonization-set-state": {
+      "description": "Set daltonization (color blindness correction) state. Used to enable or disable color blindness mode to assist users with color vision deficiency. Not applicable for adjusting color blindness mode intensity.",
+      "requirePermissions": [
+        "ohos.permission.cli.WRITE_ACCESSIBILITY_CONFIG_VISION"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "Daltonization state",
+            "enum": [
+              "true",
+              "false"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "boolean",
+                "description": "Daltonization state"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "daltonization-get-state": {
+      "description": "Get daltonization (color blindness correction) state. Used to query whether color blindness mode is currently enabled. Not applicable for modifying color blindness mode settings.",
+      "requirePermissions": [
+        "ohos.permission.cli.READ_ACCESSIBILITY_CONFIG_VISION"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "boolean",
+                "description": "Daltonization state"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "daltonization-set-filter": {
+      "description": "Set daltonization (color blindness correction) filter type. Used to select filters suitable for different types of color vision deficiency. Not applicable for disabling color blindness mode.",
+      "requirePermissions": [
+        "ohos.permission.cli.WRITE_ACCESSIBILITY_CONFIG_VISION"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "integer",
+            "description": "Filter type (0=Normal, 1=Protanomaly, 2=Deuteranomaly, 3=Tritanomaly)",
+            "enum": [
+              0,
+              1,
+              2,
+              3
+            ]
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "integer",
+                "description": "Daltonization filter type"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "daltonization-get-filter": {
+      "description": "Get daltonization (color blindness correction) filter type. Used to query the current color blindness filter type in use. Not applicable for modifying filter settings.",
+      "requirePermissions": [
+        "ohos.permission.cli.READ_ACCESSIBILITY_CONFIG_VISION"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "integer",
+                "description": "Daltonization filter type"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "click-set-response-time": {
+      "description": "Set click response time. Used to adjust the system response delay for click operations to assist users with hand tremors. Not applicable for adjusting long press time.",
+      "requirePermissions": [
+        "ohos.permission.cli.WRITE_ACCESSIBILITY_CONFIG_ACTION"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "time": {
+            "type": "integer",
+            "description": "Click response time (0=short(default), 1=medium, 2=long)",
+            "enum": [
+              0,
+              1,
+              2
+            ]
+          }
+        },
+        "required": [
+          "time"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "time": {
+                "type": "integer",
+                "description": "Click response time"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "click-get-response-time": {
+      "description": "Get click response time setting. Used to query the current response delay time for click operations. Not applicable for modifying click response time.",
+      "requirePermissions": [
+        "ohos.permission.cli.READ_ACCESSIBILITY_CONFIG_ACTION"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "time": {
+                "type": "integer",
+                "description": "Click response time"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "ignore-repeat-click-set-state": {
+      "description": "Set ignore repeat click state. Used to enable or disable repeat click filtering to assist users with hand tremors. Not applicable for adjusting filtering interval.",
+      "requirePermissions": [
+        "ohos.permission.cli.WRITE_ACCESSIBILITY_CONFIG_ACTION"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "Ignore repeat click state",
+            "enum": [
+              "true",
+              "false"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "boolean",
+                "description": "Ignore repeat click state"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "ignore-repeat-click-get-state": {
+      "description": "Get ignore repeat click state. Used to query whether repeat click filtering is currently enabled. Not applicable for modifying filter settings.",
+      "requirePermissions": [
+        "ohos.permission.cli.READ_ACCESSIBILITY_CONFIG_ACTION"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "boolean",
+                "description": "Ignore repeat click state"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "ignore-repeat-click-set-time": {
+      "description": "Set ignore repeat click time interval. Used to adjust the time threshold for determining repeat clicks. Not applicable for enabling or disabling repeat click filtering.",
+      "requirePermissions": [
+        "ohos.permission.cli.WRITE_ACCESSIBILITY_CONFIG_ACTION"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "interval": {
+            "type": "integer",
+            "description": "Ignore repeat click interval (0=0.1s, 1=0.4s, 2=0.7s, 3=1.0s, 4=1.3s)",
+            "enum": [
+              0,
+              1,
+              2,
+              3,
+              4
+            ]
+          }
+        },
+        "required": [
+          "interval"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "interval": {
+                "type": "integer",
+                "description": "Ignore repeat click interval"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "ignore-repeat-click-get-time": {
+      "description": "Get ignore repeat click time interval. Used to query the current time threshold for determining repeat clicks. Not applicable for modifying time interval settings.",
+      "requirePermissions": [
+        "ohos.permission.cli.READ_ACCESSIBILITY_CONFIG_ACTION"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "interval": {
+                "type": "integer",
+                "description": "Ignore repeat click interval"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "eventTypes": [],
+  "eventSchemas": {}
+}

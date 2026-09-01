@@ -1,0 +1,297 @@
+{
+  "name": "ohos-avsession-manager",
+  "version": "1.0.0",
+  "description": "OHOS AVSession管理工具。用于查询和控制媒体会话播放状态。不支持创建会话和投屏功能。",
+  "executablePath": "/system/bin/cli_tool/executable/ohos-avsession-manager",
+  "requirePermissions": [
+    "ohos.permission.MANAGE_MEDIA_RESOURCES",
+    "ohos.permission.MANAGE_MEDIA_RESOURCES_FOR_PUBLIC"
+  ],
+  "inputSchema": {
+    "type": "object",
+    "properties": {}
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "status": {
+        "type": "string",
+        "description": "Execution status"
+      }
+    }
+  },
+  "hasSubCommand": true,
+  "subcommands": {
+    "list-sessions": {
+      "description": "列出系统中所有AVSession描述符。用于查询当前活跃的媒体会话。无参数输入。",
+      "requirePermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sessions": {
+            "type": "array",
+            "description": "Session descriptor list",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sessionId": {
+                  "type": "string",
+                  "description": "Session unique identifier"
+                },
+                "sessionType": {
+                  "type": "string",
+                  "description": "Session type: audio/video/voice_call"
+                },
+                "sessionTag": {
+                  "type": "string",
+                  "description": "Session tag"
+                },
+                "elementName": {
+                  "type": "object",
+                  "properties": {
+                    "bundleName": {
+                      "type": "string",
+                      "description": "Bundle name"
+                    },
+                    "moduleName": {
+                      "type": "string",
+                      "description": "Module name"
+                    },
+                    "abilityName": {
+                      "type": "string",
+                      "description": "Ability name"
+                    }
+                  }
+                },
+                "pid": {
+                  "type": "integer",
+                  "description": "Process ID"
+                },
+                "uid": {
+                  "type": "integer",
+                  "description": "User ID"
+                },
+                "isActive": {
+                  "type": "boolean",
+                  "description": "Session active status"
+                },
+                "isTopSession": {
+                  "type": "boolean",
+                  "description": "Top session flag"
+                },
+                "isThirdPartyApp": {
+                  "type": "boolean",
+                  "description": "Third party app flag"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "get-playback-state": {
+      "description": "获取会话播放状态。用于查询当前播放进度和状态信息。需要提供有效的sessionId。",
+      "requirePermissions": [
+        "ohos.permission.MANAGE_MEDIA_RESOURCES_FOR_PUBLIC"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "session-id": {
+            "type": "string",
+            "description": "Session ID to query"
+          }
+        },
+        "required": [
+          "session-id"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "Playback state"
+          },
+          "speed": {
+            "type": "number",
+            "description": "Playback speed"
+          },
+          "position": {
+            "type": "object",
+            "properties": {
+              "elapsedTime": {
+                "type": "integer",
+                "description": "Elapsed time in milliseconds"
+              },
+              "updateTime": {
+                "type": "integer",
+                "description": "Update timestamp"
+              }
+            }
+          },
+          "loopMode": {
+            "type": "string",
+            "description": "Loop mode"
+          },
+          "isFavorite": {
+            "type": "boolean",
+            "description": "Favorite flag"
+          },
+          "duration": {
+            "type": "integer",
+            "description": "Total duration in milliseconds"
+          }
+        }
+      }
+    },
+    "get-metadata": {
+      "description": "获取会话元数据。用于查询媒体标题、艺术家和专辑信息。需要提供有效的sessionId。",
+      "requirePermissions": [
+        "ohos.permission.MANAGE_MEDIA_RESOURCES_FOR_PUBLIC"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "session-id": {
+            "type": "string",
+            "description": "Session ID to query"
+          }
+        },
+        "required": [
+          "session-id"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "description": "Asset ID"
+          },
+          "title": {
+            "type": "string",
+            "description": "Media title"
+          },
+          "artist": {
+            "type": "string",
+            "description": "Artist name"
+          },
+          "album": {
+            "type": "string",
+            "description": "Album name"
+          },
+          "duration": {
+            "type": "integer",
+            "description": "Duration in milliseconds"
+          }
+        }
+      }
+    },
+    "get-valid-commands": {
+      "description": "获取有效控制命令列表。用于查询会话支持的播放控制操作。需要提供有效的sessionId。",
+      "requirePermissions": [
+        "ohos.permission.MANAGE_MEDIA_RESOURCES_FOR_PUBLIC"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "session-id": {
+            "type": "string",
+            "description": "Session ID to query"
+          }
+        },
+        "required": [
+          "session-id"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "commands": {
+            "type": "array",
+            "description": "Valid command list",
+            "items": {
+              "type": "string",
+              "description": "Command name"
+            }
+          }
+        }
+      }
+    },
+    "send-control-command-to-session": {
+      "description": "向特定会话发送控制命令。用于精确控制目标会话的播放状态。不支持自定义命令。",
+      "requirePermissions": [
+        "ohos.permission.MANAGE_MEDIA_RESOURCES"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "session-id": {
+            "type": "string",
+            "description": "Session ID to control"
+          },
+          "command": {
+            "type": "string",
+            "description": "Control command to send",
+            "enum": [
+              "play",
+              "pause",
+              "stop",
+              "play_next",
+              "play_previous",
+              "fast_forward",
+              "rewind",
+              "seek",
+              "set_speed",
+              "set_loop_mode",
+              "set_target_loop_mode",
+              "toggle_favorite"
+            ]
+          },
+          "time": {
+            "type": "integer",
+            "description": "Time in milliseconds (required for seek, default 15000 for fast_forward/rewind)"
+          },
+          "speed": {
+            "type": "number",
+            "description": "Playback speed for set_speed command (default 1.0)"
+          },
+          "mode": {
+            "type": "integer",
+            "description": "Loop mode for set_loop_mode: -1=undefined, 0=sequence, 1=single, 2=list, 3=shuffle, 4=custom"
+          },
+          "target-mode": {
+            "type": "integer",
+            "description": "Target loop mode for set_target_loop_mode: -1=undefined, 0=sequence, 1=single, 2=list, 3=shuffle, 4=custom"
+          },
+          "asset-id": {
+            "type": "string",
+            "description": "Asset ID for toggle_favorite command (required)"
+          }
+        },
+        "required": [
+          "session-id",
+          "command"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "string",
+            "description": "Command execution result"
+          },
+          "command": {
+            "type": "string",
+            "description": "Executed command"
+          }
+        }
+      }
+    }
+  }
+}

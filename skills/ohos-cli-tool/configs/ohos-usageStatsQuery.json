@@ -1,0 +1,848 @@
+{
+  "name": "ohos-usageStatsQuery",
+  "version": "1.0.0",
+  "description": "Application usage statistics query tool. Used for system administration and performance analysis scenarios. Does not support real-time monitoring or subscription operations.",
+  "executablePath": "/system/bin/cli_tool/executable/ohos-usageStatsQuery",
+  "requirePermissions": [
+    "ohos.permission.cli.BUNDLE_ACTIVE_INFO"
+  ],
+  "inputSchema": {
+    "type": "object",
+    "properties": {}
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "status": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "status"
+    ]
+  },
+  "hasSubCommand": true,
+  "subcommands": {
+    "check-bundle-idle": {
+      "description": "Query whether an application is in idle state. Used for application usage analysis. Requires bundle name parameter.",
+      "requirePermissions": [
+        "ohos.permission.cli.BUNDLE_ACTIVE_INFO"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bundle": {
+            "type": "string",
+            "description": "Application bundle name to query",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "user": {
+            "type": "integer",
+            "description": "User ID, -1 means current user",
+            "minimum": -1,
+            "maximum": 1000,
+            "default": -1
+          }
+        },
+        "required": [
+          "bundle"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "isBundleIdle": {
+                "type": "boolean",
+                "description": "Whether the bundle is idle"
+              },
+              "bundleName": {
+                "type": "string"
+              },
+              "userId": {
+                "type": "integer"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      }
+    },
+    "check-bundle-period": {
+      "description": "Query whether an application is in use period. Used for application usage pattern analysis. Only available for native processes.",
+      "requirePermissions": [
+        "ohos.permission.cli.BUNDLE_ACTIVE_INFO"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bundle": {
+            "type": "string",
+            "description": "Application bundle name to query",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "user": {
+            "type": "integer",
+            "description": "User ID, -1 means current user",
+            "minimum": -1,
+            "maximum": 1000,
+            "default": -1
+          }
+        },
+        "required": [
+          "bundle"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "isUsePeriod": {
+                "type": "boolean",
+                "description": "Whether the bundle is in use period"
+              },
+              "bundleName": {
+                "type": "string"
+              },
+              "userId": {
+                "type": "integer"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      }
+    },
+    "query-stats-interval": {
+      "description": "Query application usage statistics within a time interval. Used for application usage frequency analysis. Requires valid time range and interval type.",
+      "requirePermissions": [
+        "ohos.permission.cli.BUNDLE_ACTIVE_INFO"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "interval": {
+            "type": "integer",
+            "description": "Interval type: 0=by_day, 1=by_week, 2=by_month, 3=by_year",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "begin": {
+            "type": "number",
+            "description": "Begin time in milliseconds",
+            "minimum": 0
+          },
+          "end": {
+            "type": "number",
+            "description": "End time in milliseconds",
+            "minimum": 0
+          },
+          "user": {
+            "type": "integer",
+            "description": "User ID, -1 means current user",
+            "minimum": -1,
+            "maximum": 1000,
+            "default": -1
+          }
+        },
+        "required": [
+          "interval",
+          "begin",
+          "end"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "intervalType": {
+                "type": "integer"
+              },
+              "beginTime": {
+                "type": "number"
+              },
+              "endTime": {
+                "type": "number"
+              },
+              "userId": {
+                "type": "integer"
+              },
+              "packageStats": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "bundleName": {
+                      "type": "string"
+                    },
+                    "beginTimeStamp": {
+                      "type": "number"
+                    },
+                    "endTimeStamp": {
+                      "type": "number"
+                    },
+                    "lastTimeUsed": {
+                      "type": "number"
+                    },
+                    "totalInFrontTime": {
+                      "type": "integer"
+                    },
+                    "startCount": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              },
+              "count": {
+                "type": "integer"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      }
+    },
+    "query-events": {
+      "description": "Query application event records within a time range. Used for application usage history analysis. Requires valid time range.",
+      "requirePermissions": [
+        "ohos.permission.cli.BUNDLE_ACTIVE_INFO"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "begin": {
+            "type": "number",
+            "description": "Begin time in milliseconds",
+            "minimum": 0
+          },
+          "end": {
+            "type": "number",
+            "description": "End time in milliseconds",
+            "minimum": 0
+          },
+          "user": {
+            "type": "integer",
+            "description": "User ID, -1 means current user",
+            "minimum": -1,
+            "maximum": 1000,
+            "default": -1
+          },
+          "max": {
+            "type": "integer",
+            "description": "Maximum number of records to return",
+            "minimum": 1,
+            "maximum": 1000,
+            "default": 1000
+          }
+        },
+        "required": [
+          "begin",
+          "end"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "beginTime": {
+                "type": "number"
+              },
+              "endTime": {
+                "type": "number"
+              },
+              "userId": {
+                "type": "integer"
+              },
+              "maxNum": {
+                "type": "integer"
+              },
+              "events": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "bundleName": {
+                      "type": "string"
+                    },
+                    "timeStamp": {
+                      "type": "number"
+                    },
+                    "eventId": {
+                      "type": "integer"
+                    },
+                    "uid": {
+                      "type": "integer"
+                    },
+                    "abilityName": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "count": {
+                "type": "integer"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      }
+    },
+    "query-app-group": {
+      "description": "Query application group information. Used for application priority analysis. Requires bundle name parameter.",
+      "requirePermissions": [
+        "ohos.permission.cli.BUNDLE_ACTIVE_INFO"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bundle": {
+            "type": "string",
+            "description": "Application bundle name to query",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "user": {
+            "type": "integer",
+            "description": "User ID, -1 means current user",
+            "minimum": -1,
+            "maximum": 1000,
+            "default": -1
+          }
+        },
+        "required": [
+          "bundle"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "appGroup": {
+                "type": "integer",
+                "description": "Application group value"
+              },
+              "bundleName": {
+                "type": "string"
+              },
+              "userId": {
+                "type": "integer"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      }
+    },
+    "query-high-freq-bundle": {
+      "description": "Query high-frequency usage application list. Used for identifying frequently used applications. Returns top N most used apps.",
+      "requirePermissions": [
+        "ohos.permission.cli.BUNDLE_ACTIVE_INFO"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "integer",
+            "description": "User ID, -1 means current user",
+            "minimum": -1,
+            "maximum": 1000,
+            "default": -1
+          },
+          "max": {
+            "type": "integer",
+            "description": "Maximum number of apps to return",
+            "minimum": 1,
+            "maximum": 1000,
+            "default": 20
+          },
+          "days": {
+            "type": "integer",
+            "description": "Query day range",
+            "minimum": 1,
+            "maximum": 30,
+            "default": 7
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "type": "integer"
+              },
+              "maxNum": {
+                "type": "integer"
+              },
+              "queryDayRange": {
+                "type": "integer"
+              },
+              "packageStats": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "bundleName": {
+                      "type": "string"
+                    },
+                    "totalInFrontTime": {
+                      "type": "integer"
+                    },
+                    "startCount": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              },
+              "count": {
+                "type": "integer"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      }
+    },
+    "query-module-records": {
+      "description": "Query module usage records. Used for analyzing application module usage patterns. Returns module usage history.",
+      "requirePermissions": [
+        "ohos.permission.cli.BUNDLE_ACTIVE_INFO"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "max": {
+            "type": "integer",
+            "description": "Maximum number of records to return",
+            "minimum": 1,
+            "maximum": 1000,
+            "default": 1000
+          },
+          "user": {
+            "type": "integer",
+            "description": "User ID, -1 means current user",
+            "minimum": -1,
+            "maximum": 1000,
+            "default": -1
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "maxNum": {
+                "type": "integer"
+              },
+              "userId": {
+                "type": "integer"
+              },
+              "moduleRecords": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "bundleName": {
+                      "type": "string"
+                    },
+                    "moduleName": {
+                      "type": "string"
+                    },
+                    "abilityName": {
+                      "type": "string"
+                    },
+                    "launchedCount": {
+                      "type": "integer"
+                    },
+                    "lastModuleUsedTime": {
+                      "type": "number"
+                    }
+                  }
+                }
+              },
+              "count": {
+                "type": "integer"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      }
+    },
+    "query-notification-stats": {
+      "description": "Query notification event statistics. Used for analyzing application notification patterns. Requires valid time range.",
+      "requirePermissions": [
+        "ohos.permission.cli.BUNDLE_ACTIVE_INFO"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "begin": {
+            "type": "number",
+            "description": "Begin time in milliseconds",
+            "minimum": 0
+          },
+          "end": {
+            "type": "number",
+            "description": "End time in milliseconds",
+            "minimum": 0
+          },
+          "user": {
+            "type": "integer",
+            "description": "User ID, -1 means current user",
+            "minimum": -1,
+            "maximum": 1000,
+            "default": -1
+          }
+        },
+        "required": [
+          "begin",
+          "end"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "beginTime": {
+                "type": "number"
+              },
+              "endTime": {
+                "type": "number"
+              },
+              "userId": {
+                "type": "integer"
+              },
+              "eventStats": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "eventId": {
+                      "type": "integer"
+                    },
+                    "beginTimeStamp": {
+                      "type": "number"
+                    },
+                    "endTimeStamp": {
+                      "type": "number"
+                    },
+                    "totalTime": {
+                      "type": "integer"
+                    },
+                    "count": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              },
+              "count": {
+                "type": "integer"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      }
+    },
+    "query-high-freq-period": {
+      "description": "Query high-frequency usage period for applications. Used for analyzing application usage time patterns. Returns peak usage hours.",
+      "requirePermissions": [
+        "ohos.permission.cli.BUNDLE_ACTIVE_INFO"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "integer",
+            "description": "User ID, -1 means current user",
+            "minimum": -1,
+            "maximum": 1000,
+            "default": -1
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "userId": {
+                "type": "integer"
+              },
+              "highFreqPeriods": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "bundleName": {
+                      "type": "string"
+                    },
+                    "highFreqHours": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              },
+              "count": {
+                "type": "integer"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      }
+    },
+    "query-latest-used-time": {
+      "description": "Query the latest usage time of an application today. Used for tracking recent application usage. Requires bundle name parameter.",
+      "requirePermissions": [
+        "ohos.permission.cli.BUNDLE_ACTIVE_INFO"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bundle": {
+            "type": "string",
+            "description": "Application bundle name to query",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "user": {
+            "type": "integer",
+            "description": "User ID, -1 means current user",
+            "minimum": -1,
+            "maximum": 1000,
+            "default": -1
+          }
+        },
+        "required": [
+          "bundle"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "latestUsedTime": {
+                "type": "number",
+                "description": "Latest usage time in milliseconds"
+              },
+              "bundleName": {
+                "type": "string"
+              },
+              "userId": {
+                "type": "integer"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      }
+    }
+  }
+}

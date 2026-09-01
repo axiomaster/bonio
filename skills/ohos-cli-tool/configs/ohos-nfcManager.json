@@ -1,0 +1,152 @@
+{
+  "name": "ohos-nfcManager",
+  "version": "1.0.0",
+  "description": "NFC management CLI tool for querying and controlling device NFC function status.",
+  "executablePath": "/system/bin/cli_tool/executable/ohos-nfcManager",
+  "requirePermissions": [],
+  "inputSchema": {
+    "type": "object",
+    "properties": {}
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {}
+  },
+  "hasSubCommand": true,
+  "subcommands": {
+    "get-state": {
+      "description": "Get current NFC state (off/turning_on/on/turning_off)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "error"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "description": "NFC state value"
+          },
+          "code": {
+            "type": "integer",
+            "description": "NFC state code: 1=off, 2=turning_on, 3=on, 4=turning_off"
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "requirePermissions": []
+    },
+    "turn-on": {
+      "description": "Enable device NFC function",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "error"
+            ]
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "requirePermissions": [
+        "ohos.permission.cli.MANAGE_NFC_SWITCH"
+      ]
+    },
+    "turn-off": {
+      "description": "Disable device NFC function",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "error"
+            ]
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "requirePermissions": [
+        "ohos.permission.cli.MANAGE_NFC_SWITCH"
+      ]
+    },
+    "is-available": {
+      "description": "Check if current device supports NFC function",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "error"
+            ]
+          },
+          "available": {
+            "type": "boolean",
+            "description": "Whether the device supports NFC"
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "requirePermissions": []
+    }
+  },
+  "eventTypes": [],
+  "eventSchemas": {}
+}

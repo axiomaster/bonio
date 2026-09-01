@@ -1,0 +1,257 @@
+{
+  "name": "hms-movementAwareness",
+  "executablePath": "/system/bin/cli_tool/executable/hms-movementAwareness",
+  "description": "CLI tool for subscribing and unsubscribing device movement state",
+  "version": "1.0.0",
+  "hasSubCommand": true,
+  "requirePermissions": [],
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "command": {
+        "type": "string",
+        "enum": [
+          "subscribe",
+          "unsubscribe",
+          "help"
+        ],
+        "description": "Command to execute"
+      }
+    },
+    "required": [
+      "command"
+    ]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "type": {
+        "type": "string",
+        "description": "Output type, always 'result'"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "success",
+          "failed"
+        ],
+        "description": "Execution status"
+      },
+      "data": {
+        "type": "object",
+        "description": "Result data on success",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "description": "Session ID"
+          },
+          "ruleId": {
+            "type": "string",
+            "description": "Rule ID"
+          }
+        }
+      },
+      "errCode": {
+        "type": "string",
+        "description": "Error code on failure"
+      },
+      "errMsg": {
+        "type": "string",
+        "description": "Error message on failure"
+      },
+      "suggestion": {
+        "type": "string",
+        "description": "Suggestion on failure"
+      }
+    },
+    "required": [
+      "status"
+    ]
+  },
+  "subcommands": {
+    "subscribe": {
+      "description": "订阅运动状态变化事件。用于应用需要监测用户运动状态并做出响应的场景。不适用于不需要运动状态监测的应用。属于异步接口",
+      "requirePermissions": [
+        "ohos.permission.ACTIVITY_MOTION"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "integer",
+            "description": "运动类型：0(步行WALKING)、1(跑步RUNNING)、2(骑行BICYCLE)、3(乘车IN_VEHICLE)"
+          },
+          "event": {
+            "type": "integer",
+            "description": "运动事件：1(进入ENTER)、2(退出EXIT)、3(进入和退出ENTER_EXIT)，默认值为3",
+            "default": 3
+          },
+          "interval": {
+            "type": "integer",
+            "description": "监测间隔时间（纳秒），默认值为2000000000（2秒）",
+            "default": 2000000000
+          },
+          "sessionId": {
+            "type": "string",
+            "description": "会话ID，用于标识本次订阅"
+          },
+          "ruleId": {
+            "type": "string",
+            "description": "规则ID，用于标识运动监测规则"
+          },
+          "bundleName": {
+            "type": "string",
+            "description": "应用包名"
+          },
+          "abilityName": {
+            "type": "string",
+            "description": "Ability名称"
+          },
+          "code": {
+            "type": "integer",
+            "description": "事件上报码"
+          },
+          "interfaceToken": {
+            "type": "string",
+            "description": "接口Token，用于IPC通信验证"
+          }
+        },
+        "required": [
+          "type",
+          "sessionId",
+          "ruleId",
+          "bundleName",
+          "abilityName",
+          "code",
+          "interfaceToken"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ],
+            "description": "Execution status"
+          },
+          "data": {
+            "type": "object",
+            "description": "Result data on success",
+            "properties": {
+              "sessionId": {
+                "type": "string",
+                "description": "订阅会话ID"
+              },
+              "ruleId": {
+                "type": "string",
+                "description": "运动监测规则ID"
+              },
+              "type": {
+                "type": "integer",
+                "description": "运动类型"
+              },
+              "event": {
+                "type": "integer",
+                "description": "运动事件"
+              },
+              "interval": {
+                "type": "integer",
+                "description": "监测间隔"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string",
+            "description": "Error code on failure"
+          },
+          "errMsg": {
+            "type": "string",
+            "description": "Error message on failure"
+          },
+          "suggestion": {
+            "type": "string",
+            "description": "Suggestion on failure"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      }
+    },
+    "unsubscribe": {
+      "description": "取消订阅运动状态变化事件。用于应用不再需要监测用户运动状态的场景。不适用于未订阅过运动状态的应用。为同步命令",
+      "requirePermissions": [
+        "ohos.permission.ACTIVITY_MOTION"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "description": "会话ID，用于标识需要取消的订阅"
+          },
+          "ruleId": {
+            "type": "string",
+            "description": "规则ID，用于标识需要取消的运动监测规则"
+          },
+          "bundleName": {
+            "type": "string",
+            "description": "应用包名"
+          }
+        },
+        "required": [
+          "sessionId",
+          "ruleId",
+          "bundleName"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ],
+            "description": "Execution status"
+          },
+          "data": {
+            "type": "object",
+            "description": "Result data on success",
+            "properties": {
+              "sessionId": {
+                "type": "string",
+                "description": "会话ID"
+              },
+              "ruleId": {
+                "type": "string",
+                "description": "规则ID"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string",
+            "description": "Error code on failure"
+          },
+          "errMsg": {
+            "type": "string",
+            "description": "Error message on failure"
+          },
+          "suggestion": {
+            "type": "string",
+            "description": "Suggestion on failure"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      }
+    }
+  },
+  "eventTypes": [],
+  "eventSchemas": {}
+}

@@ -1,0 +1,374 @@
+{
+  "name": "ohos-pasteboard",
+  "version": "1.0.0",
+  "description": "A command-line tool for pasteboard management that supports reading, writing, and querying pasteboard data. Suitable for setting or getting HTML, URI, or plain text data. Not suitable for setting or getting non-text data types.",
+  "executablePath": "/system/bin/cli_tool/executable/ohos-pasteboard",
+  "requirePermissions": [
+    "ohos.permission.READ_PASTEBOARD"
+  ],
+  "inputSchema": {
+    "type": "object",
+    "properties": {}
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "type": {
+        "type": "string",
+        "enum": [
+          "result"
+        ]
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "success",
+          "failed"
+        ]
+      }
+    },
+    "required": [
+      "type",
+      "status"
+    ]
+  },
+  "hasSubCommand": true,
+  "subcommands": {
+    "set-data": {
+      "description": "Set pasteboard data. Suitable for setting HTML, URI, or plain text data. Not suitable for setting non-text data types.",
+      "requirePermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "html": {
+            "type": "string",
+            "description": "HTML content to set in pasteboard"
+          },
+          "uri": {
+            "type": "string",
+            "description": "URI content to set in pasteboard"
+          },
+          "text": {
+            "type": "string",
+            "description": "Plain text content to set in pasteboard"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "result"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "primaryMimeType": {
+                "type": "string"
+              },
+              "recordCount": {
+                "type": "integer"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "status"
+        ]
+      }
+    },
+    "get-data": {
+      "description": "Get pasteboard data. Suitable for getting HTML, URI, or plain text data. Not suitable for non-text data types.",
+      "requirePermissions": [
+        "ohos.permission.READ_PASTEBOARD"
+      ],
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "result"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "records": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "mimeType": {
+                      "type": "string"
+                    },
+                    "plainText": {
+                      "type": "string"
+                    },
+                    "htmlText": {
+                      "type": "string"
+                    },
+                    "uri": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "recordCount": {
+                "type": "integer"
+              },
+              "mimeTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "status"
+        ]
+      }
+    },
+    "clear-data": {
+      "description": "Clear pasteboard data. Used for resetting pasteboard state. Not suitable for selective record deletion.",
+      "requirePermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "result"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "status"
+        ]
+      }
+    },
+    "has-data": {
+      "description": "Check if pasteboard contains any data. Used for verifying the status of the pasteboard before getting data. Not suitable for content-level data verification.",
+      "requirePermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "result"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "hasData": {
+                "type": "boolean"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "status"
+        ]
+      }
+    },
+    "has-data-type": {
+      "description": "Check if pasteboard contains data of specific data type. Used for verifying the status of the pasteboard before getting data. Not suitable for content-level data verification.",
+      "requirePermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Type to check (e.g., text/plain, text/html, text/uri)",
+            "enum": [
+              "text/plain",
+              "text/html",
+              "text/uri"
+            ]
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "result"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "hasType": {
+                "type": "boolean"
+              },
+              "type": {
+                "type": "string"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "status"
+        ]
+      }
+    },
+    "has-remote-data": {
+      "description": "Check if pasteboard contains remote data from distributed devices. Used for distributed pasteboard state verification. Not suitable for detailed remote device information query.",
+      "requirePermissions": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "result"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "hasRemoteData": {
+                "type": "boolean"
+              }
+            }
+          },
+          "errCode": {
+            "type": "string"
+          },
+          "errMsg": {
+            "type": "string"
+          },
+          "suggestion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "status"
+        ]
+      }
+    }
+  },
+  "eventTypes": [],
+  "eventSchemas": {}
+}
