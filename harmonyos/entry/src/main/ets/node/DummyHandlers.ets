@@ -27,6 +27,10 @@ export class DummyScreenHandler implements ScreenHandler {
     return { ok: false, error: { code: "NOT_IMPLEMENTED", message: "Screen Awareness not ported yet" } };
   }
 
+  async handleSmartEdgeTrigger(): Promise<InvokeResult> {
+    return { ok: false, error: { code: "NOT_IMPLEMENTED", message: "SmartEdge trigger not ported yet" } };
+  }
+
   async handleScreenshotCapture(): Promise<InvokeResult> {
     return { ok: false, error: { code: "NOT_IMPLEMENTED", message: "Screenshot capture not ported yet" } };
   }

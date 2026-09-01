@@ -480,7 +480,7 @@ struct FloatWindowPage {
       const bubble = message.includes('SCREEN_AWARENESS_DISABLED')
         ? '请先在设置开启屏幕感知~'
         : '当前页面暂时无法读取~';
-      hilog.warn(DOMAIN, TAG, 'Screenshot capture failed: %{public}s', message);
+      hilog.warn(DOMAIN, TAG, 'SmartEdge trigger failed: %{public}s', message);
       this.beginInteraction('failed', bubble, 4000);
     }
   }

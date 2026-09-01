@@ -107,6 +107,15 @@ export class ScreenHandlerImpl implements ScreenHandler {
     }
   }
 
+  async handleSmartEdgeTrigger(): Promise<InvokeResult> {
+    try {
+      const snapshot = await this.screenAwareness.triggerSmartEdge();
+      return { ok: true, payloadJson: snapshot.payloadJson };
+    } catch (error) {
+      return this.makeAwarenessError(error);
+    }
+  }
+
   async handleScreenshotCapture(): Promise<InvokeResult> {
     try {
       const snapshot = await this.screenAwareness.captureScreenshot();

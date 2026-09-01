@@ -221,7 +221,8 @@ export class MsdpScreenAwarenessManager {
       row.items?.flatMap((item: onScreen.AwarenessItem): string[] => Object.keys(item.itemInfo)) || []);
     const entityKeys = rows.flatMap((row: onScreen.OnscreenAwarenessInfo): string[] =>
       row.entityInfo?.flatMap((entity: onScreen.EntityInfo): string[] => Object.keys(entity.entityInfo)) || []);
-    const imagePattern = /(pixelmap|screenshot|screen.?shot|bitmap|image.?data|base64)/i;
+    const pageTags = rows.flatMap((row: onScreen.OnscreenAwarenessInfo): string[] => row.pageTags || []);
+    const imagePattern = /(^image$|pixelmap|screenshot|screen.?shot|bitmap|image.?data|base64)/i;
     const candidateKeys = topLevelKeys.concat(itemKeys, entityKeys)
       .filter((key: string): boolean => imagePattern.test(key));
     return JSON.stringify({
@@ -231,6 +232,7 @@ export class MsdpScreenAwarenessManager {
       itemKeys: this.uniqueStrings(itemKeys),
       entityCount: entityCount,
       entityKeys: this.uniqueStrings(entityKeys),
+      pageTags: this.uniqueStrings(pageTags),
       screenshotCandidateKeys: this.uniqueStrings(candidateKeys),
       payloadLength: payloadJson.length,
     });

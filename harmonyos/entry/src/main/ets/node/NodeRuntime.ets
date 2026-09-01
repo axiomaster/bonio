@@ -311,19 +311,19 @@ export class NodeRuntime {
     this.canvas.navigate("");
   }
 
-  /** Called by avatar double tap: capture the foreground page through MSDP Screenshot. */
+  /** Called by avatar double tap: trigger a foreground SmartEdge recognition. */
   public async captureAvatarMemory(): Promise<void> {
     if (!this.isConnected) {
       throw new Error('DSH is not connected');
     }
 
-    const capture = await this.screenHandler.handleScreenshotCapture();
+    const capture = await this.screenHandler.handleSmartEdgeTrigger();
     if (!capture.ok || !capture.payloadJson) {
-      throw new Error(`${capture.error?.code || 'SCREEN_AWARENESS_FAILED'}: ${capture.error?.message || 'Screenshot capture failed'}`);
+      throw new Error(`${capture.error?.code || 'SCREEN_AWARENESS_FAILED'}: ${capture.error?.message || 'SmartEdge trigger failed'}`);
     }
 
     this.prefs.setAvatarLastMemoryAt(Date.now());
-    hilog.info(NodeRuntime.DOMAIN, 'NodeRuntime', 'Screenshot capture queued in companion memory session');
+    hilog.info(NodeRuntime.DOMAIN, 'NodeRuntime', 'SmartEdge trigger queued in companion memory session');
   }
 
   /** Save a user-approved summary of the currently visible page as a structured DSH memory. */
