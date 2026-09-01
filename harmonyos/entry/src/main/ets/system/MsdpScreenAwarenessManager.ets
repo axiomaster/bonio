@@ -59,16 +59,11 @@ export class MsdpScreenAwarenessError extends Error {
 export class MsdpScreenAwarenessManager {
   private static readonly DOMAIN = 0x3D00;
   private static readonly TAG = 'MsdpScreenAwareness';
-  private readonly readingListener = (status: onScreen.ReadingScreenPermissionStatus): void => {
-    this.readingState = status.readingState;
-  };
   private readonly smartEdgeListener = (results: onScreen.OnscreenAwarenessInfo[]): void => {
     this.lastSmartEdgeChangeAtMs = results.length > 0 ? Date.now() : this.lastSmartEdgeChangeAtMs;
     this.reportSmartEdgeResult('subscribe', results);
   };
-  private listening: boolean = false;
   private smartEdgeSubscribed: boolean = false;
-  private readingState: number | undefined = undefined;
   private lastSnapshot: ScreenContextSnapshot | undefined = undefined;
   private lastSmartEdgeChangeAtMs: number | undefined = undefined;
   private readonly isEnabled: () => boolean;
@@ -83,14 +78,7 @@ export class MsdpScreenAwarenessManager {
   }
 
   public start(): void {
-    if (this.listening) return;
-    try {
-      onScreen.onReadingScreenPermissionListener(this.readingListener);
-      this.listening = true;
-      if (this.isEnabled()) this.subscribeSmartEdge();
-    } catch (_) {
-      // Capture reports the concrete MSDP service error after a user request.
-    }
+    if (this.isEnabled()) this.subscribeSmartEdge();
   }
 
   public setEnabled(enabled: boolean): void {
