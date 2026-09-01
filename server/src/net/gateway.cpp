@@ -1786,12 +1786,20 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
         try { server.send(hdl, r.dump(), websocketpp::frame::opcode::text); } catch (...) {}
         return;
       }
-      // Fetch QR code from ilink API
+      // Fetch QR code from ilink API (POST per protocol; carries local tokens so an
+      // already-bound bot returns binded_redirect instead of a duplicate session).
       hv::HttpClient cli;
       cli.setTimeout(15);
       ::HttpRequest req;
-      req.method = HTTP_GET;
+      req.method = HTTP_POST;
       req.url = "https://ilinkai.weixin.qq.com/ilink/bot/get_bot_qrcode?bot_type=3";
+      req.headers["Content-Type"] = "application/json";
+      req.headers["iLink-App-ClientVersion"] = "1";
+      nlohmann::json qr_body;
+      if (!config.wechat.weixin.token.empty()) {
+        qr_body["local_token_list"] = nlohmann::json::array({config.wechat.weixin.token});
+      }
+      req.body = qr_body.dump();
       req.timeout = 15;
       ::HttpResponse resp;
       int ret = cli.send(&req, &resp);
@@ -1839,12 +1847,13 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
       }
 
       hv::HttpClient cli;
-      cli.setTimeout(15);
+      // ilink polls status with a 30s long-poll; 45s covers it with margin.
+      cli.setTimeout(45);
       ::HttpRequest req;
       req.method = HTTP_GET;
       req.url = "https://ilinkai.weixin.qq.com/ilink/bot/get_qrcode_status?qrcode=" + qrcode_key;
       req.headers["iLink-App-ClientVersion"] = "1";
-      req.timeout = 10;
+      req.timeout = 45;
       ::HttpResponse resp;
       int ret = cli.send(&req, &resp);
 
