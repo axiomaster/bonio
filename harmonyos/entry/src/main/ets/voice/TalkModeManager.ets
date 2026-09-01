@@ -85,7 +85,7 @@ export class TalkModeManager {
   setMainSessionKey(sessionKey: string | undefined): void {
     const trimmed = (sessionKey || '').trim();
     if (trimmed.length === 0) return;
-    if (this.mainSessionKey === 'main') return;
+    if (this.mainSessionKey === trimmed) return;
     this.mainSessionKey = trimmed;
   }
 

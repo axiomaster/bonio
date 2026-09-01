@@ -33,14 +33,7 @@ import { AvatarStep, paramsOf, stepOf, sequencePayload } from '../intent/AvatarC
 import { TalkModeManager } from '../voice/TalkModeManager';
 import { WakeWords } from '../common/WakeWords';
 import { MemoryService } from './MemoryService';
-
-class ScreenMemoryChatParams {
-  sessionKey: string = 'system:screen-memory';
-  message: string = '';
-  thinking: string = 'low';
-  timeoutMs: number = 30000;
-  idempotencyKey: string = '';
-}
+import { CompanionMemoryController } from './CompanionMemoryController';
 
 export class NodeRuntime {
   private static readonly DOMAIN = 0x3D00;
@@ -72,6 +65,7 @@ export class NodeRuntime {
   
   public chatController: ChatController;
   public memoryService: MemoryService;
+  public companionMemoryController: CompanionMemoryController;
   public onChatUpdate: (() => void) | undefined = undefined;
 
   // Phase 4: on-device feature coordination (intent / health / notifications).
@@ -105,7 +99,7 @@ export class NodeRuntime {
       context,
       () => this.prefs.getScreenAwarenessEnabled(),
       (source: string, payloadJson: string) => {
-        this.chatController.appendMsdpDebugResult(source, payloadJson);
+        this.companionMemoryController.enqueue(source, payloadJson);
       },
     );
 
@@ -151,6 +145,7 @@ export class NodeRuntime {
         this.updateStatus();
         this.gatewayEventHandler.refreshWakeWordsFromGateway();
         this.chatController.onGatewayConnected(mainKey);
+        this.companionMemoryController.onConnected();
       },
       (message) => {
         this.operatorConnected = false;
@@ -160,10 +155,13 @@ export class NodeRuntime {
         this.mainSessionKey = "main";
         this.updateStatus();
         this.chatController.onDisconnected(message);
+        this.companionMemoryController.onDisconnected();
       },
       (event, payload) => {
         this.gatewayEventHandler.handleEvent(event, payload);
         this.chatController.handleGatewayEvent(event, payload);
+        this.talkModeManager.handleGatewayEvent(event, payload);
+        this.companionMemoryController.handleGatewayEvent(event, payload);
       }
     );
 
@@ -171,6 +169,12 @@ export class NodeRuntime {
       if (this.onChatUpdate) this.onChatUpdate();
     });
     this.memoryService = new MemoryService(this.operatorSession);
+    this.companionMemoryController = new CompanionMemoryController(
+      this.operatorSession,
+      this.memoryService,
+      () => this.isConnected,
+    );
+    this.screenHandler.startScreenAwareness();
 
     this.voiceWakeManager = new VoiceWakeManager(async (command) => {
       hilog.info(NodeRuntime.DOMAIN, 'NodeRuntime', 'Voice wake command: %{public}s', command);
@@ -272,6 +276,8 @@ export class NodeRuntime {
     if (!trimmed) return;
     if (this.mainSessionKey === trimmed) return;
     this.mainSessionKey = trimmed;
+    this.chatController?.applyMainSessionKey(trimmed);
+    this.talkModeManager?.setMainSessionKey(trimmed);
   }
 
   private updateStatus() {
@@ -316,19 +322,8 @@ export class NodeRuntime {
       throw new Error(`${capture.error?.code || 'SCREEN_AWARENESS_FAILED'}: ${capture.error?.message || 'Screenshot capture failed'}`);
     }
 
-    const params = new ScreenMemoryChatParams();
-    params.idempotencyKey = `screenshot-capture-${Date.now()}`;
-    params.message = this.buildScreenshotCapturePrompt(capture.payloadJson);
-    await this.operatorSession.request('chat.send', params);
     this.prefs.setAvatarLastMemoryAt(Date.now());
-    hilog.info(NodeRuntime.DOMAIN, 'NodeRuntime', 'Screenshot capture metadata sent to DSH');
-  }
-
-  private buildScreenshotCapturePrompt(snapshotJson: string): string {
-    return '用户双击 Bonio，明确要求采集当前页面。以下是 MSDP Screenshot capture 返回的元数据数组。'
-      + '检查 items、entityInfo 和其他页面字段，提取持久且有用的信息；绝不保存密码、验证码、金融标识或完整私信。'
-      + '有保存价值时调用 memo_save 恰好一次，source 固定为 "msdp_capture"；没有价值则不要调用工具。'
-      + '用一句中文说明结果。\n\nScreenshot capture：\n' + snapshotJson;
+    hilog.info(NodeRuntime.DOMAIN, 'NodeRuntime', 'Screenshot capture queued in companion memory session');
   }
 
   /** Save a user-approved summary of the currently visible page as a structured DSH memory. */
@@ -342,20 +337,9 @@ export class NodeRuntime {
       throw new Error(`${capture.error?.code || 'SCREEN_AWARENESS_FAILED'}: ${capture.error?.message || 'SmartEdge screen capture failed'}`);
     }
 
-    const params = new ScreenMemoryChatParams();
-    params.idempotencyKey = `screen-memory-${Date.now()}`;
-    params.message = this.buildScreenMemoryPrompt(capture.payloadJson);
-    await this.operatorSession.request('chat.send', params);
+    this.companionMemoryController.enqueue('screen_context', capture.payloadJson);
     this.prefs.setAvatarLastMemoryAt(Date.now());
-    hilog.info(NodeRuntime.DOMAIN, 'NodeRuntime', 'Screen-context memory capture sent to DSH');
-  }
-
-  private buildScreenMemoryPrompt(snapshotJson: string): string {
-    return '用户明确要求把当前看到的页面保存为记忆。阅读下面的屏幕上下文后，调用 memo_save 恰好一次。'
-      + '只保存持久且有用的信息；绝不保存密码、验证码、金融标识或完整私信。'
-      + 'memo_save 的 title 使用干净简短的页面标题，content 写 1 到 3 句中文摘要，tags 给 1 到 3 个简短分类，'
-      + 'source 固定为 "screen_context"，并传入 sourceApp、pageTitle、pageLink（没有则省略）。'
-      + '如果内容没有可保存价值，也不要调用工具，只用一句中文说明原因。工具调用后用一句中文确认。\n\n屏幕上下文：\n' + snapshotJson;
+    hilog.info(NodeRuntime.DOMAIN, 'NodeRuntime', 'Screen context queued in companion memory session');
   }
 
   /**
@@ -437,6 +421,11 @@ export class NodeRuntime {
     this.connectedEndpoint = undefined;
     this.operatorSession.disconnect();
     this.nodeSession.disconnect();
+  }
+
+  public setScreenAwarenessEnabled(enabled: boolean): void {
+    this.prefs.setScreenAwarenessEnabled(enabled);
+    this.screenHandler.setScreenAwarenessEnabled(enabled);
   }
 
   public setForeground(value: boolean) {

@@ -9,6 +9,8 @@ namespace tools {
 
 types::ToolResult memo_save(const std::string& args_json);
 types::ToolResult memo_list(const std::string& args_json);
+types::ToolResult memo_get(const std::string& args_json);
+types::ToolResult memo_delete(const std::string& args_json);
 
 }  // namespace tools
 }  // namespace hiclaw

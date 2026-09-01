@@ -32,7 +32,14 @@ export class ScreenHandlerImpl implements ScreenHandler {
     this.context = context;
     this.screenManager = new ScreenRecordManager(context);
     this.screenAwareness = new MsdpScreenAwarenessManager(isScreenAwarenessEnabled, onSmartEdgeResult);
+  }
+
+  startScreenAwareness(): void {
     this.screenAwareness.start();
+  }
+
+  setScreenAwarenessEnabled(enabled: boolean): void {
+    this.screenAwareness.setEnabled(enabled);
   }
 
   private base64 = new util.Base64Helper();

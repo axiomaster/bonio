@@ -87,9 +87,24 @@ export class MsdpScreenAwarenessManager {
     try {
       onScreen.onReadingScreenPermissionListener(this.readingListener);
       this.listening = true;
+      if (this.isEnabled()) this.subscribeSmartEdge();
     } catch (_) {
       // Capture reports the concrete MSDP service error after a user request.
     }
+  }
+
+  public setEnabled(enabled: boolean): void {
+    if (enabled) {
+      this.subscribeSmartEdge();
+      return;
+    }
+    if (!this.smartEdgeSubscribed) return;
+    try {
+      onScreen.unsubscribe(SMART_EDGE_CAPABILITY, this.smartEdgeListener);
+    } catch (_) {
+      // The local preference is still disabled even if the service already removed it.
+    }
+    this.smartEdgeSubscribed = false;
   }
 
   public async captureContext(paramsJson: string | undefined): Promise<ScreenContextSnapshot> {
@@ -110,8 +125,8 @@ export class MsdpScreenAwarenessManager {
   }
 
   /**
-   * SmartEdge subscribes to foreground-app/page changes. The subscription is
-   * local only; a result is sent to DSH exclusively for an avatar double tap.
+   * SmartEdge subscribes to foreground-app/page changes. Results are forwarded
+   * to the independent companion-memory session by NodeRuntime.
    */
   public async triggerSmartEdge(): Promise<SmartEdgeSnapshot> {
     this.assertEnabled();
@@ -136,7 +151,6 @@ export class MsdpScreenAwarenessManager {
     this.assertEnabled();
     try {
       const results = await onScreen.capture(SCREENSHOT_CAPTURE_CAPABILITY);
-      this.reportSmartEdgeResult('capture', results);
       if (results.length === 0) {
         throw new MsdpScreenAwarenessError('SCREEN_CAPTURE_EMPTY_RESULT', 'MSDP Screenshot capture returned no result');
       }
@@ -147,6 +161,7 @@ export class MsdpScreenAwarenessManager {
           `MSDP Screenshot capture returned resultCode ${failed.resultCode}`,
         );
       }
+      this.reportSmartEdgeResult('capture', results);
       return this.toSmartEdgeSnapshot(results[0], JSON.stringify(results));
     } catch (error) {
       throw this.toAwarenessError(error);

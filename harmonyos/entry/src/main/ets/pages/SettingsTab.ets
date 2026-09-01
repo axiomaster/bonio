@@ -216,10 +216,10 @@ export struct SettingsTab {
               if (enabled) {
                 const granted = await this.requestPermission("ohos.permission.ONSCREEN_AWARENESS" as Permissions);
                 this.screenAwarenessEnabled = granted;
-                this.runtime?.prefs.setScreenAwarenessEnabled(granted);
+                this.runtime?.setScreenAwarenessEnabled(granted);
               } else {
                 this.screenAwarenessEnabled = false;
-                this.runtime?.prefs.setScreenAwarenessEnabled(false);
+                this.runtime?.setScreenAwarenessEnabled(false);
               }
             })
         }

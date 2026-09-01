@@ -12,6 +12,7 @@
 #include "hiclaw/observability/log.hpp"
 #include "hiclaw/session/store.hpp"
 #include "hiclaw/skills/skill_manager.hpp"
+#include "hiclaw/tools/memo_tool.hpp"
 #include "hiclaw/cron/scheduler.hpp"
 #include "hiclaw/cron/cron_tool.hpp"
 #include <hv/HttpClient.h>
@@ -49,6 +50,37 @@ using json = nlohmann::json;
 static std::string get_string(const json& j, const char* key) {
   if (!j.contains(key) || !j[key].is_string()) return "";
   return j[key].get<std::string>();
+}
+
+static bool is_memo_rpc(const std::string& method) {
+  return method == "memo.save" || method == "memo.list" ||
+         method == "memo.get" || method == "memo.delete";
+}
+
+static json memo_rpc_response(const std::string& id, const std::string& method,
+                              const json& params) {
+  types::ToolResult result;
+  const std::string args = params.dump();
+  if (method == "memo.save") result = tools::memo_save(args);
+  else if (method == "memo.list") result = tools::memo_list(args);
+  else if (method == "memo.get") result = tools::memo_get(args);
+  else result = tools::memo_delete(args);
+
+  json response;
+  response["type"] = "res";
+  response["id"] = id;
+  response["ok"] = result.success;
+  if (result.success) {
+    try {
+      response["payload"] = json::parse(result.output);
+    } catch (...) {
+      response["payload"] = {{"result", result.output}};
+    }
+  } else {
+    response["error"] = {{"code", method == "memo.get" || method == "memo.delete" ? "NOT_FOUND" : "MEMO_ERROR"},
+                         {"message", result.error}};
+  }
+  return response;
 }
 
 /// OpenClaw-style connect: token/password may be under `auth` or top-level in `params`.
@@ -332,6 +364,14 @@ std::string gateway_handle_frame(const std::string& frame,
       res["error"] = {{"code", "AGENT_ERROR"}, {"message", sanitize_utf8(result.error)}};
     }
     return res.dump();
+  }
+  if (is_memo_rpc(method)) {
+    json params = json::object();
+    try {
+      json request = json::parse(frame);
+      if (request.contains("params") && request["params"].is_object()) params = request["params"];
+    } catch (...) {}
+    return memo_rpc_response(id, method, params).dump();
   }
   if (method == "chat.history") {
     json res;
@@ -750,6 +790,25 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
       try {
         server.send(hdl, err.dump(), websocketpp::frame::opcode::text);
       } catch (...) {}
+      return;
+    }
+
+    if (is_memo_rpc(method)) {
+      if (!it->second.connected) {
+        nlohmann::json res;
+        res["type"] = "res";
+        res["id"] = id;
+        res["ok"] = false;
+        res["error"] = {{"code", "UNAUTHORIZED"}, {"message", "connect first"}};
+        try { server.send(hdl, res.dump(), websocketpp::frame::opcode::text); } catch (...) {}
+        return;
+      }
+      nlohmann::json params = nlohmann::json::object();
+      try {
+        nlohmann::json request = nlohmann::json::parse(payload);
+        if (request.contains("params") && request["params"].is_object()) params = request["params"];
+      } catch (...) {}
+      try { server.send(hdl, memo_rpc_response(id, method, params).dump(), websocketpp::frame::opcode::text); } catch (...) {}
       return;
     }
 

@@ -26,6 +26,8 @@ export interface LocationHandler {
 }
 
 export interface ScreenHandler {
+  startScreenAwareness(): void;
+  setScreenAwarenessEnabled(enabled: boolean): void;
   handleScreenRecord(paramsJson: string | undefined): Promise<InvokeResult>;
   handleScreenContext(paramsJson: string | undefined): Promise<InvokeResult>;
   handleScreenScrollToHook(paramsJson: string | undefined): Promise<InvokeResult>;

@@ -12,6 +12,16 @@ export class BonioMemory {
   pageLink: string = '';
 }
 
+export class SaveBonioMemory {
+  title: string = '';
+  content: string = '';
+  source: string = '';
+  tags: string[] = [];
+  sourceApp: string = '';
+  pageTitle: string = '';
+  pageLink: string = '';
+}
+
 class MemoListParams {
   limit: number = 200;
 }
@@ -49,9 +59,27 @@ function toMemory(value: Object): BonioMemory {
 /** Read and manage structured memories persisted by the local DSH bridge. */
 export class MemoryService {
   private session: GatewaySession;
+  private changeListeners: Array<() => void> = [];
 
   constructor(session: GatewaySession) {
     this.session = session;
+  }
+
+  addChangeListener(listener: () => void): void {
+    if (!this.changeListeners.includes(listener)) this.changeListeners.push(listener);
+  }
+
+  removeChangeListener(listener: () => void): void {
+    this.changeListeners = this.changeListeners.filter((candidate: () => void): boolean => candidate !== listener);
+  }
+
+  private notifyChanged(): void {
+    this.changeListeners.forEach((listener: () => void) => listener());
+  }
+
+  async save(memory: SaveBonioMemory): Promise<void> {
+    await this.session.request('memo.save', memory);
+    this.notifyChanged();
   }
 
   async list(): Promise<BonioMemory[]> {
@@ -80,5 +108,6 @@ export class MemoryService {
     const params = new MemoIdParams();
     params.id = id;
     await this.session.request('memo.delete', params);
+    this.notifyChanged();
   }
 }

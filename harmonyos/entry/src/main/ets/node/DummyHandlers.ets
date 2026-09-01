@@ -11,6 +11,10 @@ export class DummyCameraHandler implements CameraHandler {
 }
 
 export class DummyScreenHandler implements ScreenHandler {
+  startScreenAwareness(): void {}
+
+  setScreenAwarenessEnabled(enabled: boolean): void {}
+
   async handleScreenRecord(paramsJson: string | undefined): Promise<InvokeResult> {
     return { ok: false, error: { code: "NOT_IMPLEMENTED", message: "Screen Record not ported yet" } };
   }

@@ -12,9 +12,15 @@ export struct MemoryTab {
   @State selectedMemory: BonioMemory | undefined = undefined;
   @State isLoading: boolean = false;
   @State errorText: string = '';
+  private readonly memoryChanged = (): void => { void this.refresh(); };
 
   aboutToAppear() {
+    this.runtime?.memoryService.addChangeListener(this.memoryChanged);
     void this.refresh();
+  }
+
+  aboutToDisappear() {
+    this.runtime?.memoryService.removeChangeListener(this.memoryChanged);
   }
 
   private async refresh() {
@@ -68,6 +74,10 @@ export struct MemoryTab {
 
   private sourceName(memory: BonioMemory): string {
     return memory.pageTitle || memory.sourceApp || memory.source || '屏幕内容';
+  }
+
+  private isMsdpMemory(memory: BonioMemory): boolean {
+    return memory.source.startsWith('msdp_');
   }
 
   private async deleteSelectedMemory() {
@@ -127,7 +137,7 @@ export struct MemoryTab {
 
   @Builder MemoryRow(memory: BonioMemory) {
     Row() {
-      Text(memory.source === 'msdp_smart_edge' ? '◇' : '▤')
+      Text(this.isMsdpMemory(memory) ? '◇' : '▤')
         .fontSize(22)
         .fontColor('#0A59F7')
         .width(50)
