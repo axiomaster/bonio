@@ -45,8 +45,8 @@ export class AgentDriver {
         this.forwardInvoke = forwardInvoke;
     }
     /** Create (or reuse) the dsh agent bound to a hiclaw sessionKey. */
-    async getOrCreateAgent(sessionKey) {
-        if (sessionKey && this.agentsByKey.has(sessionKey)) {
+    async getOrCreateAgent(sessionKey, ephemeral = false) {
+        if (!ephemeral && sessionKey && this.agentsByKey.has(sessionKey)) {
             return this.agentsByKey.get(sessionKey);
         }
         const agents = this.ctx.get('agents');
@@ -58,7 +58,7 @@ export class AgentDriver {
             installModelSelection(agentCtx, { current: selection, assembled: undefined });
         };
         // Resume a persisted session when this sessionKey has one.
-        if (sessionKey) {
+        if (!ephemeral && sessionKey) {
             const map = await this.loadSessionMap();
             const persistedId = map[sessionKey];
             if (persistedId && typeof agents.resume === 'function') {
@@ -83,7 +83,7 @@ export class AgentDriver {
             agentOptions: { provider: selection.provider, model: selection.model },
             setup,
         });
-        if (sessionKey) {
+        if (!ephemeral && sessionKey) {
             this.agentsByKey.set(sessionKey, agent);
             const map = await this.loadSessionMap();
             map[sessionKey] = agentId;
@@ -227,7 +227,10 @@ export class AgentDriver {
             if (!sessions) {
                 throw new Error('dsh session service unavailable');
             }
-            const agent = await this.getOrCreateAgent(params.sessionKey);
+            // Screen-awareness payloads are independently summarized and persisted
+            // as memos. Reusing their DSH chat history makes raw UI trees grow until
+            // they exceed the model context window.
+            const agent = await this.getOrCreateAgent(params.sessionKey, params.sessionKey === 'system:companion-memory');
             if (!agent) {
                 throw new Error('dsh agent services unavailable');
             }
@@ -307,7 +310,7 @@ export class AgentDriver {
                 : undefined;
             this.sink.chatFinal(runId, params.sessionKey, errorMessage
                 ? { state: 'error', errorMessage, done: true }
-                : { text, state: 'final', done: true });
+                : { message: text, text, state: 'final', done: true });
             return;
         }
         catch (error) {

@@ -12,7 +12,7 @@ import {
   type ReqFrame, type EventFrame,
 } from './protocol.js';
 import { SessionRegistry } from './sessions.js';
-import { deleteMemo, getMemo, listMemos } from './memo_store.js';
+import { deleteMemo, getMemo, listMemos, saveMemo } from './memo_store.js';
 
 const DEFAULT_PORT = 10724;
 const INVOKE_TIMEOUT_MS = 300_000; // 5 min, mirror hiclaw tool call timeout
@@ -186,6 +186,31 @@ export function startGateway(
       send(resOk(frame.id, { memos, total: memos.length }));
     };
 
+    const handleMemoSave = async (frame: ReqFrame): Promise<void> => {
+      if (!requireAuth()) return send(resErr(frame.id, 'AUTH_REQUIRED', 'connect first'));
+      const params = (frame.params ?? {}) as Record<string, unknown>;
+      const title = typeof params.title === 'string' ? params.title : '';
+      const content = typeof params.content === 'string' ? params.content : '';
+      if (!title || !content) return send(resErr(frame.id, 'BAD_PARAMS', 'title and content are required'));
+      const tags = Array.isArray(params.tags)
+        ? params.tags.filter((tag: unknown): tag is string => typeof tag === 'string')
+        : undefined;
+      try {
+        const memo = await saveMemo({
+          title,
+          content,
+          source: typeof params.source === 'string' ? params.source : undefined,
+          tags,
+          sourceApp: typeof params.sourceApp === 'string' ? params.sourceApp : undefined,
+          pageTitle: typeof params.pageTitle === 'string' ? params.pageTitle : undefined,
+          pageLink: typeof params.pageLink === 'string' ? params.pageLink : undefined,
+        });
+        send(resOk(frame.id, { saved: true, memo }));
+      } catch (error) {
+        send(resErr(frame.id, 'MEMO_ERROR', error instanceof Error ? error.message : String(error)));
+      }
+    };
+
     const handleMemoGet = async (frame: ReqFrame): Promise<void> => {
       if (!requireAuth()) return send(resErr(frame.id, 'AUTH_REQUIRED', 'connect first'));
       const id = typeof frame.params?.id === 'string' ? frame.params.id : '';
@@ -252,6 +277,9 @@ export function startGateway(
           break;
         case 'sessions.list':
           void handleSessionsList(req);
+          break;
+        case 'memo.save':
+          void handleMemoSave(req);
           break;
         case 'memo.list':
           void handleMemoList(req);

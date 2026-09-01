@@ -121,16 +121,24 @@ export struct MemoryTab {
     }
   }
 
+  private isTagSelected(tag: string): boolean {
+    return tag === '全部' ? this.selectedTag === '' : this.selectedTag === tag;
+  }
+
   @Builder TagChip(tag: string, count: number) {
     Button(`${tag} ${count}`)
       .type(ButtonType.Normal)
       .height(30)
       .fontSize(12)
-      .fontColor(this.selectedTag === tag ? '#FFFFFF' : '#4D5B70')
-      .backgroundColor(this.selectedTag === tag ? '#0A59F7' : '#FFFFFF')
-      .border({ width: 1, color: this.selectedTag === tag ? '#0A59F7' : '#D8E1EF', radius: 15 })
+      .fontColor(this.isTagSelected(tag) ? '#FFFFFF' : '#4D5B70')
+      .backgroundColor(this.isTagSelected(tag) ? '#0A59F7' : '#FFFFFF')
+      .border({ width: 1, color: this.isTagSelected(tag) ? '#0A59F7' : '#D8E1EF', radius: 15 })
       .margin({ right: 8 })
       .onClick(() => {
+        if (tag === '全部') {
+          this.selectedTag = '';
+          return;
+        }
         this.selectedTag = this.selectedTag === tag ? '' : tag;
       })
   }

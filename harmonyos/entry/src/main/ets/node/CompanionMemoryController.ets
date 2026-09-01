@@ -10,6 +10,7 @@ const IGNORED_BUNDLE_NAMES: string[] = [
   'com.ohos.sceneboard',
 ];
 const IGNORED_APP_NAMES: string[] = ['bonio', '大桌面'];
+const MAX_DSH_PAYLOAD_LENGTH = 60000;
 
 class CompanionChatParams {
   sessionKey: string = COMPANION_MEMORY_SESSION_KEY;
@@ -135,11 +136,14 @@ export class CompanionMemoryController {
         this.activeRunId = runId;
       } else if (state === 'final' && !this.completingActive) {
         this.completingActive = true;
-        const summary = payload['message'] as string | undefined;
+        const message = payload['message'];
+        const text = payload['text'];
+        const summary = typeof message === 'string' ? message : typeof text === 'string' ? text : undefined;
         void this.completeActive(summary);
       } else if ((state === 'error' || state === 'aborted') && !this.completingActive) {
+        const errorMessage = typeof payload['errorMessage'] === 'string' ? payload['errorMessage'] : '';
         hilog.warn(CompanionMemoryController.DOMAIN, CompanionMemoryController.TAG,
-          'DSH companion run ended with %{public}s', state || 'unknown');
+          'DSH companion run ended with %{public}s: %{public}s', state || 'unknown', errorMessage);
         this.finishActive();
       }
     } catch (error) {
@@ -185,7 +189,10 @@ export class CompanionMemoryController {
     if (!input) return;
     try {
       const summary = this.parseSummary(summaryText);
-      if (summary?.shouldRemember !== false && summary?.content?.trim()) {
+      if (!summary) {
+        hilog.warn(CompanionMemoryController.DOMAIN, CompanionMemoryController.TAG,
+          'DSH companion summary was not valid JSON');
+      } else if (summary.shouldRemember !== false && summary.content?.trim()) {
         const memory = new SaveBonioMemory();
         memory.title = summary.title?.trim() || '屏幕记忆';
         memory.content = summary.content.trim();
@@ -224,12 +231,18 @@ export class CompanionMemoryController {
   }
 
   private buildPrompt(input: CompanionMemoryInput): string {
+    const payload = this.payloadForDsh(input.payloadJson);
     return '你正在处理 Bonio 的后台伴随记忆，不是用户主对话。分析下面的 MSDP 屏幕感知结果，提取用户正在浏览的、未来可能有帮助的信息。'
       + '支付信息、账单、证件号等个人事务信息是高价值记忆，应记录关键内容。用户浏览过的文章、商品、美食、店铺、短视频，以及下单或购买过的商品也都是高价值记忆，应记录名称、关键信息和上下文。'
       + '忽略密码、验证码、完整私信以及短暂无意义的界面状态。验证码是临时信息，不应记录。不要调用任何工具，不要输出 Markdown。'
       + '只返回一个 JSON 对象：有价值时返回 {"shouldRemember":true,"title":"简短标题","content":"1到3句中文摘要",'
       + '"tags":["1到3个标签"],"sourceApp":"应用名","pageTitle":"页面标题","pageLink":"来源链接"}；'
-      + '无价值时返回 {"shouldRemember":false}。缺失字段使用空字符串或空数组。\n'
-      + `来源：${input.source}\n时间戳：${input.receivedAt}\nMSDP 原始结果：\n${input.payloadJson}`;
+      + '无价值时返回 {"shouldRemember":false}。输出必须能被标准 JSON.parse 解析；字符串正文中的英文双引号请改用中文引号或进行 JSON 转义。缺失字段使用空字符串或空数组。\n'
+      + `来源：${input.source}\n时间戳：${input.receivedAt}\nMSDP 原始结果：\n${payload}`;
+  }
+
+  private payloadForDsh(payloadJson: string): string {
+    if (payloadJson.length <= MAX_DSH_PAYLOAD_LENGTH) return payloadJson;
+    return `${payloadJson.substring(0, MAX_DSH_PAYLOAD_LENGTH)}\n[MSDP 原始结果过长，后续内容已截断]`;
   }
 }

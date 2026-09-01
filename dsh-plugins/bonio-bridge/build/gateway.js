@@ -7,7 +7,7 @@
 import { randomUUID } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import { parseFrame, resOk, resErr, eventFrame, stringify, } from './protocol.js';
-import { deleteMemo, getMemo, listMemos } from './memo_store.js';
+import { deleteMemo, getMemo, listMemos, saveMemo } from './memo_store.js';
 const DEFAULT_PORT = 10724;
 const INVOKE_TIMEOUT_MS = 300000; // 5 min, mirror hiclaw tool call timeout
 const TICK_INTERVAL_MS = 30000; // heartbeat, mirror hiclaw
@@ -139,6 +139,33 @@ export function startGateway(ctx, config, registry, driver) {
             const memos = await listMemos(rawLimit);
             send(resOk(frame.id, { memos, total: memos.length }));
         };
+        const handleMemoSave = async (frame) => {
+            if (!requireAuth())
+                return send(resErr(frame.id, 'AUTH_REQUIRED', 'connect first'));
+            const params = (frame.params ?? {});
+            const title = typeof params.title === 'string' ? params.title : '';
+            const content = typeof params.content === 'string' ? params.content : '';
+            if (!title || !content)
+                return send(resErr(frame.id, 'BAD_PARAMS', 'title and content are required'));
+            const tags = Array.isArray(params.tags)
+                ? params.tags.filter((tag) => typeof tag === 'string')
+                : undefined;
+            try {
+                const memo = await saveMemo({
+                    title,
+                    content,
+                    source: typeof params.source === 'string' ? params.source : undefined,
+                    tags,
+                    sourceApp: typeof params.sourceApp === 'string' ? params.sourceApp : undefined,
+                    pageTitle: typeof params.pageTitle === 'string' ? params.pageTitle : undefined,
+                    pageLink: typeof params.pageLink === 'string' ? params.pageLink : undefined,
+                });
+                send(resOk(frame.id, { saved: true, memo }));
+            }
+            catch (error) {
+                send(resErr(frame.id, 'MEMO_ERROR', error instanceof Error ? error.message : String(error)));
+            }
+        };
         const handleMemoGet = async (frame) => {
             if (!requireAuth())
                 return send(resErr(frame.id, 'AUTH_REQUIRED', 'connect first'));
@@ -204,6 +231,9 @@ export function startGateway(ctx, config, registry, driver) {
                     break;
                 case 'sessions.list':
                     void handleSessionsList(req);
+                    break;
+                case 'memo.save':
+                    void handleMemoSave(req);
                     break;
                 case 'memo.list':
                     void handleMemoList(req);
