@@ -297,9 +297,14 @@ export class ChatController {
     if (sessionKey && sessionKey !== this.sessionKey) return;
 
     const runId = payload.runId as string | undefined;
-    if (runId && !this.pendingRuns.has(runId)) return;
-
     const state = payload.state as string | undefined;
+    if (runId && !this.pendingRuns.has(runId)) {
+      if (this.pendingRuns.size === 0 && (state === "final" || state === "aborted" || state === "error")) {
+        void this.bootstrap(false);
+      }
+      return;
+    }
+
     if (state === "final" || state === "aborted" || state === "error") {
       if (state === "error") {
         this.errorText = (payload.errorMessage as string | undefined) || "Chat failed";

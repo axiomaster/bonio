@@ -6,6 +6,7 @@ import { fileIo as fs } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
+import { COMPANION_MEMORY_SESSION_KEY } from '../node/CompanionMemoryController';
 
 const DOMAIN = 0x3D00;
 const TAG = 'ChatTab';
@@ -21,7 +22,7 @@ export struct ChatTab {
   @State streamingText: string | undefined = undefined;
   @State errorText: string | undefined = undefined;
   @State healthOk: boolean = true;
-  @State sessionLabel: string = 'main';
+  @State sessionLabel: string = 'chat';
   @State showThinkingMenu: boolean = false;
   @State showAttachmentMenu: boolean = false;
   @State pendingAttachments: OutgoingAttachment[] = [];
@@ -49,9 +50,21 @@ export struct ChatTab {
     this.pendingRunCount = ctrl.pendingRunCount;
     this.isSending = ctrl.pendingRunCount > 0;
     this.healthOk = ctrl.healthOk;
+    this.sessionLabel = ctrl.sessionKey === COMPANION_MEMORY_SESSION_KEY ? 'memory' : 'chat';
     setTimeout(() => {
       this.scroller.scrollEdge(Edge.Bottom);
     }, 50);
+  }
+
+  private async selectSession(label: string): Promise<void> {
+    const ctrl = this.runtime?.chatController;
+    if (!ctrl) return;
+    const key = label === 'memory' ? COMPANION_MEMORY_SESSION_KEY : (this.runtime?.mainSessionKey || 'main');
+    if (ctrl.sessionKey === key) return;
+    this.inputText = '';
+    this.pendingAttachments = [];
+    this.showAttachmentMenu = false;
+    await ctrl.load(key);
   }
 
   private thinkingLabel(raw: string): string {
@@ -156,6 +169,10 @@ export struct ChatTab {
           .height(28)
           .borderRadius(8)
           .padding({ left: 10, right: 10 })
+          .bindMenu([
+            { value: 'chat', action: () => { void this.selectSession('chat'); } },
+            { value: 'memory', action: () => { void this.selectSession('memory'); } },
+          ])
 
         // Connection status pill
         Row() {
@@ -212,8 +229,9 @@ export struct ChatTab {
       .layoutWeight(1)
       .padding({ left: 12, right: 12, top: 8, bottom: 8 })
 
-      // ── Composer Area ──
-      Column() {
+      // The companion-memory conversation is read-only in Chat.
+      if (this.sessionLabel === 'chat') {
+        Column() {
         // Control Row: Continue/Stop (merged) + Thinking level
         Row() {
           // Dynamic Continue/Stop button
@@ -421,11 +439,18 @@ export struct ChatTab {
             .padding({ left: 10, right: 10, bottom: 8 })
             .maxLines(2)
         }
+        }
+        .width('100%')
+        .padding({ bottom: 20 })
+        .backgroundColor('#F0F4F8')
+        .borderRadius({ topLeft: 16, topRight: 16 })
+      } else if (this.errorText) {
+        Text(this.errorText)
+          .fontSize(12)
+          .fontColor('#E53935')
+          .padding({ left: 14, right: 14, bottom: 12 })
+          .maxLines(2)
       }
-      .width('100%')
-      .padding({ bottom: 20 })
-      .backgroundColor('#F0F4F8')
-      .borderRadius({ topLeft: 16, topRight: 16 })
     }
     .width('100%')
     .height('100%')
