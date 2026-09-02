@@ -16,6 +16,10 @@ function memoCoverPath(id) {
     const directory = memoDirectory(id);
     return directory ? path.join(directory, 'cover.jpg') : null;
 }
+function memoOriginalImagePath(id) {
+    const directory = memoDirectory(id);
+    return directory ? path.join(directory, 'screenshot.png') : null;
+}
 function text(value) {
     return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
@@ -36,6 +40,9 @@ function coverImage(value) {
         return undefined;
     const normalized = value.trim().replace(/^data:image\/(?:jpeg|jpg|png|webp|gif);base64,/i, '');
     return normalized ? normalized : undefined;
+}
+function imageMimeType(value) {
+    return value === 'image/jpeg' || value === 'image/png' || value === 'image/webp' ? value : undefined;
 }
 function normalizeMemo(value) {
     if (!value || typeof value !== 'object')
@@ -60,16 +67,19 @@ function normalizeMemo(value) {
         pageTitle: text(raw.pageTitle),
         pageLink: text(raw.pageLink),
         coverImage: coverImage(raw.coverImage),
+        originalImage: coverImage(raw.originalImage),
+        originalImageMimeType: imageMimeType(raw.originalImageMimeType),
     };
 }
 function storedMemo(memo) {
-    const { coverImage: _coverImage, ...metadata } = memo;
+    const { coverImage: _coverImage, originalImage: _originalImage, ...metadata } = memo;
     return metadata;
 }
-async function readMemo(id) {
+async function readMemo(id, includeOriginalImage = true) {
     const dataPath = memoDataPath(id);
     const coverPath = memoCoverPath(id);
-    if (!dataPath || !coverPath)
+    const originalImagePath = memoOriginalImagePath(id);
+    if (!dataPath || !coverPath || !originalImagePath)
         return null;
     try {
         const memo = normalizeMemo(JSON.parse(await fs.readFile(dataPath, 'utf8')));
@@ -81,6 +91,14 @@ async function readMemo(id) {
         catch {
             // A cover is optional; a missing/corrupt cover must not hide the memo.
         }
+        if (includeOriginalImage) {
+            try {
+                memo.originalImage = (await fs.readFile(originalImagePath)).toString('base64');
+            }
+            catch {
+                // Legacy memories do not have a full-resolution screenshot.
+            }
+        }
         return memo;
     }
     catch {
@@ -91,13 +109,17 @@ async function writeMemo(memo) {
     const directory = memoDirectory(memo.id);
     const dataPath = memoDataPath(memo.id);
     const coverPath = memoCoverPath(memo.id);
-    if (!directory || !dataPath || !coverPath)
+    const originalImagePath = memoOriginalImagePath(memo.id);
+    if (!directory || !dataPath || !coverPath || !originalImagePath)
         throw new Error('invalid memo id');
     await fs.mkdir(directory, { recursive: true });
     await fs.writeFile(dataPath, JSON.stringify(storedMemo(memo), null, 2), 'utf8');
     const cover = coverImage(memo.coverImage);
     if (cover)
         await fs.writeFile(coverPath, Buffer.from(cover, 'base64'));
+    const originalImage = coverImage(memo.originalImage);
+    if (originalImage)
+        await fs.writeFile(originalImagePath, Buffer.from(originalImage, 'base64'));
 }
 /** Move legacy <id>.json records into the per-memo directory layout. */
 async function migrateLegacyMemos() {
@@ -140,6 +162,8 @@ export async function saveMemo(input) {
         pageTitle: text(input.pageTitle),
         pageLink: text(input.pageLink),
         coverImage: coverImage(input.coverImage),
+        originalImage: coverImage(input.originalImage),
+        originalImageMimeType: imageMimeType(input.originalImageMimeType),
     };
     await fs.mkdir(memoDir(), { recursive: true });
     await writeMemo(memo);
@@ -156,7 +180,7 @@ export async function listMemos(limit = 100) {
     }
     const memos = [];
     for (const entry of entries) {
-        const memo = await readMemo(entry);
+        const memo = await readMemo(entry, false);
         if (memo)
             memos.push(memo);
     }

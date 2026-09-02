@@ -24,6 +24,8 @@ export interface InvokeResult {
   ok: boolean;
   payloadJson?: string;
   coverImageBase64?: string;
+  originalImageBase64?: string;
+  originalImageMimeType?: string;
   error?: InvokeError;
 }
 

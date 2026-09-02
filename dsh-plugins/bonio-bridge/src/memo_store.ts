@@ -14,6 +14,9 @@ export interface BonioMemo {
   pageLink?: string;
   /** Base64-encoded JPEG cover, populated when the memo is read. */
   coverImage?: string;
+  /** Base64-encoded full-resolution screenshot, loaded for memory detail. */
+  originalImage?: string;
+  originalImageMimeType?: string;
 }
 
 export interface SaveMemoInput {
@@ -26,6 +29,9 @@ export interface SaveMemoInput {
   pageLink?: string;
   /** Base64-encoded JPEG cover from an explicit MSDP capture. */
   coverImage?: string;
+  /** Full-resolution screenshot used for visual extraction and detail view. */
+  originalImage?: string;
+  originalImageMimeType?: string;
 }
 
 function memoDir(): string {
@@ -45,6 +51,11 @@ function memoDataPath(id: string): string | null {
 function memoCoverPath(id: string): string | null {
   const directory = memoDirectory(id);
   return directory ? path.join(directory, 'cover.jpg') : null;
+}
+
+function memoOriginalImagePath(id: string): string | null {
+  const directory = memoDirectory(id);
+  return directory ? path.join(directory, 'screenshot.png') : null;
 }
 
 function text(value: unknown): string | undefined {
@@ -68,6 +79,10 @@ function coverImage(value: unknown): string | undefined {
   return normalized ? normalized : undefined;
 }
 
+function imageMimeType(value: unknown): string | undefined {
+  return value === 'image/jpeg' || value === 'image/png' || value === 'image/webp' ? value : undefined;
+}
+
 function normalizeMemo(value: unknown): BonioMemo | null {
   if (!value || typeof value !== 'object') return null;
   const raw = value as Record<string, unknown>;
@@ -89,18 +104,21 @@ function normalizeMemo(value: unknown): BonioMemo | null {
     pageTitle: text(raw.pageTitle),
     pageLink: text(raw.pageLink),
     coverImage: coverImage(raw.coverImage),
+    originalImage: coverImage(raw.originalImage),
+    originalImageMimeType: imageMimeType(raw.originalImageMimeType),
   };
 }
 
-function storedMemo(memo: BonioMemo): Omit<BonioMemo, 'coverImage'> {
-  const { coverImage: _coverImage, ...metadata } = memo;
+function storedMemo(memo: BonioMemo): Omit<BonioMemo, 'coverImage' | 'originalImage'> {
+  const { coverImage: _coverImage, originalImage: _originalImage, ...metadata } = memo;
   return metadata;
 }
 
-async function readMemo(id: string): Promise<BonioMemo | null> {
+async function readMemo(id: string, includeOriginalImage = true): Promise<BonioMemo | null> {
   const dataPath = memoDataPath(id);
   const coverPath = memoCoverPath(id);
-  if (!dataPath || !coverPath) return null;
+  const originalImagePath = memoOriginalImagePath(id);
+  if (!dataPath || !coverPath || !originalImagePath) return null;
   try {
     const memo = normalizeMemo(JSON.parse(await fs.readFile(dataPath, 'utf8')));
     if (!memo) return null;
@@ -108,6 +126,13 @@ async function readMemo(id: string): Promise<BonioMemo | null> {
       memo.coverImage = (await fs.readFile(coverPath)).toString('base64');
     } catch {
       // A cover is optional; a missing/corrupt cover must not hide the memo.
+    }
+    if (includeOriginalImage) {
+      try {
+        memo.originalImage = (await fs.readFile(originalImagePath)).toString('base64');
+      } catch {
+        // Legacy memories do not have a full-resolution screenshot.
+      }
     }
     return memo;
   } catch {
@@ -119,12 +144,15 @@ async function writeMemo(memo: BonioMemo): Promise<void> {
   const directory = memoDirectory(memo.id);
   const dataPath = memoDataPath(memo.id);
   const coverPath = memoCoverPath(memo.id);
-  if (!directory || !dataPath || !coverPath) throw new Error('invalid memo id');
+  const originalImagePath = memoOriginalImagePath(memo.id);
+  if (!directory || !dataPath || !coverPath || !originalImagePath) throw new Error('invalid memo id');
 
   await fs.mkdir(directory, { recursive: true });
   await fs.writeFile(dataPath, JSON.stringify(storedMemo(memo), null, 2), 'utf8');
   const cover = coverImage(memo.coverImage);
   if (cover) await fs.writeFile(coverPath, Buffer.from(cover, 'base64'));
+  const originalImage = coverImage(memo.originalImage);
+  if (originalImage) await fs.writeFile(originalImagePath, Buffer.from(originalImage, 'base64'));
 }
 
 /** Move legacy <id>.json records into the per-memo directory layout. */
@@ -165,6 +193,8 @@ export async function saveMemo(input: SaveMemoInput): Promise<BonioMemo> {
     pageTitle: text(input.pageTitle),
     pageLink: text(input.pageLink),
     coverImage: coverImage(input.coverImage),
+    originalImage: coverImage(input.originalImage),
+    originalImageMimeType: imageMimeType(input.originalImageMimeType),
   };
   await fs.mkdir(memoDir(), { recursive: true });
   await writeMemo(memo);
@@ -181,7 +211,7 @@ export async function listMemos(limit = 100): Promise<BonioMemo[]> {
   }
   const memos: BonioMemo[] = [];
   for (const entry of entries) {
-    const memo = await readMemo(entry);
+    const memo = await readMemo(entry, false);
     if (memo) memos.push(memo);
   }
   return memos.sort((a, b) => b.createdAt - a.createdAt).slice(0, Math.max(1, Math.min(limit, 200)));

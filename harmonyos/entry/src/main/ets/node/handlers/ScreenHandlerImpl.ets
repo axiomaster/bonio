@@ -28,7 +28,7 @@ export class ScreenHandlerImpl implements ScreenHandler {
     context: common.Context,
     isScreenAwarenessEnabled: () => boolean,
     onSmartEdgeResult?: (source: SmartEdgeResultSource, payloadJson: string,
-      coverImageBase64?: string) => void,
+      coverImageBase64?: string, originalImageBase64?: string, originalImageMimeType?: string) => void,
   ) {
     this.context = context;
     this.screenManager = new ScreenRecordManager(context);
@@ -115,6 +115,8 @@ export class ScreenHandlerImpl implements ScreenHandler {
         ok: true,
         payloadJson: snapshot.payloadJson,
         coverImageBase64: snapshot.coverImageBase64,
+        originalImageBase64: snapshot.originalImageBase64,
+        originalImageMimeType: snapshot.originalImageMimeType,
       };
     } catch (error) {
       return this.makeAwarenessError(error);

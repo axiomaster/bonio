@@ -29,8 +29,8 @@ class CompanionChatParams {
 
 class CompanionAttachmentPayload {
   type: string = 'image';
-  mimeType: string = 'image/jpeg';
-  fileName: string = 'msdp-screen.jpg';
+  mimeType: string = 'image/png';
+  fileName: string = 'msdp-screen.png';
   content: string = '';
 }
 
@@ -39,6 +39,8 @@ class CompanionMemoryInput {
   source: string = '';
   payloadJson: string = '';
   coverImageBase64: string | undefined = undefined;
+  originalImageBase64: string | undefined = undefined;
+  originalImageMimeType: string | undefined = undefined;
   receivedAt: number = 0;
   explicitCapture: boolean = false;
   favoriteAction: boolean = false;
@@ -84,19 +86,21 @@ export class CompanionMemoryController {
     this.isConnected = isConnected;
   }
 
-  enqueue(source: string, payloadJson: string, coverImageBase64?: string): void {
-    this.enqueueInternal(source, payloadJson, coverImageBase64);
+  enqueue(source: string, payloadJson: string, coverImageBase64?: string, originalImageBase64?: string,
+    originalImageMimeType?: string): void {
+    this.enqueueInternal(source, payloadJson, coverImageBase64, originalImageBase64, originalImageMimeType);
   }
 
   /** Wait for a user-initiated capture to finish DSH analysis and memo persistence. */
-  enqueueAndWait(source: string, payloadJson: string, coverImageBase64?: string): Promise<CompanionMemoryOutcome> {
+  enqueueAndWait(source: string, payloadJson: string, coverImageBase64?: string, originalImageBase64?: string,
+    originalImageMimeType?: string): Promise<CompanionMemoryOutcome> {
     return new Promise((resolve: (outcome: CompanionMemoryOutcome) => void) => {
-      this.enqueueInternal(source, payloadJson, coverImageBase64, resolve);
+      this.enqueueInternal(source, payloadJson, coverImageBase64, originalImageBase64, originalImageMimeType, resolve);
     });
   }
 
-  private enqueueInternal(source: string, payloadJson: string, coverImageBase64?: string,
-    completionListener?: (outcome: CompanionMemoryOutcome) => void): void {
+  private enqueueInternal(source: string, payloadJson: string, coverImageBase64?: string, originalImageBase64?: string,
+    originalImageMimeType?: string, completionListener?: (outcome: CompanionMemoryOutcome) => void): void {
     if (!payloadJson.trim()) {
       if (completionListener) completionListener(this.outcome(false, '', '屏幕识别未返回内容'));
       return;
@@ -116,6 +120,8 @@ export class CompanionMemoryController {
     input.source = source;
     input.payloadJson = filteredPayload;
     input.coverImageBase64 = coverImageBase64;
+    input.originalImageBase64 = originalImageBase64;
+    input.originalImageMimeType = originalImageMimeType;
     input.receivedAt = Date.now();
     input.explicitCapture = source === 'trigger';
     input.favoriteAction = this.isFavoriteAction(filteredPayload);
@@ -238,9 +244,10 @@ export class CompanionMemoryController {
       const params = new CompanionChatParams();
       params.message = this.buildPrompt(input);
       params.idempotencyKey = `companion-memory-${input.receivedAt}-${input.sequence}`;
-      if (input.coverImageBase64) {
+      if (input.originalImageBase64) {
         const attachment = new CompanionAttachmentPayload();
-        attachment.content = input.coverImageBase64;
+        attachment.content = input.originalImageBase64;
+        attachment.mimeType = input.originalImageMimeType || 'image/png';
         params.attachments = [attachment];
       }
       const response = await this.session.request('chat.send', params);
@@ -286,6 +293,8 @@ export class CompanionMemoryController {
         memory.pageTitle = summary.pageTitle?.trim() || '';
         memory.pageLink = summary.pageLink?.trim() || '';
         memory.coverImage = input.coverImageBase64 || '';
+        memory.originalImage = input.originalImageBase64 || '';
+        memory.originalImageMimeType = input.originalImageMimeType || '';
         await this.memoryService.save(memory);
         hilog.info(CompanionMemoryController.DOMAIN, CompanionMemoryController.TAG,
           'saved companion summary: %{public}s', memory.title);

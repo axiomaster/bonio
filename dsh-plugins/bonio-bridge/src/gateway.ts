@@ -344,6 +344,8 @@ export function startGateway(
           pageTitle: typeof params.pageTitle === 'string' ? params.pageTitle : undefined,
           pageLink: typeof params.pageLink === 'string' ? params.pageLink : undefined,
           coverImage: typeof params.coverImage === 'string' ? params.coverImage : undefined,
+          originalImage: typeof params.originalImage === 'string' ? params.originalImage : undefined,
+          originalImageMimeType: typeof params.originalImageMimeType === 'string' ? params.originalImageMimeType : undefined,
         });
         send(resOk(frame.id, { saved: true, memo }));
       } catch (error) {

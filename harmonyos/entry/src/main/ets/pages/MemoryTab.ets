@@ -84,6 +84,13 @@ export struct MemoryTab {
     return `data:image/jpeg;base64,${memory.coverImage}`;
   }
 
+  private detailImageDataUrl(memory: BonioMemory): string {
+    if (memory.originalImage) {
+      return `data:${memory.originalImageMimeType || 'image/png'};base64,${memory.originalImage}`;
+    }
+    return this.coverDataUrl(memory);
+  }
+
   private cardTags(memory: BonioMemory): string[] {
     const content = memory.tags.find((tag: string): boolean => tag.startsWith('内容:'));
     const behavior = memory.tags.find((tag: string): boolean => tag.startsWith('行为:'));
@@ -98,6 +105,17 @@ export struct MemoryTab {
       await this.refresh();
     } catch (error) {
       this.errorText = error instanceof Error ? error.message : '删除记忆失败';
+    }
+  }
+
+  private async openMemoryDetail(memory: BonioMemory) {
+    this.selectedMemory = memory;
+    if (!this.runtime) return;
+    try {
+      const detailedMemory = await this.runtime.memoryService.get(memory.id);
+      if (detailedMemory) this.selectedMemory = detailedMemory;
+    } catch (error) {
+      this.errorText = error instanceof Error ? error.message : '记忆详情加载失败';
     }
   }
 
@@ -218,7 +236,7 @@ export struct MemoryTab {
     .padding({ top: 13, bottom: 13 })
     .border({ width: { bottom: 1 }, color: '#E8EDF5' })
     .onClick(() => {
-      this.selectedMemory = memory;
+      void this.openMemoryDetail(memory);
     })
   }
 
@@ -265,11 +283,11 @@ export struct MemoryTab {
             .fontColor('#98A2B3')
             .width('100%')
             .margin({ top: 4 })
-          if (memory.coverImage) {
-            Image(this.coverDataUrl(memory))
+          if (memory.originalImage || memory.coverImage) {
+            Image(this.detailImageDataUrl(memory))
               .width('100%')
-              .height(180)
-              .objectFit(ImageFit.Cover)
+              .height(360)
+              .objectFit(ImageFit.Contain)
               .borderRadius(6)
               .margin({ top: 16 })
           }

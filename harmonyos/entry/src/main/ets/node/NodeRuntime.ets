@@ -98,11 +98,12 @@ export class NodeRuntime {
     this.screenHandler = new ScreenHandlerImpl(
       context,
       () => this.prefs.getScreenAwarenessEnabled(),
-      (source: string, payloadJson: string, coverImageBase64?: string) => {
+      (source: string, payloadJson: string, coverImageBase64?: string, originalImageBase64?: string,
+        originalImageMimeType?: string) => {
         // Explicit trigger captures are enqueued after the handler returns so
         // the completion listener and screenshot cover share one input.
         if (source === 'trigger') return;
-        this.companionMemoryController.enqueue(source, payloadJson, coverImageBase64);
+        this.companionMemoryController.enqueue(source, payloadJson, coverImageBase64, originalImageBase64, originalImageMimeType);
       },
     );
 
@@ -326,7 +327,7 @@ export class NodeRuntime {
     }
 
     const outcome = await this.companionMemoryController.enqueueAndWait(
-      'trigger', capture.payloadJson, capture.coverImageBase64);
+      'trigger', capture.payloadJson, capture.coverImageBase64, capture.originalImageBase64, capture.originalImageMimeType);
     if (!outcome.saved) {
       throw new Error(`MEMORY_NOT_SAVED: ${outcome.reason || '当前页面未生成记忆'}`);
     }
