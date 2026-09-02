@@ -1,0 +1,41 @@
+dsh-plugins/bonio-bridge/src/channel_store.ts
+  s_65a1faaab12715::t_47890120f2741e 34-38,48-57
+  s_65a1faaab12715::t_42eb6af80b671f 2-3,5-7
+dsh-plugins/bonio-bridge/src/ilink.ts
+  s_65a1faaab12715::t_e4e7c5ae10d499 14-15
+  s_65a1faaab12715::t_d6bab0e508de79 81-101
+  s_65a1faaab12715::t_ec53869fa7748e 12
+  s_65a1faaab12715::t_d53426a80e92f2 48-53,61,64
+  s_65a1faaab12715::t_cfb95d1dd7f8a3 115-117,119
+  s_65a1faaab12715::t_f22412f30d2dbf 214-215,221-232,234-239,243-253,255-296
+  s_65a1faaab12715::t_0fc67c45909f7f 204
+harmonyos/entry/src/main/ets/pages/ChatTab.ets
+  s_65a1faaab12715::t_c0a5eed71b07d8 192-206
+  s_65a1faaab12715::t_1da15c8470e500 268-287
+  s_65a1faaab12715::t_2870d5e260ce19 307
+dsh-plugins/bonio-bridge/build/channel_store.d.ts
+  s_65a1faaab12715::t_d5290070076ecc 1-36
+dsh-plugins/bonio-bridge/build/channel_store.js
+  s_65a1faaab12715::t_0cc139e47a6f40 1-143
+dsh-plugins/bonio-bridge/build/ilink.d.ts
+  s_65a1faaab12715::t_df5f1920fe9ca4 24-29,34-36,42,44
+dsh-plugins/bonio-bridge/build/ilink.js
+  s_65a1faaab12715::t_7f3c53a3c323da 11,13-14,27-32,39,45,64-85,99-101,103,193,203-204,212-227,229-233,236-247,249-291
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "7fa3a827d26527292630acc377e8f3809b37de06",
+  "prompts": {},
+  "sessions": {
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "glm-5.3"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 69
+    }
+  }
+}
