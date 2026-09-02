@@ -14,6 +14,9 @@ const MAX_DSH_PAYLOAD_LENGTH = 60000;
 const ORDER_MEMORY_KEYWORDS: string[] = [
   '订单', '下单', '购买', '支付', '付款', '结算', '外卖', '取餐', '咖啡', 'coffee', 'luckin', '瑞幸',
 ];
+const CONTENT_TAG_PREFIX = '内容:';
+const ACTION_TAG_PREFIX = '行为:';
+const FAVORITE_PAGE_TAG = 'addtofavorite';
 
 class CompanionChatParams {
   sessionKey: string = COMPANION_MEMORY_SESSION_KEY;
@@ -38,6 +41,7 @@ class CompanionMemoryInput {
   coverImageBase64: string | undefined = undefined;
   receivedAt: number = 0;
   explicitCapture: boolean = false;
+  favoriteAction: boolean = false;
   completionListeners: Array<(outcome: CompanionMemoryOutcome) => void> = [];
 }
 
@@ -114,6 +118,7 @@ export class CompanionMemoryController {
     input.coverImageBase64 = coverImageBase64;
     input.receivedAt = Date.now();
     input.explicitCapture = source === 'trigger';
+    input.favoriteAction = this.isFavoriteAction(filteredPayload);
     if (completionListener) input.completionListeners.push(completionListener);
     if (this.queue.length >= CompanionMemoryController.MAX_QUEUE_SIZE) {
       this.queue.shift();
@@ -122,8 +127,8 @@ export class CompanionMemoryController {
     }
     this.queue.push(input);
     hilog.info(CompanionMemoryController.DOMAIN, CompanionMemoryController.TAG,
-      'queued %{public}s input seq=%{public}d explicit=%{public}s queue=%{public}d connected=%{public}s',
-      source, input.sequence, input.explicitCapture ? 'true' : 'false', this.queue.length,
+      'queued %{public}s input seq=%{public}d explicit=%{public}s favorite=%{public}s queue=%{public}d connected=%{public}s',
+      source, input.sequence, input.explicitCapture ? 'true' : 'false', input.favoriteAction ? 'true' : 'false', this.queue.length,
       this.isConnected() ? 'true' : 'false');
     this.processNext();
   }
@@ -163,6 +168,10 @@ export class CompanionMemoryController {
     const bundleName = typeof bundleValue === 'string' ? bundleValue.trim().toLowerCase() : '';
     const appName = typeof appValue === 'string' ? appValue.trim().toLowerCase() : '';
     return IGNORED_BUNDLE_NAMES.includes(bundleName) || IGNORED_APP_NAMES.includes(appName);
+  }
+
+  private isFavoriteAction(payloadJson: string): boolean {
+    return payloadJson.toLowerCase().includes(FAVORITE_PAGE_TAG);
   }
 
   onConnected(): void {
@@ -262,17 +271,17 @@ export class CompanionMemoryController {
           'DSH companion summary was not valid JSON, source=%{public}s response=%{public}s',
           input.source, (summaryText || '').substring(0, 300));
       }
-      if (this.shouldCreateExplicitFallback(input, summary)) {
-        summary = this.explicitFallbackSummary(input);
+      if (this.shouldCreateRequiredFallback(input, summary)) {
+        summary = this.requiredFallbackSummary(input);
         hilog.info(CompanionMemoryController.DOMAIN, CompanionMemoryController.TAG,
-          'using explicit capture fallback for %{public}s', input.source);
+          'using required memory fallback for %{public}s', input.source);
       }
       if (summary && summary.shouldRemember !== false && summary.content?.trim()) {
         const memory = new SaveBonioMemory();
         memory.title = summary.title?.trim() || '屏幕记忆';
         memory.content = summary.content.trim();
         memory.source = `msdp_${input.source}`;
-        memory.tags = Array.isArray(summary.tags) ? summary.tags.filter((tag: string): boolean => tag.trim().length > 0) : [];
+        memory.tags = this.memoryTags(summary.tags, input);
         memory.sourceApp = summary.sourceApp?.trim() || '';
         memory.pageTitle = summary.pageTitle?.trim() || '';
         memory.pageLink = summary.pageLink?.trim() || '';
@@ -323,9 +332,23 @@ export class CompanionMemoryController {
     return outcome;
   }
 
-  private shouldCreateExplicitFallback(input: CompanionMemoryInput, summary: CompanionSummary | undefined): boolean {
-    if (!input.explicitCapture) return false;
+  private shouldCreateRequiredFallback(input: CompanionMemoryInput, summary: CompanionSummary | undefined): boolean {
+    if (!input.explicitCapture && !input.favoriteAction) return false;
     return !summary || summary.shouldRemember === false || !summary.content?.trim();
+  }
+
+  private memoryTags(summaryTags: string[] | undefined, input: CompanionMemoryInput): string[] {
+    const contentTags: string[] = [];
+    (summaryTags || []).forEach((tag: string) => {
+      const normalized = tag.trim().replace(/^内容[:：]/, '').replace(/^行为[:：]/, '');
+      if (normalized && !['浏览记', '主动记', '收藏记'].includes(normalized) && !contentTags.includes(normalized)) {
+        contentTags.push(normalized);
+      }
+    });
+    if (contentTags.length === 0) contentTags.push('待分类');
+    const behavior = input.favoriteAction ? '收藏记' : input.explicitCapture ? '主动记' : '浏览记';
+    return contentTags.slice(0, 3).map((tag: string): string => `${CONTENT_TAG_PREFIX}${tag}`)
+      .concat(`${ACTION_TAG_PREFIX}${behavior}`);
   }
 
   private containsOrderSignal(payloadJson: string): boolean {
@@ -333,17 +356,18 @@ export class CompanionMemoryController {
     return ORDER_MEMORY_KEYWORDS.some((keyword: string): boolean => lowerPayload.includes(keyword));
   }
 
-  private explicitFallbackSummary(input: CompanionMemoryInput): CompanionSummary {
+  private requiredFallbackSummary(input: CompanionMemoryInput): CompanionSummary {
     const lowerPayload = input.payloadJson.toLowerCase();
     const isOrder = this.containsOrderSignal(input.payloadJson);
     const isLuckin = lowerPayload.includes('luckin') || input.payloadJson.includes('瑞幸');
     const subject = isLuckin ? '瑞幸咖啡订单' : isOrder ? '订单页面' : '当前页面';
+    const rememberedBy = input.favoriteAction ? 'MSDP 检测到用户收藏了当前内容。' : '用户通过双击 avatar 明确要求记录当前页面。';
     return {
       shouldRemember: true,
-      title: `${subject}记录`,
+      title: `${input.favoriteAction ? '收藏' : ''}${subject}记录`,
       content: isOrder
-        ? `用户显式记录了${subject}。下次用户说“再来一单”时，应先读取此记忆，再结合关联截图和页面信息调用 phone-use skill 复现下单流程。`
-        : '用户通过双击 avatar 明确要求记录当前页面。后续可结合本条记忆的截图和页面信息继续处理。',
+        ? `${rememberedBy}下次用户说“再来一单”时，应先读取此记忆，再结合关联截图和页面信息调用 phone-use skill 复现下单流程。`
+        : `${rememberedBy}后续可结合本条记忆的截图和页面信息继续处理。`,
       tags: isLuckin ? ['瑞幸咖啡', '订单', '复购'] : isOrder ? ['订单', '复购'] : ['显式记录'],
       sourceApp: isLuckin ? '瑞幸咖啡' : '',
       pageTitle: subject,
@@ -358,13 +382,16 @@ export class CompanionMemoryController {
         + '订单提取规则：商品名称、规格、温度/冰量、糖度、数量和金额必须逐字忠实转录截图或 MSDP 原文中可见的文字。不得依据杯子颜色、商品图片、常见搭配或经验推断饮品种类；不得把“冷萃”概括、改写或纠正为“冰拿铁”等其他饮品。名称不可辨认时写“商品名称未识别”，并省略该字段，绝不猜测。\n'
         + '在 content 中按“商品名称：…；规格：…；温度/冰量：…；糖度：…；数量：…；金额：…”依次记录可确认字段。例如画面文字为“埃塞瑰夏冷萃 / 大杯 / 冰 / 不另外加糖”，则必须保留这四个原文值。再补充品牌、取餐方式、门店、订单状态等明确可见的信息。\n'
       : '';
+    const favoriteInstruction = input.favoriteAction
+      ? 'MSDP 的 pageTags 包含 addtofavorite，表示用户刚刚收藏了当前内容。这是明确的收藏行为，必须返回 shouldRemember:true；即使页面详情不足，也要保存可用的标题、来源和收藏上下文。\n'
+      : '';
     return '你正在处理 Bonio 的后台伴随记忆，不是用户主对话。分析下面的 MSDP 屏幕感知结果，提取用户正在浏览的、未来可能有帮助的信息。'
       + '支付信息、账单、证件号等个人事务信息是高价值记忆，应记录关键内容。用户浏览过的文章、商品、美食、店铺、短视频，以及下单或购买过的商品也都是高价值记忆，应记录名称、关键信息和上下文。'
       + '忽略密码、验证码、完整私信以及短暂无意义的界面状态。验证码是临时信息，不应记录。若附有截图，请结合截图和结构化结果判断内容。不要调用任何工具，不要输出 Markdown。'
       + '只返回一个 JSON 对象：有价值时返回 {"shouldRemember":true,"title":"简短标题","content":"1到3句中文摘要",'
-      + '"tags":["1到3个标签"],"sourceApp":"应用名","pageTitle":"页面标题","pageLink":"来源链接"}；'
+      + '"tags":["1到3个内容类别"],"sourceApp":"应用名","pageTitle":"页面标题","pageLink":"来源链接"}。tags 只能是内容类别，不要输出行为类别或“内容:”/“行为:”前缀；可使用新闻、时政、财经、科技、购物、美食、生活、健康、出行、教育、娱乐、情感等贴合页面的类别；'
       + '无价值时返回 {"shouldRemember":false}。输出必须能被标准 JSON.parse 解析；字符串正文中的英文双引号请改用中文引号或进行 JSON 转义。缺失字段使用空字符串或空数组。\n'
-      + `来源：${input.source}\n时间戳：${input.receivedAt}\n${captureInstruction}MSDP 原始结果：\n${payload}`;
+      + `来源：${input.source}\n时间戳：${input.receivedAt}\n${captureInstruction}${favoriteInstruction}MSDP 原始结果：\n${payload}`;
   }
 
   private payloadForDsh(payloadJson: string): string {

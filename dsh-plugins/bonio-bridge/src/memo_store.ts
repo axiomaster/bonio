@@ -58,7 +58,8 @@ function tags(value: unknown): string[] | undefined {
     const normalized = text(tag);
     if (normalized) unique.add(normalized.replace(/^#+/, ''));
   }
-  return unique.size > 0 ? [...unique].slice(0, 3) : undefined;
+  // Up to three content tags plus one behavior tag are shown and filterable.
+  return unique.size > 0 ? [...unique].slice(0, 4) : undefined;
 }
 
 function coverImage(value: unknown): string | undefined {

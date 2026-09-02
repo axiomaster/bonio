@@ -84,6 +84,12 @@ export struct MemoryTab {
     return `data:image/jpeg;base64,${memory.coverImage}`;
   }
 
+  private cardTags(memory: BonioMemory): string[] {
+    const content = memory.tags.find((tag: string): boolean => tag.startsWith('内容:'));
+    const behavior = memory.tags.find((tag: string): boolean => tag.startsWith('行为:'));
+    return [content, behavior].filter((tag: string | undefined): boolean => !!tag) as string[];
+  }
+
   private async deleteSelectedMemory() {
     if (!this.runtime || !this.selectedMemory) return;
     try {
@@ -190,14 +196,19 @@ export struct MemoryTab {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .width('100%')
           .margin({ top: 4 })
-        if (memory.tags.length > 0) {
-          Text(memory.tags[0])
-            .fontSize(11)
-            .fontColor('#0A59F7')
-            .backgroundColor('#E8F1FF')
-            .borderRadius(3)
-            .padding({ left: 6, right: 6, top: 2, bottom: 2 })
-            .margin({ top: 6 })
+        if (this.cardTags(memory).length > 0) {
+          Flex({ wrap: FlexWrap.Wrap }) {
+            ForEach(this.cardTags(memory), (tag: string) => {
+              Text(tag)
+                .fontSize(11)
+                .fontColor(tag.startsWith('行为:') ? '#027A48' : '#0A59F7')
+                .backgroundColor(tag.startsWith('行为:') ? '#ECFDF3' : '#E8F1FF')
+                .borderRadius(3)
+                .padding({ left: 6, right: 6, top: 2, bottom: 2 })
+                .margin({ right: 6, top: 6 })
+            }, (tag: string): string => tag)
+          }
+          .width('100%')
         }
       }
       .layoutWeight(1)
