@@ -189,7 +189,7 @@ export class ChatController {
       this.pendingRuns.delete(runId);
       this.pendingRunCount = this.pendingRuns.size;
       this.errorText = err instanceof Error ? err.message : String(err);
-      this.setAvatarAgentState('failed', 4000, 'waiting');
+      this.setAvatarAgentState('failed', 4000, 'idle');
       if (this.onChatUpdate) { this.onChatUpdate(); };
     }
   }
@@ -308,11 +308,11 @@ export class ChatController {
     if (state === "final" || state === "aborted" || state === "error") {
       if (state === "error") {
         this.errorText = (payload.errorMessage as string | undefined) || "Chat failed";
-        this.setAvatarAgentState('failed', 4000, 'waiting');
+        this.setAvatarAgentState('failed', 4000, 'idle');
       } else if (state === "final") {
-        this.setAvatarAgentState('completed', 4000, 'waiting');
+        this.setAvatarAgentState('completed', 4000, 'idle');
       } else {
-        this.setAvatarAgentState('waiting');
+        this.setAvatarAgentState('idle');
       }
       if (runId) this.pendingRuns.delete(runId);
       this.pendingRunCount = this.pendingRuns.size;
@@ -375,17 +375,10 @@ export class ChatController {
       const msg: ChatMessage = {
         id: this.generateUuid(),
         role: (m.role as string) || "user",
-        content: (m.content as Object[] || []).map((cObj: Object) => {
-          const c = cObj as Record<string, Object>;
-          const content: ChatMessageContent = {
-            type: (c.type as string) || "text",
-            text: c.text as string | undefined,
-            mimeType: c.mimeType as string | undefined,
-            fileName: c.fileName as string | undefined,
-            base64: c.content as string | undefined
-          };
-          return content;
-        }),
+        content: (m.content as Object[] || [])
+          .map((cObj: Object) => this.parseContentBlock(cObj))
+          .filter((content: ChatMessageContent | undefined): boolean => content !== undefined)
+          .map((content: ChatMessageContent | undefined): ChatMessageContent => content!),
         timestampMs: m.timestamp as number | undefined
       };
       return msg;
@@ -398,6 +391,33 @@ export class ChatController {
       messages: messages
     };
     return history;
+  }
+
+  /** Only expose content that the chat UI can actually render. */
+  private parseContentBlock(cObj: Object): ChatMessageContent | undefined {
+    const c = cObj as Record<string, Object>;
+    const type = c.type as string | undefined;
+    const text = c.text as string | undefined;
+    const base64 = (c.content as string | undefined) || (c.base64 as string | undefined);
+
+    if (type === 'text' && text && text.trim().length > 0) {
+      return {
+        type: 'text',
+        text: text,
+        mimeType: c.mimeType as string | undefined,
+        fileName: c.fileName as string | undefined
+      };
+    }
+    if ((type === 'image' || type === 'file') && base64 && base64.trim().length > 0) {
+      return {
+        type: type,
+        text: text as string | undefined,
+        mimeType: c.mimeType as string | undefined,
+        fileName: c.fileName as string | undefined,
+        base64: base64
+      };
+    }
+    return undefined;
   }
 
   private clearPendingRuns() {

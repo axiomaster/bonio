@@ -125,7 +125,7 @@ export struct ChatSheet {
             Text(content.text)
               .fontSize(14)
               .width('100%')
-          } else {
+          } else if (content.type === 'file' && content.base64) {
              Text(`[${content.type}] ${content.fileName || ''}`)
               .fontSize(12)
               .fontColor(Color.Gray)

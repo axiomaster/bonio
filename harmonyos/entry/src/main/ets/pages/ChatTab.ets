@@ -511,7 +511,7 @@ export struct ChatTab {
                   .width(200)
                   .borderRadius(8)
                   .margin({ top: 4, bottom: 4 })
-              } else if (part.type !== 'text') {
+              } else if (part.type === 'file' && part.base64) {
                 Row() {
                   Text('📄').margin({ right: 6 })
                   Text(part.fileName || 'file')
@@ -547,7 +547,7 @@ export struct ChatTab {
                   .width(200)
                   .borderRadius(8)
                   .margin({ top: 4, bottom: 4 })
-              } else if (part.type !== 'text') {
+              } else if (part.type === 'file' && part.base64) {
                 Row() {
                   Text('📄').margin({ right: 6 })
                   Text(part.fileName || 'file')
