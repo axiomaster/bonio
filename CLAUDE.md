@@ -25,7 +25,7 @@ Feature development follows a three-stage document pipeline:
 Bonio (HiClaw) is an AI agent gateway system with four components:
 - **server/** — C++ WebSocket gateway server (HiClaw) that connects to LLM providers and routes tool calls
 - **android/** — Kotlin/Jetpack Compose companion app for device control (camera, location, SMS)
-- **harmonyos/** — ArkTS/HarmonyOS port of the Android app
+- **harmonyos/** — ArkTS/HarmonyOS port of the Android app; its agent backend is the on-device DSH daemon + `dsh-plugins/bonio-bridge` (WebSocket at `127.0.0.1:10724`), not hiclaw
 - **desktop/** — Flutter desktop client for Windows/macOS (chat, config, session management)
 
 Clients maintain **dual WebSocket sessions**: `operatorSession` (user commands: chat, config) and `nodeSession` (server-initiated tool calls: camera, location, etc.).
@@ -120,12 +120,15 @@ Package: `ai.axiomaster.boji`, compileSdk 36, minSdk 31, Java 17, Jetpack Compos
 ### HarmonyOS App
 
 ```bash
-# Requires DevEco Studio SDK
-$env:DEVECO_SDK_HOME="D:\Program Files\Huawei\DevEco Studio\sdk"
+# Requires DevEco Studio SDK (API 26). No hvigorw wrapper is vendored in
+# harmonyos/ — use DevEco's bundled hvigor. On this Mac:
+export DEVECO_SDK_HOME=/Applications/DevEco-Studio.app/Contents/sdk
 cd harmonyos && hvigorw --mode module -p product=default assembleHap
 ```
 
-See `harmonyos/CLAUDE.md` for full HarmonyOS development details.
+Builds are **unsigned** (no `signingConfigs` committed). After any HAP task: full `hvigorw clean assembleHap` → sign with `tools/hapsigner` using the `system_core` profile in `harmonyos/root_float_signing/` → `hdc install -r` onto a connected device (report the blocker if no device).
+
+See `harmonyos/CLAUDE.md` for the full build/sign/install workflow and ets architecture.
 
 ### Desktop App (Flutter)
 
@@ -364,8 +367,9 @@ Server config lives in `hiclaw.json` (workspace root, default: `~/.bonio/hiclaw.
 
 ## Additional Directories
 
-- **`design/`** — PRD documents and implementation plans for features (记一记, 阅读搭子, plugin system, avatar, voice input, etc.)
-- **`skills/phone-use-agent/`** — C++ native CLI for mobile screen automation (references Open-AutoGLM)
+- **`docs/design/`** — PRD documents and implementation plans for features (记一记, 阅读搭子, plugin system, avatar, voice input, etc.)
+- **`skills/`** — Device skills: `phone-use-agent` (C++ native CLI for mobile screen automation, references Open-AutoGLM), plus `ohos-cli-tool` and `phone-use-harmonyos` deployed to the on-device DSH
+- **`dsh-plugins/`** — On-device DSH plugins (`bonio-bridge` speaks the hiclaw gateway protocol to the app, `bonio-wechat` bridges WeChat), deployed via `tools/deploy-*-ohos.sh`
 - **`reference/`** — OpenClaw (Node.js) and ZeroClaw (Rust) reference implementations, used during porting — read-only
 - **`assets/`** — Shared Lottie animations for the avatar cat (various states: idle, happy, confused, etc.)
 
