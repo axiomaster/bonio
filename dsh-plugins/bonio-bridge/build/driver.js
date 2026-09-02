@@ -5,7 +5,7 @@ import { SessionId } from '@deepseek-ai/dsh-session';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { listMemos, saveMemo } from './memo_store.js';
-export const INVOKE_TIMEOUT_MS = 300_000;
+export const INVOKE_TIMEOUT_MS = 300000;
 function textContent(text) {
     return [{ type: 'text', text }];
 }
@@ -74,8 +74,18 @@ export class AgentDriver {
             return null;
         const selection = defaultModel.currentSelection();
         console.log('[bonio-bridge] using model', `${selection.provider}/${selection.model}`);
-        const setup = (agentCtx) => {
+        const setup = async (agentCtx) => {
             installModelSelection(agentCtx, { current: selection, assembled: undefined });
+            try {
+                const presets = this.ctx.get('agentPresets');
+                if (presets && typeof presets.mount === 'function') {
+                    await presets.mount(agentCtx, 'standard');
+                    console.log('[bonio-bridge] agent joined preset standard');
+                }
+            }
+            catch (e) {
+                console.log('[bonio-bridge] preset mount failed (continuing preset-less):', e instanceof Error ? e.message : String(e));
+            }
         };
         // Resume a persisted session when this sessionKey has one.
         if (!ephemeral && sessionKey) {

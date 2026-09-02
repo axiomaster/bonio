@@ -96,8 +96,19 @@ export class AgentDriver {
 
     const selection = defaultModel.currentSelection();
     console.log('[bonio-bridge] using model', `${selection.provider}/${selection.model}`);
-    const setup = (agentCtx: Context) => {
+    const setup = async (agentCtx: Context) => {
       installModelSelection(agentCtx, { current: selection, assembled: undefined });
+      try {
+        const presets = this.ctx.get('agentPresets') as
+          { mount(ctx: unknown, id?: string): Promise<unknown> } | undefined;
+        if (presets && typeof presets.mount === 'function') {
+          await presets.mount(agentCtx, 'standard');
+          console.log('[bonio-bridge] agent joined preset standard');
+        }
+      } catch (e) {
+        console.log('[bonio-bridge] preset mount failed (continuing preset-less):',
+          e instanceof Error ? e.message : String(e));
+      }
     };
     // Resume a persisted session when this sessionKey has one.
     if (!ephemeral && sessionKey) {
