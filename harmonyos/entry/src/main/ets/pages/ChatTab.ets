@@ -82,6 +82,9 @@ export struct ChatTab {
     if (label === 'memory') {
       key = COMPANION_MEMORY_SESSION_KEY;
     } else if (label === 'wechat') {
+      // The bridge registers wechat:* session keys as messages arrive; refresh
+      // so a conversation that started while Chat was open is still found.
+      await ctrl.refreshSessions();
       key = this.latestWechatSessionKey(ctrl) || `${WECHAT_SESSION_PREFIX}pending`;
     } else {
       key = this.runtime?.mainSessionKey || 'main';

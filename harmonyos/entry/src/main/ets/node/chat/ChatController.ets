@@ -258,6 +258,11 @@ export class ChatController {
     }
   }
 
+  /** Re-fetch the session list (bridge learns new wechat:* keys as messages arrive). */
+  public async refreshSessions() {
+    await this.fetchSessions(50);
+  }
+
   private async fetchSessions(limit: number) {
     try {
       const params = new SessionListParams();
