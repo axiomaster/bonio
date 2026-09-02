@@ -5,6 +5,17 @@ function memoDir() {
     const home = process.env.DSH_HOME || process.env.HOME || '/data/local/home';
     return path.join(home === '/root' ? '/data/local/home' : home, '.bonio', 'memos');
 }
+function memoDirectory(id) {
+    return /^[A-Za-z0-9_-]+$/.test(id) ? path.join(memoDir(), id) : null;
+}
+function memoDataPath(id) {
+    const directory = memoDirectory(id);
+    return directory ? path.join(directory, 'memo.json') : null;
+}
+function memoCoverPath(id) {
+    const directory = memoDirectory(id);
+    return directory ? path.join(directory, 'cover.jpg') : null;
+}
 function text(value) {
     return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
@@ -18,6 +29,12 @@ function tags(value) {
             unique.add(normalized.replace(/^#+/, ''));
     }
     return unique.size > 0 ? [...unique].slice(0, 3) : undefined;
+}
+function coverImage(value) {
+    if (typeof value !== 'string')
+        return undefined;
+    const normalized = value.trim().replace(/^data:image\/(?:jpeg|jpg|png|webp|gif);base64,/i, '');
+    return normalized ? normalized : undefined;
 }
 function normalizeMemo(value) {
     if (!value || typeof value !== 'object')
@@ -41,10 +58,70 @@ function normalizeMemo(value) {
         sourceApp: text(raw.sourceApp),
         pageTitle: text(raw.pageTitle),
         pageLink: text(raw.pageLink),
+        coverImage: coverImage(raw.coverImage),
     };
 }
-function memoPath(id) {
-    return /^[A-Za-z0-9_-]+$/.test(id) ? path.join(memoDir(), `${id}.json`) : null;
+function storedMemo(memo) {
+    const { coverImage: _coverImage, ...metadata } = memo;
+    return metadata;
+}
+async function readMemo(id) {
+    const dataPath = memoDataPath(id);
+    const coverPath = memoCoverPath(id);
+    if (!dataPath || !coverPath)
+        return null;
+    try {
+        const memo = normalizeMemo(JSON.parse(await fs.readFile(dataPath, 'utf8')));
+        if (!memo)
+            return null;
+        try {
+            memo.coverImage = (await fs.readFile(coverPath)).toString('base64');
+        }
+        catch {
+            // A cover is optional; a missing/corrupt cover must not hide the memo.
+        }
+        return memo;
+    }
+    catch {
+        return null;
+    }
+}
+async function writeMemo(memo) {
+    const directory = memoDirectory(memo.id);
+    const dataPath = memoDataPath(memo.id);
+    const coverPath = memoCoverPath(memo.id);
+    if (!directory || !dataPath || !coverPath)
+        throw new Error('invalid memo id');
+    await fs.mkdir(directory, { recursive: true });
+    await fs.writeFile(dataPath, JSON.stringify(storedMemo(memo), null, 2), 'utf8');
+    const cover = coverImage(memo.coverImage);
+    if (cover)
+        await fs.writeFile(coverPath, Buffer.from(cover, 'base64'));
+}
+/** Move legacy <id>.json records into the per-memo directory layout. */
+async function migrateLegacyMemos() {
+    let entries = [];
+    try {
+        entries = await fs.readdir(memoDir());
+    }
+    catch {
+        return;
+    }
+    for (const entry of entries) {
+        if (!entry.endsWith('.json'))
+            continue;
+        const legacyPath = path.join(memoDir(), entry);
+        try {
+            const memo = normalizeMemo(JSON.parse(await fs.readFile(legacyPath, 'utf8')));
+            if (!memo)
+                continue;
+            await writeMemo(memo);
+            await fs.unlink(legacyPath);
+        }
+        catch {
+            // Leave unreadable legacy files untouched for manual recovery.
+        }
+    }
 }
 export async function saveMemo(input) {
     const title = text(input.title);
@@ -61,51 +138,39 @@ export async function saveMemo(input) {
         sourceApp: text(input.sourceApp),
         pageTitle: text(input.pageTitle),
         pageLink: text(input.pageLink),
+        coverImage: coverImage(input.coverImage),
     };
     await fs.mkdir(memoDir(), { recursive: true });
-    await fs.writeFile(path.join(memoDir(), `${memo.id}.json`), JSON.stringify(memo, null, 2), 'utf8');
+    await writeMemo(memo);
     return memo;
 }
 export async function listMemos(limit = 100) {
-    let files = [];
+    await migrateLegacyMemos();
+    let entries = [];
     try {
-        files = await fs.readdir(memoDir());
+        entries = await fs.readdir(memoDir());
     }
     catch {
         return [];
     }
     const memos = [];
-    for (const file of files) {
-        if (!file.endsWith('.json'))
-            continue;
-        try {
-            const parsed = normalizeMemo(JSON.parse(await fs.readFile(path.join(memoDir(), file), 'utf8')));
-            if (parsed)
-                memos.push(parsed);
-        }
-        catch {
-            // A partially written or legacy-invalid file must not hide other memories.
-        }
+    for (const entry of entries) {
+        const memo = await readMemo(entry);
+        if (memo)
+            memos.push(memo);
     }
     return memos.sort((a, b) => b.createdAt - a.createdAt).slice(0, Math.max(1, Math.min(limit, 200)));
 }
 export async function getMemo(id) {
-    const target = memoPath(id);
-    if (!target)
-        return null;
-    try {
-        return normalizeMemo(JSON.parse(await fs.readFile(target, 'utf8')));
-    }
-    catch {
-        return null;
-    }
+    await migrateLegacyMemos();
+    return readMemo(id);
 }
 export async function deleteMemo(id) {
-    const target = memoPath(id);
-    if (!target)
+    const directory = memoDirectory(id);
+    if (!directory)
         return false;
     try {
-        await fs.unlink(target);
+        await fs.rm(directory, { recursive: true });
         return true;
     }
     catch (error) {

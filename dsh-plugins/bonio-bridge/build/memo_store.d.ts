@@ -8,6 +8,8 @@ export interface BonioMemo {
     sourceApp?: string;
     pageTitle?: string;
     pageLink?: string;
+    /** Base64-encoded JPEG cover, populated when the memo is read. */
+    coverImage?: string;
 }
 export interface SaveMemoInput {
     title: string;
@@ -17,6 +19,8 @@ export interface SaveMemoInput {
     sourceApp?: string;
     pageTitle?: string;
     pageLink?: string;
+    /** Base64-encoded JPEG cover from an explicit MSDP capture. */
+    coverImage?: string;
 }
 export declare function saveMemo(input: SaveMemoInput): Promise<BonioMemo>;
 export declare function listMemos(limit?: number): Promise<BonioMemo[]>;

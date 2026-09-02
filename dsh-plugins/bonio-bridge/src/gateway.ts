@@ -343,6 +343,7 @@ export function startGateway(
           sourceApp: typeof params.sourceApp === 'string' ? params.sourceApp : undefined,
           pageTitle: typeof params.pageTitle === 'string' ? params.pageTitle : undefined,
           pageLink: typeof params.pageLink === 'string' ? params.pageLink : undefined,
+          coverImage: typeof params.coverImage === 'string' ? params.coverImage : undefined,
         });
         send(resOk(frame.id, { saved: true, memo }));
       } catch (error) {

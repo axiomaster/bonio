@@ -11,8 +11,8 @@ import { deleteMemo, getMemo, listMemos, saveMemo } from './memo_store.js';
 import { listSkills, setSkillEnabled } from './skills_store.js';
 import { getChannelConfig, setWechatBinding, disableWechat, fetchWechatQrCode, pollWechatQrStatus, } from './channel_store.js';
 const DEFAULT_PORT = 10724;
-const INVOKE_TIMEOUT_MS = 300000; // 5 min, mirror hiclaw tool call timeout
-const TICK_INTERVAL_MS = 30000; // heartbeat, mirror hiclaw
+const INVOKE_TIMEOUT_MS = 300_000; // 5 min, mirror hiclaw tool call timeout
+const TICK_INTERVAL_MS = 30_000; // heartbeat, mirror hiclaw
 async function handleSkillsList(req, send) {
     try {
         const skills = await listSkills();
@@ -287,6 +287,7 @@ export function startGateway(ctx, config, registry, driver) {
                     sourceApp: typeof params.sourceApp === 'string' ? params.sourceApp : undefined,
                     pageTitle: typeof params.pageTitle === 'string' ? params.pageTitle : undefined,
                     pageLink: typeof params.pageLink === 'string' ? params.pageLink : undefined,
+                    coverImage: typeof params.coverImage === 'string' ? params.coverImage : undefined,
                 });
                 send(resOk(frame.id, { saved: true, memo }));
             }

@@ -5,7 +5,8 @@
 import type { Context } from '@deepseek-ai/cordis';
 import { randomUUID } from 'node:crypto';
 import { installModelSelection } from '@deepseek-ai/dsh-agent';
-import { createUserMessage } from '@deepseek-ai/dsh-llm';
+import { createUserMessage, type ContentBlock } from '@deepseek-ai/dsh-llm';
+import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment';
 import { SessionId } from '@deepseek-ai/dsh-session';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -283,10 +284,10 @@ export class AgentDriver {
       const off = ctx.on('session/event', onEvent);
 
       await agent.whenIdle();
-      const content: Array<Record<string, unknown>> = [{ type: 'text', text: params.text }];
+      const content: ContentBlock[] = [{ type: 'text', text: params.text }];
       if (params.attachments && params.attachments.length > 0) {
         const attachmentStore = ctx.get('attachments') as {
-          saveImage(input: { data: Uint8Array; mediaType: string; name?: string }): Promise<Record<string, unknown>>;
+          saveImage(input: { data: Uint8Array; mediaType: string; name?: string }): Promise<ImageAttachmentRef>;
         } | undefined;
         if (!attachmentStore) throw new Error('image attachment service unavailable');
         for (const attachment of params.attachments) {
