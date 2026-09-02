@@ -1,10 +1,10 @@
 /**
- * channel_store — wechat channel binding state (hiclaw-compatible) and
- * ilink QR-code proxy for the dsh bonio-bridge gateway.
+ * channel_store — wechat channel binding state and ilink QR-code proxy for
+ * the dsh bonio-bridge gateway.
  *
- * State is persisted in <home>/.bonio/hiclaw.json under the 'wechat' key,
- * matching the hiclaw server config format so the bridge and hiclaw can
- * share the same on-device configuration.
+ * The Bonio backend is DSH, not the hiclaw server: binding state is persisted
+ * in the bridge-owned <home>/.bonio/wechat.json. A legacy hiclaw.json
+ * 'wechat' block (written before the split) is imported once for migration.
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -31,6 +31,11 @@ export function bonioHome(): string {
 }
 
 function configPath(): string {
+  return path.join(bonioHome(), '.bonio', 'wechat.json');
+}
+
+/** Pre-split storage; read-only, imported into wechat.json on first access. */
+function legacyConfigPath(): string {
   return path.join(bonioHome(), '.bonio', 'hiclaw.json');
 }
 
@@ -40,7 +45,16 @@ async function loadConfig(): Promise<JsonObject> {
   try {
     const raw = await fs.readFile(configPath(), 'utf8');
     const parsed = JSON.parse(raw) as JsonObject;
-    return parsed && typeof parsed === 'object' ? parsed : {};
+    if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) return parsed;
+  } catch { /* fall through to legacy import */ }
+  try {
+    const legacy = JSON.parse(await fs.readFile(legacyConfigPath(), 'utf8')) as JsonObject;
+    const imported: JsonObject = {};
+    if (legacy && typeof legacy === 'object' && legacy['wechat'] !== undefined) {
+      imported['wechat'] = legacy['wechat'];
+    }
+    if (Object.keys(imported).length > 0) await saveConfig(imported);
+    return imported;
   } catch {
     return {};
   }

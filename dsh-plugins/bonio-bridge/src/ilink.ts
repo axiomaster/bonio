@@ -9,8 +9,10 @@ import { join } from 'node:path';
 import http from 'node:http';
 import https from 'node:https';
 
-const CHANNEL_VERSION = '2.0.0';
+const CHANNEL_VERSION = 'bonio-weixin/1.0';
 const POLL_INTERVAL_MS = 1500;
+const MAX_CHUNK_BYTES = 3800;
+const MAX_SEND_RETRIES = 3;
 
 export interface IlinkInboundMessage {
   messageId: string;
@@ -43,6 +45,12 @@ export class IlinkHttpClient {
   private contextTokens = new Map<string, string>();
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private sessionExpiredPauseUntil = 0;
+  /**
+   * Random per-instance UIN. hiclaw's ilink_http_client.cpp sends a random
+   * 4-byte base64 value here; without it (and AuthorizationType) the server
+   * rejects even freshly bound tokens with errcode=-14.
+   */
+  private readonly xWechatUin: string;
 
   constructor(token: string, baseUrl: string, stateDir: string, onMessage: OnMessage, log: Log = () => {}) {
     this.token = token;
@@ -50,8 +58,10 @@ export class IlinkHttpClient {
     this.stateDir = stateDir;
     this.onMessage = onMessage;
     this.log = log;
+    this.xWechatUin = Buffer.from(Array.from({ length: 4 }, () => Math.floor(Math.random() * 256))).toString('base64');
     try { mkdirSync(stateDir, { recursive: true }); } catch { /* ignore */ }
     this.loadCursor();
+    this.loadContextTokens();
   }
 
   private cursorFile(): string {
@@ -68,6 +78,27 @@ export class IlinkHttpClient {
     try { writeFileSync(this.cursorFile(), cursor); } catch { /* ignore */ }
   }
 
+  private contextTokensFile(): string {
+    return join(this.stateDir, 'context_tokens.json');
+  }
+
+  private loadContextTokens(): void {
+    try {
+      const raw = JSON.parse(readFileSync(this.contextTokensFile(), 'utf8')) as Record<string, unknown>;
+      for (const [k, v] of Object.entries(raw)) {
+        if (typeof v === 'string' && v) this.contextTokens.set(k, v);
+      }
+    } catch { /* ignore */ }
+  }
+
+  private saveContextTokens(): void {
+    try {
+      const obj: Record<string, string> = {};
+      for (const [k, v] of this.contextTokens) obj[k] = v;
+      writeFileSync(this.contextTokensFile(), JSON.stringify(obj, null, 2));
+    } catch { /* ignore */ }
+  }
+
   private post(path: string, body: Record<string, unknown>): Promise<IlinkResponse | null> {
     const url = new URL(this.baseUrl + path);
     const lib = url.protocol === 'https:' ? https : http;
@@ -81,7 +112,11 @@ export class IlinkHttpClient {
         headers: {
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(data),
+          // Both auth headers are required (see hiclaw ilink_http_client.cpp);
+          // omitting AuthorizationType yields errcode=-14 even for fresh tokens.
+          'AuthorizationType': 'ilink_bot_token',
           'Authorization': 'Bearer ' + this.token,
+          'X-WECHAT-UIN': this.xWechatUin,
         },
         timeout: 20000,
       }, (res) => {
@@ -166,6 +201,7 @@ export class IlinkHttpClient {
         };
         if (msg.contextToken && msg.fromUserId) {
           this.contextTokens.set(msg.fromUserId, msg.contextToken);
+          this.saveContextTokens();
         }
         this.onMessage(msg);
       }
@@ -175,29 +211,88 @@ export class IlinkHttpClient {
   }
 
   private extractText(itemList: unknown): string {
+    // Mirrors hiclaw extract_text: text lives in item.text_item.text, voice
+    // transcriptions in item.voice_item.text; media items become placeholders.
     if (!Array.isArray(itemList)) return '';
     const parts: string[] = [];
     for (const itemRaw of itemList) {
       if (!itemRaw || typeof itemRaw !== 'object') continue;
       const item = itemRaw as Record<string, unknown>;
-      if (item['type'] === 1 && typeof item['content'] === 'string' && item['content']) parts.push(item['content']);
-      else if (item['type'] === 1 && item['value'] !== undefined) parts.push(String(item['value']));
-      else if (typeof item['content'] === 'string' && item['content']) parts.push(item['content']);
+      const type = typeof item['type'] === 'number' ? item['type'] : 0;
+      if (type === 1 || type === 3) {
+        const holder = (type === 1 ? item['text_item'] : item['voice_item']) as Record<string, unknown> | undefined;
+        const text = holder && typeof holder['text'] === 'string' ? holder['text'] : '';
+        if (text) parts.push(text);
+      } else if (type === 2) {
+        parts.push('[image]');
+      } else if (type === 4) {
+        parts.push('[file]');
+      } else if (type === 5) {
+        parts.push('[video]');
+      }
     }
-    return parts.join(' ');
+    return parts.join('\n');
+  }
+
+  private generateClientId(): string {
+    const bytes = Array.from({ length: 8 }, () => Math.floor(Math.random() * 256));
+    return 'cc-' + Buffer.from(bytes).toString('hex');
   }
 
   async sendMessage(toUserId: string, content: string): Promise<boolean> {
+    // Chunk to 3800 chars without splitting mid-UTF8, retry ret=-2 (hiclaw parity).
+    const chunks: string[] = [];
+    const buf = Buffer.from(content, 'utf8');
+    for (let offset = 0; offset < buf.length;) {
+      let len = Math.min(buf.length - offset, MAX_CHUNK_BYTES);
+      while (len > 0 && offset + len < buf.length && (buf[offset + len] & 0xC0) === 0x80) len--;
+      if (len === 0) len = 1;
+      chunks.push(buf.subarray(offset, offset + len).toString('utf8'));
+      offset += len;
+    }
+
     const contextToken = this.contextTokens.get(toUserId) || '';
-    const body: Record<string, unknown> = {
-      base_info: { channel_version: CHANNEL_VERSION, context_token: contextToken },
-      to_user_id: toUserId,
-      msg_type: 1,
-      content: [
-        { type: 1, content },
-      ],
-    };
-    const res = await this.post('/ilink/bot/sendmessage', body);
-    return res !== null && res.retCode === 0;
+    for (let i = 0; i < chunks.length; i++) {
+      const msg: Record<string, unknown> = {
+        from_user_id: '',
+        to_user_id: toUserId,
+        client_id: this.generateClientId(),
+        message_type: 2,
+        message_state: 2,
+        item_list: [{ type: 1, text_item: { text: chunks[i] } }],
+      };
+      if (contextToken) msg['context_token'] = contextToken;
+      const body: Record<string, unknown> = { msg, base_info: { channel_version: CHANNEL_VERSION } };
+
+      let ok = false;
+      for (let attempt = 0; attempt < MAX_SEND_RETRIES; attempt++) {
+        const res = await this.post('/ilink/bot/sendmessage', body);
+        if (!res) {
+          if (attempt < MAX_SEND_RETRIES - 1) await this.delay(500);
+          continue;
+        }
+        if (res.retCode === -2) {
+          this.log('[ilink] sendMessage ret=-2, retry ' + (attempt + 1));
+          await this.delay(500);
+          continue;
+        }
+        if (res.errCode === -14) {
+          this.log('[ilink] session expired during send');
+          return false;
+        }
+        ok = true;
+        break;
+      }
+      if (!ok) {
+        this.log('[ilink] failed to send chunk ' + (i + 1) + ' to ' + toUserId);
+        return false;
+      }
+      if (i < chunks.length - 1) await this.delay(100);
+    }
+    return true;
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

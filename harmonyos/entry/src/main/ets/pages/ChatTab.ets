@@ -189,6 +189,21 @@ export struct ChatTab {
     Column() {
       // ── Session Header Bar ──
       Row() {
+        // Connection status pill (top-left)
+        Row() {
+          Text('●')
+            .fontSize(6)
+            .fontColor(this.healthOk ? '#2ECC71' : '#F39C12')
+            .margin({ right: 4 })
+          Text(this.healthOk ? 'Connected' : 'Offline')
+            .fontSize(11)
+            .fontColor('#999999')
+        }
+        .height(28)
+        .padding({ left: 8, right: 8 })
+        .borderRadius(8)
+        .backgroundColor('#E8ECF0')
+
         Scroll(this.sessionScroller) {
           Row({ space: 6 }) {
             Button('chat')
@@ -225,21 +240,6 @@ export struct ChatTab {
         .scrollable(ScrollDirection.Horizontal)
         .scrollBar(BarState.Off)
         .constraintSize({ maxWidth: 140 })
-
-        // Connection status pill
-        Row() {
-          Text('●')
-            .fontSize(6)
-            .fontColor(this.healthOk ? '#2ECC71' : '#F39C12')
-            .margin({ right: 4 })
-          Text(this.healthOk ? 'Connected' : 'Offline')
-            .fontSize(11)
-            .fontColor('#999999')
-        }
-        .height(28)
-        .padding({ left: 8, right: 8 })
-        .borderRadius(8)
-        .backgroundColor('#E8ECF0')
         .margin({ left: 6 })
 
         Blank()
@@ -265,6 +265,26 @@ export struct ChatTab {
 
       // ── Message Area ──
       List({ scroller: this.scroller }) {
+        // WeChat conversations are created by the bridge on the first inbound
+        // message; show why the pane is empty until then.
+        if (this.sessionLabel === 'wechat' && this.messages.length === 0
+          && !this.streamingText && !this.isSending) {
+          ListItem() {
+            Column() {
+              Text('No WeChat messages yet')
+                .fontSize(14)
+                .fontColor('#999999')
+              Text('Messages sent to the bound WeChat account will appear here')
+                .fontSize(12)
+                .fontColor('#BBBBBB')
+                .margin({ top: 6 })
+            }
+            .width('100%')
+            .padding({ top: 96 })
+            .alignItems(HorizontalAlign.Center)
+          }
+        }
+
         ForEach(this.messages, (msg: ChatMessage) => {
           ListItem() { this.MessageBubble(msg) }
         }, (msg: ChatMessage) => msg.id)
@@ -284,40 +304,8 @@ export struct ChatTab {
       // The companion-memory conversation is read-only in Chat.
       if (this.sessionLabel === 'chat') {
         Column() {
-        // Control Row: Continue/Stop (merged) + Thinking level
+        // Control Row: Thinking level
         Row() {
-          // Dynamic Continue/Stop button
-          if (this.pendingRunCount > 0) {
-            Button('Stop')
-              .type(ButtonType.Normal)
-              .height(28)
-              .borderRadius(8)
-              .fontSize(12)
-              .fontWeight(FontWeight.Medium)
-              .backgroundColor(Color.White)
-              .fontColor('#666666')
-              .border({ width: 1, color: '#CCCCCC' })
-              .padding({ left: 8, right: 8 })
-              .onClick(() => {
-                // abort not yet implemented in ChatController, use refresh as fallback
-                this.runtime?.chatController?.refresh();
-              })
-          } else {
-            Button('Continue')
-              .type(ButtonType.Normal)
-              .height(28)
-              .borderRadius(8)
-              .fontSize(12)
-              .fontWeight(FontWeight.Medium)
-              .backgroundColor(Color.White)
-              .fontColor('#666666')
-              .border({ width: 1, color: '#CCCCCC' })
-              .padding({ left: 8, right: 8 })
-              .onClick(() => {
-                this.runtime?.chatController?.refresh();
-              })
-          }
-
           Blank()
 
           // Thinking level chip
