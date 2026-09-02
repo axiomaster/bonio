@@ -1,0 +1,22 @@
+CLAUDE.md
+  s_65a1faaab12715::t_444492a6a569ee 123-125,129-131
+  s_65a1faaab12715::t_69a419f257f4f8 370-372
+  s_65a1faaab12715::t_c01c196e0f44e3 28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "f0bbfcbd2249dba630cdd4235107f2c63bee13d0",
+  "prompts": {},
+  "sessions": {
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "glm-5.3"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 6
+    }
+  }
+}
