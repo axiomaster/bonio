@@ -1,6 +1,6 @@
 import { NodeRuntime } from '../node/NodeRuntime';
-import { ChatController } from '../node/chat/ChatController';
-import { ChatMessage, ChatMessageContent, OutgoingAttachment } from '../node/chat/ChatModels';
+import { ChatController, WECHAT_SESSION_PREFIX } from '../node/chat/ChatController';
+import { ChatMessage, ChatMessageContent, ChatSessionEntry, OutgoingAttachment } from '../node/chat/ChatModels';
 import { picker } from '@kit.CoreFileKit';
 import { fileIo as fs } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
@@ -51,16 +51,41 @@ export struct ChatTab {
     this.pendingRunCount = ctrl.pendingRunCount;
     this.isSending = ctrl.pendingRunCount > 0;
     this.healthOk = ctrl.healthOk;
-    this.sessionLabel = ctrl.sessionKey === COMPANION_MEMORY_SESSION_KEY ? 'memory' : 'chat';
+    this.sessionLabel = this.labelForSessionKey(ctrl.sessionKey);
     setTimeout(() => {
       this.scroller.scrollEdge(Edge.Bottom);
     }, 50);
   }
 
+  private labelForSessionKey(key: string): string {
+    if (key === COMPANION_MEMORY_SESSION_KEY) return 'memory';
+    if (key.startsWith(WECHAT_SESSION_PREFIX)) return 'wechat';
+    return 'chat';
+  }
+
+  /** WeChat sessions are keyed per sender (`wechat:weixin:<userId>`); show the newest one. */
+  private latestWechatSessionKey(ctrl: ChatController): string | undefined {
+    let newest: ChatSessionEntry | undefined = undefined;
+    for (const entry of ctrl.sessions) {
+      if (!entry.key.startsWith(WECHAT_SESSION_PREFIX)) continue;
+      if (newest === undefined || (entry.updatedAtMs ?? 0) > (newest.updatedAtMs ?? 0)) {
+        newest = entry;
+      }
+    }
+    return newest?.key;
+  }
+
   private async selectSession(label: string): Promise<void> {
     const ctrl = this.runtime?.chatController;
     if (!ctrl) return;
-    const key = label === 'memory' ? COMPANION_MEMORY_SESSION_KEY : (this.runtime?.mainSessionKey || 'main');
+    let key: string;
+    if (label === 'memory') {
+      key = COMPANION_MEMORY_SESSION_KEY;
+    } else if (label === 'wechat') {
+      key = this.latestWechatSessionKey(ctrl) || `${WECHAT_SESSION_PREFIX}pending`;
+    } else {
+      key = this.runtime?.mainSessionKey || 'main';
+    }
     if (ctrl.sessionKey === key) return;
     this.inputText = '';
     this.pendingAttachments = [];
@@ -182,6 +207,16 @@ export struct ChatTab {
               .borderRadius(14)
               .padding({ left: 12, right: 12 })
               .onClick(() => { void this.selectSession('memory'); })
+
+            Button('wechat')
+              .type(ButtonType.Normal)
+              .backgroundColor(this.sessionLabel === 'wechat' ? '#0A59F7' : '#E8ECF0')
+              .fontColor(this.sessionLabel === 'wechat' ? Color.White : '#333333')
+              .fontSize(13)
+              .height(28)
+              .borderRadius(14)
+              .padding({ left: 12, right: 12 })
+              .onClick(() => { void this.selectSession('wechat'); })
           }
         }
         .scrollable(ScrollDirection.Horizontal)

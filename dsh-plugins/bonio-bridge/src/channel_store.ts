@@ -24,13 +24,14 @@ export interface WechatBinding {
   allowFrom: string[];
 }
 
-function home(): string {
+/** Resolve the on-device bonio home (~/.bonio lives under it). */
+export function bonioHome(): string {
   const h = process.env.DSH_HOME || process.env.HOME || os.homedir();
   return h === '/root' ? '/data/local/home' : h;
 }
 
 function configPath(): string {
-  return path.join(home(), '.bonio', 'hiclaw.json');
+  return path.join(bonioHome(), '.bonio', 'hiclaw.json');
 }
 
 type JsonObject = Record<string, unknown>;

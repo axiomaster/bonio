@@ -11,8 +11,8 @@ import { deleteMemo, getMemo, listMemos, saveMemo } from './memo_store.js';
 import { listSkills, setSkillEnabled } from './skills_store.js';
 import { getChannelConfig, setWechatBinding, disableWechat, fetchWechatQrCode, pollWechatQrStatus, } from './channel_store.js';
 const DEFAULT_PORT = 10724;
-const INVOKE_TIMEOUT_MS = 300000; // 5 min, mirror hiclaw tool call timeout
-const TICK_INTERVAL_MS = 30000; // heartbeat, mirror hiclaw
+const INVOKE_TIMEOUT_MS = 300_000; // 5 min, mirror hiclaw tool call timeout
+const TICK_INTERVAL_MS = 30_000; // heartbeat, mirror hiclaw
 async function handleSkillsList(req, send) {
     try {
         const skills = await listSkills();
@@ -103,7 +103,7 @@ async function handleWechatStatus(req, send) {
         send(resErr(req.id, 'NETWORK_ERROR', error instanceof Error ? error.message : String(error)));
     }
 }
-async function handleWechatSetup(req, send) {
+async function handleWechatSetup(req, send, wechat) {
     const params = (req.params ?? {});
     const token = typeof params.token === 'string' ? params.token : '';
     if (!token) {
@@ -116,22 +116,24 @@ async function handleWechatSetup(req, send) {
         : undefined;
     try {
         await setWechatBinding({ token, baseUrl, allowFrom });
+        void wechat?.syncFromConfig();
         send(resOk(req.id, { saved: true }));
     }
     catch (error) {
         send(resErr(req.id, 'SAVE_ERROR', error instanceof Error ? error.message : String(error)));
     }
 }
-async function handleWechatDisable(req, send) {
+async function handleWechatDisable(req, send, wechat) {
     try {
         await disableWechat();
+        void wechat?.syncFromConfig();
         send(resOk(req.id, { saved: true }));
     }
     catch (error) {
         send(resErr(req.id, 'SAVE_ERROR', error instanceof Error ? error.message : String(error)));
     }
 }
-export function startGateway(ctx, config, registry, driver) {
+export function startGateway(ctx, config, registry, driver, wechat) {
     const port = config.port ?? DEFAULT_PORT;
     const token = config.token ?? '';
     // connId -> WebSocket map so the broadcaster can reach node sockets.
@@ -406,10 +408,10 @@ export function startGateway(ctx, config, registry, driver) {
                     void handleWechatStatus(req, send);
                     break;
                 case 'channel.wechat.setup':
-                    void handleWechatSetup(req, send);
+                    void handleWechatSetup(req, send, wechat);
                     break;
                 case 'channel.wechat.disable':
-                    void handleWechatDisable(req, send);
+                    void handleWechatDisable(req, send, wechat);
                     break;
                 case 'ping':
                 case 'tick':

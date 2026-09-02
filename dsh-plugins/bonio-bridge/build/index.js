@@ -2,6 +2,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools';
 import { startGateway } from './gateway.js';
 import { SessionRegistry } from './sessions.js';
 import { AgentDriver } from './driver.js';
+import { WechatChannel } from './wechat_channel.js';
 import { eventFrame } from './protocol.js';
 const BONIO_IDENTITY_PROMPT = `
 你的名字是 Bonio。你的身份是：我是 Bonio，是住在手机里你的搭子，陪你解闷，帮你记录，完成各项琐事；陪你笑、陪你哭，陪你走过风风雨雨、度过分分秒秒。
@@ -19,6 +20,7 @@ class BridgeService {
     start() {
         const registry = new SessionRegistry();
         const service = this;
+        let wechatChannel;
         this.ctx.systemPrompt.section({
             name: 'bonio:identity',
             order: -100,
@@ -31,6 +33,8 @@ class BridgeService {
             },
             chatFinal(runId, sessionKey, payload) {
                 service.emit('chat', { runId, sessionKey, state: payload.state ?? 'final', ...payload });
+                // Wechat-triggered runs send their final reply back to the WeChat sender.
+                wechatChannel?.handleChatFinal(runId, payload);
             },
         };
         const driver = new AgentDriver(this.ctx, registry, sink, async (callId, command, args, timeoutMs) => {
@@ -57,10 +61,17 @@ class BridgeService {
                 console.error('[bonio-bridge] tool registration failed:', error instanceof Error ? error.message : error);
             }
         }
+        // Wechat channel: starts/stops from the persisted hiclaw.json binding and
+        // is re-synced whenever the app changes the binding via channel.wechat.*.
+        wechatChannel = new WechatChannel(driver);
+        void wechatChannel.syncFromConfig();
         // Start the gateway and keep the broadcaster for event emission.
-        const { dispose, broadcaster } = startGateway(this.ctx, this.config, registry, driver);
+        const { dispose, broadcaster } = startGateway(this.ctx, this.config, registry, driver, {
+            syncFromConfig: () => wechatChannel ? wechatChannel.syncFromConfig() : Promise.resolve(),
+        });
         this.broadcaster = broadcaster;
         this.ctx.on('dispose', () => {
+            wechatChannel?.stop();
             this.broadcaster = null;
             dispose();
         });

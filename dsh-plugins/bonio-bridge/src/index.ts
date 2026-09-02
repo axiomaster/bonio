@@ -13,6 +13,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools';
 import { startGateway, type WireBroadcaster } from './gateway.js';
 import { SessionRegistry } from './sessions.js';
 import { AgentDriver } from './driver.js';
+import { WechatChannel } from './wechat_channel.js';
 import { eventFrame, type EventFrame } from './protocol.js';
 
 const BONIO_IDENTITY_PROMPT = `
@@ -45,6 +46,7 @@ class BridgeService {
   start(): void {
     const registry = new SessionRegistry();
     const service = this;
+    let wechatChannel: WechatChannel | undefined;
 
     this.ctx.systemPrompt.section({
       name: 'bonio:identity',
@@ -59,6 +61,8 @@ class BridgeService {
       },
       chatFinal(runId: string, sessionKey: string | undefined, payload: Record<string, unknown>) {
         service.emit('chat', { runId, sessionKey, state: payload.state ?? 'final', ...payload });
+        // Wechat-triggered runs send their final reply back to the WeChat sender.
+        wechatChannel?.handleChatFinal(runId, payload);
       },
     };
 
@@ -92,11 +96,19 @@ class BridgeService {
       }
     }
 
+    // Wechat channel: starts/stops from the persisted hiclaw.json binding and
+    // is re-synced whenever the app changes the binding via channel.wechat.*.
+    wechatChannel = new WechatChannel(driver);
+    void wechatChannel.syncFromConfig();
+
     // Start the gateway and keep the broadcaster for event emission.
-    const { dispose, broadcaster } = startGateway(this.ctx, this.config, registry, driver);
+    const { dispose, broadcaster } = startGateway(this.ctx, this.config, registry, driver, {
+      syncFromConfig: () => wechatChannel ? wechatChannel.syncFromConfig() : Promise.resolve(),
+    });
     this.broadcaster = broadcaster;
 
     (this.ctx as any).on('dispose', () => {
+      wechatChannel?.stop();
       this.broadcaster = null;
       dispose();
     });

@@ -5,7 +5,7 @@ import { SessionId } from '@deepseek-ai/dsh-session';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { listMemos, saveMemo } from './memo_store.js';
-export const INVOKE_TIMEOUT_MS = 300000;
+export const INVOKE_TIMEOUT_MS = 300_000;
 function textContent(text) {
     return [{ type: 'text', text }];
 }

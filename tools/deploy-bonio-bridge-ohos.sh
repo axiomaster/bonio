@@ -94,7 +94,19 @@ log "Installing daemon script"
 "$HDC" shell "chmod 755 /data/local/bin/dsh-daemon.sh"
 
 log "Restarting daemon (self-healing loop)"
-"$HDC" shell "pkill -f 'bin.js --profile bonio' 2>/dev/null; pkill -f 'dsh-daemon.sh' 2>/dev/null; sleep 1; rm -f /data/local/dsh-daemon.pid; true"
+# Kill EVERY supervisor + dsh instance. Relying on pkill alone let duplicate
+# dsh-daemon.sh supervisors pile up (dozens racing to spawn dsh, losers crash
+# with EADDRINUSE every 15s), so also kill via ps|grep as a pkill-free path.
+"$HDC" shell '
+  ps -ef | grep -E "dsh-daemon.sh|dsh --profile bonio|bin[.]js --profile bonio" | grep -v grep | while read -r _u _p _r; do
+    kill -9 "$_p" 2>/dev/null
+  done
+  pkill -9 -f dsh-daemon.sh 2>/dev/null
+  pkill -9 -f "bin.js --profile bonio" 2>/dev/null
+  sleep 1
+  rm -f /data/local/dsh-daemon.pid
+  true
+'
 "$HDC" shell "
   HOME=$DEVICE_HOME LD_LIBRARY_PATH=/usr/local/lib nohup /data/local/bin/dsh-daemon.sh > /dev/null 2>&1 &
 "

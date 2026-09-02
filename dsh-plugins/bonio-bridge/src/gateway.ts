@@ -29,6 +29,11 @@ export interface BridgeConfig {
   token?: string;
 }
 
+/** Optional wechat channel service notified when the persisted binding changes. */
+export interface WechatChannelLike {
+  syncFromConfig(): Promise<void>;
+}
+
 interface AgentDriver {
   /** create a fresh agent, send the user message, and stream assistant events. */
   runChat(params: {
@@ -140,7 +145,7 @@ async function handleWechatStatus(req: ReqFrame, send: (f: { type: string; id?: 
   }
 }
 
-async function handleWechatSetup(req: ReqFrame, send: (f: { type: string; id?: string; ok?: boolean; payload?: unknown; error?: unknown; event?: string }) => void): Promise<void> {
+async function handleWechatSetup(req: ReqFrame, send: (f: { type: string; id?: string; ok?: boolean; payload?: unknown; error?: unknown; event?: string }) => void, wechat?: WechatChannelLike): Promise<void> {
   const params = (req.params ?? {}) as { token?: unknown; base_url?: unknown; allow_from?: unknown };
   const token = typeof params.token === 'string' ? params.token : '';
   if (!token) {
@@ -153,15 +158,17 @@ async function handleWechatSetup(req: ReqFrame, send: (f: { type: string; id?: s
     : undefined;
   try {
     await setWechatBinding({ token, baseUrl, allowFrom });
+    void wechat?.syncFromConfig();
     send(resOk(req.id, { saved: true }));
   } catch (error) {
     send(resErr(req.id, 'SAVE_ERROR', error instanceof Error ? error.message : String(error)));
   }
 }
 
-async function handleWechatDisable(req: ReqFrame, send: (f: { type: string; id?: string; ok?: boolean; payload?: unknown; error?: unknown; event?: string }) => void): Promise<void> {
+async function handleWechatDisable(req: ReqFrame, send: (f: { type: string; id?: string; ok?: boolean; payload?: unknown; error?: unknown; event?: string }) => void, wechat?: WechatChannelLike): Promise<void> {
   try {
     await disableWechat();
+    void wechat?.syncFromConfig();
     send(resOk(req.id, { saved: true }));
   } catch (error) {
     send(resErr(req.id, 'SAVE_ERROR', error instanceof Error ? error.message : String(error)));
@@ -173,6 +180,7 @@ export function startGateway(
   config: BridgeConfig,
   registry: SessionRegistry,
   driver: AgentDriver,
+  wechat?: WechatChannelLike,
 ): { dispose: () => void; broadcaster: WireBroadcaster } {
   const port = config.port ?? DEFAULT_PORT;
   const token = config.token ?? '';
@@ -463,10 +471,10 @@ export function startGateway(
           void handleWechatStatus(req, send);
           break;
         case 'channel.wechat.setup':
-          void handleWechatSetup(req, send);
+          void handleWechatSetup(req, send, wechat);
           break;
         case 'channel.wechat.disable':
-          void handleWechatDisable(req, send);
+          void handleWechatDisable(req, send, wechat);
           break;
         case 'ping':
         case 'tick':

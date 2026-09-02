@@ -1,13 +1,16 @@
 import { GatewaySession } from '../../gateway/GatewaySession';
 import { util } from '@kit.ArkTS';
-import { 
-  ChatMessage, 
-  ChatMessageContent, 
-  ChatPendingToolCall, 
-  ChatSessionEntry, 
-  ChatHistory, 
-  OutgoingAttachment 
+import {
+  ChatMessage,
+  ChatMessageContent,
+  ChatPendingToolCall,
+  ChatSessionEntry,
+  ChatHistory,
+  OutgoingAttachment
 } from './ChatModels';
+
+/** Bridge session keys for WeChat-triggered conversations: `wechat:<channel>:<userId>`. */
+export const WECHAT_SESSION_PREFIX = 'wechat:';
 
 export class ChatOutgoingAttachmentPayload {
   type: string = '';
