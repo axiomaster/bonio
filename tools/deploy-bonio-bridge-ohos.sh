@@ -34,6 +34,14 @@ log "Extracting into dsh node_modules"
   find build -name '._*' -delete
 "
 
+log "Applying HarmonyOS attachment compatibility"
+"$HDC" shell "
+  ATTACHMENT_FILE=$DSH_NM/@deepseek-ai/dsh-attachment-local/lib/index.js
+  if [ -f \"\${ATTACHMENT_FILE}\" ] && ! grep -q 'error.code === \"EINVAL\"' \"\${ATTACHMENT_FILE}\"; then
+    sed -i \"/async function syncDirectory(path)/,/^}/ s/[[:space:]]*await handle.sync();/\\ttry { await handle.sync(); } catch (error) { if (!(error instanceof Error \\&\\& \\\"code\\\" in error \\&\\& error.code === \\\"EINVAL\\\")) throw error; }/\" \"\${ATTACHMENT_FILE}\"
+  fi
+"
+
 log "Creating bonio profile (locally, then pushing)"
 PROFILE_DIR="$(mktemp -d)"
 mkdir -p "$PROFILE_DIR/bonio/node_modules/@bonio"
