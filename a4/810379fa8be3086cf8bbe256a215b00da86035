@@ -1,0 +1,24 @@
+docs/blog/cn/08-memory-system.md
+  s_1868faa95b82a0::t_1b6e97716869ef 3-4
+docs/design/arch/20260831-bonio-msdp-screen-awareness.md
+  s_1868faa95b82a0::t_07191ec1be3806 4-6
+docs/design/arch/20260902-dsh-msdp-memory-current.md
+  s_1868faa95b82a0::t_a86c4697b9e59e 1-117
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "a4810379fa8be3086cf8bbe256a215b00da86035",
+  "prompts": {},
+  "sessions": {
+    "s_1868faa95b82a0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a05f8b-b4e2-7370-b8c5-0a41255ff1aa",
+        "model": "unknown"
+      },
+      "human_author": "ohci <maguangsheng1@huawei.com>",
+      "total_deletions": 0
+    }
+  }
+}
