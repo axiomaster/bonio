@@ -99,6 +99,9 @@ export class NodeRuntime {
       context,
       () => this.prefs.getScreenAwarenessEnabled(),
       (source: string, payloadJson: string, coverImageBase64?: string) => {
+        // Explicit trigger captures are enqueued after the handler returns so
+        // the completion listener and screenshot cover share one input.
+        if (source === 'trigger') return;
         this.companionMemoryController.enqueue(source, payloadJson, coverImageBase64);
       },
     );
@@ -322,7 +325,8 @@ export class NodeRuntime {
       throw new Error(`${capture.error?.code || 'SCREEN_AWARENESS_FAILED'}: ${capture.error?.message || 'SmartEdge trigger failed'}`);
     }
 
-    const outcome = await this.companionMemoryController.enqueueAndWait('trigger', capture.payloadJson);
+    const outcome = await this.companionMemoryController.enqueueAndWait(
+      'trigger', capture.payloadJson, capture.coverImageBase64);
     if (!outcome.saved) {
       throw new Error(`MEMORY_NOT_SAVED: ${outcome.reason || '当前页面未生成记忆'}`);
     }

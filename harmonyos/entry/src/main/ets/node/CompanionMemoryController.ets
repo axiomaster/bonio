@@ -121,6 +121,10 @@ export class CompanionMemoryController {
         'companion queue full; dropped oldest awareness result');
     }
     this.queue.push(input);
+    hilog.info(CompanionMemoryController.DOMAIN, CompanionMemoryController.TAG,
+      'queued %{public}s input seq=%{public}d explicit=%{public}s queue=%{public}d connected=%{public}s',
+      source, input.sequence, input.explicitCapture ? 'true' : 'false', this.queue.length,
+      this.isConnected() ? 'true' : 'false');
     this.processNext();
   }
 
@@ -203,7 +207,15 @@ export class CompanionMemoryController {
   }
 
   private processNext(): void {
-    if (!this.isConnected() || this.activeInput || this.requestInFlight || this.queue.length === 0) return;
+    if (!this.isConnected() || this.activeInput || this.requestInFlight || this.queue.length === 0) {
+      if (this.queue.length > 0) {
+        hilog.info(CompanionMemoryController.DOMAIN, CompanionMemoryController.TAG,
+          'companion queue waiting connected=%{public}s active=%{public}s request=%{public}s queue=%{public}d',
+          this.isConnected() ? 'true' : 'false', this.activeInput ? 'true' : 'false',
+          this.requestInFlight ? 'true' : 'false', this.queue.length);
+      }
+      return;
+    }
     const next = this.queue.shift();
     if (!next) return;
     this.activeInput = next;

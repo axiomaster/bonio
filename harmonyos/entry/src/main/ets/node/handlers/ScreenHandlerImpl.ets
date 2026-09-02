@@ -27,7 +27,8 @@ export class ScreenHandlerImpl implements ScreenHandler {
   constructor(
     context: common.Context,
     isScreenAwarenessEnabled: () => boolean,
-    onSmartEdgeResult?: (source: SmartEdgeResultSource, payloadJson: string) => void,
+    onSmartEdgeResult?: (source: SmartEdgeResultSource, payloadJson: string,
+      coverImageBase64?: string) => void,
   ) {
     this.context = context;
     this.screenManager = new ScreenRecordManager(context);
@@ -110,7 +111,11 @@ export class ScreenHandlerImpl implements ScreenHandler {
   async handleSmartEdgeTrigger(): Promise<InvokeResult> {
     try {
       const snapshot = await this.screenAwareness.triggerSmartEdge();
-      return { ok: true, payloadJson: snapshot.payloadJson };
+      return {
+        ok: true,
+        payloadJson: snapshot.payloadJson,
+        coverImageBase64: snapshot.coverImageBase64,
+      };
     } catch (error) {
       return this.makeAwarenessError(error);
     }

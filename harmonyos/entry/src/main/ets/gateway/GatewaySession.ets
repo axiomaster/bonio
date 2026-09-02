@@ -23,6 +23,7 @@ export interface InvokeError {
 export interface InvokeResult {
   ok: boolean;
   payloadJson?: string;
+  coverImageBase64?: string;
   error?: InvokeError;
 }
 
