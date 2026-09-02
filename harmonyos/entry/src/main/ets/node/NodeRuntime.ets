@@ -312,7 +312,7 @@ export class NodeRuntime {
   }
 
   /** Called by avatar double tap: trigger a foreground SmartEdge recognition. */
-  public async captureAvatarMemory(): Promise<void> {
+  public async captureAvatarMemory(): Promise<string> {
     if (!this.isConnected) {
       throw new Error('DSH is not connected');
     }
@@ -322,8 +322,13 @@ export class NodeRuntime {
       throw new Error(`${capture.error?.code || 'SCREEN_AWARENESS_FAILED'}: ${capture.error?.message || 'SmartEdge trigger failed'}`);
     }
 
+    const outcome = await this.companionMemoryController.enqueueAndWait('trigger', capture.payloadJson);
+    if (!outcome.saved) {
+      throw new Error(`MEMORY_NOT_SAVED: ${outcome.reason || '当前页面未生成记忆'}`);
+    }
     this.prefs.setAvatarLastMemoryAt(Date.now());
-    hilog.info(NodeRuntime.DOMAIN, 'NodeRuntime', 'SmartEdge trigger queued in companion memory session');
+    hilog.info(NodeRuntime.DOMAIN, 'NodeRuntime', 'SmartEdge trigger saved to companion memory: %{public}s', outcome.title);
+    return outcome.title;
   }
 
   /** Save a user-approved summary of the currently visible page as a structured DSH memory. */

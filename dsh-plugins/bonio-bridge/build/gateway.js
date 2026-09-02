@@ -8,9 +8,129 @@ import { randomUUID } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import { parseFrame, resOk, resErr, eventFrame, stringify, } from './protocol.js';
 import { deleteMemo, getMemo, listMemos, saveMemo } from './memo_store.js';
+import { listSkills, setSkillEnabled } from './skills_store.js';
+import { getChannelConfig, setWechatBinding, disableWechat, fetchWechatQrCode, pollWechatQrStatus, } from './channel_store.js';
 const DEFAULT_PORT = 10724;
 const INVOKE_TIMEOUT_MS = 300000; // 5 min, mirror hiclaw tool call timeout
 const TICK_INTERVAL_MS = 30000; // heartbeat, mirror hiclaw
+async function handleSkillsList(req, send) {
+    try {
+        const skills = await listSkills();
+        send(resOk(req.id, { skills }));
+    }
+    catch (error) {
+        send(resErr(req.id, 'INTERNAL_ERROR', error instanceof Error ? error.message : String(error)));
+    }
+}
+async function handleSkillsEnable(req, send) {
+    const params = (req.params ?? {});
+    const id = typeof params.id === 'string' ? params.id : '';
+    if (!id) {
+        send(resErr(req.id, 'BAD_REQUEST', 'missing id parameter'));
+        return;
+    }
+    try {
+        const ok = await setSkillEnabled(id, true);
+        if (!ok) {
+            send(resErr(req.id, 'NOT_FOUND', 'skill not found or already enabled'));
+            return;
+        }
+        send(resOk(req.id, { id, enabled: true }));
+    }
+    catch (error) {
+        send(resErr(req.id, 'INTERNAL_ERROR', error instanceof Error ? error.message : String(error)));
+    }
+}
+async function handleSkillsDisable(req, send) {
+    const params = (req.params ?? {});
+    const id = typeof params.id === 'string' ? params.id : '';
+    if (!id) {
+        send(resErr(req.id, 'BAD_REQUEST', 'missing id parameter'));
+        return;
+    }
+    try {
+        const ok = await setSkillEnabled(id, false);
+        if (!ok) {
+            send(resErr(req.id, 'NOT_FOUND', 'skill not found or already disabled'));
+            return;
+        }
+        send(resOk(req.id, { id, enabled: false }));
+    }
+    catch (error) {
+        send(resErr(req.id, 'INTERNAL_ERROR', error instanceof Error ? error.message : String(error)));
+    }
+}
+async function handleChannelConfig(req, send) {
+    try {
+        const cfg = await getChannelConfig();
+        send(resOk(req.id, { enabled: cfg.enabled, mode: cfg.mode, wecom_bot_id: cfg.wecomBotId }));
+    }
+    catch (error) {
+        send(resErr(req.id, 'INTERNAL_ERROR', error instanceof Error ? error.message : String(error)));
+    }
+}
+async function handleWechatQrcode(req, send) {
+    try {
+        const qr = await fetchWechatQrCode();
+        if (!qr.qrcode_key) {
+            send(resErr(req.id, 'PARSE_ERROR', 'failed to parse QR code response'));
+            return;
+        }
+        send(resOk(req.id, { qrcode_key: qr.qrcode_key, qrcode_img: qr.qrcode_img }));
+    }
+    catch (error) {
+        send(resErr(req.id, 'NETWORK_ERROR', error instanceof Error ? error.message : String(error)));
+    }
+}
+async function handleWechatStatus(req, send) {
+    const params = (req.params ?? {});
+    const key = typeof params.qrcode_key === 'string' ? params.qrcode_key : '';
+    if (!key) {
+        send(resErr(req.id, 'BAD_REQUEST', 'missing qrcode_key'));
+        return;
+    }
+    const verifyCode = typeof params.verify_code === 'string' ? params.verify_code : undefined;
+    try {
+        const st = await pollWechatQrStatus(key, verifyCode);
+        send(resOk(req.id, {
+            status: st.status,
+            bot_token: st.bot_token ?? '',
+            ilink_user_id: st.ilink_user_id ?? '',
+            baseurl: st.baseurl ?? '',
+        }));
+    }
+    catch (error) {
+        send(resErr(req.id, 'NETWORK_ERROR', error instanceof Error ? error.message : String(error)));
+    }
+}
+async function handleWechatSetup(req, send) {
+    const params = (req.params ?? {});
+    const token = typeof params.token === 'string' ? params.token : '';
+    if (!token) {
+        send(resErr(req.id, 'BAD_REQUEST', 'missing token'));
+        return;
+    }
+    const baseUrl = typeof params.base_url === 'string' ? params.base_url : undefined;
+    const allowFrom = Array.isArray(params.allow_from)
+        ? params.allow_from.filter((v) => typeof v === 'string')
+        : undefined;
+    try {
+        await setWechatBinding({ token, baseUrl, allowFrom });
+        send(resOk(req.id, { saved: true }));
+    }
+    catch (error) {
+        send(resErr(req.id, 'SAVE_ERROR', error instanceof Error ? error.message : String(error)));
+    }
+}
+async function handleWechatDisable(req, send) {
+    try {
+        await disableWechat();
+        send(resOk(req.id, { saved: true }));
+    }
+    catch (error) {
+        send(resErr(req.id, 'SAVE_ERROR', error instanceof Error ? error.message : String(error)));
+    }
+}
 export function startGateway(ctx, config, registry, driver) {
     const port = config.port ?? DEFAULT_PORT;
     const token = config.token ?? '';
@@ -89,7 +209,15 @@ export function startGateway(ctx, config, registry, driver) {
             // events match the client's pendingRuns filter.
             const runId = typeof params.idempotencyKey === 'string' && params.idempotencyKey
                 ? params.idempotencyKey : undefined;
-            const result = await driver.runChat({ text, sessionKey: key, runId });
+            const attachments = Array.isArray(params.attachments)
+                ? params.attachments.filter((attachment) => typeof attachment === 'object' && attachment !== null && typeof attachment.content === 'string')
+                    .map((attachment) => ({
+                    content: attachment.content,
+                    mimeType: typeof attachment.mimeType === 'string' ? attachment.mimeType : undefined,
+                    fileName: typeof attachment.fileName === 'string' ? attachment.fileName : undefined,
+                }))
+                : undefined;
+            const result = await driver.runChat({ text, sessionKey: key, runId, attachments });
             if (result.error)
                 return send(resErr(frame.id, 'CHAT_FAILED', result.error));
             // Respond immediately with the runId; agent events stream afterwards.
@@ -255,6 +383,30 @@ export function startGateway(ctx, config, registry, driver) {
                     break;
                 case 'config.get':
                     handleConfigGet(req);
+                    break;
+                case 'skills.list':
+                    void handleSkillsList(req, send);
+                    break;
+                case 'skills.enable':
+                    void handleSkillsEnable(req, send);
+                    break;
+                case 'skills.disable':
+                    void handleSkillsDisable(req, send);
+                    break;
+                case 'channel.config':
+                    void handleChannelConfig(req, send);
+                    break;
+                case 'channel.wechat.qrcode':
+                    void handleWechatQrcode(req, send);
+                    break;
+                case 'channel.wechat.status':
+                    void handleWechatStatus(req, send);
+                    break;
+                case 'channel.wechat.setup':
+                    void handleWechatSetup(req, send);
+                    break;
+                case 'channel.wechat.disable':
+                    void handleWechatDisable(req, send);
                     break;
                 case 'ping':
                 case 'tick':

@@ -75,6 +75,7 @@ export class AgentDriver {
     if (!agents || !defaultModel) return null;
 
     const selection = defaultModel.currentSelection();
+    console.log('[bonio-bridge] using model', `${selection.provider}/${selection.model}`);
     const setup = (agentCtx: Context) => {
       installModelSelection(agentCtx, { current: selection, assembled: undefined });
     };
@@ -218,7 +219,12 @@ export class AgentDriver {
     return { sessions };
   }
 
-  async runChat(params: { text: string; sessionKey?: string; runId?: string }): Promise<{ runId: string; error?: string }> {
+  async runChat(params: {
+    text: string;
+    sessionKey?: string;
+    runId?: string;
+    attachments?: Array<{ content: string; mimeType?: string; fileName?: string }>;
+  }): Promise<{ runId: string; error?: string }> {
     const ctx = this.ctx;
     const agents = ctx.get('agents');
     const sessions = ctx.get('sessions');
@@ -236,7 +242,11 @@ export class AgentDriver {
     return { runId };
   }
 
-  private async _run(runId: string, params: { text: string; sessionKey?: string }, controller: AbortController): Promise<void> {
+  private async _run(runId: string, params: {
+    text: string;
+    sessionKey?: string;
+    attachments?: Array<{ content: string; mimeType?: string; fileName?: string }>;
+  }, controller: AbortController): Promise<void> {
     const ctx = this.ctx;
     const sessions = ctx.get('sessions');
     try {
@@ -273,8 +283,28 @@ export class AgentDriver {
       const off = ctx.on('session/event', onEvent);
 
       await agent.whenIdle();
+      const content: Array<Record<string, unknown>> = [{ type: 'text', text: params.text }];
+      if (params.attachments && params.attachments.length > 0) {
+        const attachmentStore = ctx.get('attachments') as {
+          saveImage(input: { data: Uint8Array; mediaType: string; name?: string }): Promise<Record<string, unknown>>;
+        } | undefined;
+        if (!attachmentStore) throw new Error('image attachment service unavailable');
+        for (const attachment of params.attachments) {
+          const mediaType = attachment.mimeType === 'image/png' || attachment.mimeType === 'image/webp' ||
+            attachment.mimeType === 'image/gif' ? attachment.mimeType : 'image/jpeg';
+          const data = Buffer.from(attachment.content, 'base64');
+          if (data.length === 0) throw new Error('image attachment is empty');
+          const ref = await attachmentStore.saveImage({
+            data: new Uint8Array(data),
+            mediaType,
+            name: attachment.fileName || 'bonio-screen.jpg',
+          });
+          content.push({ type: 'image', attachment: ref });
+        }
+        console.log('[bonio-bridge] attached', params.attachments.length, 'image(s) to dsh message');
+      }
       agent.followup(createUserMessage({
-        content: [{ type: 'text', text: params.text }],
+        content,
         source: { kind: 'user' },
       }));
       await agent.whenIdle();

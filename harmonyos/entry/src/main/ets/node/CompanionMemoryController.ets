@@ -11,6 +11,9 @@ const IGNORED_BUNDLE_NAMES: string[] = [
 ];
 const IGNORED_APP_NAMES: string[] = ['bonio', '大桌面'];
 const MAX_DSH_PAYLOAD_LENGTH = 60000;
+const ORDER_MEMORY_KEYWORDS: string[] = [
+  '订单', '下单', '购买', '支付', '付款', '结算', '外卖', '取餐', '咖啡', 'coffee', 'luckin', '瑞幸',
+];
 
 class CompanionChatParams {
   sessionKey: string = COMPANION_MEMORY_SESSION_KEY;
@@ -34,6 +37,8 @@ class CompanionMemoryInput {
   payloadJson: string = '';
   coverImageBase64: string | undefined = undefined;
   receivedAt: number = 0;
+  explicitCapture: boolean = false;
+  completionListeners: Array<(outcome: CompanionMemoryOutcome) => void> = [];
 }
 
 interface CompanionSummary {
@@ -44,6 +49,12 @@ interface CompanionSummary {
   sourceApp?: string;
   pageTitle?: string;
   pageLink?: string;
+}
+
+export class CompanionMemoryOutcome {
+  saved: boolean = false;
+  title: string = '';
+  reason: string = '';
 }
 
 /** Serializes background MSDP results through a conversation hidden from the main chat. */
@@ -70,17 +81,40 @@ export class CompanionMemoryController {
   }
 
   enqueue(source: string, payloadJson: string, coverImageBase64?: string): void {
-    if (!payloadJson.trim()) return;
+    this.enqueueInternal(source, payloadJson, coverImageBase64);
+  }
+
+  /** Wait for a user-initiated capture to finish DSH analysis and memo persistence. */
+  enqueueAndWait(source: string, payloadJson: string, coverImageBase64?: string): Promise<CompanionMemoryOutcome> {
+    return new Promise((resolve: (outcome: CompanionMemoryOutcome) => void) => {
+      this.enqueueInternal(source, payloadJson, coverImageBase64, resolve);
+    });
+  }
+
+  private enqueueInternal(source: string, payloadJson: string, coverImageBase64?: string,
+    completionListener?: (outcome: CompanionMemoryOutcome) => void): void {
+    if (!payloadJson.trim()) {
+      if (completionListener) completionListener(this.outcome(false, '', '屏幕识别未返回内容'));
+      return;
+    }
     const filteredPayload = this.filterIgnoredApplications(source, payloadJson);
-    if (!filteredPayload) return;
-    const previous = this.queue.length > 0 ? this.queue[this.queue.length - 1] : this.activeInput;
-    if (previous?.source === source && previous.payloadJson === filteredPayload) return;
+    if (!filteredPayload) {
+      if (completionListener) completionListener(this.outcome(false, '', '当前页面不支持记忆'));
+      return;
+    }
+    const pending = this.findPendingInput(source, filteredPayload);
+    if (pending) {
+      if (completionListener) pending.completionListeners.push(completionListener);
+      return;
+    }
     const input = new CompanionMemoryInput();
     input.sequence = this.nextInputSequence++;
     input.source = source;
     input.payloadJson = filteredPayload;
     input.coverImageBase64 = coverImageBase64;
     input.receivedAt = Date.now();
+    input.explicitCapture = source === 'trigger';
+    if (completionListener) input.completionListeners.push(completionListener);
     if (this.queue.length >= CompanionMemoryController.MAX_QUEUE_SIZE) {
       this.queue.shift();
       hilog.warn(CompanionMemoryController.DOMAIN, CompanionMemoryController.TAG,
@@ -88,6 +122,12 @@ export class CompanionMemoryController {
     }
     this.queue.push(input);
     this.processNext();
+  }
+
+  private findPendingInput(source: string, payloadJson: string): CompanionMemoryInput | undefined {
+    if (this.activeInput?.source === source && this.activeInput.payloadJson === payloadJson) return this.activeInput;
+    return this.queue.find((candidate: CompanionMemoryInput): boolean =>
+      candidate.source === source && candidate.payloadJson === payloadJson);
   }
 
   private filterIgnoredApplications(source: string, payloadJson: string): string | undefined {
@@ -154,7 +194,7 @@ export class CompanionMemoryController {
         const errorMessage = typeof payload['errorMessage'] === 'string' ? payload['errorMessage'] : '';
         hilog.warn(CompanionMemoryController.DOMAIN, CompanionMemoryController.TAG,
           'DSH companion run ended with %{public}s: %{public}s', state || 'unknown', errorMessage);
-        this.finishActive();
+        this.finishActive(this.outcome(false, '', state === 'error' ? errorMessage || 'DSH 分析失败' : 'DSH 分析已取消'));
       }
     } catch (error) {
       hilog.warn(CompanionMemoryController.DOMAIN, CompanionMemoryController.TAG,
@@ -195,19 +235,27 @@ export class CompanionMemoryController {
       this.requestInFlight = false;
       hilog.warn(CompanionMemoryController.DOMAIN, CompanionMemoryController.TAG,
         'failed to send companion memory: %{public}s', error instanceof Error ? error.message : String(error));
-      this.finishActive();
+        this.finishActive(this.outcome(false, '', error instanceof Error ? error.message : String(error)));
     }
   }
 
   private async completeActive(summaryText: string | undefined): Promise<void> {
     const input = this.activeInput;
     if (!input) return;
+    let outcome = this.outcome(false, '', 'DSH 未返回可保存的摘要');
     try {
-      const summary = this.parseSummary(summaryText);
+      let summary = this.parseSummary(summaryText);
       if (!summary) {
         hilog.warn(CompanionMemoryController.DOMAIN, CompanionMemoryController.TAG,
-          'DSH companion summary was not valid JSON');
-      } else if (summary.shouldRemember !== false && summary.content?.trim()) {
+          'DSH companion summary was not valid JSON, source=%{public}s response=%{public}s',
+          input.source, (summaryText || '').substring(0, 300));
+      }
+      if (this.shouldCreateExplicitFallback(input, summary)) {
+        summary = this.explicitFallbackSummary(input);
+        hilog.info(CompanionMemoryController.DOMAIN, CompanionMemoryController.TAG,
+          'using explicit capture fallback for %{public}s', input.source);
+      }
+      if (summary && summary.shouldRemember !== false && summary.content?.trim()) {
         const memory = new SaveBonioMemory();
         memory.title = summary.title?.trim() || '屏幕记忆';
         memory.content = summary.content.trim();
@@ -220,16 +268,25 @@ export class CompanionMemoryController {
         await this.memoryService.save(memory);
         hilog.info(CompanionMemoryController.DOMAIN, CompanionMemoryController.TAG,
           'saved companion summary: %{public}s', memory.title);
+        outcome = this.outcome(true, memory.title, '');
+      } else if (summary?.shouldRemember === false) {
+        outcome = this.outcome(false, '', '当前页面未发现需要长期记忆的内容');
       }
     } catch (error) {
       hilog.warn(CompanionMemoryController.DOMAIN, CompanionMemoryController.TAG,
         'failed to persist companion summary: %{public}s', error instanceof Error ? error.message : String(error));
+      outcome = this.outcome(false, '', error instanceof Error ? error.message : String(error));
     } finally {
-      this.finishActive();
+      this.finishActive(outcome);
     }
   }
 
-  private finishActive(): void {
+  private finishActive(outcome?: CompanionMemoryOutcome): void {
+    const completed = this.activeInput;
+    if (completed) {
+      const finalOutcome = outcome || this.outcome(false, '', '伴随记忆未完成');
+      completed.completionListeners.forEach((listener: (value: CompanionMemoryOutcome) => void) => listener(finalOutcome));
+    }
     this.activeInput = undefined;
     this.activeRunId = undefined;
     this.requestInFlight = false;
@@ -246,15 +303,54 @@ export class CompanionMemoryController {
     return JSON.parse(value.substring(start, end + 1)) as CompanionSummary;
   }
 
+  private outcome(saved: boolean, title: string, reason: string): CompanionMemoryOutcome {
+    const outcome = new CompanionMemoryOutcome();
+    outcome.saved = saved;
+    outcome.title = title;
+    outcome.reason = reason;
+    return outcome;
+  }
+
+  private shouldCreateExplicitFallback(input: CompanionMemoryInput, summary: CompanionSummary | undefined): boolean {
+    if (!input.explicitCapture) return false;
+    return !summary || summary.shouldRemember === false || !summary.content?.trim();
+  }
+
+  private containsOrderSignal(payloadJson: string): boolean {
+    const lowerPayload = payloadJson.toLowerCase();
+    return ORDER_MEMORY_KEYWORDS.some((keyword: string): boolean => lowerPayload.includes(keyword));
+  }
+
+  private explicitFallbackSummary(input: CompanionMemoryInput): CompanionSummary {
+    const lowerPayload = input.payloadJson.toLowerCase();
+    const isOrder = this.containsOrderSignal(input.payloadJson);
+    const isLuckin = lowerPayload.includes('luckin') || input.payloadJson.includes('瑞幸');
+    const subject = isLuckin ? '瑞幸咖啡订单' : isOrder ? '订单页面' : '当前页面';
+    return {
+      shouldRemember: true,
+      title: `${subject}记录`,
+      content: isOrder
+        ? `用户显式记录了${subject}。下次用户说“再来一单”时，应先读取此记忆，再结合关联截图和页面信息调用 phone-use skill 复现下单流程。`
+        : '用户通过双击 avatar 明确要求记录当前页面。后续可结合本条记忆的截图和页面信息继续处理。',
+      tags: isLuckin ? ['瑞幸咖啡', '订单', '复购'] : isOrder ? ['订单', '复购'] : ['显式记录'],
+      sourceApp: isLuckin ? '瑞幸咖啡' : '',
+      pageTitle: subject,
+      pageLink: '',
+    };
+  }
+
   private buildPrompt(input: CompanionMemoryInput): string {
     const payload = this.payloadForDsh(input.payloadJson);
+    const captureInstruction = input.explicitCapture
+      ? '用户指令：用户刚刚双击 avatar，明确要求把当前页面分析并保存为长期记忆。此请求不得按普通后台浏览数据忽略，必须返回 shouldRemember:true。微信小程序可能没有可用的 view tree；若附有截图，截图就是主要事实来源。订单、购买、支付或商品详情应尽量提取品牌、商品名称、咖啡类型（如美式或拿铁）、冷热/冰量、规格、数量、金额、取餐方式和订单状态，缺失项可省略。\n'
+      : '';
     return '你正在处理 Bonio 的后台伴随记忆，不是用户主对话。分析下面的 MSDP 屏幕感知结果，提取用户正在浏览的、未来可能有帮助的信息。'
       + '支付信息、账单、证件号等个人事务信息是高价值记忆，应记录关键内容。用户浏览过的文章、商品、美食、店铺、短视频，以及下单或购买过的商品也都是高价值记忆，应记录名称、关键信息和上下文。'
       + '忽略密码、验证码、完整私信以及短暂无意义的界面状态。验证码是临时信息，不应记录。若附有截图，请结合截图和结构化结果判断内容。不要调用任何工具，不要输出 Markdown。'
       + '只返回一个 JSON 对象：有价值时返回 {"shouldRemember":true,"title":"简短标题","content":"1到3句中文摘要",'
       + '"tags":["1到3个标签"],"sourceApp":"应用名","pageTitle":"页面标题","pageLink":"来源链接"}；'
       + '无价值时返回 {"shouldRemember":false}。输出必须能被标准 JSON.parse 解析；字符串正文中的英文双引号请改用中文引号或进行 JSON 转义。缺失字段使用空字符串或空数组。\n'
-      + `来源：${input.source}\n时间戳：${input.receivedAt}\nMSDP 原始结果：\n${payload}`;
+      + `来源：${input.source}\n时间戳：${input.receivedAt}\n${captureInstruction}MSDP 原始结果：\n${payload}`;
   }
 
   private payloadForDsh(payloadJson: string): string {

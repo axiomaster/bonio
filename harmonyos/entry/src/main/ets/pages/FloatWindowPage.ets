@@ -473,12 +473,14 @@ struct FloatWindowPage {
   private async captureCurrentScreenMemory(): Promise<void> {
     try {
       if (!this.runtime) throw new Error('Bonio runtime is unavailable');
-      await this.runtime.captureAvatarMemory();
-      this.beginInteraction('completed', '当前页面采集完成~', 4000);
+      const title = await this.runtime.captureAvatarMemory();
+      this.beginInteraction('completed', title ? `已记下：${title}` : '当前页面已记下~', 5000);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const bubble = message.includes('SCREEN_AWARENESS_DISABLED')
         ? '请先在设置开启屏幕感知~'
+        : message.includes('MEMORY_NOT_SAVED')
+          ? '这页没有成功记下，请再试一次~'
         : '当前页面暂时无法读取~';
       hilog.warn(DOMAIN, TAG, 'SmartEdge trigger failed: %{public}s', message);
       this.beginInteraction('failed', bubble, 4000);

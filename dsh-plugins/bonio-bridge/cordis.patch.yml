@@ -1,4 +1,9 @@
 # bonio-bridge bundle patch: mounts the hiclaw-compatible gateway inside dsh.
+- id: agent-default-model
+  config:
+    provider: deepseek-official
+    model: deepseek-v4-flash-vision-exp
+
 - insert:
     - id: bonio-bridge
       name: "@bonio/dsh-bonio-bridge"

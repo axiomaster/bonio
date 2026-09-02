@@ -12,6 +12,8 @@ avatar ⇄（同进程）⇄ bonio-app ⇄（WebSocket hiclaw 协议）⇄ dsh �
 
 - **operator session**：聊天（`chat.send` → dsh agent，流式 `agent` 事件 + 最终 `chat` 事件）
 - **node session**：设备工具调用（dsh 工具 `bonio_node_invoke` → `node.invoke.request` → node session 执行 → `node.invoke.result` 回填）
+- **默认模型**：`deepseek-official/deepseek-v4-flash-vision-exp`，用于支持截图理解的主对话和伴随记忆请求。
+- **图片消息**：`chat.send.attachments` 中的 base64 图片会先保存到 DSH 的持久附件服务，再作为 `image` content block 发送给模型。
 
 ## 已实现 dsh 工具
 

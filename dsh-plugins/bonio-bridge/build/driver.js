@@ -54,6 +54,7 @@ export class AgentDriver {
         if (!agents || !defaultModel)
             return null;
         const selection = defaultModel.currentSelection();
+        console.log('[bonio-bridge] using model', `${selection.provider}/${selection.model}`);
         const setup = (agentCtx) => {
             installModelSelection(agentCtx, { current: selection, assembled: undefined });
         };
@@ -253,8 +254,28 @@ export class AgentDriver {
             };
             const off = ctx.on('session/event', onEvent);
             await agent.whenIdle();
+            const content = [{ type: 'text', text: params.text }];
+            if (params.attachments && params.attachments.length > 0) {
+                const attachmentStore = ctx.get('attachments');
+                if (!attachmentStore)
+                    throw new Error('image attachment service unavailable');
+                for (const attachment of params.attachments) {
+                    const mediaType = attachment.mimeType === 'image/png' || attachment.mimeType === 'image/webp' ||
+                        attachment.mimeType === 'image/gif' ? attachment.mimeType : 'image/jpeg';
+                    const data = Buffer.from(attachment.content, 'base64');
+                    if (data.length === 0)
+                        throw new Error('image attachment is empty');
+                    const ref = await attachmentStore.saveImage({
+                        data: new Uint8Array(data),
+                        mediaType,
+                        name: attachment.fileName || 'bonio-screen.jpg',
+                    });
+                    content.push({ type: 'image', attachment: ref });
+                }
+                console.log('[bonio-bridge] attached', params.attachments.length, 'image(s) to dsh message');
+            }
             agent.followup(createUserMessage({
-                content: [{ type: 'text', text: params.text }],
+                content,
                 source: { kind: 'user' },
             }));
             await agent.whenIdle();

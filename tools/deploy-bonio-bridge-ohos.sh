@@ -60,6 +60,11 @@ PKGEOF
 printf '[]\n' > "$PROFILE_DIR/bonio/cordis.yml"
 cat > "$PROFILE_DIR/bonio/cordis.patch.yml" << PATCHEOF
 # bonio profile patch layer.
+- id: agent-default-model
+  config:
+    provider: deepseek-official
+    model: deepseek-v4-flash-vision-exp
+
 - id: bonio-bridge
   config:
     port: 10724
