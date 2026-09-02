@@ -1,0 +1,56 @@
+dsh-plugins/bonio-bridge/src/gateway.ts
+  s_65a1faaab12715::t_e4040b416ee6c7 474,477
+  s_65a1faaab12715::t_15af0ec99800dd 148,161,168,171
+  s_65a1faaab12715::t_420a02e8afe932 32-36
+  s_65a1faaab12715::t_0defe0da3b2a39 183
+harmonyos/entry/src/main/ets/pages/ChatTab.ets
+  s_65a1faaab12715::t_6bf8d8902b37b6 2-3
+  s_65a1faaab12715::t_ffe2eab60b7045 54,60-77,81-88
+  s_65a1faaab12715::t_cdbb591d7230a4 210-219
+dsh-plugins/bonio-bridge/src/channel_store.ts
+  s_65a1faaab12715::t_bc0e8874161485 27-28,34
+tools/deploy-bonio-bridge-ohos.sh
+  s_65a1faaab12715::t_ea6471063193f7 97-109
+dsh-plugins/bonio-bridge/src/ilink.ts
+  s_65a1faaab12715::t_baf68b4f374107 1-203
+dsh-plugins/bonio-bridge/src/wechat_channel.ts
+  s_65a1faaab12715::t_4354fd9aaf60e9 1-127
+dsh-plugins/bonio-bridge/src/index.ts
+  s_65a1faaab12715::t_b5c9e40ef1498e 49,64-65
+  s_65a1faaab12715::t_e931a8094be62a 99-103,105-107,111
+  s_65a1faaab12715::t_b3783bd58da5a7 16
+harmonyos/entry/src/main/ets/node/chat/ChatController.ets
+  s_65a1faaab12715::t_213e3436e5d4f0 3-9,12-13
+  s_65a1faaab12715::t_02f5c6c6968570 14
+dsh-plugins/bonio-bridge/build/driver.js
+  s_65a1faaab12715::t_3b3a909c175144 8
+dsh-plugins/bonio-bridge/build/gateway.js
+  s_65a1faaab12715::t_b1988d0b79be0d 14-15,106,119,126,129,136,411,414
+dsh-plugins/bonio-bridge/build/ilink.d.ts
+  s_65a1faaab12715::t_94e3b00f335095 1-35
+dsh-plugins/bonio-bridge/build/ilink.js
+  s_65a1faaab12715::t_05cddebcc83582 1-195
+dsh-plugins/bonio-bridge/build/index.js
+  s_65a1faaab12715::t_ff0952a3ce7d97 5,23,36-37,64-67,69-71,74
+dsh-plugins/bonio-bridge/build/wechat_channel.d.ts
+  s_65a1faaab12715::t_680252935aa24f 1-31
+dsh-plugins/bonio-bridge/build/wechat_channel.js
+  s_65a1faaab12715::t_8f579fff47586c 1-114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "93710db9754ba787b6fc0a5851c51948e1d9ae25",
+  "prompts": {},
+  "sessions": {
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "glm-5.3"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 23
+    }
+  }
+}
