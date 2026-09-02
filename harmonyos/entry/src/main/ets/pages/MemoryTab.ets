@@ -85,10 +85,8 @@ export struct MemoryTab {
   }
 
   private detailImageDataUrl(memory: BonioMemory): string {
-    if (memory.originalImage) {
-      return `data:${memory.originalImageMimeType || 'image/png'};base64,${memory.originalImage}`;
-    }
-    return this.coverDataUrl(memory);
+    if (!memory.originalImage) return '';
+    return `data:${memory.originalImageMimeType || 'image/png'};base64,${memory.originalImage}`;
   }
 
   private cardTags(memory: BonioMemory): string[] {
@@ -109,13 +107,17 @@ export struct MemoryTab {
   }
 
   private async openMemoryDetail(memory: BonioMemory) {
-    this.selectedMemory = memory;
-    if (!this.runtime) return;
+    if (!this.runtime) {
+      this.selectedMemory = memory;
+      return;
+    }
+    this.errorText = '';
     try {
       const detailedMemory = await this.runtime.memoryService.get(memory.id);
-      if (detailedMemory) this.selectedMemory = detailedMemory;
+      this.selectedMemory = detailedMemory || memory;
     } catch (error) {
       this.errorText = error instanceof Error ? error.message : '记忆详情加载失败';
+      this.selectedMemory = memory;
     }
   }
 
@@ -283,7 +285,7 @@ export struct MemoryTab {
             .fontColor('#98A2B3')
             .width('100%')
             .margin({ top: 4 })
-          if (memory.originalImage || memory.coverImage) {
+          if (memory.originalImage) {
             Image(this.detailImageDataUrl(memory))
               .width('100%')
               .height(360)
