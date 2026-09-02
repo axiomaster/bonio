@@ -38,6 +38,22 @@ export class AgentDriver {
             console.log('[bonio-bridge] session-map save failed:', e instanceof Error ? e.message : String(e));
         }
     }
+    /**
+     * Forget a persisted session that can no longer be loaded. The session data
+     * itself is intentionally left in place so this only rotates the bridge's
+     * mapping and never touches user memories or other dsh state.
+     */
+    async invalidatePersistedSession(sessionKey, sessionId) {
+        const map = await this.loadSessionMap();
+        if (sessionId && map[sessionKey] !== sessionId)
+            return;
+        if (!map[sessionKey])
+            return;
+        delete map[sessionKey];
+        await this.saveSessionMap(map);
+        this.agentsByKey.delete(sessionKey);
+        console.log('[bonio-bridge] rotated corrupted session for', sessionKey);
+    }
     constructor(ctx, registry, sink, forwardInvoke) {
         this.ctx = ctx;
         this.registry = registry;
@@ -74,6 +90,7 @@ export class AgentDriver {
                 }
                 catch (e) {
                     console.log('[bonio-bridge] resume failed for', sessionKey, ':', e instanceof Error ? e.message : String(e));
+                    await this.invalidatePersistedSession(sessionKey, persistedId);
                 }
             }
         }
@@ -146,6 +163,7 @@ export class AgentDriver {
                 }
                 catch (e) {
                     console.log('[bonio-bridge] history load failed for', sessionKey, ':', e instanceof Error ? e.message : String(e));
+                    await this.invalidatePersistedSession(sessionKey, persistedId);
                 }
             }
         }
@@ -200,7 +218,11 @@ export class AgentDriver {
                     }
                 }
             }
-            catch { /* skip */ }
+            catch (e) {
+                console.log('[bonio-bridge] skipping corrupted session', key, ':', e instanceof Error ? e.message : String(e));
+                await this.invalidatePersistedSession(key, sessionId);
+                continue;
+            }
             sessions.push({ key, updatedAt, displayName });
         }
         return { sessions };
