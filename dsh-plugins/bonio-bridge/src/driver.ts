@@ -34,6 +34,10 @@ interface HistoryMessage {
   timestamp: number;
 }
 
+function textContent(text: string): ContentBlock[] {
+  return [{ type: 'text', text }];
+}
+
 export class AgentDriver {
   private runs = new Map<string, { agent: any; controller: AbortController }>();
   /** sessionKey -> live agent (multi-turn continuity within one operator session). */
@@ -416,10 +420,10 @@ export class AgentDriver {
         schema: { type: 'object', additionalProperties: true, description: 'The device result payload returned by the node session.' },
         render(args: Record<string, unknown>, value: unknown) {
           if (value && typeof value === 'object' && (value as Record<string, unknown>).error) {
-            return 'device tool error: ' + String((value as Record<string, unknown>).error);
+            return textContent('device tool error: ' + String((value as Record<string, unknown>).error));
           }
-          try { return JSON.stringify(value, null, 2); }
-          catch { return String(value); }
+          try { return textContent(JSON.stringify(value, null, 2)); }
+          catch { return textContent(String(value)); }
         },
       },
       async execute(args: { command: string; arguments?: Record<string, unknown>; timeoutMs?: number }, exec: unknown) {
@@ -455,7 +459,7 @@ export class AgentDriver {
         schema: { type: 'object', additionalProperties: true },
         render(args: Record<string, unknown>, value: unknown) {
           const v = value as { id?: string; title?: string } | undefined;
-          return v && v.id ? `saved memo ${v.id}: ${v.title}` : JSON.stringify(value);
+          return textContent(v && v.id ? `saved memo ${v.id}: ${v.title}` : JSON.stringify(value));
         },
       },
       async execute(args: { title: string; content: string; source?: string; tags?: string[]; sourceApp?: string; pageTitle?: string; pageLink?: string }, exec: unknown) {
@@ -473,17 +477,33 @@ export class AgentDriver {
         render(args: Record<string, unknown>, value: unknown) {
           try {
             if (value && typeof value === 'object' && typeof (value as { text?: unknown }).text === 'string') {
-              return (value as { text: string }).text;
+              return textContent((value as { text: string }).text);
             }
-            return JSON.stringify(value);
-          } catch { return JSON.stringify(value); }
+            return textContent(JSON.stringify(value));
+          } catch { return textContent(JSON.stringify(value)); }
         },
       },
       async execute(args: { limit?: number }, exec: unknown) {
         const memos = await listMemos(args?.limit ?? 20);
-        if (memos.length === 0) return { isError: false, value: { text: '没有保存的备忘。', memos: [] } };
-        const lines = memos.map((m: any) => `- ${m.title}: ${m.content}`).join('\n');
-        return { isError: false, value: { text: '共有 ' + memos.length + ' 条备忘:\n' + lines, memos } };
+        // Keep tool output lossless-JSON: memo objects may contain optional
+        // undefined fields and large image data intended only for the UI.
+        const summaries = memos.map((memo: any) => {
+          const summary: Record<string, unknown> = {
+            id: memo.id,
+            title: memo.title,
+            content: memo.content,
+            source: memo.source,
+            createdAt: memo.createdAt,
+          };
+          if (Array.isArray(memo.tags) && memo.tags.length > 0) summary.tags = memo.tags;
+          if (typeof memo.sourceApp === 'string' && memo.sourceApp) summary.sourceApp = memo.sourceApp;
+          if (typeof memo.pageTitle === 'string' && memo.pageTitle) summary.pageTitle = memo.pageTitle;
+          if (typeof memo.pageLink === 'string' && memo.pageLink) summary.pageLink = memo.pageLink;
+          return summary;
+        });
+        if (summaries.length === 0) return { text: '没有保存的备忘。', memos: [] };
+        const lines = summaries.map((m) => `- ${m.title}: ${m.content}`).join('\n');
+        return { text: '共有 ' + summaries.length + ' 条备忘:\n' + lines, memos: summaries };
       },
     })));
 
@@ -493,7 +513,7 @@ export class AgentDriver {
       parameters: {},
       output: {
         schema: { type: 'object', additionalProperties: true },
-        render(args: Record<string, unknown>, value: unknown) { return JSON.stringify(value); },
+        render(args: Record<string, unknown>, value: unknown) { return textContent(JSON.stringify(value)); },
       },
       async execute() {
         return { isError: false, value: { platform: process.platform, arch: process.arch, node: process.versions.node, dsh: 'bonio-bridge 0.1', os: process.env.OS || 'HarmonyOS/OpenHarmony' } };
@@ -543,7 +563,7 @@ export class AgentDriver {
         prompt: { type: 'string', required: true, description: 'The message/prompt to send to the agent when the task fires.' },
         maxCount: { type: 'number', description: 'Maximum number of times to run (0 = unlimited).' },
       },
-      output: { schema: { type: 'object', additionalProperties: true }, render(_args: unknown, value: unknown) { return JSON.stringify(value); } },
+      output: { schema: { type: 'object', additionalProperties: true }, render(_args: unknown, value: unknown) { return textContent(JSON.stringify(value)); } },
       async execute(args: { schedule: string; prompt: string; maxCount?: number }, exec: unknown) {
         const { schedule, prompt, maxCount } = args ?? {};
         const parsed = parseSchedule(schedule);
@@ -560,7 +580,7 @@ export class AgentDriver {
       name: 'cron_list',
       description: 'List all scheduled cron jobs with their status and run counts.',
       parameters: {},
-      output: { schema: { type: 'object', additionalProperties: true }, render(_args: unknown, value: unknown) { return JSON.stringify(value); } },
+      output: { schema: { type: 'object', additionalProperties: true }, render(_args: unknown, value: unknown) { return textContent(JSON.stringify(value)); } },
       async execute(args: Record<string, never>, exec: unknown) {
         const jobs = await loadCronJobs();
         const list = Object.values(jobs).map((j: any) => ({ id: j.id, schedule: j.schedule, prompt: String(j.prompt).slice(0, 60), runs: j.runs, enabled: j.enabled }));
@@ -572,7 +592,7 @@ export class AgentDriver {
       name: 'cron_remove',
       description: 'Remove a scheduled cron job by its ID.',
       parameters: { jobId: { type: 'string', required: true, description: 'The ID of the cron job to remove.' } },
-      output: { schema: { type: 'object', additionalProperties: true }, render(_args: unknown, value: unknown) { return JSON.stringify(value); } },
+      output: { schema: { type: 'object', additionalProperties: true }, render(_args: unknown, value: unknown) { return textContent(JSON.stringify(value)); } },
       async execute(args: { jobId: string }, exec: unknown) {
         const { jobId } = args ?? {};
         const jobs = await loadCronJobs();
@@ -587,7 +607,7 @@ export class AgentDriver {
       name: 'cron_runs',
       description: 'Get recent execution history for a cron job.',
       parameters: { jobId: { type: 'string', required: true, description: 'The ID of the cron job to inspect.' } },
-      output: { schema: { type: 'object', additionalProperties: true }, render(_args: unknown, value: unknown) { return JSON.stringify(value); } },
+      output: { schema: { type: 'object', additionalProperties: true }, render(_args: unknown, value: unknown) { return textContent(JSON.stringify(value)); } },
       async execute(args: { jobId: string }, exec: unknown) {
         const { jobId } = args ?? {};
         const jobs = await loadCronJobs();

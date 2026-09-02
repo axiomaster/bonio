@@ -6,6 +6,9 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { listMemos, saveMemo } from './memo_store.js';
 export const INVOKE_TIMEOUT_MS = 300_000;
+function textContent(text) {
+    return [{ type: 'text', text }];
+}
 export class AgentDriver {
     ctx;
     registry;
@@ -391,13 +394,13 @@ export class AgentDriver {
                 schema: { type: 'object', additionalProperties: true, description: 'The device result payload returned by the node session.' },
                 render(args, value) {
                     if (value && typeof value === 'object' && value.error) {
-                        return 'device tool error: ' + String(value.error);
+                        return textContent('device tool error: ' + String(value.error));
                     }
                     try {
-                        return JSON.stringify(value, null, 2);
+                        return textContent(JSON.stringify(value, null, 2));
                     }
                     catch {
-                        return String(value);
+                        return textContent(String(value));
                     }
                 },
             },
@@ -434,7 +437,7 @@ export class AgentDriver {
                 schema: { type: 'object', additionalProperties: true },
                 render(args, value) {
                     const v = value;
-                    return v && v.id ? `saved memo ${v.id}: ${v.title}` : JSON.stringify(value);
+                    return textContent(v && v.id ? `saved memo ${v.id}: ${v.title}` : JSON.stringify(value));
                 },
             },
             async execute(args, exec) {
@@ -451,21 +454,41 @@ export class AgentDriver {
                 render(args, value) {
                     try {
                         if (value && typeof value === 'object' && typeof value.text === 'string') {
-                            return value.text;
+                            return textContent(value.text);
                         }
-                        return JSON.stringify(value);
+                        return textContent(JSON.stringify(value));
                     }
                     catch {
-                        return JSON.stringify(value);
+                        return textContent(JSON.stringify(value));
                     }
                 },
             },
             async execute(args, exec) {
                 const memos = await listMemos(args?.limit ?? 20);
-                if (memos.length === 0)
-                    return { isError: false, value: { text: '没有保存的备忘。', memos: [] } };
-                const lines = memos.map((m) => `- ${m.title}: ${m.content}`).join('\n');
-                return { isError: false, value: { text: '共有 ' + memos.length + ' 条备忘:\n' + lines, memos } };
+                // Keep tool output lossless-JSON: memo objects may contain optional
+                // undefined fields and large image data intended only for the UI.
+                const summaries = memos.map((memo) => {
+                    const summary = {
+                        id: memo.id,
+                        title: memo.title,
+                        content: memo.content,
+                        source: memo.source,
+                        createdAt: memo.createdAt,
+                    };
+                    if (Array.isArray(memo.tags) && memo.tags.length > 0)
+                        summary.tags = memo.tags;
+                    if (typeof memo.sourceApp === 'string' && memo.sourceApp)
+                        summary.sourceApp = memo.sourceApp;
+                    if (typeof memo.pageTitle === 'string' && memo.pageTitle)
+                        summary.pageTitle = memo.pageTitle;
+                    if (typeof memo.pageLink === 'string' && memo.pageLink)
+                        summary.pageLink = memo.pageLink;
+                    return summary;
+                });
+                if (summaries.length === 0)
+                    return { text: '没有保存的备忘。', memos: [] };
+                const lines = summaries.map((m) => `- ${m.title}: ${m.content}`).join('\n');
+                return { text: '共有 ' + summaries.length + ' 条备忘:\n' + lines, memos: summaries };
             },
         })));
         disposers.push(register(defineTool({
@@ -474,7 +497,7 @@ export class AgentDriver {
             parameters: {},
             output: {
                 schema: { type: 'object', additionalProperties: true },
-                render(args, value) { return JSON.stringify(value); },
+                render(args, value) { return textContent(JSON.stringify(value)); },
             },
             async execute() {
                 return { isError: false, value: { platform: process.platform, arch: process.arch, node: process.versions.node, dsh: 'bonio-bridge 0.1', os: process.env.OS || 'HarmonyOS/OpenHarmony' } };
@@ -529,7 +552,7 @@ export class AgentDriver {
                 prompt: { type: 'string', required: true, description: 'The message/prompt to send to the agent when the task fires.' },
                 maxCount: { type: 'number', description: 'Maximum number of times to run (0 = unlimited).' },
             },
-            output: { schema: { type: 'object', additionalProperties: true }, render(_args, value) { return JSON.stringify(value); } },
+            output: { schema: { type: 'object', additionalProperties: true }, render(_args, value) { return textContent(JSON.stringify(value)); } },
             async execute(args, exec) {
                 const { schedule, prompt, maxCount } = args ?? {};
                 const parsed = parseSchedule(schedule);
@@ -546,7 +569,7 @@ export class AgentDriver {
             name: 'cron_list',
             description: 'List all scheduled cron jobs with their status and run counts.',
             parameters: {},
-            output: { schema: { type: 'object', additionalProperties: true }, render(_args, value) { return JSON.stringify(value); } },
+            output: { schema: { type: 'object', additionalProperties: true }, render(_args, value) { return textContent(JSON.stringify(value)); } },
             async execute(args, exec) {
                 const jobs = await loadCronJobs();
                 const list = Object.values(jobs).map((j) => ({ id: j.id, schedule: j.schedule, prompt: String(j.prompt).slice(0, 60), runs: j.runs, enabled: j.enabled }));
@@ -557,7 +580,7 @@ export class AgentDriver {
             name: 'cron_remove',
             description: 'Remove a scheduled cron job by its ID.',
             parameters: { jobId: { type: 'string', required: true, description: 'The ID of the cron job to remove.' } },
-            output: { schema: { type: 'object', additionalProperties: true }, render(_args, value) { return JSON.stringify(value); } },
+            output: { schema: { type: 'object', additionalProperties: true }, render(_args, value) { return textContent(JSON.stringify(value)); } },
             async execute(args, exec) {
                 const { jobId } = args ?? {};
                 const jobs = await loadCronJobs();
@@ -572,7 +595,7 @@ export class AgentDriver {
             name: 'cron_runs',
             description: 'Get recent execution history for a cron job.',
             parameters: { jobId: { type: 'string', required: true, description: 'The ID of the cron job to inspect.' } },
-            output: { schema: { type: 'object', additionalProperties: true }, render(_args, value) { return JSON.stringify(value); } },
+            output: { schema: { type: 'object', additionalProperties: true }, render(_args, value) { return textContent(JSON.stringify(value)); } },
             async execute(args, exec) {
                 const { jobId } = args ?? {};
                 const jobs = await loadCronJobs();
