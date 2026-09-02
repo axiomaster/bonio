@@ -1,7 +1,9 @@
 # Bonio 三层四部分架构与 MSDP 屏幕感知
 
 > 日期：2026-08-31
-> 状态：实施中
+> 状态：已实现（当前实现以 [20260902-dsh-msdp-memory-current.md](20260902-dsh-msdp-memory-current.md) 为准）
+
+> 注意：本文记录的是 2026-08-31 的阶段性方案。双击 trigger、subscribe 伴随记忆、PixelMap 原图/封面分离、DSH vision 分析、目录化 memo 存储和行为标签等后续实现，请以当前实现文档为准。
 
 ## 架构
 
