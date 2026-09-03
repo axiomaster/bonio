@@ -13,6 +13,7 @@ const SESSION_KEY = process.argv[3] || 'main';
 const ws = new WebSocket(URL);
 const pending = new Map();
 let seq = 0;
+let lastShown = 0;
 
 const rpc = (method, params) => new Promise((resolve, reject) => {
   const id = `r${++seq}`;
@@ -26,8 +27,12 @@ ws.on('message', (data) => {
     if (f.event === 'connect.challenge') void connect(f.payload.nonce);
     if (f.event === 'agent') {
       const d = f.payload ?? {};
-      if (d.stream === 'assistant' && d.data?.text) {
-        process.stdout.write('.');
+      if (d.stream === 'assistant' && typeof d.data?.text === 'string') {
+        // Deltas are cumulative; print only the new suffix.
+        if (d.data.text.length > lastShown) {
+          process.stdout.write(d.data.text.slice(lastShown));
+          lastShown = d.data.text.length;
+        }
       } else if (d.stream === 'tool') {
         console.log(`\n[tool] ${d.data?.phase} ${d.data?.name} ${JSON.stringify(d.data?.args ?? {}).slice(0, 120)}`);
       }

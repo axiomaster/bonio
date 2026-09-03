@@ -19,6 +19,14 @@ export class AgentDriver {
     agentsByKey = new Map();
     /** Every agent this bridge created (incl. ephemeral runs), for approval routing. */
     ownedAgents = new WeakSet();
+    /** agent -> bound sessionKey ('' for ephemeral agents nobody is watching). */
+    agentSession = new WeakMap();
+    /** sessionKey -> ask_user_question waiting for the user's next chat message. */
+    pendingAsks = new Map();
+    /** sessionKey -> runId of the run currently driving that session. */
+    runIdBySession = new Map();
+    /** sessionKey -> last cumulative assistant text shown to the app. */
+    lastDeltaBySession = new Map();
     /** sessionKey -> durable dsh sessionId, persisted across dsh restarts. */
     sessionMapFile = () => {
         const home = process.env.DSH_HOME || process.env.HOME || '/data/local/home';
@@ -76,6 +84,126 @@ export class AgentDriver {
             }
             return next();
         });
+        this.patchUserQuestions();
+    }
+    /**
+     * Route ask_user_question for bridge-owned agents into the chat surface.
+     * dsh's registered provider is the web UI, which nobody watches on-device —
+     * without this the tool call blocks forever and the run never goes idle
+     * ("thinking" forever). The question is streamed into the chat bubble and
+     * the user's NEXT chat message on that session becomes the answer. Unlike
+     * approvals (which the user asked to auto-grant), questions often carry
+     * real-world consequences (e.g. payment confirmation) and need a human.
+     */
+    patchUserQuestions() {
+        let attempts = 0;
+        const tryPatch = () => {
+            const svc = this.ctx.get('userQuestions');
+            const ask = svc?.ask;
+            if (!svc || typeof ask !== 'function') {
+                // The service loads with the preset toolchain, possibly after us.
+                if (++attempts < 60)
+                    setTimeout(tryPatch, 1000);
+                else
+                    console.log('[bonio-bridge] userQuestions service never appeared; ask_user_question falls through to web');
+                return;
+            }
+            const origAsk = ask.bind(svc);
+            const wrapped = async (request) => {
+                if (request?.agent && this.ownedAgents.has(request.agent)) {
+                    return this.answerViaChat(request);
+                }
+                return origAsk(request);
+            };
+            wrapped.__bonio = true;
+            svc.ask = wrapped;
+            console.log('[bonio-bridge] userQuestions.ask patched for chat-surface Q&A');
+        };
+        tryPatch();
+    }
+    /** Format a question payload for display as chat text. */
+    formatQuestions(questions) {
+        const parts = [];
+        for (const q of questions) {
+            const lines = [];
+            if (q.header)
+                lines.push(`**${q.header}**`);
+            lines.push(String(q.question ?? ''));
+            if (q.detail)
+                lines.push(String(q.detail));
+            if (Array.isArray(q.options)) {
+                q.options.forEach((o, i) => {
+                    lines.push(`${i + 1}. ${o.label}${o.description ? ` — ${o.description}` : ''}`);
+                });
+            }
+            parts.push(lines.join('\n'));
+        }
+        return parts.join('\n\n') + '\n\n_（请回复序号或选项内容，也可以直接用一句话说明）_';
+    }
+    /**
+     * Map the user's chat reply onto structured answers: option labels (or
+     * ordinals) become `selected`; anything else rides along as free text the
+     * model interprets itself.
+     */
+    parseAnswer(questions, reply) {
+        const trimmed = reply.trim();
+        return {
+            answers: questions.map((q) => {
+                const options = Array.isArray(q.options) ? q.options : [];
+                const selected = [];
+                options.forEach((o, i) => {
+                    const label = String(o.label ?? '');
+                    if (!label)
+                        return;
+                    if (trimmed.includes(label) || trimmed === String(i + 1))
+                        selected.push(label);
+                });
+                const item = { id: q.id, selected };
+                const matchedLen = selected.join('').length;
+                if (selected.length === 0 || trimmed.length > matchedLen + 6)
+                    item.custom = trimmed;
+                return item;
+            }),
+        };
+    }
+    /** Hold a bridge-owned agent's question open until the user replies in chat. */
+    answerViaChat(request) {
+        const sessionKey = this.agentSession.get(request.agent) ?? '';
+        if (!sessionKey) {
+            // Background/ephemeral agent: no chat surface exists to ask on. Answer
+            // negatively instead of blocking a run nobody can rescue.
+            console.log('[bonio-bridge] ask_user_question on agent without a chat session; auto-answering');
+            return Promise.resolve({
+                answers: request.questions.map((q) => ({
+                    id: q.id, selected: [],
+                    custom: '(当前没有可交互的用户在线，请不要等待用户，基于已有信息继续或结束)',
+                })),
+            });
+        }
+        const runId = this.runIdBySession.get(sessionKey) ?? `ask-${Date.now()}`;
+        // The app REPLACES streamingAssistantText with each delta, so prepend the
+        // cumulative model text to keep any pre-question output on screen.
+        const shown = (this.lastDeltaBySession.get(sessionKey) ?? '') + this.formatQuestions(request.questions);
+        this.sink.agentDelta(runId, sessionKey, shown);
+        console.log('[bonio-bridge] question forwarded to chat session', sessionKey);
+        return new Promise((resolve, reject) => {
+            let done = false;
+            const onAbort = () => { finish(); reject(new Error('ask_user_question was aborted')); };
+            const timer = setTimeout(() => { finish(); reject(new Error('ask_user_question timed out waiting for the user')); }, 10 * 60_000);
+            request.signal?.addEventListener?.('abort', onAbort, { once: true });
+            function finish() {
+                if (done)
+                    return;
+                done = true;
+                clearTimeout(timer);
+                request.signal?.removeEventListener?.('abort', onAbort);
+            }
+            this.pendingAsks.set(sessionKey, {
+                questions: request.questions,
+                resolve, reject,
+                cleanup: finish,
+            });
+        });
     }
     /** Create (or reuse) the dsh agent bound to a hiclaw sessionKey. */
     async getOrCreateAgent(sessionKey, ephemeral = false) {
@@ -113,6 +241,7 @@ export class AgentDriver {
                         setup,
                     });
                     this.ownedAgents.add(agent);
+                    this.agentSession.set(agent, sessionKey);
                     this.agentsByKey.set(sessionKey, agent);
                     return agent;
                 }
@@ -130,6 +259,7 @@ export class AgentDriver {
             setup,
         });
         this.ownedAgents.add(agent);
+        this.agentSession.set(agent, sessionKey ?? '');
         if (!ephemeral && sessionKey) {
             this.agentsByKey.set(sessionKey, agent);
             const map = await this.loadSessionMap();
@@ -267,6 +397,19 @@ export class AgentDriver {
         // pendingRuns filter matches our agent/chat events immediately.
         const runId = params.runId || randomUUID();
         const controller = new AbortController();
+        // A pending ask_user_question is waiting on this session: the incoming
+        // message is its answer, not a new run. Reply with the ORIGINAL runId so
+        // the app keeps tracking the run that is still open.
+        const pendingAsk = params.sessionKey ? this.pendingAsks.get(params.sessionKey) : undefined;
+        if (pendingAsk) {
+            this.pendingAsks.delete(params.sessionKey);
+            const answer = this.parseAnswer(pendingAsk.questions, params.text);
+            pendingAsk.cleanup();
+            pendingAsk.resolve(answer);
+            const activeRunId = this.runIdBySession.get(params.sessionKey) ?? runId;
+            console.log('[bonio-bridge] chat message answered pending question on', params.sessionKey);
+            return { runId: activeRunId };
+        }
         // Fire-and-forget: return the runId right away; agent events stream as
         // they happen and the chat final arrives when the run completes.
         void this._run(runId, params, controller);
@@ -287,6 +430,8 @@ export class AgentDriver {
                 throw new Error('dsh agent services unavailable');
             }
             this.runs.set(runId, { agent, controller });
+            if (params.sessionKey)
+                this.runIdBySession.set(params.sessionKey, runId);
             const firstSeq = agent.session.seq;
             // bonio-app's handleAgentEvent REPLACES streamingAssistantText with
             // data.text, so send cumulative text, not per-chunk deltas.
@@ -300,6 +445,8 @@ export class AgentDriver {
                     if (text) {
                         cumulative += text;
                         this.sink.agentDelta(runId, params.sessionKey, cumulative);
+                        if (params.sessionKey)
+                            this.lastDeltaBySession.set(params.sessionKey, cumulative);
                     }
                 }
             };
@@ -377,6 +524,7 @@ export class AgentDriver {
                 text = toolResults.join('\n');
             await sessions.flush(agent.session);
             this.runs.delete(runId);
+            this.cleanupRun(runId, params.sessionKey);
             const errorMessage = reason && reason.kind === 'error'
                 ? (reason.error?.message ?? 'agent error')
                 : undefined;
@@ -387,8 +535,23 @@ export class AgentDriver {
         }
         catch (error) {
             this.runs.delete(runId);
+            this.cleanupRun(runId, params.sessionKey);
             const message = error instanceof Error ? error.message : String(error);
             this.sink.chatFinal(runId, params.sessionKey, { text: '', state: 'error', errorMessage: message, done: true });
+        }
+    }
+    /** Drop per-run bookkeeping; unblock any question the run left dangling. */
+    cleanupRun(runId, sessionKey) {
+        this.runs.delete(runId);
+        if (!sessionKey || this.runIdBySession.get(sessionKey) !== runId)
+            return;
+        this.runIdBySession.delete(sessionKey);
+        this.lastDeltaBySession.delete(sessionKey);
+        const pending = this.pendingAsks.get(sessionKey);
+        if (pending) {
+            this.pendingAsks.delete(sessionKey);
+            pending.cleanup();
+            pending.reject(new Error('run ended before the question was answered'));
         }
     }
     abort(runId) {
