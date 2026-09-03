@@ -1,0 +1,14 @@
+dsh-plugins/bonio-bridge/test/one-shot.mjs
+  h_de08bd40967a17 1-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "f76c63d56cacc64c7c9f52f22cd1cb2b94c97eae",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  }
+}
