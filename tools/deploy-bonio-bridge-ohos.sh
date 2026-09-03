@@ -93,6 +93,9 @@ log "Installing daemon script"
 "$HDC" file send "$SCRIPT_DIR/dsh-daemon.sh" /data/local/bin/dsh-daemon.sh
 "$HDC" shell "chmod 755 /data/local/bin/dsh-daemon.sh"
 
+log "Ensuring bash shim (dsh spawns literal 'bash'; OHOS only ships /bin/sh)"
+"$HDC" shell "ln -sf /bin/sh /usr/local/bin/bash 2>/dev/null || echo 'WARN: cannot write /usr/local/bin (run: hdc target mount)'"
+
 log "Restarting daemon (self-healing loop)"
 # Kill EVERY supervisor + dsh instance. Relying on pkill alone let duplicate
 # dsh-daemon.sh supervisors pile up (dozens racing to spawn dsh, losers crash

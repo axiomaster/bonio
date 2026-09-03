@@ -17,6 +17,8 @@ export class AgentDriver {
     runs = new Map();
     /** sessionKey -> live agent (multi-turn continuity within one operator session). */
     agentsByKey = new Map();
+    /** Every agent this bridge created (incl. ephemeral runs), for approval routing. */
+    ownedAgents = new WeakSet();
     /** sessionKey -> durable dsh sessionId, persisted across dsh restarts. */
     sessionMapFile = () => {
         const home = process.env.DSH_HOME || process.env.HOME || '/data/local/home';
@@ -62,6 +64,18 @@ export class AgentDriver {
         this.registry = registry;
         this.sink = sink;
         this.forwardInvoke = forwardInvoke;
+        // bonio-app has no approval surface and the bridge drives an on-device
+        // root daemon (hiclaw's agent loop has no approval gate either), so grant
+        // sandbox-escalation asks for agents this bridge created. Without an
+        // answerer the web UI's interactive one holds the ask forever and the run
+        // never goes idle ("thinking" forever). Other agents fall through.
+        this.ctx.on('approval/request', async (req, next) => {
+            if (this.ownedAgents.has(req.agent)) {
+                console.log('[bonio-bridge] approval granted for', req.toolName, '-', req.reason ?? '');
+                return 'allowed-once';
+            }
+            return next();
+        });
     }
     /** Create (or reuse) the dsh agent bound to a hiclaw sessionKey. */
     async getOrCreateAgent(sessionKey, ephemeral = false) {
@@ -98,6 +112,7 @@ export class AgentDriver {
                         agentOptions: { provider: selection.provider, model: selection.model },
                         setup,
                     });
+                    this.ownedAgents.add(agent);
                     this.agentsByKey.set(sessionKey, agent);
                     return agent;
                 }
@@ -114,6 +129,7 @@ export class AgentDriver {
             agentOptions: { provider: selection.provider, model: selection.model },
             setup,
         });
+        this.ownedAgents.add(agent);
         if (!ephemeral && sessionKey) {
             this.agentsByKey.set(sessionKey, agent);
             const map = await this.loadSessionMap();

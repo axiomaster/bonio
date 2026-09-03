@@ -132,6 +132,8 @@ log "Installing HOME-aware dsh launcher (replaces the npm symlink)"
 #!/bin/sh
 # DeepSeek Harness launcher for HarmonyOS/OpenHarmony (musl).
 export HOME=\"\${DSH_HOME:-$DEVICE_HOME}\"
+# Do NOT add anco_hmos/chipset-sdk paths here: they shadow system libs and
+# break native /system binaries (cli_tool suite) spawned by dsh agents.
 export LD_LIBRARY_PATH=$NODE_PREFIX/lib
 exec $NODE_BIN --expose-internals $DSH_DIR/lib/bin.js \"\$@\"
 EOF

@@ -2,6 +2,9 @@
 # dsh bonio 常驻守护脚本：确保 dsh --profile bonio 始终运行。
 # 由 tools/deploy-bonio-bridge-ohos.sh 推送到设备 /data/local/bin/。
 export HOME=/data/local/home
+# Keep this free of anco_hmos/chipset-sdk entries: they shadow system libs and
+# break native /system binaries (cli_tool) with symbol relocation errors. Plain
+# /usr/local/lib lets the loader fall back to the correct system defaults.
 export LD_LIBRARY_PATH=/usr/local/lib
 LOG=/data/local/dsh-daemon.log
 PIDFILE=/data/local/dsh-daemon.pid
