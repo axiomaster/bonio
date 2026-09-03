@@ -239,7 +239,7 @@ export struct ChatTab {
         }
         .scrollable(ScrollDirection.Horizontal)
         .scrollBar(BarState.Off)
-        .constraintSize({ maxWidth: 140 })
+        .layoutWeight(1)
         .margin({ left: 6 })
 
         Blank()
@@ -590,8 +590,8 @@ export struct ChatTab {
           }
           .padding({ left: 14, right: 14, top: 10, bottom: 10 })
           .borderRadius(16)
-          .backgroundColor(Color.Transparent)
-          .constraintSize({ maxWidth: '92%' })
+          .backgroundColor('#E8ECF0')
+          .constraintSize({ maxWidth: '85%' })
           Blank()
         }
         .width('100%')
