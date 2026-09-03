@@ -1,0 +1,34 @@
+dsh-plugins/bonio-bridge/test/one-shot.mjs
+  s_65a1faaab12715::t_63d069d5e45b36 30-35
+  s_65a1faaab12715::t_3cae102c205c74 16
+dsh-plugins/bonio-bridge/src/driver.ts
+  s_65a1faaab12715::t_4d461d238a62d2 291
+  s_65a1faaab12715::t_ffd6e23bd65c2d 274
+  s_65a1faaab12715::t_c12a74f8089aea 119-221,223-226,228-234,587
+  s_65a1faaab12715::t_fd889afe25e13f 471,485
+  s_65a1faaab12715::t_0888cf86b2c3c3 43-50,57-64
+  s_65a1faaab12715::t_1239dad1122f44 222,227
+  s_65a1faaab12715::t_7eedfbcf556559 569,575-585
+  s_65a1faaab12715::t_990e0874cf46c6 429-442,586
+  s_65a1faaab12715::t_221d26370bde55 558
+  s_65a1faaab12715::t_5795b6587ab65e 588
+dsh-plugins/bonio-bridge/build/driver.js
+  s_65a1faaab12715::t_e305f9e1abb871 22-29,87-206,244,262,400-412,433-434,448-449,527,538,543-556
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "7849a9a4a30b05b0d0aaae7c3356fd58b947286b",
+  "prompts": {},
+  "sessions": {
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "glm-5.3"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 4
+    }
+  }
+}
