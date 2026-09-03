@@ -1,0 +1,20 @@
+harmonyos/entry/src/main/ets/pages/ChatTab.ets
+  s_65a1faaab12715::t_6115eef584d4d7 242,593-594
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "299ddcaa740b542230cb8a4d73cc63000efd2b22",
+  "prompts": {},
+  "sessions": {
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "unknown"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 0
+    }
+  }
+}
