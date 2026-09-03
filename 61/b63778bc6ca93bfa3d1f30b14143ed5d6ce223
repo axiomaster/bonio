@@ -1,0 +1,35 @@
+dsh-plugins/bonio-bridge/test/one-shot.mjs
+  h_de08bd40967a17 1-67
+dsh-plugins/bonio-bridge/src/driver.ts
+  s_65a1faaab12715::t_fa84d3acd16715 6-7,47-48,90-103,141,157
+tools/deploy-bonio-bridge-ohos.sh
+  s_65a1faaab12715::t_fa84d3acd16715 96-98
+tools/dsh-daemon.sh
+  s_65a1faaab12715::t_fa84d3acd16715 5-7
+tools/deploy-node-ohos.sh
+  s_65a1faaab12715::t_fa84d3acd16715 135-136
+dsh-plugins/bonio-bridge/build/driver.js
+  s_65a1faaab12715::t_60ea0b976b9595 20-21,67-78,115,132
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "61b63778bc6ca93bfa3d1f30b14143ed5d6ce223",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  },
+  "sessions": {
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "glm-5.3"
+      },
+      "human_author": null,
+      "total_deletions": 1
+    }
+  }
+}
