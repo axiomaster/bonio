@@ -1,0 +1,22 @@
+.gitignore
+  s_65a1faaab12715::t_ac57f34803a255 40-42
+dsh-plugins/bonio-bridge/package-lock.json
+  s_65a1faaab12715::t_06f7fc7d182048 1-316
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "d9446227ae35b07f565d7ad28371cc8ec86c7274",
+  "prompts": {},
+  "sessions": {
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "glm-5.3"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 0
+    }
+  }
+}
