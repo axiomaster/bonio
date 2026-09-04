@@ -37,3 +37,6 @@ server/bin/
 # Release packages
 release/
 hapsigner
+
+# Node (dsh plugins)
+dsh-plugins/*/node_modules/
