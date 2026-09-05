@@ -424,8 +424,11 @@ export class AgentDriver {
             }
             // Screen-awareness payloads are independently summarized and persisted
             // as memos. Reusing their DSH chat history makes raw UI trees grow until
-            // they exceed the model context window.
-            const agent = await this.getOrCreateAgent(params.sessionKey, params.sessionKey === 'system:companion-memory');
+            // they exceed the model context window. Magic-cue turns are the same:
+            // one-shot screen analysis, never persisted.
+            const ephemeral = params.sessionKey === 'system:companion-memory'
+                || params.sessionKey === 'system:magic-cue';
+            const agent = await this.getOrCreateAgent(params.sessionKey, ephemeral);
             if (!agent) {
                 throw new Error('dsh agent services unavailable');
             }
@@ -569,12 +572,12 @@ export class AgentDriver {
         const bridge = this;
         const def = defineTool({
             name: 'bonio_node_invoke',
-            description: 'Invoke a device capability on the companion bonio-app node session (camera, screen capture, location, sms, canvas, input typing, system notifications, calendar, contacts, and similar device commands). Returns the device result payload.',
+            description: 'Invoke a device capability on the companion bonio-app node session. Returns the device result payload.',
             parameters: {
                 command: {
                     type: 'string',
                     required: true,
-                    description: 'Device command name, e.g. camera.snap, screen.capture, sms.send, location.get, canvas.present, input.type, system.notify, calendar.events, contacts.search.',
+                    description: 'Device command name. Available: contacts.search {query,limit} (address-book lookup), calendar.events {fromTs,toTs,titleQuery,limit} (calendar events), screen.context (structured on-screen text), screen.record, camera.snap, camera.clip, location.get, canvas.present/navigate/hide.',
                 },
                 arguments: { type: 'object', additionalProperties: true, description: 'Command arguments as a JSON object, e.g. {"text":"hello"} for input.type.' },
                 timeoutMs: { type: 'number', description: 'Timeout in milliseconds; default 300000.' },
@@ -636,8 +639,11 @@ export class AgentDriver {
         })));
         disposers.push(register(defineTool({
             name: 'memo_list',
-            description: 'List saved memos/notes. Returns recent memos with title, content, and timestamp.',
-            parameters: { limit: { type: 'number', description: 'Max number of memos to return; default 20.' } },
+            description: 'List saved memos/notes (Bonio memories captured from the screen). Pass query to filter by keywords; every whitespace-separated token must match. Returns recent memos with title, content, and timestamp.',
+            parameters: {
+                limit: { type: 'number', description: 'Max number of memos to return; default 20.' },
+                query: { type: 'string', description: "Keyword filter, e.g. '瑞幸 电话'." },
+            },
             output: {
                 schema: { type: 'object', additionalProperties: true },
                 render(args, value) {
@@ -653,7 +659,7 @@ export class AgentDriver {
                 },
             },
             async execute(args, exec) {
-                const memos = await listMemos(args?.limit ?? 20);
+                const memos = await listMemos(args?.limit ?? 20, typeof args?.query === 'string' && args.query ? args.query : undefined);
                 // Keep tool output lossless-JSON: memo objects may contain optional
                 // undefined fields and large image data intended only for the UI.
                 const summaries = memos.map((memo) => {

@@ -169,7 +169,7 @@ export async function saveMemo(input) {
     await writeMemo(memo);
     return memo;
 }
-export async function listMemos(limit = 100) {
+export async function listMemos(limit = 100, query) {
     await migrateLegacyMemos();
     let entries = [];
     try {
@@ -178,11 +178,22 @@ export async function listMemos(limit = 100) {
     catch {
         return [];
     }
+    const needle = typeof query === 'string' ? query.trim().toLowerCase() : '';
     const memos = [];
     for (const entry of entries) {
         const memo = await readMemo(entry, false);
-        if (memo)
-            memos.push(memo);
+        if (!memo)
+            continue;
+        if (needle) {
+            const haystack = [memo.title, memo.content, ...(memo.tags ?? []), memo.pageTitle ?? '']
+                .join('\n').toLowerCase();
+            // Split the query on whitespace; every token must match somewhere
+            // (title/content/tags), so "瑞幸 电话" finds memos containing both.
+            const tokens = needle.split(/\s+/).filter(Boolean);
+            if (!tokens.every((token) => haystack.includes(token)))
+                continue;
+        }
+        memos.push(memo);
     }
     return memos.sort((a, b) => b.createdAt - a.createdAt).slice(0, Math.max(1, Math.min(limit, 200)));
 }

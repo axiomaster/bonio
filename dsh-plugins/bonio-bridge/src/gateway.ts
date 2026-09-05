@@ -18,6 +18,7 @@ import {
   getChannelConfig, getWechatBinding, setWechatBinding, disableWechat,
   fetchWechatQrCode, pollWechatQrStatus,
 } from './channel_store.js';
+import { injectAndSend, openApp } from './inject.js';
 
 const DEFAULT_PORT = 10724;
 const INVOKE_TIMEOUT_MS = 300_000; // 5 min, mirror hiclaw tool call timeout
@@ -329,7 +330,8 @@ export function startGateway(
       if (!requireAuth()) return send(resErr(frame.id, 'AUTH_REQUIRED', 'connect first'));
       const params = (frame.params ?? {}) as Record<string, unknown>;
       const rawLimit = typeof params.limit === 'number' ? params.limit : 100;
-      const memos = await listMemos(rawLimit);
+      const query = typeof params.query === 'string' && params.query ? params.query : undefined;
+      const memos = await listMemos(rawLimit, query);
       send(resOk(frame.id, { memos, total: memos.length }));
     };
 
@@ -391,6 +393,40 @@ export function startGateway(
       send(resOk(frame.id, { received: true }));
     };
 
+    // Magic Cue: type `text` into the chat app's input box and tap send.
+    // inputX/Y = pre-keyboard input center; sendX/Y = learned send point
+    // (omitted on first use — the bridge discovers it once and returns it
+    // so the app can cache it; later calls are a fixed 3-tap sequence).
+    const handleCueInject = async (frame: ReqFrame): Promise<void> => {
+      if (!requireAuth()) return send(resErr(frame.id, 'AUTH_REQUIRED', 'connect first'));
+      const params = (frame.params ?? {}) as Record<string, unknown>;
+      const text = typeof params.text === 'string' ? params.text : '';
+      if (!text) return send(resErr(frame.id, 'BAD_PARAMS', 'missing text'));
+      const num = (v: unknown): number | undefined => typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+      const result = await injectAndSend({
+        text,
+        inputX: num(params.inputX),
+        inputY: num(params.inputY),
+        sendX: num(params.sendX),
+        sendY: num(params.sendY),
+        send: params.send === false ? false : true,
+      });
+      if (result.ok) send(resOk(frame.id, { ok: true, inputPoint: result.inputPoint, sendPoint: result.sendPoint }));
+      else send(resErr(frame.id, 'CUE_INJECT_FAILED', `${result.stage}: ${result.error ?? 'failed'}`));
+    };
+
+    // Magic Cue: launch an app (e.g. the system calendar) by bundle+ability.
+    const handleCueOpen = async (frame: ReqFrame): Promise<void> => {
+      if (!requireAuth()) return send(resErr(frame.id, 'AUTH_REQUIRED', 'connect first'));
+      const params = (frame.params ?? {}) as Record<string, unknown>;
+      const bundle = typeof params.bundle === 'string' ? params.bundle : '';
+      if (!bundle || !/^[A-Za-z0-9._]+$/.test(bundle)) return send(resErr(frame.id, 'BAD_PARAMS', 'missing/invalid bundle'));
+      const ability = typeof params.ability === 'string' && params.ability ? params.ability : undefined;
+      const result = await openApp(bundle, ability);
+      if (result.ok) send(resOk(frame.id, { ok: true }));
+      else send(resErr(frame.id, 'CUE_OPEN_FAILED', result.error ?? 'failed'));
+    };
+
     const handleConfigGet = (frame: ReqFrame): void => {
       send(resOk(frame.id, {
         default_model: 'deepseek',
@@ -424,6 +460,12 @@ export function startGateway(
           break;
         case 'node.event':
           handleNodeEvent(req);
+          break;
+        case 'cue.inject':
+          void handleCueInject(req);
+          break;
+        case 'cue.open':
+          void handleCueOpen(req);
           break;
         case 'sessions.list':
           void handleSessionsList(req);

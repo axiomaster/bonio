@@ -29,6 +29,6 @@ export interface SaveMemoInput {
     originalImageMimeType?: string;
 }
 export declare function saveMemo(input: SaveMemoInput): Promise<BonioMemo>;
-export declare function listMemos(limit?: number): Promise<BonioMemo[]>;
+export declare function listMemos(limit?: number, query?: string): Promise<BonioMemo[]>;
 export declare function getMemo(id: string): Promise<BonioMemo | null>;
 export declare function deleteMemo(id: string): Promise<boolean>;
