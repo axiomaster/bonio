@@ -1,0 +1,27 @@
+docs/design/arch/magic-cue-arch-20260905.md
+  h_de08bd40967a17 153,155-163,166-174,176,205,212,224,233-250
+docs/design/prd/magic-cue-prd-20260905.md
+  h_de08bd40967a17 39-42,51,66,107,109-122,128,154,160
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "465eb33fccae74411beb05724c618c5d5aa134a6",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  },
+  "sessions": {
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 36
+    }
+  }
+}
