@@ -164,6 +164,14 @@ export class SecurePrefs {
     this.putSyncValue('avatar.skin', skin === 'kun' ? 'kun' : 'cat');
   }
 
+  public getFloatingWindowEnabled(): boolean {
+    return this.getSyncValue('avatar.floatingWindowEnabled', true);
+  }
+
+  public setFloatingWindowEnabled(value: boolean): void {
+    this.putSyncValue('avatar.floatingWindowEnabled', value);
+  }
+
   public setAvatarLastMemoryAt(timestampMs: number): void {
     this.putSyncValue('avatar.lastMemoryAt', timestampMs);
   }

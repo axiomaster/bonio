@@ -89,15 +89,19 @@ export default class EntryAbility extends UIAbility {
       hilog.info(DOMAIN, 'testTag', 'Succeeded in loading the content.');
 
       // DSH refactor: the float window is the global avatar host — show it on
-      // startup (system_core SYSTEM_FLOAT_WINDOW ACL is granted at install).
-      setTimeout(() => {
-        FloatWindowManager.getInstance().showFloatWindow().then((shown: boolean) => {
-          hilog.info(DOMAIN, 'testTag', 'Auto float window shown: %{public}s', String(shown));
-        }).catch((e: Error) => {
-          hilog.error(DOMAIN, 'testTag', 'Auto float window failed: %{public}s', e instanceof Error ? e.message : String(e));
-        });
-      }, 800);
-
+      // startup if enabled by user preference (defaults to true).
+      const shouldShowFloat = SecurePrefs.getInstance().getFloatingWindowEnabled();
+      if (shouldShowFloat) {
+        setTimeout(() => {
+          FloatWindowManager.getInstance().showFloatWindow().then((shown: boolean) => {
+            hilog.info(DOMAIN, 'testTag', 'Auto float window shown: %{public}s', String(shown));
+          }).catch((e: Error) => {
+            hilog.error(DOMAIN, 'testTag', 'Auto float window failed: %{public}s', e instanceof Error ? e.message : String(e));
+          });
+        }, 800);
+      } else {
+        hilog.info(DOMAIN, 'testTag', 'Auto float window skipped (disabled in preferences)');
+      }
     });
 
     // DSH refactor: auto-connect to the on-device dsh bonio-bridge so the

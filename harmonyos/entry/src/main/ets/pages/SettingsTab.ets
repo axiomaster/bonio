@@ -55,6 +55,11 @@ export struct SettingsTab {
       this.manualPort = prefs.getManualPort().toString() || '10724';
       this.manualToken = prefs.getGatewayToken() || '';
       this.manualTls = prefs.getManualTls();
+      this.isFloatingWindowEnabled = FloatWindowManager.getInstance().isWindowShowing() ||
+        prefs.getFloatingWindowEnabled();
+    } else {
+      this.isFloatingWindowEnabled = FloatWindowManager.getInstance().isWindowShowing() ||
+        SecurePrefs.getInstance().getFloatingWindowEnabled();
     }
   }
 
@@ -108,6 +113,10 @@ export struct SettingsTab {
       if (this.isConnecting && (this.isConnected || this.statusText.toLowerCase().includes('fail') || this.statusText.toLowerCase().includes('error'))) {
         this.isConnecting = false;
       }
+    }
+    const windowShowing = FloatWindowManager.getInstance().isWindowShowing();
+    if (this.isFloatingWindowEnabled !== windowShowing) {
+      this.isFloatingWindowEnabled = windowShowing;
     }
   }
 
@@ -235,19 +244,11 @@ export struct SettingsTab {
         // Floating Window Section
         ListItem() { this.SectionHeader("Floating Window") }
         ListItem() {
-          Row() {
-            Text("Enable Avatar Overlay")
-              .fontSize(14)
-              .fontColor('#333333')
-            Blank()
-            Toggle({ type: ToggleType.Switch, isOn: this.isFloatingWindowEnabled })
-              .selectedColor('#0A59F7')
-              .onChange((isOn: boolean) => {
-                this.toggleFloatingWindow(isOn);
-              })
-          }
-          .width('100%')
-          .padding({ left: 16, right: 16, top: 8, bottom: 8 })
+          this.ToggleRow("Enable Avatar Overlay", "Floating desktop pet and Magic Cue companion",
+            this.isFloatingWindowEnabled,
+            (isOn: boolean) => {
+              void this.toggleFloatingWindow(isOn);
+            })
         }
 
         // Permissions Section
@@ -424,14 +425,20 @@ export struct SettingsTab {
   }
 
   private async toggleFloatingWindow(isOn: boolean) {
+    if (this.isFloatingWindowEnabled === isOn && FloatWindowManager.getInstance().isWindowShowing() === isOn) {
+      return;
+    }
     this.isFloatingWindowEnabled = isOn;
+    (this.runtime?.prefs || SecurePrefs.getInstance()).setFloatingWindowEnabled(isOn);
     if (isOn) {
       const shown = await FloatWindowManager.getInstance().showFloatWindow();
       if (!shown) {
         this.isFloatingWindowEnabled = false;
+        (this.runtime?.prefs || SecurePrefs.getInstance()).setFloatingWindowEnabled(false);
       }
     } else {
       await FloatWindowManager.getInstance().hideFloatWindow();
+      this.isFloatingWindowEnabled = false;
     }
   }
 }
