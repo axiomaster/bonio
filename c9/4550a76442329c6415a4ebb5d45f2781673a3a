@@ -1,0 +1,16 @@
+skills/phone-use-harmonyos/scripts/deploy.sh
+  h_de08bd40967a17 6
+tools/deploy-dsh-skills-ohos.sh
+  h_de08bd40967a17 12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "c94550a76442329c6415a4ebb5d45f2781673a3a",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  }
+}
