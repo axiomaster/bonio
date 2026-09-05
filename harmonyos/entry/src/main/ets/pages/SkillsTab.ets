@@ -56,6 +56,53 @@ class ConfigSetParams {
 }
 
 @Component
+struct SettingToggleRow {
+  title: string = '';
+  subtitle: string = '';
+  @Prop @Watch('onPropChange') isOn: boolean = false;
+  @State private currentIsOn: boolean = false;
+  onChange: (isOn: boolean) => Promise<boolean> | void = (_isOn: boolean) => {};
+
+  aboutToAppear() {
+    this.currentIsOn = this.isOn;
+  }
+
+  private onPropChange() {
+    this.currentIsOn = this.isOn;
+  }
+
+  build() {
+    Row() {
+      Column() {
+        Text(this.title).fontSize(15).fontColor('#333333').fontWeight(FontWeight.Medium)
+        Text(this.subtitle).fontSize(12).fontColor('#999999').margin({ top: 2 })
+      }
+      .alignItems(HorizontalAlign.Start)
+      .layoutWeight(1)
+
+      Toggle({ type: ToggleType.Switch, isOn: this.currentIsOn })
+        .selectedColor('#0A59F7')
+        .onChange(async (value: boolean) => {
+          if (value !== this.currentIsOn) {
+            this.currentIsOn = value;
+            const res = this.onChange(value);
+            if (res instanceof Promise) {
+              const accepted = await res;
+              if (accepted !== value) {
+                this.currentIsOn = accepted;
+              }
+            }
+          }
+        })
+    }
+    .width('100%')
+    .height(56)
+    .padding({ left: 16, right: 16 })
+    .backgroundColor(Color.White)
+  }
+}
+
+@Component
 export struct SkillsTab {
   runtime: NodeRuntime | undefined = undefined;
 
@@ -77,10 +124,12 @@ export struct SkillsTab {
 
   // System Data Permissions state
   @State contactsEnabled: boolean = false;
+  @State smsEnabled: boolean = false;
+  @State notificationEnabled: boolean = true;
   @State calendarEnabled: boolean = false;
   @State memoEnabled: boolean = true;
-  @State galleryEnabled: boolean = true;
-  @State filesEnabled: boolean = true;
+  @State galleryEnabled: boolean = false;
+  @State filesEnabled: boolean = false;
 
   // WeChat iLink binding state
   @State wechatEnabled: boolean = false;
@@ -96,14 +145,27 @@ export struct SkillsTab {
 
   private statusTimer: number = -1;
 
-  aboutToAppear() {
+  async aboutToAppear() {
+    if (!this.runtime) {
+      this.runtime = AppStorage.get<NodeRuntime>('nodeRuntime');
+    }
+    const context = getContext(this) as common.UIAbilityContext;
+    try {
+      await SecurePrefs.getInstance().init(context);
+    } catch (_) {}
+
     this.avatarSkin = this.runtime?.prefs.getAvatarSkin() || SecurePrefs.getInstance().getAvatarSkin() || 'cat';
     this.refreshStatus();
-    this.statusTimer = setInterval(() => { this.refreshStatus(); }, 1000);
+    this.statusTimer = setInterval(() => {
+      if (!this.runtime) {
+        this.runtime = AppStorage.get<NodeRuntime>('nodeRuntime');
+      }
+      this.refreshStatus();
+    }, 1000);
     void this.loadSkills();
     void this.loadChannelConfig();
     void this.loadModelConfig();
-    void this.syncSystemDataPermissions();
+    await this.syncSystemDataPermissions();
   }
 
   aboutToDisappear() {
@@ -292,23 +354,43 @@ export struct SkillsTab {
   }
 
   private async syncSystemDataPermissions(): Promise<void> {
+    const context = getContext(this) as common.UIAbilityContext;
     const prefs = this.runtime?.prefs || SecurePrefs.getInstance();
-    this.contactsEnabled = prefs.getContactsEnabled();
-    this.calendarEnabled = prefs.getCalendarEnabled();
-    this.memoEnabled = prefs.getMemoEnabled();
-    this.galleryEnabled = prefs.getGalleryEnabled();
-    this.filesEnabled = prefs.getFilesEnabled();
+    try {
+      await prefs.init(context);
+    } catch (_) {}
 
     try {
+      this.notificationEnabled = prefs.getNotificationEnabled();
+      this.memoEnabled = prefs.getMemoEnabled();
+      this.smsEnabled = prefs.getSmsReadEnabled();
+      this.filesEnabled = prefs.getFilesEnabled();
+
       const atManager = abilityAccessCtrl.createAtManager();
-      const tokenID = (getContext(this) as common.UIAbilityContext).applicationInfo.accessTokenId;
+      const tokenID = context.applicationInfo.accessTokenId;
+
+      // 1. Contacts
       const contactsStatus = await atManager.checkAccessToken(tokenID, "ohos.permission.READ_CONTACTS");
-      if (contactsStatus === abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED) {
-        this.contactsEnabled = true;
+      const contactsGranted = (contactsStatus === abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED);
+      this.contactsEnabled = prefs.getContactsEnabled() && contactsGranted;
+      if (!contactsGranted && prefs.getContactsEnabled()) {
+        prefs.setContactsEnabled(false);
       }
+
+      // 2. Calendar
       const calendarStatus = await atManager.checkAccessToken(tokenID, "ohos.permission.READ_CALENDAR");
-      if (calendarStatus === abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED) {
-        this.calendarEnabled = true;
+      const calendarGranted = (calendarStatus === abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED);
+      this.calendarEnabled = prefs.getCalendarEnabled() && calendarGranted;
+      if (!calendarGranted && prefs.getCalendarEnabled()) {
+        prefs.setCalendarEnabled(false);
+      }
+
+      // 3. Gallery
+      const galleryStatus = await atManager.checkAccessToken(tokenID, "ohos.permission.READ_IMAGEVIDEO");
+      const galleryGranted = (galleryStatus === abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED);
+      this.galleryEnabled = prefs.getGalleryEnabled() && galleryGranted;
+      if (!galleryGranted && prefs.getGalleryEnabled()) {
+        prefs.setGalleryEnabled(false);
       }
     } catch (e) {
       hilog.error(DOMAIN, 'SkillsTab', `syncSystemDataPermissions failed: ${e}`);
@@ -327,6 +409,23 @@ export struct SkillsTab {
       hilog.error(DOMAIN, 'SkillsTab', `Permission request failed: ${e}`);
     }
     return false;
+  }
+
+  private async handlePermissionToggle(
+    permission: Permissions,
+    isOn: boolean,
+    onResult: (granted: boolean) => void
+  ): Promise<boolean> {
+    if (isOn) {
+      const granted = await this.requestPermission(permission);
+      onResult(granted);
+      this.runtime?.refreshNodeCapabilities();
+      return granted;
+    } else {
+      onResult(false);
+      this.runtime?.refreshNodeCapabilities();
+      return false;
+    }
   }
 
   // ── WeChat iLink QR binding ──
@@ -845,25 +944,6 @@ export struct SkillsTab {
     .backgroundColor(Color.White)
   }
 
-  @Builder ToggleRow(title: string, subtitle: string, isOn: boolean, onChange: (isOn: boolean) => void) {
-    Row() {
-      Column() {
-        Text(title).fontSize(15).fontColor('#333333').fontWeight(FontWeight.Medium)
-        Text(subtitle).fontSize(12).fontColor('#999999').margin({ top: 2 })
-      }
-      .alignItems(HorizontalAlign.Start)
-      .layoutWeight(1)
-
-      Toggle({ type: ToggleType.Switch, isOn: isOn })
-        .selectedColor('#0A59F7')
-        .onChange(onChange)
-    }
-    .width('100%')
-    .height(56)
-    .padding({ left: 16, right: 16 })
-    .backgroundColor(Color.White)
-  }
-
   build() {
     Column() {
       List({ space: 8 }) {
@@ -947,50 +1027,109 @@ export struct SkillsTab {
         // 5. System Data Permissions Section
         ListItem() { this.SectionHeader('系统数据授权访问范围') }
         ListItem() {
-          this.ToggleRow('通讯录', '允许智能体读取联系人信息', this.contactsEnabled, async (isOn: boolean) => {
-            if (isOn) {
-              const granted = await this.requestPermission("ohos.permission.READ_CONTACTS" as Permissions);
-              this.contactsEnabled = granted;
-              (this.runtime?.prefs || SecurePrefs.getInstance()).setContactsEnabled(granted);
-            } else {
-              this.contactsEnabled = false;
-              (this.runtime?.prefs || SecurePrefs.getInstance()).setContactsEnabled(false);
+          SettingToggleRow({
+            title: '通讯录',
+            subtitle: '允许智能体读取联系人信息',
+            isOn: this.contactsEnabled,
+            onChange: async (isOn: boolean): Promise<boolean> => {
+              return await this.handlePermissionToggle("ohos.permission.READ_CONTACTS" as Permissions, isOn, (granted: boolean) => {
+                this.contactsEnabled = granted;
+                (this.runtime?.prefs || SecurePrefs.getInstance()).setContactsEnabled(granted);
+              });
             }
-            this.runtime?.refreshNodeCapabilities();
           })
         }
         ListItem() {
-          this.ToggleRow('日历', '允许智能体读取日程与日历', this.calendarEnabled, async (isOn: boolean) => {
-            if (isOn) {
-              const granted = await this.requestPermission("ohos.permission.READ_CALENDAR" as Permissions);
-              this.calendarEnabled = granted;
-              (this.runtime?.prefs || SecurePrefs.getInstance()).setCalendarEnabled(granted);
-            } else {
-              this.calendarEnabled = false;
-              (this.runtime?.prefs || SecurePrefs.getInstance()).setCalendarEnabled(false);
+          SettingToggleRow({
+            title: '短信',
+            subtitle: '允许智能体读取和检索短信内容',
+            isOn: this.smsEnabled,
+            onChange: async (isOn: boolean): Promise<boolean> => {
+              if (isOn) {
+                // 优先向系统请求权限弹窗；系统限制时通过 DSH root 数据库直接读取
+                const granted = await this.requestPermission("ohos.permission.READ_MESSAGES" as Permissions);
+                this.smsEnabled = true;
+                (this.runtime?.prefs || SecurePrefs.getInstance()).setSmsReadEnabled(true);
+                this.runtime?.refreshNodeCapabilities();
+                return true;
+              } else {
+                this.smsEnabled = false;
+                (this.runtime?.prefs || SecurePrefs.getInstance()).setSmsReadEnabled(false);
+                this.runtime?.refreshNodeCapabilities();
+                return false;
+              }
             }
-            this.runtime?.refreshNodeCapabilities();
           })
         }
         ListItem() {
-          this.ToggleRow('备忘录', '允许智能体读取和记录便签备忘', this.memoEnabled, (isOn: boolean) => {
-            this.memoEnabled = isOn;
-            (this.runtime?.prefs || SecurePrefs.getInstance()).setMemoEnabled(isOn);
-            this.runtime?.refreshNodeCapabilities();
+          SettingToggleRow({
+            title: '通知',
+            subtitle: '允许智能体感知各应用即时通知',
+            isOn: this.notificationEnabled,
+            onChange: (isOn: boolean) => {
+              this.notificationEnabled = isOn;
+              (this.runtime?.prefs || SecurePrefs.getInstance()).setNotificationEnabled(isOn);
+              this.runtime?.refreshNodeCapabilities();
+            }
           })
         }
         ListItem() {
-          this.ToggleRow('图库', '允许智能体读取相册与图片媒体', this.galleryEnabled, (isOn: boolean) => {
-            this.galleryEnabled = isOn;
-            (this.runtime?.prefs || SecurePrefs.getInstance()).setGalleryEnabled(isOn);
-            this.runtime?.refreshNodeCapabilities();
+          SettingToggleRow({
+            title: '日历',
+            subtitle: '允许智能体读取日程与日历',
+            isOn: this.calendarEnabled,
+            onChange: async (isOn: boolean): Promise<boolean> => {
+              return await this.handlePermissionToggle("ohos.permission.READ_CALENDAR" as Permissions, isOn, (granted: boolean) => {
+                this.calendarEnabled = granted;
+                (this.runtime?.prefs || SecurePrefs.getInstance()).setCalendarEnabled(granted);
+              });
+            }
           })
         }
         ListItem() {
-          this.ToggleRow('文管', '允许智能体访问文档与本地文件', this.filesEnabled, (isOn: boolean) => {
-            this.filesEnabled = isOn;
-            (this.runtime?.prefs || SecurePrefs.getInstance()).setFilesEnabled(isOn);
-            this.runtime?.refreshNodeCapabilities();
+          SettingToggleRow({
+            title: '备忘录',
+            subtitle: '允许智能体读取和记录便签备忘',
+            isOn: this.memoEnabled,
+            onChange: (isOn: boolean) => {
+              this.memoEnabled = isOn;
+              (this.runtime?.prefs || SecurePrefs.getInstance()).setMemoEnabled(isOn);
+              this.runtime?.refreshNodeCapabilities();
+            }
+          })
+        }
+        ListItem() {
+          SettingToggleRow({
+            title: '图库',
+            subtitle: '允许智能体读取相册与图片媒体',
+            isOn: this.galleryEnabled,
+            onChange: async (isOn: boolean): Promise<boolean> => {
+              return await this.handlePermissionToggle("ohos.permission.READ_IMAGEVIDEO" as Permissions, isOn, (granted: boolean) => {
+                this.galleryEnabled = granted;
+                (this.runtime?.prefs || SecurePrefs.getInstance()).setGalleryEnabled(granted);
+              });
+            }
+          })
+        }
+        ListItem() {
+          SettingToggleRow({
+            title: '文管',
+            subtitle: '允许智能体访问文档与本地文件',
+            isOn: this.filesEnabled,
+            onChange: async (isOn: boolean): Promise<boolean> => {
+              if (isOn) {
+                const granted = await this.requestPermission("ohos.permission.READ_WRITE_DOCUMENTS_DIRECTORY" as Permissions);
+                this.filesEnabled = true;
+                (this.runtime?.prefs || SecurePrefs.getInstance()).setFilesEnabled(true);
+                this.runtime?.refreshNodeCapabilities();
+                return true;
+              } else {
+                this.filesEnabled = false;
+                (this.runtime?.prefs || SecurePrefs.getInstance()).setFilesEnabled(false);
+                this.runtime?.refreshNodeCapabilities();
+                return false;
+              }
+            }
           })
         }
       }

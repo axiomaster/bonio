@@ -13,7 +13,7 @@ struct MainPage {
   @State serverName: string = '';
   @State statusText: string = 'Offline';
 
-  private runtime: NodeRuntime | undefined = undefined;
+  @State runtime: NodeRuntime | undefined = undefined;
   private statusTimer: number = -1;
   private controller: TabsController = new TabsController();
 

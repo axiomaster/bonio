@@ -21,11 +21,16 @@
             "ohos.permission.CAPTURE_SCREEN",
             "ohos.permission.GET_SCREEN_CONTENT",
             "ohos.permission.SIMULATE_USER_INPUT",
-            "ohos.permission.NOTIFICATION_CONTROLLER"
+            "ohos.permission.NOTIFICATION_CONTROLLER",
+            "ohos.permission.READ_MESSAGES",
+            "ohos.permission.READ_WRITE_DOCUMENTS_DIRECTORY"
         ]
     },
     "permissions": {
-        "restricted-permissions": []
+        "restricted-permissions": [
+            "ohos.permission.READ_MESSAGES",
+            "ohos.permission.READ_WRITE_DOCUMENTS_DIRECTORY"
+        ]
     },
     "issuer": "pki_internal"
 }

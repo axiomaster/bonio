@@ -22,7 +22,7 @@
     },
     {
       "name": "reason_sms",
-      "value": "Used to send SMS messages on command"
+      "value": "Used to read and search SMS messages for assistant chat"
     },
     {
       "name": "reason_camera",
@@ -51,6 +51,18 @@
     {
       "name": "reason_calendar",
       "value": "Used to look up your schedule when a chat asks about an event"
+    },
+    {
+      "name": "reason_imagevideo",
+      "value": "Used to access gallery photos and videos for assistant chat"
+    },
+    {
+      "name": "reason_documents",
+      "value": "Used to access local documents and files for assistant chat"
+    },
+    {
+      "name": "reason_search_service",
+      "value": "Used to access notes and todos from notepad service"
     }
   ]
 }

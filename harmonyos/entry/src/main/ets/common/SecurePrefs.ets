@@ -228,6 +228,22 @@ export class SecurePrefs {
     this.putSyncValue('magicCue.calendar.enabled', value);
   }
 
+  public getSmsReadEnabled(): boolean {
+    return this.getSyncValue('systemData.sms.enabled', false);
+  }
+
+  public setSmsReadEnabled(value: boolean): void {
+    this.putSyncValue('systemData.sms.enabled', value);
+  }
+
+  public getNotificationEnabled(): boolean {
+    return this.getSyncValue('systemData.notification.enabled', true);
+  }
+
+  public setNotificationEnabled(value: boolean): void {
+    this.putSyncValue('systemData.notification.enabled', value);
+  }
+
   public getMemoEnabled(): boolean {
     return this.getSyncValue('systemData.memo.enabled', true);
   }
@@ -237,7 +253,7 @@ export class SecurePrefs {
   }
 
   public getGalleryEnabled(): boolean {
-    return this.getSyncValue('systemData.gallery.enabled', true);
+    return this.getSyncValue('systemData.gallery.enabled', false);
   }
 
   public setGalleryEnabled(value: boolean): void {
@@ -245,7 +261,7 @@ export class SecurePrefs {
   }
 
   public getFilesEnabled(): boolean {
-    return this.getSyncValue('systemData.files.enabled', true);
+    return this.getSyncValue('systemData.files.enabled', false);
   }
 
   public setFilesEnabled(value: boolean): void {
