@@ -563,6 +563,7 @@ struct FloatWindowPage {
     try {
       if (!this.runtime) throw new Error('Bonio runtime is unavailable');
       const cues = await this.runtime.captureAvatarCues();
+      hilog.info(DOMAIN, TAG, 'magic cue resolved: count=%{public}d', cues.length);
       if (cues.length === 0) {
         // No in-chat question detected — silently degrade to the normal
         // double-tap memory capture so the feature is never a dead end.

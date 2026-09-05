@@ -47,38 +47,58 @@ export class ContactsHandlerImpl implements ContactsHandler {
 
     try {
       const all = await contact.queryContacts(this.context);
-      const needle = query.toLowerCase();
-      const hits: ContactHit[] = [];
+      let needle = query.trim().toLowerCase();
+      // Strip common query suffixes (e.g. "刘兴临的电话号码" -> "刘兴临")
+      const stripped = needle.replace(/(的)?(手机号码|电话号码|手机号|电话号|手机|电话|号码|联系方式|邮箱|微信)$/g, '').trim();
+      if (stripped.length > 0) {
+        needle = stripped;
+      }
+
+      const hitMap = new Map<string, ContactHit>();
       for (const c of all) {
-        const name = c.name?.fullName ?? '';
-        const given = c.name?.givenName ?? '';
-        const family = c.name?.familyName ?? '';
+        const name = (c.name?.fullName ?? '').trim();
+        const given = (c.name?.givenName ?? '').trim();
+        const family = (c.name?.familyName ?? '').trim();
         const givenPhonetic = (c.name?.givenNamePhonetic ?? '').toLowerCase();
         const familyPhonetic = (c.name?.familyNamePhonetic ?? '').toLowerCase();
         const haystack = `${name} ${given} ${family}`.toLowerCase();
         const phonetic = `${givenPhonetic} ${familyPhonetic}`;
         const matches = haystack.includes(needle)
-          || name.toLowerCase().startsWith(needle)
-          || given.toLowerCase().startsWith(needle)
-          || phonetic.includes(needle);
+          || (name.length > 0 && name.toLowerCase().startsWith(needle))
+          || (given.length > 0 && given.toLowerCase().startsWith(needle))
+          || (needle.length >= 2 && phonetic.includes(needle));
         if (!matches) continue;
 
-        const phones: string[] = [];
-        for (const p of c.phoneNumbers ?? []) {
-          if (p.phoneNumber && !phones.includes(p.phoneNumber)) phones.push(p.phoneNumber);
+        const contactName = name || (family + given) || '未命名';
+        let hit = hitMap.get(contactName);
+        if (!hit) {
+          hit = { name: contactName, phones: [] };
+          hitMap.set(contactName, hit);
         }
-        const emails: string[] = [];
-        for (const e of c.emails ?? []) {
-          if (e.email && !emails.includes(e.email)) emails.push(e.email);
-        }
-        const org = c.organization?.name ?? undefined;
 
-        const hit: ContactHit = { name: name || '未命名', phones };
-        if (org) hit.org = org;
-        if (emails.length > 0) hit.emails = emails;
-        hits.push(hit);
-        if (hits.length >= Math.max(1, Math.min(limit, 20))) break;
+        for (const p of c.phoneNumbers ?? []) {
+          if (p.phoneNumber && !hit.phones.includes(p.phoneNumber)) {
+            hit.phones.push(p.phoneNumber);
+          }
+        }
+        for (const e of c.emails ?? []) {
+          if (e.email) {
+            if (!hit.emails) hit.emails = [];
+            if (!hit.emails.includes(e.email)) hit.emails.push(e.email);
+          }
+        }
+        if (!hit.org && c.organization?.name) {
+          hit.org = c.organization.name;
+        }
       }
+
+      const hits: ContactHit[] = [];
+      const maxHits = Math.max(1, Math.min(limit, 20));
+      hitMap.forEach((hit: ContactHit) => {
+        if (hits.length < maxHits) {
+          hits.push(hit);
+        }
+      });
 
       const payload: ContactsPayload = { contacts: hits, total: hits.length };
       return { ok: true, payloadJson: JSON.stringify(payload) };

@@ -5,7 +5,7 @@ import { SessionId } from '@deepseek-ai/dsh-session';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { listMemos, saveMemo } from './memo_store.js';
-export const INVOKE_TIMEOUT_MS = 300_000;
+export const INVOKE_TIMEOUT_MS = 300000;
 function textContent(text) {
     return [{ type: 'text', text }];
 }
@@ -189,7 +189,7 @@ export class AgentDriver {
         return new Promise((resolve, reject) => {
             let done = false;
             const onAbort = () => { finish(); reject(new Error('ask_user_question was aborted')); };
-            const timer = setTimeout(() => { finish(); reject(new Error('ask_user_question timed out waiting for the user')); }, 10 * 60_000);
+            const timer = setTimeout(() => { finish(); reject(new Error('ask_user_question timed out waiting for the user')); }, 10 * 60000);
             request.signal?.addEventListener?.('abort', onAbort, { once: true });
             function finish() {
                 if (done)

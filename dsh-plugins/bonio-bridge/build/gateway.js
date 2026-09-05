@@ -12,8 +12,8 @@ import { listSkills, setSkillEnabled } from './skills_store.js';
 import { getChannelConfig, setWechatBinding, disableWechat, fetchWechatQrCode, pollWechatQrStatus, } from './channel_store.js';
 import { injectAndSend, openApp } from './inject.js';
 const DEFAULT_PORT = 10724;
-const INVOKE_TIMEOUT_MS = 300_000; // 5 min, mirror hiclaw tool call timeout
-const TICK_INTERVAL_MS = 30_000; // heartbeat, mirror hiclaw
+const INVOKE_TIMEOUT_MS = 300000; // 5 min, mirror hiclaw tool call timeout
+const TICK_INTERVAL_MS = 30000; // heartbeat, mirror hiclaw
 async function handleSkillsList(req, send) {
     try {
         const skills = await listSkills();
