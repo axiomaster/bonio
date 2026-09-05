@@ -150,17 +150,30 @@ sleep ~300ms
   （ohos-cli-tool skill 已验证的 shell 路径），封装为现有 `cue.inject` 同级的 `cue.open` RPC。
 - 跳转后胶囊组整体收起。
 
-### 3.7 权限与设置
+### 3.7 权限与设置（数据源授权，非功能开关）
 
-`module.json5` 新增：
-- `ohos.permission.READ_CONTACTS`（system_basic user_grant ACL）
-- `ohos.permission.READ_CALENDAR`（normal user_grant）
+**实现后的产品口径（2026-09-05 落地，与 PRD FR6 一致）：** Magic Cue 是默认功能（`magicCue.enabled` 默认 `true`，双击总是先跑 Magic Cue，无命中降级记忆），**Settings 不再有 Magic Cue 开关**。Settings `Permissions` 区新增两个**数据源 toggle**，只控制 Bonio 可读哪些个人数据：
+
+- **Contacts**（通讯录）→ 授权 `ohos.permission.READ_CONTACTS`；
+- **Calendar**（日历）→ 授权 `ohos.permission.READ_CALENDAR`；
+- Memo 为 Bonio 自有存储，无 toggle。
+
+`module.json5` requestPermissions 声明（两个源 + 跳日历所需后台拉起权限）：
+- `ohos.permission.READ_CONTACTS`（reason + usedScene: EntryAbility）
+- `ohos.permission.READ_CALENDAR`（reason + usedScene: EntryAbility）
 - `ohos.permission.START_ABILITIES_FROM_BACKGROUND`（system_basic system_grant ACL；悬浮窗点击跳转日历用，若走 bridge `aa start` 备选则不需要）
 
-设置页新增 Magic Cue 开关（`magicCue.enabled`，SecurePrefs，默认关）；开启时统一
-`requestPermissionsFromUser`。`EntryAbility` ACL 自检清单补两项。
-（`INJECT_INPUT_EVENT` 仅在 spike 选择 app 内注入备选方案时才加。）
+**权限级别红线（踩坑结论）**：`READ_CONTACTS`/`READ_CALENDAR` 是 **NORMAL 级 user_grant**，**绝不能写进签名 profile 的 `allowed-acls`**。写进去的后果：系统把它们当 ACL 静态授予——设置里看不到 toggle、`requestPermissionsFromUser` 返回 -1“无需请求”、底层 Contacts dataability 无授权记录导致 `contacts.search` 报 permission error。正确做法：保持普通 user_grant 声明，用户在 Settings 数据源 toggle 开启时经标准弹窗授权。
 
+**授权交互**：
+- toggle 从关→开：立即 `requestPermissionsFromUser`（逐个弹，一次一个）；拒绝则该源保持关并 toast 轻提示。
+- toggle 初始/刷新状态 = `checkAccessToken` 实际授权结果（用户在系统设置 revoke 后回 App 自动置灰）。
+- **EntryAbility 启动不请求任何 user_grant 权限**（曾自动弹 3 个窗，已移除）。
+- 授权状态落 SecurePrefs：`magicCue.contacts.enabled` / `magicCue.calendar.enabled`（默认 false），供 `ConnectionManager` 决定是否广播命令。
+
+**能力联动（agent 只见已授权数据源）**：`ConnectionManager.buildInvokeCommands()` 按各源 enabled 单独 push `contacts.search` / `calendar.events`；未授权源不广播 → dsh agent 查不到 → 该类型 cue 自动缺席，无需 app 端额外过滤。toggle 变更后调 `NodeRuntime.refreshNodeCapabilities()`（仅重连 node 会话）即时生效。
+
+**双击兜底**：Magic Cue 空结果 → `captureCues()` 静默调用原 `captureCurrentScreenMemory()` 记忆流程，不弹胶囊不报错。
 ## 4. 序列图（命中场景）
 
 ```
@@ -189,14 +202,14 @@ sleep ~300ms
 | R2 | 发送键位置（输入点偏移）因 app/键盘态不同而漂移 | 中 | 校准点含输入框点+发送点两点分别校准；默认值保守；失败不重试直接降级 |
 | R3 | MSDP 文本在微信聊天页的覆盖度（部分控件拿不到文本） | 中 | Spike 里实测微信；不足时降级附截图走视觉 |
 | R4 | 联系人/日历运行时授权被拒 | 低 | 明确引导+设置跳转，未授权时该类 cue 静默跳过 |
-| R5 | 误弹胶囊打扰 | 中 | 只响应"询问"句式；空结果不弹；12s 自动收起；总开关默认关 |
+| R5 | 误弹胶囊打扰 | 中 | 只响应“询问”句式；空结果不弹；12s 自动收起；Magic Cue 无开关（默认功能），数据源授权按需开启 |
 
 ## 6. 开发拆解与排期
 
 | 里程碑 | 内容 | 产出 | 预估 |
 |---|---|---|---|
 | M0 | **Spike**：真机验证 uitest 注入微信 + MSDP 微信文本覆盖度 | 结论记录进本文档 §5 | 0.5–1d |
-| M1 | `contacts.search` / `calendar.events` handler + 权限声明 + 设置开关 + 确认日历应用 bundleName（`bm dump -a`） | 真机可查（smoke-tool 验证） | 1–1.5d |
+| M1 | `contacts.search` / `calendar.events` handler + 权限声明 + **Settings 数据源 toggle（Contacts/Calendar，非 Magic Cue 开关）** + 确认日历应用 bundleName（`bm dump -a`） | 真机可查（smoke-tool 验证） | 1–1.5d |
 | M2 | magic-cue 会话 + prompt + memo query + 工具描述修正 | one-shot 脚本跑出正确 JSON | 1d |
 | M3 | 胶囊 UI + 窗口动态加宽 + side 判定 + 日历双胶囊（信息+跳转）+ 自动收起 | 真机可见可点、跳转胶囊可打开日历 | 1–1.5d |
 | M4 | `cue.inject` RPC + 注入主路径 + 降级路径 + 校准 | 端到端点击→发送 | 1–1.5d |
@@ -208,7 +221,7 @@ sleep ~300ms
 
 - M1/M2：`dsh-plugins/bonio-bridge/test/one-shot.mjs` 扩展 `magic-cue.mjs`（发屏幕样例文本，
   断言 JSON cues）；`smoke-tool.mjs` 直接调 `contacts.search`/`calendar.events`。
-- M3–M5：真机（5MQ0125716000138）手动 + `snapshot_display` 截图确认；微信双人实测三类询问。
+- M3–M5：真机（当前开发机 Mate 80 RS / SGU-AL10，原 5MQ0125716000138）手动 + `snapshot_display` 截图确认；微信双人实测三类询问。
 - 回归：双击记忆（`system:companion-memory`）与拖动 avatar 不受影响。
 
 ## 8. 后续版本（不在本次范围）
@@ -217,3 +230,21 @@ sleep ~300ms
 - 系统备忘录（root 变通或华为后续开放）
 - 短信源（等公开 API）
 - 胶囊长按看全文、多 cue 分页、按应用记忆校准点
+
+## 9. 实现状态（2026-09-05 真机落地）
+
+下述里程碑已在 Mate 80 RS（SGU-AL10）真机编译、system_core 签名、安装并验证：
+
+- **M0 注入 spike**：`/bin/uitest` 三连击注入（点输入框→输中文→点发送）验证可行；校准点由 bridge 学习后 app 缓存（`magicCue.inputPoint/sendPoint`）。
+- **M1 数据源 handler + 设置**：`ContactsHandlerImpl`（`contacts.search`，全量拉取本地模糊匹配）、`CalendarHandlerImpl`（`calendar.events`，默认 ±7 天、标题查询 ±90 天）。Settings `Permissions` 区落地 **Contacts / Calendar 数据源 toggle**（无 Magic Cue 开关）。
+- **M2 magic-cue 会话**：`MagicCueController`（`system:magic-cue` ephemeral chat.send + JSON cues 解析）、prompt 契约、`memo_list` query 过滤、`bonio_node_invoke` 工具描述与实际命令一致。
+- **M3 胶囊 UI**：`FloatWindowPage` 侧边胶囊条（按 avatar 左右半屏翻转）、日历双胶囊（信息 + 查看日历跳转）、12s 自动收起、窗口动态加宽/左移。
+- **M4 cue.inject / cue.open**：bridge `inject.ts`（布局发现 + uitest 注入）、`gateway.ts` `cue.inject`/`cue.open` RPC、降级复制路径。
+- **M5 打磨 + 权限交互修正（本次提交）**：
+  - Magic Cue 定为**默认功能**：`magicCue.enabled` 默认 `true`，双击总是先跑 Magic Cue，无命中**静默降级为原记忆流程**；移除 Settings 里的 Magic Cue 开关。
+  - Settings 展示**数据源授权项**（Contacts/Calendar），开启时标准 user_grant 弹窗；**EntryAbility 移除启动自动授权**（启动零弹窗）。
+  - **权限级别修正**：READ_CONTACTS/READ_CALENDAR 移出签名 profile allowed-acls（NORMAL user_grant 应显示 toggle 并走弹窗；曾因 ACL 化导致设置无 toggle、dataability 无授权记录）。
+  - 命令广播按数据源授权联动（`refreshNodeCapabilities()` 重连 node 即时生效），未授权数据源 agent 不可见、该类 cue 自动缺席。
+- **端到端实测**：双击 → SmartEdge 取屏 → dsh magic-cue 会话 → `{"cues":[]}`（无询问）→ 降级记忆；授权后 `contacts.search` 返回真实联系人（测试设备含 5 位姓“张”），`calendar.events` 正常查询（当前无事件返回空）。
+
+**遗留**：`cue.inject` 点击“发送”的端到端真机验证尚未在真实聊天应用完成（架构文档 R1 风险项）；微信输入框文本注入在 inject.ts 已按 spike 结论实现，待双人实测。

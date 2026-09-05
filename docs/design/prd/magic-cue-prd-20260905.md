@@ -36,6 +36,10 @@ Google 官方评测中暴露的教训（我们直接吸收为设计约束）：
 | 备忘录来源 | Bonio 自己的 memo 存储；系统备忘录为后续扩展（当前无公开 API） |
 | 匹配引擎 | 云端 LLM，复用 dsh 链路（与现有双击识别一致） |
 | 点击胶囊行为 | 填入当前聊天输入框并发送（用户原始需求明确） |
+| **Magic Cue 定位（2026-09-05 补充确认）** | **默认功能，无功能开关**。双击 avatar 总是先跑 Magic Cue；没有命中时静默降级为原双击记忆流程，不让用户感知到“功能关掉/开起来” |
+| **设置页展示项（2026-09-05 补充确认）** | **不展示 Magic Cue 开关**；展示的是 Magic Cue 依赖的**数据源授权项**（联系人 Contacts / 日历 Calendar toggle）。Memo 是 Bonio 自有存储，无需授权，不展示 |
+| **授权交互（2026-09-05 补充确认）** | **标准 user_grant**：用户在 Settings 点开某数据源 toggle 时才弹对应授权框；**app 启动绝不自动弹窗**。数据源权限不进 ACL（NORMAL user_grant 必须在系统设置可见可 revoke） |
+| **未授权时的行为** | 数据源未授权 → 该类型不参与推荐（contacts.search / calendar.events 命令不广播给 agent），但 Magic Cue 其余数据源（如 memo）照常工作 |
 
 ## 3. 范围
 
@@ -44,7 +48,7 @@ Google 官方评测中暴露的教训（我们直接吸收为设计约束）：
 1. 双击触发识别 + 信息询问匹配（联系人 / 日历 / Bonio memo 三类）
 2. 侧边横条胶囊 UI（按 avatar 位置决定弹出方向）
 3. 点击胶囊 → 填入输入框 → 发送
-4. Magic Cue 开关（复用/新增设置项）与运行时权限引导
+4. 设置页的 **Magic Cue 数据源授权项**（Contacts / Calendar）与标准运行时授权引导
 
 ### 非目标（out of scope，V1 不做）
 
@@ -59,7 +63,7 @@ Google 官方评测中暴露的教训（我们直接吸收为设计约束）：
 ### FR1 触发
 
 - 双击 avatar（现有手势）触发一次 Magic Cue 流程。
-- 前置条件：屏幕感知开关开启（现有 `screenAwareness.enabled`）+ Magic Cue 开关开启 + 已连接 dsh。
+- 前置条件：屏幕感知开关开启（现有 `screenAwareness.enabled`）+ 已连接 dsh。Magic Cue 是默认功能，**无独立开关**；其推荐能力随 Settings 中数据源授权情况伸缩（见 FR6）。
 - 流程中 avatar 进入 thinking 状态，顶部提示"看看朋友在问什么…"。
 - 屏幕上没有信息询问时静默降级：走现有记忆流程（或仅提示"没发现需要的信息"），**不弹胶囊**。
 
@@ -100,16 +104,28 @@ Google 官方评测中暴露的教训（我们直接吸收为设计约束）：
 - 目标输入框位置：默认屏幕底部居中（微信等聊天应用输入栏的典型位置），提供一次性校准入口（用户长按胶囊 2s 进入校准模式，点选输入框位置）。
 - 点击**跳转胶囊**（"查看日历"）→ 打开系统日历应用（不注入、不发送）；打开后胶囊组收起。
 
-### FR6 设置与权限
+### FR6 设置与权限（数据源授权，非功能开关）
 
-- 新增 Magic Cue 开关（默认关闭；开启时引导授予联系人、日历权限）。
-- 首次触发时若权限缺失：气泡提示 + 跳设置引导，不做静默失败。
+**产品逻辑：** Magic Cue 是 Bonio 的默认能力（双击分析屏幕、命中询问时给答案），**没有“开/关 Magic Cue”的概念**。设置页权限区展示的是 Magic Cue 可选用的**数据源**——用户决定 Bonio 可以读哪些个人数据；不授权某个源，Magic Cue 就不推荐那一类，其余照常工作（例如只开联系人时，日历类询问静默不弹胶囊，联系人/记忆类不受影响）。
+
+- **设置项**：`Permissions` 区新增两个 toggle——
+  - **Contacts**（通讯录）：授权 `ohos.permission.READ_CONTACTS`（user_grant）；
+  - **Calendar**（日历）：授权 `ohos.permission.READ_CALENDAR`（user_grant）。
+  - 副标题均注明用途（“Magic Cue recommends … when the chat asks”）。
+  - Memo 无需授权（Bonio 自有存储），不设 toggle。
+- **授权交互（标准 user_grant，禁止启动弹窗）**：
+  - toggle **从关→开**时立即 `requestPermissionsFromUser` 弹授权框；拒绝则不开启该源并轻提示。
+  - toggle 状态 = 当前系统授权状态（系统设置里 revoke 后回 App 自动变灰）。
+  - **EntryAbility 不得在启动/冷启动时自动请求任何 user_grant 权限**。
+- **权限级别**：READ_CONTACTS / READ_CALENDAR 均为 **NORMAL 级 user_grant**，**不得写入签名 profile 的 allowed-acls**（否则系统按 ACL 静态授予、设置里无 toggle、底层 dataability 无授权记录——已踩坑，见架构文档 §3.7）。
+- **能力联动**：某数据源授权后才把对应命令（`contacts.search` / `calendar.events`）广播给 dsh agent；未授权不广播 → agent 查不到 → 该类型 cue 自动缺席。toggle 变更后重连 node 会话即时生效。
+- **双击兜底**：Magic Cue 无命中时静默降级为原双击记忆流程（非死路、不报错）。
 
 ## 5. 数据源可行性（调研结论）
 
 | 数据源 | 可行性 | API / 权限 | 备注 |
 |---|---|---|---|
-| 联系人 | ✅ | `@ohos.contact` queryContacts 等；`READ_CONTACTS`（system_basic, user_grant, ACL） | system_core 签名可声明，需运行时弹窗授权 |
+| 联系人 | ✅ | `@ohos.contact` queryContacts 等；`READ_CONTACTS`（**NORMAL 级 user_grant**，**不进 profile allowed-acls**，系统设置可见可 revoke） | 标准运行时弹窗授权（Settings 数据源 toggle 触发） |
 | 日历 | ✅ | `@ohos.calendarManager` getEvents；`READ_CALENDAR`（normal）；全量 `READ_WHOLE_CALENDAR`（system_basic ACL） | V1 先读本应用可见日历；需要全量再升权限 |
 | Bonio memo | ✅ | 现有 `memo.list` / `listMemos`，需加 query 参数 | 双击记忆的历史数据直接可用 |
 | 短信读取 | ❌ | 无公开 API（`READ_MESSAGES` 权限存在但无消费接口） | V1 放弃 |
@@ -135,7 +151,7 @@ Google 官方评测中暴露的教训（我们直接吸收为设计约束）：
 3. 胶囊弹出方向随 avatar 位置正确翻转（左/右各验证一次）。
 4. 点击信息胶囊后文本出现在聊天输入框并自动发送（主路径真机验证；降级路径可演示）。
 5. 无询问场景不弹胶囊，双击记忆功能回归正常。
-6. 权限未授/开关关闭时给出明确引导，无崩溃无静默失败。
+6. 数据源未授权时该类型不推荐且无崩溃无静默失败；无任何数据源授权时 Magic Cue 仍能工作（memo），双击降级记忆流程正常。
 7. 胶囊 12s 自动收起，不遮挡 avatar，不影响拖动 avatar。
 
 ## 9. 开放问题
