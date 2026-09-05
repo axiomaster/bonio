@@ -3,7 +3,6 @@ import { common, abilityAccessCtrl, Permissions } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { SecurePrefs } from '../common/SecurePrefs';
 import { LocationMode, VoiceWakeMode } from '../models/CommonModels';
-import { deviceInfo } from '@kit.BasicServicesKit';
 import { FloatWindowManager } from '../common/FloatWindowManager';
 
 const DOMAIN = 0x3D00;
@@ -29,8 +28,6 @@ export struct SettingsTab {
   @State cameraEnabled: boolean = false;
   @State screenRecordEnabled: boolean = false;
   @State screenAwarenessEnabled: boolean = false;
-  @State contactsEnabled: boolean = false;
-  @State calendarEnabled: boolean = false;
   @State serverName: string = '';
   @State remoteAddress: string = '';
 
@@ -85,13 +82,6 @@ export struct SettingsTab {
         this.cameraEnabled = false;
         this.runtime?.prefs.setCameraEnabled(false);
       }
-
-      // Magic Cue data sources: toggle state mirrors the actual grant. A user
-      // who revokes in system Settings flips the switch off here on next view.
-      const contactsStatus = await atManager.checkAccessToken(tokenID, "ohos.permission.READ_CONTACTS");
-      this.contactsEnabled = contactsStatus === abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED;
-      const calendarStatus = await atManager.checkAccessToken(tokenID, "ohos.permission.READ_CALENDAR");
-      this.calendarEnabled = calendarStatus === abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED;
     } catch (e) {
       hilog.error(0x3D00, 'SettingsTab', `syncWithSystemPermissions failed: ${e}`);
     }
@@ -235,12 +225,6 @@ export struct SettingsTab {
           .border({ width: 1, color: '#E0E0E0' })
         }
 
-        // Node Info Section
-        ListItem() { this.SectionHeader("Node Info") }
-        ListItem() { this.InfoRow("Device", `${deviceInfo.marketName || deviceInfo.productModel}`) }
-        ListItem() { this.InfoRow("Version", "1.0.0-dev") }
-        ListItem() { this.InfoRow("Instance ID", this.runtime?.prefs.getInstanceId() || 'Unknown') }
-
         // Floating Window Section
         ListItem() { this.SectionHeader("Floating Window") }
         ListItem() {
@@ -251,8 +235,8 @@ export struct SettingsTab {
             })
         }
 
-        // Permissions Section
-        ListItem() { this.SectionHeader("Permissions") }
+        // System Permissions Section
+        ListItem() { this.SectionHeader("System Permissions") }
         ListItem() {
           this.ToggleRow("Location", "GPS location sharing",
             this.locationMode !== LocationMode.Off,
@@ -310,7 +294,6 @@ export struct SettingsTab {
             this.screenRecordEnabled,
             async (enabled: boolean) => {
               if (enabled) {
-                // Screen recording often requires multiple permissions or special dialogs
                 const granted = await this.requestPermission("ohos.permission.MICROPHONE");
                 if (granted) {
                   this.screenRecordEnabled = true;
@@ -336,38 +319,6 @@ export struct SettingsTab {
               }
             })
         }
-        ListItem() {
-          this.ToggleRow("Contacts", "Magic Cue recommends contacts when the chat asks",
-            this.contactsEnabled,
-            async (enabled: boolean) => {
-              if (enabled) {
-                const granted = await this.requestPermission("ohos.permission.READ_CONTACTS" as Permissions);
-                this.contactsEnabled = granted;
-                this.runtime?.prefs.setContactsEnabled(granted);
-              } else {
-                this.contactsEnabled = false;
-                this.runtime?.prefs.setContactsEnabled(false);
-              }
-              // Re-advertise node commands so the agent sees/forgets contacts.search.
-              this.runtime?.refreshNodeCapabilities();
-            })
-        }
-        ListItem() {
-          this.ToggleRow("Calendar", "Magic Cue recommends calendar events when the chat asks",
-            this.calendarEnabled,
-            async (enabled: boolean) => {
-              if (enabled) {
-                const granted = await this.requestPermission("ohos.permission.READ_CALENDAR" as Permissions);
-                this.calendarEnabled = granted;
-                this.runtime?.prefs.setCalendarEnabled(granted);
-              } else {
-                this.calendarEnabled = false;
-                this.runtime?.prefs.setCalendarEnabled(false);
-              }
-              // Re-advertise node commands so the agent sees/forgets calendar.events.
-              this.runtime?.refreshNodeCapabilities();
-            })
-        }
       }
       .layoutWeight(1)
       .width('100%')
@@ -384,25 +335,6 @@ export struct SettingsTab {
       .fontWeight(FontWeight.Medium)
       .width('100%')
       .padding({ left: 16, top: 20, bottom: 6 })
-  }
-
-  @Builder InfoRow(label: string, value: string) {
-    Row() {
-      Text(label)
-        .fontSize(15)
-        .fontColor('#333333')
-        .width(100)
-      Text(value)
-        .fontSize(15)
-        .fontColor('#666666')
-        .layoutWeight(1)
-        .maxLines(1)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
-    }
-    .width('100%')
-    .height(44)
-    .padding({ left: 16, right: 16 })
-    .backgroundColor(Color.White)
   }
 
   @Builder ToggleRow(title: string, subtitle: string, isOn: boolean, onChange: (isOn: boolean) => void) {

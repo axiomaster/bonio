@@ -228,6 +228,46 @@ export class SecurePrefs {
     this.putSyncValue('magicCue.calendar.enabled', value);
   }
 
+  public getMemoEnabled(): boolean {
+    return this.getSyncValue('systemData.memo.enabled', true);
+  }
+
+  public setMemoEnabled(value: boolean): void {
+    this.putSyncValue('systemData.memo.enabled', value);
+  }
+
+  public getGalleryEnabled(): boolean {
+    return this.getSyncValue('systemData.gallery.enabled', true);
+  }
+
+  public setGalleryEnabled(value: boolean): void {
+    this.putSyncValue('systemData.gallery.enabled', value);
+  }
+
+  public getFilesEnabled(): boolean {
+    return this.getSyncValue('systemData.files.enabled', true);
+  }
+
+  public setFilesEnabled(value: boolean): void {
+    this.putSyncValue('systemData.files.enabled', value);
+  }
+
+  public getDefaultModel(): string {
+    return this.getSyncValue('model.defaultModel', 'glm-4.7');
+  }
+
+  public setDefaultModel(value: string): void {
+    this.putSyncValue('model.defaultModel', value);
+  }
+
+  public getCustomModels(): string {
+    return this.getSyncValue('model.customModels', '[]');
+  }
+
+  public setCustomModels(value: string): void {
+    this.putSyncValue('model.customModels', value);
+  }
+
   public getMagicCueInputPoint(): string {
     return this.getSyncValue('magicCue.inputPoint', '');
   }
