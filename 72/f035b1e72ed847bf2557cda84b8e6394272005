@@ -1,0 +1,35 @@
+harmonyos/entry/src/main/ets/common/SecurePrefs.ets
+  h_de08bd40967a17 231-246,256,264
+harmonyos/entry/src/main/ets/pages/MainPage.ets
+  h_de08bd40967a17 16
+harmonyos/entry/src/main/ets/pages/SkillsTab.ets
+  h_de08bd40967a17 58-104,127-128,131-132,148-156,159-164,168,357,359-361,364-368,370-372,374-377,379-380,382-393,414-430,1030-1072,1077-1085,1090-1098,1102-1111,1115-1132
+harmonyos/entry/src/main/module.json5
+  h_de08bd40967a17 101-133
+harmonyos/entry/src/main/resources/base/element/string.json
+  h_de08bd40967a17 25,54-65
+harmonyos/root_float_signing/msdpdemo-system-core-profile.json
+  h_de08bd40967a17 24-26,30-33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "72f035b1e72ed847bf2557cda84b8e6394272005",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  },
+  "sessions": {
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 36
+    }
+  }
+}
