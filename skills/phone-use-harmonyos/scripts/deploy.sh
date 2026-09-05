@@ -3,6 +3,7 @@
 # Usage: ./scripts/deploy.sh [path-to-binary]
 set -euo pipefail
 
+export HDC_SERVER_PORT="${HDC_SERVER_PORT:-8710}"
 HDC="${HDC:-/Users/ohci/tools/ohos-command-line-tools/sdk/default/openharmony/toolchains/hdc}"
 BIN="${1:-/Users/ohci/code/phone-use-harmonyos/build/bin/phone-use-harmonyos}"
 REMOTE=/data/local/bin/phone-use-harmonyos

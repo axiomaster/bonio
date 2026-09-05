@@ -9,6 +9,7 @@
 # ============================================================================
 set -euo pipefail
 
+export HDC_SERVER_PORT="${HDC_SERVER_PORT:-8710}"
 HDC="${HDC:-/Users/ohci/tools/ohos-command-line-tools/sdk/default/openharmony/toolchains/hdc}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
