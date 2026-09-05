@@ -1,0 +1,55 @@
+dsh-plugins/bonio-bridge/src/gateway.ts
+  s_65a1faaab12715::t_007808390a7927 464-469
+  s_65a1faaab12715::t_cf6ede3354c838 21
+  s_65a1faaab12715::t_5dbd2825bb6db5 333-334
+  s_65a1faaab12715::t_239662201d2298 396-413,415-429
+  s_65a1faaab12715::t_57d1012d2c5d70 414
+dsh-plugins/bonio-bridge/src/inject.ts
+  s_65a1faaab12715::t_ec947acbb2d417 1-5,13-30,35-39,45-78,116-117,133,136-137,150-151,158-171
+  s_65a1faaab12715::t_891ef8ed7f8801 6-12,31-34,43-44,139-149
+  s_65a1faaab12715::t_68779929e5d9f2 79-115
+  s_65a1faaab12715::t_5b5975ff38adb3 118-132,134-135,138,152-157
+  s_65a1faaab12715::t_0cf8fd950ac494 40-42
+dsh-plugins/bonio-bridge/src/driver.ts
+  s_65a1faaab12715::t_db5f8fa2a431fb 462-466
+  s_65a1faaab12715::t_82c7b4f058842a 669-673
+  s_65a1faaab12715::t_1b1cd3adc1346d 605,610
+  s_65a1faaab12715::t_11ad144aeecc1b 685
+  s_65a1faaab12715::t_c9a2b5e2f98e9a 686
+dsh-plugins/bonio-bridge/src/memo_store.ts
+  s_65a1faaab12715::t_452758ab511f6f 204,212,216-225
+dsh-plugins/bonio-bridge/test/magic-cue-e2e.mjs
+  s_65a1faaab12715::t_a908b8f542ba4f 1-55,61-64
+  s_65a1faaab12715::t_0dd946e62988fa 56-60
+dsh-plugins/bonio-bridge/build/driver.js
+  s_65a1faaab12715::t_6b2aba083b2c48 427-431,575,580,642-646,662
+dsh-plugins/bonio-bridge/build/gateway.js
+  s_65a1faaab12715::t_53fa245001f76e 13,270-271,334-373,407-412
+dsh-plugins/bonio-bridge/build/inject.d.ts
+  s_65a1faaab12715::t_ce940764ccda84 1-35
+dsh-plugins/bonio-bridge/build/inject.js
+  s_65a1faaab12715::t_26ce13145c8d62 1-155
+dsh-plugins/bonio-bridge/build/memo_store.d.ts
+  s_65a1faaab12715::t_6e09200b161a62 32
+dsh-plugins/bonio-bridge/build/memo_store.js
+  s_65a1faaab12715::t_5fc13d7940ff9e 172,181,185-196
+dsh-plugins/bonio-bridge/test/cue-rpc-test.mjs
+  s_65a1faaab12715::t_4224c4c1bae8d4 1-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "b347e96540e9c009d21044aed3679c9b4756f0a5",
+  "prompts": {},
+  "sessions": {
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 104
+    }
+  }
+}
