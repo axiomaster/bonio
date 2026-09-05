@@ -309,15 +309,15 @@ export struct ChatTab {
         Row() {
           // Thinking level chip (on LEFT)
           Button(`Thinking: ${this.thinkingLabel(this.thinkingLevel)}`)
-            .type(ButtonType.Normal)
+            .type(ButtonType.Capsule)
             .height(28)
-            .borderRadius(8)
+            .borderRadius(14)
             .fontSize(12)
             .fontWeight(FontWeight.Medium)
             .backgroundColor(Color.White)
             .fontColor('#666666')
-            .border({ width: 1, color: '#CCCCCC' })
-            .padding({ left: 8, right: 8 })
+            .border({ width: 1, color: '#CCCCCC', radius: 14 })
+            .padding({ left: 10, right: 10 })
             .bindMenu([
               { value: 'Off', action: () => { this.thinkingLevel = 'off'; this.runtime?.chatController?.setThinkingLevel('off'); } },
               { value: 'Low', action: () => { this.thinkingLevel = 'low'; this.runtime?.chatController?.setThinkingLevel('low'); } },
@@ -341,12 +341,12 @@ export struct ChatTab {
                   .fontColor('#E53935')
               }
             }
-            .type(ButtonType.Normal)
+            .type(ButtonType.Capsule)
             .height(28)
-            .borderRadius(8)
+            .borderRadius(14)
             .backgroundColor('#FFEBEE')
-            .border({ width: 1, color: '#FFCDD2' })
-            .padding({ left: 8, right: 8 })
+            .border({ width: 1, color: '#FFCDD2', radius: 14 })
+            .padding({ left: 10, right: 10 })
             .onClick(() => {
               this.runtime?.chatController?.abort();
             })
@@ -378,7 +378,7 @@ export struct ChatTab {
             .height(36)
             .borderRadius(12)
             .backgroundColor(Color.White)
-            .border({ width: 1, color: '#E0E0E0' })
+            .border({ width: 1, color: '#E0E0E0', radius: 12 })
             .fontSize(14)
             .padding({ left: 12, right: 12 })
             .onChange((val: string) => { this.inputText = val; })
@@ -401,7 +401,7 @@ export struct ChatTab {
           .type(ButtonType.Normal)
           .width(36)
           .height(36)
-          .borderRadius(8)
+          .borderRadius(12)
           .backgroundColor(this.inputText.trim().length > 0 && this.canSend() ? '#0A59F7' : '#E3F2FD')
           .margin({ left: 8 })
           .onClick(() => {
