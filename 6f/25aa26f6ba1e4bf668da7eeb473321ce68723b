@@ -1,0 +1,24 @@
+docs/design/prd/magic-cue-prd-20260905.md
+  s_65a1faaab12715::t_dcfb495ffc45e2 1-138
+docs/design/arch/magic-cue-arch-20260905.md
+  s_65a1faaab12715::t_6cc01764342a16 1-203
+docs/design/rr/magic-cue-20260905.md
+  s_65a1faaab12715::t_ba7e265a69380a 1-36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "6f25aa26f6ba1e4bf668da7eeb473321ce68723b",
+  "prompts": {},
+  "sessions": {
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "glm-5.3"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 0
+    }
+  }
+}
