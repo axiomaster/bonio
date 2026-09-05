@@ -191,7 +191,7 @@ export class SecurePrefs {
   }
 
   public getMagicCueEnabled(): boolean {
-    return this.getSyncValue('magicCue.enabled', false);
+    return this.getSyncValue('magicCue.enabled', true);
   }
 
   public setMagicCueEnabled(value: boolean): void {
