@@ -19,18 +19,21 @@ interface PendingInvoke {
 }
 
 export class SessionRegistry {
-  private operator: ClientSession | null = null;
+  private operators = new Map<string, ClientSession>();
   private node: ClientSession | null = null;
   private pendingInvokes = new Map<string, PendingInvoke>();
 
-  /** Attach a connection under a role; replaces any previous session of that role. */
+  /** Attach a connection under a role; multiple operators are supported. */
   attach(session: ClientSession): void {
-    if (session.role === 'operator') this.operator = session;
-    else this.node = session;
+    if (session.role === 'operator') {
+      this.operators.set(session.connId, session);
+    } else {
+      this.node = session;
+    }
   }
 
   detach(connId: string): void {
-    if (this.operator?.connId === connId) this.operator = null;
+    this.operators.delete(connId);
     if (this.node?.connId === connId) this.node = null;
     // Cancel invokes owned by this connection (they can only be node).
     if (this.node === null || this.node.connId !== connId) {
@@ -43,7 +46,8 @@ export class SessionRegistry {
   }
 
   getOperator(): ClientSession | null {
-    return this.operator;
+    const first = this.operators.values().next();
+    return first.done ? null : first.value;
   }
 
   getNode(): ClientSession | null {

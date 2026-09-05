@@ -3,19 +3,20 @@
  * and the pending node.invoke tool-call futures.
  */
 export class SessionRegistry {
-    operator = null;
+    operators = new Map();
     node = null;
     pendingInvokes = new Map();
-    /** Attach a connection under a role; replaces any previous session of that role. */
+    /** Attach a connection under a role; multiple operators are supported. */
     attach(session) {
-        if (session.role === 'operator')
-            this.operator = session;
-        else
+        if (session.role === 'operator') {
+            this.operators.set(session.connId, session);
+        }
+        else {
             this.node = session;
+        }
     }
     detach(connId) {
-        if (this.operator?.connId === connId)
-            this.operator = null;
+        this.operators.delete(connId);
         if (this.node?.connId === connId)
             this.node = null;
         // Cancel invokes owned by this connection (they can only be node).
@@ -28,7 +29,8 @@ export class SessionRegistry {
         }
     }
     getOperator() {
-        return this.operator;
+        const first = this.operators.values().next();
+        return first.done ? null : first.value;
     }
     getNode() {
         return this.node;

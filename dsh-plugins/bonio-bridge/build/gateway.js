@@ -12,8 +12,8 @@ import { listSkills, setSkillEnabled } from './skills_store.js';
 import { getChannelConfig, setWechatBinding, disableWechat, fetchWechatQrCode, pollWechatQrStatus, } from './channel_store.js';
 import { injectAndSend, openApp } from './inject.js';
 const DEFAULT_PORT = 10724;
-const INVOKE_TIMEOUT_MS = 300000; // 5 min, mirror hiclaw tool call timeout
-const TICK_INTERVAL_MS = 30000; // heartbeat, mirror hiclaw
+const INVOKE_TIMEOUT_MS = 300_000; // 5 min, mirror hiclaw tool call timeout
+const TICK_INTERVAL_MS = 30_000; // heartbeat, mirror hiclaw
 async function handleSkillsList(req, send) {
     try {
         const skills = await listSkills();
@@ -142,15 +142,17 @@ export function startGateway(ctx, config, registry, driver, wechat) {
     const roleByConn = new Map();
     const broadcaster = {
         sendToRole(role, frame) {
-            // Find the connection registered under that role.
-            const session = role === 'operator' ? registry.getOperator() : registry.getNode();
-            if (!session)
-                return false;
-            const ws = sockets.get(session.connId);
-            if (!ws || ws.readyState !== WebSocket.OPEN)
-                return false;
-            ws.send(stringify(frame));
-            return true;
+            let sent = false;
+            for (const [connId, r] of roleByConn) {
+                if (r === role) {
+                    const ws = sockets.get(connId);
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(stringify(frame));
+                        sent = true;
+                    }
+                }
+            }
+            return sent;
         },
     };
     const wss = new WebSocketServer({ host: '127.0.0.1', port });

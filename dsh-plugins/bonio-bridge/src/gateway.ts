@@ -192,13 +192,17 @@ export function startGateway(
 
   const broadcaster: WireBroadcaster = {
     sendToRole(role, frame) {
-      // Find the connection registered under that role.
-      const session = role === 'operator' ? registry.getOperator() : registry.getNode();
-      if (!session) return false;
-      const ws = sockets.get(session.connId);
-      if (!ws || ws.readyState !== WebSocket.OPEN) return false;
-      ws.send(stringify(frame));
-      return true;
+      let sent = false;
+      for (const [connId, r] of roleByConn) {
+        if (r === role) {
+          const ws = sockets.get(connId);
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(stringify(frame));
+            sent = true;
+          }
+        }
+      }
+      return sent;
     },
   };
 
