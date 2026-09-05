@@ -130,16 +130,32 @@ sleep ~300ms
   - avatar 定位于窗口内**固定锚点**，视觉不移动；收起时还原 300×348。
 - side 判定：`windowX + 150 < screenWidth / 2 ? 'right' : 'left'`（屏幕中线与 avatar 中心比较）。
 - 胶囊条目：类别图标 + 标题（如"张三的电话"）+ content 摘要（单行截断，长按看全文可后置）；
-  垂直堆叠 ≤3；整体 12s 自动收起；点击 → `cue.inject`，成功气泡"已发送～"，失败走降级。
+  信息胶囊最多 2 条、总胶囊数 ≤3，**上下垂直堆叠**；整体 12s 自动收起。
+- **日历类双胶囊（app 侧派生，不改 prompt 契约）**：`kind === 'calendar'` 的 cue 渲染为一组两条：
+  1. 信息胶囊（时间+地点+标题），点击 → `cue.inject`（§3.5），成功气泡"已发送～"，失败走降级；
+  2. 紧随其下的"查看日历"跳转胶囊，点击 → 打开系统日历应用（§3.6.1），不注入不发送。
+  联系人/记忆类默认只有信息胶囊；跳转胶囊计入总数（如 1 条日历信息 + 1 条跳转 + 1 条联系人 = 3）。
 - 长按胶囊 2s → 校准模式：气泡"点一下聊天输入框的位置"，下一次屏幕点击记录绝对坐标存
   SecurePrefs（`magicCue.inputPoint`），默认 `screenWidth/2, screenHeight-120`。
 - 拖动 avatar / 新的双击发生时立即收起胶囊并还原窗口。
+
+#### 3.6.1 跳转系统日历
+
+- 主路径：app 内 `UIAbilityContext.startAbility(Want)`：
+  `bundleName: 'com.huawei.hmos.calendar'`（真机 `bm dump -a` 实测确认，M1 任务），
+  尽力携带目标日期参数（日历深链格式若不支持则打开主页）。
+- 悬浮窗点击时 app 在后台 → 需声明 `ohos.permission.START_ABILITIES_FROM_BACKGROUND`
+  （system_basic，ACL；现有 system_core profile 可覆盖）。
+- 备选路径（权限受阻时）：bridge（root）执行 `/bin/aa start -b <bundle> -a <ability>`
+  （ohos-cli-tool skill 已验证的 shell 路径），封装为现有 `cue.inject` 同级的 `cue.open` RPC。
+- 跳转后胶囊组整体收起。
 
 ### 3.7 权限与设置
 
 `module.json5` 新增：
 - `ohos.permission.READ_CONTACTS`（system_basic user_grant ACL）
 - `ohos.permission.READ_CALENDAR`（normal user_grant）
+- `ohos.permission.START_ABILITIES_FROM_BACKGROUND`（system_basic system_grant ACL；悬浮窗点击跳转日历用，若走 bridge `aa start` 备选则不需要）
 
 设置页新增 Magic Cue 开关（`magicCue.enabled`，SecurePrefs，默认关）；开启时统一
 `requestPermissionsFromUser`。`EntryAbility` ACL 自检清单补两项。
@@ -180,9 +196,9 @@ sleep ~300ms
 | 里程碑 | 内容 | 产出 | 预估 |
 |---|---|---|---|
 | M0 | **Spike**：真机验证 uitest 注入微信 + MSDP 微信文本覆盖度 | 结论记录进本文档 §5 | 0.5–1d |
-| M1 | `contacts.search` / `calendar.events` handler + 权限声明 + 设置开关 | 真机可查（smoke-tool 验证） | 1–1.5d |
+| M1 | `contacts.search` / `calendar.events` handler + 权限声明 + 设置开关 + 确认日历应用 bundleName（`bm dump -a`） | 真机可查（smoke-tool 验证） | 1–1.5d |
 | M2 | magic-cue 会话 + prompt + memo query + 工具描述修正 | one-shot 脚本跑出正确 JSON | 1d |
-| M3 | 胶囊 UI + 窗口动态加宽 + side 判定 + 自动收起 | 真机可见可点 | 1–1.5d |
+| M3 | 胶囊 UI + 窗口动态加宽 + side 判定 + 日历双胶囊（信息+跳转）+ 自动收起 | 真机可见可点、跳转胶囊可打开日历 | 1–1.5d |
 | M4 | `cue.inject` RPC + 注入主路径 + 降级路径 + 校准 | 端到端点击→发送 | 1–1.5d |
 | M5 | 打磨：文案、回归双击记忆、多 cue、异常路径、签名安装 | 验收清单过一遍 | 0.5–1d |
 
