@@ -1,0 +1,35 @@
+harmonyos/entry/src/main/ets/gateway/GatewaySession.ets
+  h_de08bd40967a17 31
+harmonyos/entry/src/main/ets/node/MagicCueController.ets
+  h_de08bd40967a17 21,172,185-187,193-215,217-231,258-260,278,289-299,313,319-327,335,341-343,345-366
+harmonyos/entry/src/main/ets/node/NodeRuntime.ets
+  h_de08bd40967a17 75,371-397
+harmonyos/entry/src/main/ets/node/handlers/ScreenHandlerImpl.ets
+  h_de08bd40967a17 122
+harmonyos/entry/src/main/ets/pages/FloatWindowPage.ets
+  h_de08bd40967a17 583-588
+harmonyos/entry/src/main/ets/system/MsdpScreenAwarenessManager.ets
+  h_de08bd40967a17 44,367-379,385
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "38d19bc123cae58f0ae81a2fed55bd45fe862ab7",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  },
+  "sessions": {
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 36
+    }
+  }
+}
