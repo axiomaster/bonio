@@ -1,0 +1,28 @@
+docs/design/arch/magic-cue-arch-20260905.md
+  s_65a1faaab12715::t_1cae9202728085 199,201
+  s_65a1faaab12715::t_d87b18da72feb3 133-137,142-151
+  s_65a1faaab12715::t_27ddb20cf9de0c 158
+  s_65a1faaab12715::t_722ef037d32fe9 152
+docs/design/prd/magic-cue-prd-20260905.md
+  s_65a1faaab12715::t_a352e53965d3dc 87-91
+  s_65a1faaab12715::t_fb8c3a84c7e6b3 97,101
+  s_65a1faaab12715::t_a968ad2cf9d3a2 134-135
+  s_65a1faaab12715::t_67efa54140aa13 136-139
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "05efe373d9c5f76ad839100f231fc00959a0cdd5",
+  "prompts": {},
+  "sessions": {
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "glm-5.3"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 10
+    }
+  }
+}
