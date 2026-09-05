@@ -43,8 +43,9 @@ cd skills/phone-use-harmonyos
 | Option | Meaning | Required |
 |---|---|---|
 | `--task <COMMAND>` | Task description in Chinese (natural language) | yes |
+| `--sop <NAME_OR_PATH>` | Target SOP procedure name or JSON file (e.g. `luckin_coffee_reorder`) | no |
 | `--apikey <KEY>` | GLM API key (optional if set in config file) | no |
-| `--max-step <NUM>` | Max execution steps, default 20, max 200 | no |
+| `--max-step <NUM>` | Max execution steps, default 35, max 200 | no |
 | `--verbose` | Verbose output | no |
 | `--help` / `-h` | Show help | no |
 | `--version` | Show version | no |
@@ -57,7 +58,7 @@ cd skills/phone-use-harmonyos
 | 1 | General failure |
 | 2 | Invalid arguments |
 | 4 | Task execution failed |
-| 5 | Timeout (exceeded max steps) |
+| 5 | Timeout (exceeded max steps, default 35) |
 | 10 | Network error |
 | 11 | Initialization failed |
 
