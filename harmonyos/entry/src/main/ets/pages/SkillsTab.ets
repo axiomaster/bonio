@@ -333,26 +333,44 @@ export struct SkillsTab {
       .padding({ left: 16, top: 20, bottom: 6 })
   }
 
-  @Builder SkinChoice(value: string, title: string, subtitle: string) {
+  @Builder AvatarSkinRow() {
     Row() {
       Column() {
-        Text(title).fontSize(15).fontColor('#333333')
-        Text(subtitle).fontSize(12).fontColor('#999999').margin({ top: 2 })
+        Text('Skin Style')
+          .fontSize(15)
+          .fontColor('#333333')
+          .fontWeight(FontWeight.Medium)
+        Text(this.avatarSkin === 'kun' ? 'Pixel-art Kun avatar' : 'Lottie cat avatar')
+          .fontSize(12)
+          .fontColor('#999999')
+          .margin({ top: 3 })
       }
       .alignItems(HorizontalAlign.Start)
       .layoutWeight(1)
 
-      Radio({ value: value, group: 'avatarSkin' })
-        .checked(this.avatarSkin === value)
-        .onChange((isChecked: boolean) => {
-          if (isChecked) this.selectAvatarSkin(value);
+      Select([
+        { value: 'Cat (Lottie)' },
+        { value: 'Kun (Pixel)' }
+      ])
+        .selected(this.avatarSkin === 'kun' ? 1 : 0)
+        .value(this.avatarSkin === 'kun' ? 'Kun (Pixel)' : 'Cat (Lottie)')
+        .font({ size: 14, weight: FontWeight.Medium })
+        .fontColor('#333333')
+        .selectedOptionFont({ size: 14, weight: FontWeight.Medium })
+        .selectedOptionFontColor('#0A59F7')
+        .selectedOptionBgColor('#E8F0FE')
+        .optionFont({ size: 14 })
+        .optionFontColor('#333333')
+        .backgroundColor('#F5F5F5')
+        .borderRadius(8)
+        .height(36)
+        .onSelect((index: number) => {
+          this.selectAvatarSkin(index === 1 ? 'kun' : 'cat');
         })
     }
     .width('100%')
-    .height(56)
-    .padding({ left: 16, right: 16 })
+    .padding(16)
     .backgroundColor(Color.White)
-    .onClick(() => this.selectAvatarSkin(value))
   }
 
   @Builder SkillRow(entry: SkillEntry) {
@@ -548,10 +566,7 @@ export struct SkillsTab {
         // Avatar Skin Section
         ListItem() { this.SectionHeader('Avatar Skin') }
         ListItem() {
-          this.SkinChoice('cat', 'Cat', 'Lottie cat avatar')
-        }
-        ListItem() {
-          this.SkinChoice('kun', 'Kun', 'Pixel-art Kun avatar')
+          this.AvatarSkinRow()
         }
 
         // WeChat iLink Section
