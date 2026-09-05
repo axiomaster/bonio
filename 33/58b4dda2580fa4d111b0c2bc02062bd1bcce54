@@ -1,0 +1,27 @@
+docs/design/arch/20260905-phone-use-sop-arch.md
+  s_65a1faaab12715::t_a5d0cab07ae479 94,98-117,147,171,176-177,182-184,188-190,194-196,200-202,206-208,212-218
+  s_65a1faaab12715::t_4da1079c6ca191 318-327
+tools/skills-device/phone-use-harmonyos-SKILL.md
+  s_65a1faaab12715::t_97a69cc1030ac5 39,41,54
+docs/design/prd/20260905-phone-use-sop-prd.md
+  s_65a1faaab12715::t_f31d52b3017764 3,5,18-19,25,29-35,63-66
+skills/phone-use-harmonyos/SKILL.md
+  s_65a1faaab12715::t_6f76f6b78be1ff 46,48,61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "3358b4dda2580fa4d111b0c2bc02062bd1bcce54",
+  "prompts": {},
+  "sessions": {
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 36
+    }
+  }
+}
