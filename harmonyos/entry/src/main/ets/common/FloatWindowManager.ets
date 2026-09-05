@@ -1,4 +1,4 @@
-import { window } from '@kit.ArkUI';
+import { window, display } from '@kit.ArkUI';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { common } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
@@ -8,8 +8,8 @@ const TAG = 'FloatWindowManager';
 const FLOAT_WINDOW_NAME = 'CatSystemFloatWindow';
 const FLOAT_WINDOW_WIDTH_PX = 300;
 const FLOAT_WINDOW_HEIGHT_PX = 348;
-const INITIAL_WINDOW_X = 100;
-const INITIAL_WINDOW_Y = 100;
+const AVATAR_CENTER_OFFSET_X_PX = 150;
+const AVATAR_CENTER_OFFSET_Y_PX = 198;
 // Magic Cue: when expanded the window widens to hold the capsule strip beside
 // the avatar. Side 'left' also shifts the window origin left so the avatar
 // keeps its absolute screen position.
@@ -22,14 +22,20 @@ export class FloatWindowManager {
   private static instance: FloatWindowManager;
   private floatWindow: window.Window | null = null;
   private abilityContext: common.UIAbilityContext | null = null;
-  private windowX: number = INITIAL_WINDOW_X;
-  private windowY: number = INITIAL_WINDOW_Y;
+  private windowX: number = 0;
+  private windowY: number = 0;
   private isMovePending: boolean = false;
-  private pendingX: number = INITIAL_WINDOW_X;
-  private pendingY: number = INITIAL_WINDOW_Y;
+  private pendingX: number = 0;
+  private pendingY: number = 0;
   private cueExpandedSide: string | null = null;
 
-  private constructor() {}
+  private constructor() {
+    const defaultPos = this.getDefaultWindowPosition();
+    this.windowX = defaultPos[0];
+    this.windowY = defaultPos[1];
+    this.pendingX = defaultPos[0];
+    this.pendingY = defaultPos[1];
+  }
 
   public static getInstance(): FloatWindowManager {
     if (!FloatWindowManager.instance) {
@@ -70,7 +76,14 @@ export class FloatWindowManager {
       await this.tryConfigureWindow('setWindowTouchable', async () => {
         await this.floatWindow?.setWindowTouchable(true);
       });
-      await this.moveWindowTo(INITIAL_WINDOW_X, INITIAL_WINDOW_Y, false);
+      const defaultPos = this.getDefaultWindowPosition();
+      const defaultX = defaultPos[0];
+      const defaultY = defaultPos[1];
+      this.windowX = defaultX;
+      this.windowY = defaultY;
+      this.pendingX = defaultX;
+      this.pendingY = defaultY;
+      await this.moveWindowTo(defaultX, defaultY, false);
 
       await this.floatWindow.setUIContent('pages/FloatWindowPage');
       hilog.info(DOMAIN, TAG, 'System float window UI content loaded');
@@ -85,6 +98,30 @@ export class FloatWindowManager {
       hilog.error(DOMAIN, TAG, 'Failed to create system float window: %{public}s', JSON.stringify(error));
       await this.destroyCreatedWindow();
       return false;
+    }
+  }
+
+  /**
+   * Calculate default avatar window position:
+   * Bottom-right of screen, 1/4 from the bottom, 1/5 from the right.
+   */
+  public getDefaultWindowPosition(): [number, number] {
+    try {
+      const d = display.getDefaultDisplaySync();
+      const screenWidth = d.width;
+      const screenHeight = d.height;
+      // Target avatar center: 1/5 from right (80% width), 1/4 from bottom (75% height)
+      const targetCenterX = screenWidth * 0.8;
+      const targetCenterY = screenHeight * 0.75;
+      const x = Math.round(targetCenterX - AVATAR_CENTER_OFFSET_X_PX);
+      const y = Math.round(targetCenterY - AVATAR_CENTER_OFFSET_Y_PX);
+      const clampedX = Math.max(0, Math.min(x, screenWidth - FLOAT_WINDOW_WIDTH_PX));
+      const clampedY = Math.max(0, Math.min(y, screenHeight - FLOAT_WINDOW_HEIGHT_PX));
+      return [clampedX, clampedY];
+    } catch (err) {
+      const error = err as BusinessError;
+      hilog.warn(DOMAIN, TAG, 'Failed to get default display: %{public}s', JSON.stringify(error));
+      return [906, 1938];
     }
   }
 
