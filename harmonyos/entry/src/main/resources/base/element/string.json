@@ -43,6 +43,14 @@
     {
       "name": "reason_float_window",
       "value": "Used to show the assistant overlay over other apps"
+    },
+    {
+      "name": "reason_contacts",
+      "value": "Used to look up a contact's phone or organization when a chat asks for it"
+    },
+    {
+      "name": "reason_calendar",
+      "value": "Used to look up your schedule when a chat asks about an event"
     }
   ]
 }

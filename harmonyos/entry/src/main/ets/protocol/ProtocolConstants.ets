@@ -51,3 +51,15 @@ export enum OpenClawLocationCommand {
 }
 
 export const LocationCommandNamespacePrefix = "location.";
+
+export enum OpenClawContactsCommand {
+  Search = "contacts.search",
+}
+
+export const ContactsCommandNamespacePrefix = "contacts.";
+
+export enum OpenClawCalendarCommand {
+  Events = "calendar.events",
+}
+
+export const CalendarCommandNamespacePrefix = "calendar.";

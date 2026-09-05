@@ -14,6 +14,8 @@ import {
   OpenClawCameraCommand,
   OpenClawLocationCommand,
   OpenClawSmsCommand,
+  OpenClawContactsCommand,
+  OpenClawCalendarCommand,
   OpenClawCapability
 } from '../protocol/ProtocolConstants';
 import { deviceInfo } from '@kit.BasicServicesKit';
@@ -122,12 +124,20 @@ export class ConnectionManager {
     if (this.smsAvailable()) {
       list.push(OpenClawSmsCommand.Send);
     }
-    
+
+    // Magic Cue data sources — advertised only once the user enabled Magic Cue
+    // (which requests READ_CONTACTS / READ_CALENDAR). Otherwise the agent sees
+    // UNSUPPORTED_COMMAND and the prompt's fallback keeps it silent.
+    if (this.prefs.getMagicCueEnabled()) {
+      list.push(OpenClawContactsCommand.Search);
+      list.push(OpenClawCalendarCommand.Events);
+    }
+
     // Add debug and app commands
     list.push("debug.logs");
     list.push("debug.ed25519");
     list.push("app.update");
-    
+
     return list;
   }
 

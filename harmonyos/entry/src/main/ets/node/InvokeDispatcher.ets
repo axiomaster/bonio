@@ -6,6 +6,8 @@ import {
   OpenClawLocationCommand,
   OpenClawScreenCommand,
   OpenClawSmsCommand,
+  OpenClawContactsCommand,
+  OpenClawCalendarCommand,
   CanvasCommandNamespacePrefix,
   CanvasA2UICommandNamespacePrefix,
   CameraCommandNamespacePrefix,
@@ -56,6 +58,14 @@ export interface AppUpdateHandler {
   handleUpdate(paramsJson: string | undefined): Promise<InvokeResult>;
 }
 
+export interface ContactsHandler {
+  handleContactsSearch(paramsJson: string | undefined): Promise<InvokeResult>;
+}
+
+export interface CalendarHandler {
+  handleCalendarEvents(paramsJson: string | undefined): Promise<InvokeResult>;
+}
+
 export class InvokeDispatcher {
   private canvas: CanvasController;
   private cameraHandler: CameraHandler;
@@ -65,6 +75,8 @@ export class InvokeDispatcher {
   private a2uiHandler: A2UIHandler;
   private debugHandler: DebugHandler;
   private appUpdateHandler: AppUpdateHandler;
+  private contactsHandler: ContactsHandler;
+  private calendarHandler: CalendarHandler;
   private isForeground: () => boolean;
   private cameraEnabled: () => boolean;
   private locationEnabled: () => boolean;
@@ -78,6 +90,8 @@ export class InvokeDispatcher {
     a2uiHandler: A2UIHandler,
     debugHandler: DebugHandler,
     appUpdateHandler: AppUpdateHandler,
+    contactsHandler: ContactsHandler,
+    calendarHandler: CalendarHandler,
     isForeground: () => boolean,
     cameraEnabled: () => boolean,
     locationEnabled: () => boolean
@@ -90,6 +104,8 @@ export class InvokeDispatcher {
     this.a2uiHandler = a2uiHandler;
     this.debugHandler = debugHandler;
     this.appUpdateHandler = appUpdateHandler;
+    this.contactsHandler = contactsHandler;
+    this.calendarHandler = calendarHandler;
     this.isForeground = isForeground;
     this.cameraEnabled = cameraEnabled;
     this.locationEnabled = locationEnabled;
@@ -205,6 +221,12 @@ export class InvokeDispatcher {
 
         case "app.update":
           return await this.appUpdateHandler.handleUpdate(paramsJson);
+
+        case OpenClawContactsCommand.Search:
+          return await this.contactsHandler.handleContactsSearch(paramsJson);
+
+        case OpenClawCalendarCommand.Events:
+          return await this.calendarHandler.handleCalendarEvents(paramsJson);
 
         default:
           return this.makeError("INVALID_REQUEST", "INVALID_REQUEST: unknown command");

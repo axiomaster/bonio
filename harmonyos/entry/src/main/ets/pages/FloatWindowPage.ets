@@ -7,9 +7,11 @@
 import { common } from '@kit.AbilityKit';
 import { util } from '@kit.ArkTS';
 import { hilog } from '@kit.PerformanceAnalysisKit';
+import { display } from '@kit.ArkUI';
 import lottie, { AnimationItem } from '@ohos/lottie';
 import { NodeRuntime } from '../node/NodeRuntime';
 import { FloatWindowManager } from '../common/FloatWindowManager';
+import { MagicCue } from '../node/MagicCueController';
 
 const DOMAIN = 0x3D00;
 const TAG = 'FloatWindowPage';
@@ -28,6 +30,24 @@ const DRAG_THRESHOLD_PX = 8;
 const KUN_FRAME_WIDTH = 192 * AVATAR_SIZE / 208;
 const KUN_SHEET_WIDTH = KUN_FRAME_WIDTH * 8;
 const KUN_SHEET_HEIGHT = AVATAR_SIZE * 9;
+// Magic Cue capsule strip. The capsule slides out beside the avatar: avatar on
+// the left half → capsule on the right; avatar on the right half → capsule on
+// the left (so the capsule always opens toward the screen centre).
+const CAPSULE_WIDTH = 420;
+const CAPSULE_WIDTH_PX = `${CAPSULE_WIDTH}px`;
+const CAPSULE_GAP = 16;
+const CUE_OFFSET = AVATAR_SIZE + CAPSULE_GAP;
+const CUE_WINDOW_WIDTH = AVATAR_SIZE + CAPSULE_GAP + CAPSULE_WIDTH;
+const CUE_WINDOW_WIDTH_PX = `${CUE_WINDOW_WIDTH}px`;
+const CUE_DISMISS_MS = 12000;
+
+/** A single rendered capsule row (calendar cues render two: info + jump). */
+class CueDisplayItem {
+  kind: string = '';   // 'info' | 'jump'
+  cueKind: string = ''; // 'contact' | 'calendar' | 'memo'
+  title: string = '';
+  content: string = '';
+}
 
 class KunAnimationSpec {
   row: number;
@@ -70,6 +90,9 @@ struct FloatWindowPage {
   @State avatarSkin: string = 'cat';
   @State bubbleText: string = '休息中~ 有事叫我';
   @State kunFrame: number = 0;
+  @State cuesVisible: boolean = false;
+  @State cueSide: string = 'right';
+  @State cueItems: CueDisplayItem[] = [];
 
   private catCanvasSettings: RenderingContextSettings = new RenderingContextSettings(true);
   private catCanvasContext: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.catCanvasSettings);
@@ -85,6 +108,7 @@ struct FloatWindowPage {
   private kunTimer: number = -1;
   private longPressTimer: number = -1;
   private clickTimer: number = -1;
+  private cueDismissTimer: number = -1;
   private interactionUntil: number = 0;
   private commandOverrideUntil: number = 0;
   private interactionState: string = '';
@@ -322,68 +346,128 @@ struct FloatWindowPage {
     if (this.kunTimer !== -1) clearTimeout(this.kunTimer);
     if (this.longPressTimer !== -1) clearTimeout(this.longPressTimer);
     if (this.clickTimer !== -1) clearTimeout(this.clickTimer);
+    if (this.cueDismissTimer !== -1) clearTimeout(this.cueDismissTimer);
     this.statusTimer = -1; this.bubbleTimer = -1; this.kunTimer = -1;
-    this.longPressTimer = -1; this.clickTimer = -1; this.requestedAsset = '';
+    this.longPressTimer = -1; this.clickTimer = -1; this.cueDismissTimer = -1;
+    this.requestedAsset = '';
     this.destroyCatAnimation();
   }
 
   build() {
-    Column() {
-      Row() {
-        if (this.bubbleText !== '') {
-          Text(this.bubbleText)
-            .fontSize('24px')
-            .fontColor('#3D2D18')
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-            .constraintSize({ maxWidth: '260px' })
-            .padding({ left: '10px', right: '10px', top: '10px', bottom: '10px' })
-            .backgroundColor('#FFFFFFFF')
-            .border({ width: '1px', color: '#CCCCCC' })
-            .borderRadius('8px')
-        }
+    Row() {
+      if (this.cuesVisible && this.cueSide === 'left') {
+        this.CueColumn()
       }
-        .width(AVATAR_SIZE_PX)
-        .height(BUBBLE_AREA_HEIGHT_PX)
-        .justifyContent(FlexAlign.Start)
-        .alignItems(VerticalAlign.Center)
-        .padding({ left: '10px', right: '10px' })
-      Stack({ alignContent: Alignment.TopStart }) {
-        if (this.avatarSkin === 'cat') {
-          Canvas(this.catCanvasContext)
+      Column() {
+        Row() {
+          if (this.bubbleText !== '') {
+            Text(this.bubbleText)
+              .fontSize('24px')
+              .fontColor('#3D2D18')
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .constraintSize({ maxWidth: '260px' })
+              .padding({ left: '10px', right: '10px', top: '10px', bottom: '10px' })
+              .backgroundColor('#FFFFFFFF')
+              .border({ width: '1px', color: '#CCCCCC' })
+              .borderRadius('8px')
+          }
+        }
+          .width(AVATAR_SIZE_PX)
+          .height(BUBBLE_AREA_HEIGHT_PX)
+          .justifyContent(FlexAlign.Start)
+          .alignItems(VerticalAlign.Center)
+          .padding({ left: '10px', right: '10px' })
+        Stack({ alignContent: Alignment.TopStart }) {
+          if (this.avatarSkin === 'cat') {
+            Canvas(this.catCanvasContext)
+              .width(AVATAR_SIZE_PX)
+              .height(AVATAR_SIZE_PX)
+              .onReady(() => {
+                this.catCanvasReady = true;
+                this.catCanvasContext.imageSmoothingEnabled = true;
+                this.catCanvasContext.imageSmoothingQuality = 'high';
+                void this.loadCatAnimation();
+              })
+          } else {
+            Stack({ alignContent: Alignment.TopStart }) {
+              Image($rawfile('kun-spritesheet.webp'))
+                .width(`${KUN_SHEET_WIDTH}px`)
+                .height(`${KUN_SHEET_HEIGHT}px`)
+                .objectFit(ImageFit.Fill)
+                .position({ x: this.kunImageX(), y: this.kunImageY() })
+                .interpolation(ImageInterpolation.None)
+                // Float-window movement is handled by onTouch below, never by system drag-and-drop.
+                .draggable(false)
+            }
             .width(AVATAR_SIZE_PX)
             .height(AVATAR_SIZE_PX)
-            .onReady(() => {
-              this.catCanvasReady = true;
-              this.catCanvasContext.imageSmoothingEnabled = true;
-              this.catCanvasContext.imageSmoothingQuality = 'high';
-              void this.loadCatAnimation();
-            })
-        } else {
-          Stack({ alignContent: Alignment.TopStart }) {
-            Image($rawfile('kun-spritesheet.webp'))
-              .width(`${KUN_SHEET_WIDTH}px`)
-              .height(`${KUN_SHEET_HEIGHT}px`)
-              .objectFit(ImageFit.Fill)
-              .position({ x: this.kunImageX(), y: this.kunImageY() })
-              .interpolation(ImageInterpolation.None)
-              // Float-window movement is handled by onTouch below, never by system drag-and-drop.
-              .draggable(false)
+            .clip(true)
           }
-          .width(AVATAR_SIZE_PX)
-          .height(AVATAR_SIZE_PX)
-          .clip(true)
         }
+        .width(AVATAR_SIZE_PX)
+        .height(AVATAR_SIZE_PX)
       }
       .width(AVATAR_SIZE_PX)
-      .height(AVATAR_SIZE_PX)
+      .height(FLOAT_WINDOW_HEIGHT_PX)
+      .onTouch((event: TouchEvent) => this.handleTouch(event))
+      if (this.cuesVisible && this.cueSide === 'right') {
+        this.CueColumn()
+      }
     }
-    .width(AVATAR_SIZE_PX)
+    .width(this.cuesVisible ? CUE_WINDOW_WIDTH_PX : AVATAR_SIZE_PX)
     .height(FLOAT_WINDOW_HEIGHT_PX)
     .backgroundColor(Color.Transparent)
     .clip(true)
     .draggable(false)
-    .onTouch((event: TouchEvent) => this.handleTouch(event))
+  }
+
+  @Builder CueColumn() {
+    Column({ space: '10px' }) {
+      ForEach(this.cueItems, (item: CueDisplayItem) => {
+        this.CueCapsule(item)
+      }, (item: CueDisplayItem) => `${item.kind}-${item.cueKind}-${item.title}-${item.content}`)
+    }
+    .width(CAPSULE_WIDTH_PX)
+    .height(FLOAT_WINDOW_HEIGHT_PX)
+    .padding({ top: '14px' })
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  @Builder CueCapsule(item: CueDisplayItem) {
+    Row() {
+      if (item.kind === 'jump') {
+        Text(item.title)
+          .fontSize('26px')
+          .fontColor('#0A59F7')
+          .fontWeight(FontWeight.Medium)
+          .textAlign(TextAlign.Center)
+      } else {
+        Column() {
+          if (item.title !== '') {
+            Text(item.title)
+              .fontSize('20px')
+              .fontColor('#999999')
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+          }
+          Text(item.content)
+            .fontSize('26px')
+            .fontColor('#222222')
+            .maxLines(2)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .margin({ top: item.title !== '' ? '4px' : '0px' })
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+      }
+    }
+    .width(CAPSULE_WIDTH_PX)
+    .padding({ left: '16px', right: '16px', top: '12px', bottom: '12px' })
+    .backgroundColor('#FFFFFFFF')
+    .border({ width: '1px', color: '#E5E5E5' })
+    .borderRadius('14px')
+    .onClick(() => this.handleCueTap(item))
   }
 
   private handleTouch(event: TouchEvent): void {
@@ -459,8 +543,14 @@ struct FloatWindowPage {
     if (now - this.lastTapAtMs <= DOUBLE_TAP_MS) {
       if (this.clickTimer !== -1) clearTimeout(this.clickTimer);
       this.clickTimer = -1; this.lastTapAtMs = 0;
-      this.beginInteraction('thinking', '正在采集当前页面…', 30000);
-      void this.captureCurrentScreenMemory();
+      if (this.runtime?.prefs.getMagicCueEnabled()) {
+        this.dismissCues();
+        this.beginInteraction('thinking', '正在识别屏幕…', 30000);
+        void this.captureCues();
+      } else {
+        this.beginInteraction('thinking', '正在采集当前页面…', 30000);
+        void this.captureCurrentScreenMemory();
+      }
       return;
     }
     this.lastTapAtMs = now;
@@ -468,6 +558,96 @@ struct FloatWindowPage {
       this.clickTimer = -1; this.lastTapAtMs = 0;
       this.beginInteraction('interacting', '诶嘿~');
     }, DOUBLE_TAP_MS);
+  }
+
+  /** Double-tap → SmartEdge screen → DSH magic-cue analysis → capsule strip. */
+  private async captureCues(): Promise<void> {
+    try {
+      if (!this.runtime) throw new Error('Bonio runtime is unavailable');
+      const cues = await this.runtime.captureAvatarCues();
+      if (cues.length === 0) {
+        this.dismissCues();
+        this.beginInteraction('idle', '没发现朋友在问什么~', 5000);
+        return;
+      }
+      const side = this.determineCueSide();
+      this.cueSide = side;
+      this.cueItems = this.buildCueItems(cues);
+      this.cuesVisible = true;
+      await FloatWindowManager.getInstance().setCueExpanded(side);
+      if (this.cueDismissTimer !== -1) clearTimeout(this.cueDismissTimer);
+      this.cueDismissTimer = setTimeout(() => this.dismissCues(), CUE_DISMISS_MS);
+      this.beginInteraction('idle', '要不要我帮你回？点一下就行~', 5000);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const bubble = message.includes('SCREEN_AWARENESS_DISABLED')
+        ? '请先在设置开启屏幕感知~'
+        : '当前页面暂时无法读取~';
+      hilog.warn(DOMAIN, TAG, 'magic cue capture failed: %{public}s', message);
+      this.beginInteraction('failed', bubble, 4000);
+    }
+  }
+
+  private dismissCues(): void {
+    if (this.cueDismissTimer !== -1) clearTimeout(this.cueDismissTimer);
+    this.cueDismissTimer = -1;
+    this.cuesVisible = false;
+    this.cueItems = [];
+    void FloatWindowManager.getInstance().collapseCue();
+  }
+
+  private handleCueTap(item: CueDisplayItem): void {
+    if (!this.runtime) return;
+    if (item.kind === 'jump') {
+      this.dismissCues();
+      this.beginInteraction('completed', '打开日历~', 4000);
+      void this.runtime.openCueApp('com.huawei.hmos.calendar', 'MainAbility').catch((e: Error) => {
+        hilog.warn(DOMAIN, TAG, 'open calendar failed: %{public}s', e.message);
+        this.beginInteraction('failed', '打开日历失败~', 4000);
+      });
+      return;
+    }
+    const content = item.content;
+    this.dismissCues();
+    this.beginInteraction('working', '发送中…', 4000);
+    void this.runtime.injectCue(content).then(() => {
+      this.beginInteraction('completed', '已发送~', 4000);
+    }).catch((e: Error) => {
+      hilog.warn(DOMAIN, TAG, 'inject cue failed: %{public}s', e.message);
+      this.beginInteraction('failed', '发送失败，请再试一次~', 4000);
+    });
+  }
+
+  private buildCueItems(cues: MagicCue[]): CueDisplayItem[] {
+    const items: CueDisplayItem[] = [];
+    for (const cue of cues) {
+      const info = new CueDisplayItem();
+      info.kind = 'info';
+      info.cueKind = cue.kind;
+      info.title = cue.title;
+      info.content = cue.content;
+      items.push(info);
+      if (cue.kind === 'calendar') {
+        const jump = new CueDisplayItem();
+        jump.kind = 'jump';
+        jump.cueKind = 'calendar';
+        jump.title = '查看日历';
+        jump.content = '';
+        items.push(jump);
+      }
+      if (items.length >= 3) break;
+    }
+    return items;
+  }
+
+  private determineCueSide(): string {
+    try {
+      const pos = FloatWindowManager.getInstance().getWindowPosition();
+      const width = display.getDefaultDisplaySync().width;
+      return (pos[0] + AVATAR_SIZE / 2) < (width / 2) ? 'right' : 'left';
+    } catch (_) {
+      return 'right';
+    }
   }
 
   private async captureCurrentScreenMemory(): Promise<void> {

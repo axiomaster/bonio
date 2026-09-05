@@ -29,6 +29,7 @@ export struct SettingsTab {
   @State cameraEnabled: boolean = false;
   @State screenRecordEnabled: boolean = false;
   @State screenAwarenessEnabled: boolean = false;
+  @State magicCueEnabled: boolean = false;
   @State serverName: string = '';
   @State remoteAddress: string = '';
 
@@ -49,6 +50,7 @@ export struct SettingsTab {
       this.cameraEnabled = prefs.getCameraEnabled();
       this.screenRecordEnabled = prefs.getScreenRecordEnabled();
       this.screenAwarenessEnabled = prefs.getScreenAwarenessEnabled();
+      this.magicCueEnabled = prefs.getMagicCueEnabled();
       this.manualHost = prefs.getManualHost() || '';
       this.manualPort = prefs.getManualPort().toString() || '10724';
       this.manualToken = prefs.getGatewayToken() || '';
@@ -323,6 +325,22 @@ export struct SettingsTab {
               } else {
                 this.screenAwarenessEnabled = false;
                 this.runtime?.setScreenAwarenessEnabled(false);
+              }
+            })
+        }
+        ListItem() {
+          this.ToggleRow("Magic Cue", "Double-tap to surface answers from contacts, calendar & memos",
+            this.magicCueEnabled,
+            async (enabled: boolean) => {
+              if (enabled) {
+                const contactsGranted = await this.requestPermission("ohos.permission.READ_CONTACTS" as Permissions);
+                const calendarGranted = await this.requestPermission("ohos.permission.READ_CALENDAR" as Permissions);
+                const granted = contactsGranted && calendarGranted;
+                this.magicCueEnabled = granted;
+                this.runtime?.prefs.setMagicCueEnabled(granted);
+              } else {
+                this.magicCueEnabled = false;
+                this.runtime?.prefs.setMagicCueEnabled(false);
               }
             })
         }

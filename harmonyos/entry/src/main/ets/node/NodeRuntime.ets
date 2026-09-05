@@ -14,7 +14,9 @@ import {
   SmsHandler,
   A2UIHandler,
   DebugHandler,
-  AppUpdateHandler
+  AppUpdateHandler,
+  ContactsHandler,
+  CalendarHandler
 } from './InvokeDispatcher';
 import { CanvasController } from './CanvasController';
 import { DummyCameraHandler, DummyScreenHandler } from './DummyHandlers';
@@ -24,6 +26,8 @@ import { LocationHandlerImpl } from './handlers/LocationHandlerImpl';
 import { CameraHandlerImpl } from './handlers/CameraHandlerImpl';
 import { ScreenHandlerImpl } from './handlers/ScreenHandlerImpl';
 import { A2UIHandlerImpl } from './handlers/A2UIHandlerImpl';
+import { ContactsHandlerImpl } from './handlers/ContactsHandlerImpl';
+import { CalendarHandlerImpl } from './handlers/CalendarHandlerImpl';
 import { ChatController } from './chat/ChatController';
 import { VoiceWakeManager } from '../voice/VoiceWakeManager';
 import { FeatureManager } from '../intent/FeatureManager';
@@ -34,6 +38,7 @@ import { TalkModeManager } from '../voice/TalkModeManager';
 import { WakeWords } from '../common/WakeWords';
 import { MemoryService } from './MemoryService';
 import { CompanionMemoryController } from './CompanionMemoryController';
+import { MagicCueController, MagicCue } from './MagicCueController';
 
 export class NodeRuntime {
   private static readonly DOMAIN = 0x3D00;
@@ -66,6 +71,7 @@ export class NodeRuntime {
   public chatController: ChatController;
   public memoryService: MemoryService;
   public companionMemoryController: CompanionMemoryController;
+  public magicCueController: MagicCueController;
   public onChatUpdate: (() => void) | undefined = undefined;
 
   // Phase 4: on-device feature coordination (intent / health / notifications).
@@ -82,6 +88,8 @@ export class NodeRuntime {
   private smsHandler: SmsHandlerImpl;
   private a2uiHandler: A2UIHandlerImpl;
   private debugHandler: DebugHandlerImpl;
+  private contactsHandler: ContactsHandler;
+  private calendarHandler: CalendarHandler;
   private dummyAppUpdate = new DummyAppUpdate();
 
   private lastAutoA2uiUrl: string | undefined = undefined;
@@ -123,6 +131,9 @@ export class NodeRuntime {
       () => this.operatorSession?.getCanvasHostUrl()
     );
 
+    this.contactsHandler = new ContactsHandlerImpl(context);
+    this.calendarHandler = new CalendarHandlerImpl(context);
+
     this.invokeDispatcher = new InvokeDispatcher(
       this.canvas,
       this.cameraHandler,
@@ -132,6 +143,8 @@ export class NodeRuntime {
       this.a2uiHandler,
       this.debugHandler,
       this.dummyAppUpdate,
+      this.contactsHandler,
+      this.calendarHandler,
       () => this.isForeground,
       () => this.prefs.getCameraEnabled(),
       () => this.prefs.getLocationMode() !== LocationMode.Off
@@ -166,6 +179,7 @@ export class NodeRuntime {
         this.chatController.handleGatewayEvent(event, payload);
         this.talkModeManager.handleGatewayEvent(event, payload);
         this.companionMemoryController.handleGatewayEvent(event, payload);
+        this.magicCueController.handleGatewayEvent(event, payload);
       }
     );
 
@@ -176,6 +190,10 @@ export class NodeRuntime {
     this.companionMemoryController = new CompanionMemoryController(
       this.operatorSession,
       this.memoryService,
+      () => this.isConnected,
+    );
+    this.magicCueController = new MagicCueController(
+      this.operatorSession,
       () => this.isConnected,
     );
     this.screenHandler.startScreenAwareness();
@@ -336,6 +354,87 @@ export class NodeRuntime {
     return outcome.title;
   }
 
+  /**
+   * Magic Cue: analyze the current screen for an in-chat information request
+   * and return the recommended capsules. Returns [] when nothing to show.
+   */
+  public async captureAvatarCues(): Promise<MagicCue[]> {
+    if (!this.isConnected) {
+      throw new Error('DSH is not connected');
+    }
+    const capture = await this.screenHandler.handleSmartEdgeTrigger();
+    if (!capture.ok || !capture.payloadJson) {
+      throw new Error(`${capture.error?.code || 'SCREEN_AWARENESS_FAILED'}: ${capture.error?.message || 'SmartEdge trigger failed'}`);
+    }
+    const bundleName = capture.bundleName ?? '';
+    const title = capture.appName ?? '';
+    return await this.magicCueController.run(capture.payloadJson, bundleName, title);
+  }
+
+  /**
+   * Magic Cue: write a capsule's answer into the chat input and send it.
+   * Uses cached input/send points (learned once by the bridge) so later
+   * injections are a fixed tap sequence instead of re-discovering layout.
+   */
+  public async injectCue(text: string): Promise<void> {
+    if (!this.isConnected) {
+      throw new Error('DSH is not connected');
+    }
+    const params = new CueInjectParams();
+    params.text = text;
+    const input = this.parsePoint(this.prefs.getMagicCueInputPoint());
+    if (input) {
+      params.inputX = input[0];
+      params.inputY = input[1];
+    }
+    const send = this.parsePoint(this.prefs.getMagicCueSendPoint());
+    if (send) {
+      params.sendX = send[0];
+      params.sendY = send[1];
+    }
+    const response = await this.operatorSession.request('cue.inject', params, 15000);
+    if (!response.ok) {
+      throw new Error(response.error?.message || 'CUE_INJECT_FAILED');
+    }
+    this.cacheCuePoints(response.payload);
+  }
+
+  /** Magic Cue: launch an app (e.g. the system calendar). */
+  public async openCueApp(bundle: string, ability?: string): Promise<void> {
+    if (!this.isConnected) {
+      throw new Error('DSH is not connected');
+    }
+    const params = new CueOpenParams();
+    params.bundle = bundle;
+    params.ability = ability;
+    const response = await this.operatorSession.request('cue.open', params, 15000);
+    if (!response.ok) {
+      throw new Error(response.error?.message || 'CUE_OPEN_FAILED');
+    }
+  }
+
+  private parsePoint(raw: string): number[] | undefined {
+    const parts = raw.split(',');
+    if (parts.length !== 2) return undefined;
+    const x = Number(parts[0]);
+    const y = Number(parts[1]);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return undefined;
+    return [x, y];
+  }
+
+  private cacheCuePoints(payload: Object | undefined): void {
+    if (!payload) return;
+    const p = payload as Record<string, Object>;
+    const input = p['inputPoint'] as Record<string, Object> | undefined;
+    const send = p['sendPoint'] as Record<string, Object> | undefined;
+    if (input && input['learned'] === true) {
+      this.prefs.setMagicCueInputPoint(`${input['x']},${input['y']}`);
+    }
+    if (send && send['learned'] === true) {
+      this.prefs.setMagicCueSendPoint(`${send['x']},${send['y']}`);
+    }
+  }
+
   /** Save a user-approved summary of the currently visible page as a structured DSH memory. */
   public async captureCurrentScreenMemory(): Promise<void> {
     if (!this.isConnected) {
@@ -450,4 +549,17 @@ function makeDummyResult(): InvokeResult {
 
 class DummyAppUpdate implements AppUpdateHandler {
   async handleUpdate(paramsJson: string | undefined): Promise<InvokeResult> { return makeDummyResult(); }
+}
+
+class CueInjectParams {
+  text: string = '';
+  inputX?: number;
+  inputY?: number;
+  sendX?: number;
+  sendY?: number;
+}
+
+class CueOpenParams {
+  bundle: string = '';
+  ability?: string;
 }

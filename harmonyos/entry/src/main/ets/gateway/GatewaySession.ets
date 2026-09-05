@@ -26,6 +26,8 @@ export interface InvokeResult {
   coverImageBase64?: string;
   originalImageBase64?: string;
   originalImageMimeType?: string;
+  bundleName?: string;
+  appName?: string;
   error?: InvokeError;
 }
 

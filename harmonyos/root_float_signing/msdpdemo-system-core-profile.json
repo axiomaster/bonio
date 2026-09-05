@@ -21,7 +21,8 @@
    "ohos.permission.CAPTURE_SCREEN",
    "ohos.permission.GET_SCREEN_CONTENT",
    "ohos.permission.SIMULATE_USER_INPUT",
-   "ohos.permission.NOTIFICATION_CONTROLLER"
+   "ohos.permission.NOTIFICATION_CONTROLLER",
+   "ohos.permission.READ_CONTACTS"
   ]
  },
  "permissions": {

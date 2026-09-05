@@ -10,6 +10,13 @@ const FLOAT_WINDOW_WIDTH_PX = 300;
 const FLOAT_WINDOW_HEIGHT_PX = 348;
 const INITIAL_WINDOW_X = 100;
 const INITIAL_WINDOW_Y = 100;
+// Magic Cue: when expanded the window widens to hold the capsule strip beside
+// the avatar. Side 'left' also shifts the window origin left so the avatar
+// keeps its absolute screen position.
+const CUE_CAPSULE_WIDTH_PX = 420;
+const CUE_GAP_PX = 16;
+const CUE_OFFSET_PX = FLOAT_WINDOW_WIDTH_PX + CUE_GAP_PX;
+const CUE_EXPANDED_WIDTH_PX = FLOAT_WINDOW_WIDTH_PX + CUE_GAP_PX + CUE_CAPSULE_WIDTH_PX;
 
 export class FloatWindowManager {
   private static instance: FloatWindowManager;
@@ -20,6 +27,7 @@ export class FloatWindowManager {
   private isMovePending: boolean = false;
   private pendingX: number = INITIAL_WINDOW_X;
   private pendingY: number = INITIAL_WINDOW_Y;
+  private cueExpandedSide: string | null = null;
 
   private constructor() {}
 
@@ -156,5 +164,35 @@ export class FloatWindowManager {
 
   public isWindowShowing(): boolean {
     return this.floatWindow !== null;
+  }
+
+  public isCueExpanded(): boolean {
+    return this.cueExpandedSide !== null;
+  }
+
+  /** Widen the window to reveal the capsule strip; shift left for side 'left'. */
+  public async setCueExpanded(side: string): Promise<void> {
+    if (!this.floatWindow || this.cueExpandedSide !== null) return;
+    const dir = side === 'left' ? 'left' : 'right';
+    await this.tryConfigureWindow('resize', async () => {
+      await this.floatWindow?.resize(CUE_EXPANDED_WIDTH_PX, FLOAT_WINDOW_HEIGHT_PX);
+    });
+    this.cueExpandedSide = dir;
+    if (dir === 'left') {
+      await this.moveWindowTo(this.windowX - CUE_OFFSET_PX, this.windowY, false);
+    }
+  }
+
+  /** Restore the compact avatar window, undoing any leftward shift. */
+  public async collapseCue(): Promise<void> {
+    if (!this.floatWindow || this.cueExpandedSide === null) return;
+    const dir = this.cueExpandedSide;
+    this.cueExpandedSide = null;
+    await this.tryConfigureWindow('resize', async () => {
+      await this.floatWindow?.resize(FLOAT_WINDOW_WIDTH_PX, FLOAT_WINDOW_HEIGHT_PX);
+    });
+    if (dir === 'left') {
+      await this.moveWindowTo(this.windowX + CUE_OFFSET_PX, this.windowY, false);
+    }
   }
 }

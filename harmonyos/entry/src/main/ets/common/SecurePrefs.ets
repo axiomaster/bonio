@@ -190,6 +190,30 @@ export class SecurePrefs {
     this.putSyncValue('voiceWake.mode', mode as string);
   }
 
+  public getMagicCueEnabled(): boolean {
+    return this.getSyncValue('magicCue.enabled', false);
+  }
+
+  public setMagicCueEnabled(value: boolean): void {
+    this.putSyncValue('magicCue.enabled', value);
+  }
+
+  public getMagicCueInputPoint(): string {
+    return this.getSyncValue('magicCue.inputPoint', '');
+  }
+
+  public setMagicCueInputPoint(value: string): void {
+    this.putSyncValue('magicCue.inputPoint', value);
+  }
+
+  public getMagicCueSendPoint(): string {
+    return this.getSyncValue('magicCue.sendPoint', '');
+  }
+
+  public setMagicCueSendPoint(value: string): void {
+    this.putSyncValue('magicCue.sendPoint', value);
+  }
+
   private generateUUID(): string {
     return util.generateRandomUUID(true);
   }
