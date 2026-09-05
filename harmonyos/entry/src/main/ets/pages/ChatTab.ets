@@ -24,7 +24,6 @@ export struct ChatTab {
   @State healthOk: boolean = true;
   @State sessionLabel: string = 'chat';
   @State showThinkingMenu: boolean = false;
-  @State showAttachmentMenu: boolean = false;
   @State pendingAttachments: OutgoingAttachment[] = [];
   @State isSpeakerEnabled: boolean = true;
   @State pendingRunCount: number = 0;
@@ -92,7 +91,6 @@ export struct ChatTab {
     if (ctrl.sessionKey === key) return;
     this.inputText = '';
     this.pendingAttachments = [];
-    this.showAttachmentMenu = false;
     await ctrl.load(key);
   }
 
@@ -337,7 +335,7 @@ export struct ChatTab {
                   .fontSize(10)
                   .fontColor('#E53935')
                   .margin({ right: 4 })
-                Text('打断')
+                Text('Stop')
                   .fontSize(12)
                   .fontWeight(FontWeight.Medium)
                   .fontColor('#E53935')
@@ -386,7 +384,7 @@ export struct ChatTab {
             .onChange((val: string) => { this.inputText = val; })
             .onSubmit(() => this.send())
 
-          // Dynamic +/Send button
+          // Send button
           Button() {
             if (this.isSending) {
               LoadingProgress()
@@ -394,7 +392,7 @@ export struct ChatTab {
                 .height(16)
                 .color(Color.White)
             } else {
-              Text(this.inputText.trim().length > 0 ? '↑' : '+')
+              Text('↑')
                 .fontSize(18)
                 .fontWeight(FontWeight.Bold)
                 .fontColor(this.inputText.trim().length > 0 && this.canSend() ? Color.White : '#0A59F7')
@@ -409,95 +407,11 @@ export struct ChatTab {
           .onClick(() => {
             if (this.inputText.trim().length > 0) {
               this.send();
-            } else {
-              this.showAttachmentMenu = !this.showAttachmentMenu;
             }
           })
         }
         .width('100%')
         .padding({ left: 8, right: 8, top: 2, bottom: 2 })
-
-        // Attachment menu (slide-up drawer)
-        if (this.showAttachmentMenu) {
-          Row() {
-            // Camera
-            Column() {
-              Column() {
-                Text('📷')
-                  .fontSize(24)
-              }
-              .width(52)
-              .height(52)
-              .borderRadius(16)
-              .backgroundColor(Color.White)
-              .border({ width: 1, color: '#E0E0E0' })
-              .justifyContent(FlexAlign.Center)
-              .alignItems(HorizontalAlign.Center)
-              Text('Camera')
-                .fontSize(11)
-                .fontColor('#999999')
-                .margin({ top: 4 })
-            }
-            .alignItems(HorizontalAlign.Center)
-            .layoutWeight(1)
-            .onClick(() => {
-              this.showAttachmentMenu = false;
-              // TODO: camera logic
-            })
-
-            // Gallery
-            Column() {
-              Column() {
-                Text('🖼️')
-                  .fontSize(24)
-              }
-              .width(52)
-              .height(52)
-              .borderRadius(16)
-              .backgroundColor(Color.White)
-              .border({ width: 1, color: '#E0E0E0' })
-              .justifyContent(FlexAlign.Center)
-              .alignItems(HorizontalAlign.Center)
-              Text('Gallery')
-                .fontSize(11)
-                .fontColor('#999999')
-                .margin({ top: 4 })
-            }
-            .alignItems(HorizontalAlign.Center)
-            .layoutWeight(1)
-            .onClick(() => {
-              this.showAttachmentMenu = false;
-              this.selectImages();
-            })
-
-            // File
-            Column() {
-              Column() {
-                Text('📄')
-                  .fontSize(24)
-              }
-              .width(52)
-              .height(52)
-              .borderRadius(16)
-              .backgroundColor(Color.White)
-              .border({ width: 1, color: '#E0E0E0' })
-              .justifyContent(FlexAlign.Center)
-              .alignItems(HorizontalAlign.Center)
-              Text('File')
-                .fontSize(11)
-                .fontColor('#999999')
-                .margin({ top: 4 })
-            }
-            .alignItems(HorizontalAlign.Center)
-            .layoutWeight(1)
-            .onClick(() => {
-              this.showAttachmentMenu = false;
-              this.selectFiles();
-            })
-          }
-          .width('100%')
-          .padding({ left: 8, right: 8, top: 12, bottom: 12 })
-        }
 
         // Error text
         if (this.errorText) {
