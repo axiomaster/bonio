@@ -36,10 +36,10 @@ const KUN_SHEET_HEIGHT = AVATAR_SIZE * 9;
 const CAPSULE_WIDTH = 420;
 const CAPSULE_WIDTH_PX = `${CAPSULE_WIDTH}px`;
 const CAPSULE_GAP = 16;
-const CUE_OFFSET = AVATAR_SIZE + CAPSULE_GAP;
+const CUE_OFFSET = CAPSULE_WIDTH + CAPSULE_GAP;
 const CUE_WINDOW_WIDTH = AVATAR_SIZE + CAPSULE_GAP + CAPSULE_WIDTH;
 const CUE_WINDOW_WIDTH_PX = `${CUE_WINDOW_WIDTH}px`;
-const CUE_DISMISS_MS = 12000;
+const CUE_DISMISS_MS = 25000;
 
 /** A single rendered capsule row (calendar cues render two: info + jump). */
 class CueDisplayItem {
@@ -432,41 +432,54 @@ struct FloatWindowPage {
     .height(FLOAT_WINDOW_HEIGHT_PX)
     .padding({ top: '14px' })
     .alignItems(HorizontalAlign.Start)
+    .margin(this.cueSide === 'left' ? { right: `${CAPSULE_GAP}px` } : { left: `${CAPSULE_GAP}px` })
   }
 
   @Builder CueCapsule(item: CueDisplayItem) {
     Row() {
       if (item.kind === 'jump') {
         Text(item.title)
-          .fontSize('26px')
+          .fontSize('24px')
           .fontColor('#0A59F7')
           .fontWeight(FontWeight.Medium)
           .textAlign(TextAlign.Center)
+          .layoutWeight(1)
       } else {
         Column() {
           if (item.title !== '') {
             Text(item.title)
               .fontSize('20px')
-              .fontColor('#999999')
+              .fontColor('#888888')
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
           }
           Text(item.content)
-            .fontSize('26px')
-            .fontColor('#222222')
+            .fontSize('24px')
+            .fontColor('#1A1A1A')
+            .fontWeight(FontWeight.Medium)
             .maxLines(2)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
             .margin({ top: item.title !== '' ? '4px' : '0px' })
         }
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1)
+
+        Text('发送')
+          .fontSize('22px')
+          .fontColor('#0A59F7')
+          .fontWeight(FontWeight.Medium)
+          .padding({ left: '10px', right: '10px', top: '4px', bottom: '4px' })
+          .backgroundColor('#F0F4FF')
+          .borderRadius('8px')
+          .margin({ left: '8px' })
       }
     }
     .width(CAPSULE_WIDTH_PX)
     .padding({ left: '16px', right: '16px', top: '12px', bottom: '12px' })
     .backgroundColor('#FFFFFFFF')
-    .border({ width: '1px', color: '#E5E5E5' })
-    .borderRadius('14px')
+    .border({ width: '1px', color: '#E0E0E0' })
+    .borderRadius('16px')
+    .shadow({ radius: 12, color: '#33000000', offsetX: 0, offsetY: 3 })
     .onClick(() => this.handleCueTap(item))
   }
 
@@ -563,7 +576,8 @@ struct FloatWindowPage {
     try {
       if (!this.runtime) throw new Error('Bonio runtime is unavailable');
       const cues = await this.runtime.captureAvatarCues();
-      hilog.info(DOMAIN, TAG, 'magic cue resolved: count=%{public}d', cues.length);
+      hilog.info(DOMAIN, TAG, 'magic cue resolved: count=%{public}d, cues=%{public}s',
+        cues.length, JSON.stringify(cues));
       if (cues.length === 0) {
         // No in-chat question detected — silently degrade to the normal
         // double-tap memory capture so the feature is never a dead end.
@@ -599,6 +613,8 @@ struct FloatWindowPage {
 
   private handleCueTap(item: CueDisplayItem): void {
     if (!this.runtime) return;
+    hilog.info(DOMAIN, TAG, 'handleCueTap: kind=%{public}s, title=%{public}s, content=%{public}s',
+      item.kind, item.title, item.content);
     if (item.kind === 'jump') {
       this.dismissCues();
       this.beginInteraction('completed', '打开日历~', 4000);

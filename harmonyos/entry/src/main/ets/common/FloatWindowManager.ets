@@ -15,7 +15,7 @@ const INITIAL_WINDOW_Y = 100;
 // keeps its absolute screen position.
 const CUE_CAPSULE_WIDTH_PX = 420;
 const CUE_GAP_PX = 16;
-const CUE_OFFSET_PX = FLOAT_WINDOW_WIDTH_PX + CUE_GAP_PX;
+const CUE_OFFSET_PX = CUE_CAPSULE_WIDTH_PX + CUE_GAP_PX;
 const CUE_EXPANDED_WIDTH_PX = FLOAT_WINDOW_WIDTH_PX + CUE_GAP_PX + CUE_CAPSULE_WIDTH_PX;
 
 export class FloatWindowManager {
