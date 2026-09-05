@@ -197,8 +197,11 @@ export class GatewaySession {
     try {
       await this.doConnect();
     } catch (e) {
+      hilog.error(GatewaySession.DOMAIN, GatewaySession.TAG, "[%{public}s] Connect failed: %{public}s", this.role, e instanceof Error ? e.message : String(e));
       console.error('GatewaySession', `Connect failed: ${e instanceof Error ? e.message : String(e)}`);
       this.scheduleReconnect();
+    } finally {
+      this.isConnecting = false;
     }
   }
 
@@ -304,10 +307,11 @@ export class GatewaySession {
   private scheduleReconnect(): void {
     if (!this.desiredEndpoint) return;
     if (this.reconnectTimer !== -1) clearTimeout(this.reconnectTimer);
+    hilog.info(GatewaySession.DOMAIN, GatewaySession.TAG, "[%{public}s] Scheduling reconnect in 1500ms...", this.role);
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = -1;
       this.startConnectLoop();
-    }, 5000);
+    }, 1500);
   }
 
   private async handleMessage(text: string): Promise<void> {
@@ -445,11 +449,15 @@ export class GatewaySession {
         hilog.error(GatewaySession.DOMAIN, GatewaySession.TAG, "[%{public}s] Connect RPC failed: %{public}s (code: %{public}d)", this.role, res.error?.message || "", res.error?.code || 0);
         console.error('GatewaySession', `Connect RPC failed: ${res.error?.message} (code: ${res.error?.code})`);
         this.closeWebSocket();
+        this.onDisconnected(res.error?.message || 'Connect RPC failed');
+        this.scheduleReconnect();
       }
     } catch (e) {
       hilog.error(GatewaySession.DOMAIN, GatewaySession.TAG, "[%{public}s] Connect request error: %{public}s", this.role, (e as Error).message);
       console.error('GatewaySession', `Connect request failed or timed out: ${e instanceof Error ? e.message : String(e)}`);
       this.closeWebSocket();
+      this.onDisconnected((e as Error).message || 'Connect request failed');
+      this.scheduleReconnect();
     }
   }
 

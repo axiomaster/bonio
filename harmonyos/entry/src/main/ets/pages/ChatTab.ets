@@ -173,7 +173,7 @@ export struct ChatTab {
   }
 
   private canSend(): boolean {
-    return !this.isSending && (this.inputText.trim().length > 0 || this.pendingAttachments.length > 0) && this.healthOk;
+    return !this.isSending && (this.inputText.trim().length > 0 || this.pendingAttachments.length > 0);
   }
 
   private send() {
@@ -182,6 +182,9 @@ export struct ChatTab {
     this.inputText = '';
     const atts = [...this.pendingAttachments];
     this.pendingAttachments = [];
+    if (this.runtime && !this.runtime.isConnected) {
+      this.runtime.connectManual();
+    }
     this.runtime?.chatController?.sendMessage(msg, this.thinkingLevel, atts);
   }
 
@@ -304,11 +307,9 @@ export struct ChatTab {
       // The companion-memory conversation is read-only in Chat.
       if (this.sessionLabel === 'chat') {
         Column() {
-        // Control Row: Thinking level
+        // Control Row: Thinking level on left, Interrupt button on right
         Row() {
-          Blank()
-
-          // Thinking level chip
+          // Thinking level chip (on LEFT)
           Button(`Thinking: ${this.thinkingLabel(this.thinkingLevel)}`)
             .type(ButtonType.Normal)
             .height(28)
@@ -325,6 +326,33 @@ export struct ChatTab {
               { value: 'Medium', action: () => { this.thinkingLevel = 'medium'; this.runtime?.chatController?.setThinkingLevel('medium'); } },
               { value: 'High', action: () => { this.thinkingLevel = 'high'; this.runtime?.chatController?.setThinkingLevel('high'); } },
             ])
+
+          Blank()
+
+          // Interrupt / Abort button (on RIGHT)
+          if (this.isSending || this.pendingRunCount > 0 || this.streamingText !== undefined) {
+            Button() {
+              Row() {
+                Text('■')
+                  .fontSize(10)
+                  .fontColor('#E53935')
+                  .margin({ right: 4 })
+                Text('打断')
+                  .fontSize(12)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor('#E53935')
+              }
+            }
+            .type(ButtonType.Normal)
+            .height(28)
+            .borderRadius(8)
+            .backgroundColor('#FFEBEE')
+            .border({ width: 1, color: '#FFCDD2' })
+            .padding({ left: 8, right: 8 })
+            .onClick(() => {
+              this.runtime?.chatController?.abort();
+            })
+          }
         }
         .width('100%')
         .padding({ left: 8, right: 8, top: 4, bottom: 4 })

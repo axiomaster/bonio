@@ -38,6 +38,11 @@ export class SessionListParams {
   limit: number = 50;
 }
 
+export class ChatAbortParams {
+  sessionKey: string = '';
+  runId: string = '';
+}
+
 export class ChatController {
   private session: GatewaySession;
   private supportsChatSubscribe: boolean;
@@ -97,9 +102,32 @@ export class ChatController {
 
   /** Restore the active conversation as soon as the operator session is ready. */
   public onGatewayConnected(mainSessionKey: string | undefined) {
+    this.healthOk = true;
     const key = mainSessionKey?.trim();
     if (this.sessionKey === 'main' && key) this.sessionKey = key;
     void this.bootstrap(true);
+  }
+
+  public async abort(): Promise<void> {
+    const runIds: string[] = [];
+    this.pendingRuns.forEach((id: string) => {
+      runIds.push(id);
+    });
+    if (runIds.length === 0) return;
+
+    for (const runId of runIds) {
+      try {
+        const params = new ChatAbortParams();
+        params.sessionKey = this.sessionKey;
+        params.runId = runId;
+        await this.session.request("chat.abort", params);
+      } catch (_) {}
+    }
+    this.clearPendingRuns();
+    this.pendingToolCalls = [];
+    this.streamingAssistantText = undefined;
+    this.setAvatarAgentState('idle');
+    this.notifyUpdate();
   }
 
   public async setThinkingLevel(level: string) {
@@ -123,9 +151,7 @@ export class ChatController {
     if (trimmed === "" && attachments.length === 0) return;
     
     if (!this.healthOk) {
-      this.errorText = "Gateway health not OK; cannot send";
-      if (this.onChatUpdate) { this.onChatUpdate(); };
-      return;
+      void this.pollHealthIfNeeded(true);
     }
 
     const runId = this.generateUuid();
@@ -224,7 +250,6 @@ export class ChatController {
 
   private async bootstrap(forceHealth: boolean) {
     this.errorText = undefined;
-    this.healthOk = false;
     this.clearPendingRuns();
     this.pendingToolCalls = [];
     this.streamingAssistantText = undefined;

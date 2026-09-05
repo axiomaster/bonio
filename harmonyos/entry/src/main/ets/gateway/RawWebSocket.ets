@@ -391,12 +391,18 @@ export class RawWebSocket {
   public async close(code?: number, reason?: string): Promise<boolean> {
     try {
       if (this.socket) {
-        if (this.isTls) {
-          await (this.socket as socket.TLSSocket).close();
-        } else {
-          await (this.socket as socket.TCPSocket).close();
-        }
+        const s = this.socket;
         this.socket = null;
+        try {
+          s.off('message');
+          s.off('close');
+          s.off('error');
+        } catch (_) {}
+        if (this.isTls) {
+          await (s as socket.TLSSocket).close();
+        } else {
+          await (s as socket.TCPSocket).close();
+        }
       }
       this.isHandshakeComplete = false;
       return true;

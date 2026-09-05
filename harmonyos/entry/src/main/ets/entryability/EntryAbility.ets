@@ -127,6 +127,14 @@ export default class EntryAbility extends UIAbility {
     const runtime = AppStorage.get<NodeRuntime>('nodeRuntime');
     if (runtime) {
       runtime.setForeground(true);
+      if (runtime.prefs.getManualEnabled() && !runtime.isConnected) {
+        hilog.info(DOMAIN, 'testTag', 'onForeground: runtime disconnected, reconnecting...');
+        try {
+          runtime.connectManual();
+        } catch (e) {
+          hilog.error(DOMAIN, 'testTag', 'onForeground reconnect failed: %{public}s', e instanceof Error ? e.message : String(e));
+        }
+      }
     }
   }
 
