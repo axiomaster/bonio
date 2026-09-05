@@ -579,9 +579,13 @@ struct FloatWindowPage {
       hilog.info(DOMAIN, TAG, 'magic cue resolved: count=%{public}d, cues=%{public}s',
         cues.length, JSON.stringify(cues));
       if (cues.length === 0) {
-        // No in-chat question detected — silently degrade to the normal
-        // double-tap memory capture so the feature is never a dead end.
         this.dismissCues();
+        const bundle = this.runtime.lastCaptureBundleName;
+        const isChatApp = bundle.includes('wechat') || bundle.includes('mms') || bundle.includes('msg') || bundle.includes('chat');
+        if (isChatApp) {
+          this.beginInteraction('idle', '暂无未回复的提问~', 3000);
+          return;
+        }
         await this.captureCurrentScreenMemory();
         return;
       }

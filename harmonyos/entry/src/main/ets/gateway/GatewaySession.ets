@@ -28,6 +28,7 @@ export interface InvokeResult {
   originalImageMimeType?: string;
   bundleName?: string;
   appName?: string;
+  title?: string;
   error?: InvokeError;
 }
 

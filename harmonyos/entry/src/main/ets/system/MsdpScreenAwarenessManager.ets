@@ -41,6 +41,7 @@ export interface SmartEdgeSnapshot {
   timestamp: number;
   bundleName?: string;
   appName?: string;
+  title?: string;
   pageId?: string;
   collectStrategy?: number;
   pageTags?: string[];
@@ -363,11 +364,25 @@ export class MsdpScreenAwarenessManager {
   }
 
   private toSmartEdgeSnapshot(result: onScreen.OnscreenAwarenessInfo, report: SmartEdgeReport): SmartEdgeSnapshot {
+    let title: string | undefined = undefined;
+    if (Array.isArray(result.entityInfo)) {
+      for (const ent of result.entityInfo) {
+        if (ent && ent.entityInfo) {
+          const rec = ent.entityInfo as Record<string, Object>;
+          const t = rec['title'];
+          if (typeof t === 'string' && t.trim()) {
+            title = t.trim();
+            break;
+          }
+        }
+      }
+    }
     return {
       resultCode: result.resultCode,
       timestamp: result.timestamp,
       bundleName: result.bundleName,
       appName: result.appName,
+      title: title,
       pageId: result.pageId,
       collectStrategy: result.collectStrategy,
       pageTags: result.pageTags,

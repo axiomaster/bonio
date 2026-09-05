@@ -72,6 +72,7 @@ export class NodeRuntime {
   public memoryService: MemoryService;
   public companionMemoryController: CompanionMemoryController;
   public magicCueController: MagicCueController;
+  public lastCaptureBundleName: string = '';
   public onChatUpdate: (() => void) | undefined = undefined;
 
   // Phase 4: on-device feature coordination (intent / health / notifications).
@@ -367,7 +368,33 @@ export class NodeRuntime {
       throw new Error(`${capture.error?.code || 'SCREEN_AWARENESS_FAILED'}: ${capture.error?.message || 'SmartEdge trigger failed'}`);
     }
     const bundleName = capture.bundleName ?? '';
-    const title = capture.appName ?? '';
+    this.lastCaptureBundleName = bundleName;
+    let title = capture.title ?? '';
+    if (!title && capture.payloadJson) {
+      try {
+        const parsed = JSON.parse(capture.payloadJson) as Record<string, Object>;
+        const entityList = parsed['entityInfo'];
+        if (Array.isArray(entityList) && entityList.length > 0) {
+          for (const ent of entityList as Object[]) {
+            if (typeof ent === 'object' && ent !== null) {
+              const entObj = ent as Record<string, Object>;
+              const subInfo = entObj['entityInfo'] as Record<string, Object> | undefined;
+              if (subInfo && typeof subInfo['title'] === 'string' && subInfo['title'].trim()) {
+                title = subInfo['title'].trim();
+                break;
+              }
+              if (typeof entObj['title'] === 'string' && entObj['title'].trim()) {
+                title = entObj['title'].trim();
+                break;
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
+    if (!title) {
+      title = capture.appName ?? '';
+    }
     return await this.magicCueController.run(capture.payloadJson, bundleName, title);
   }
 

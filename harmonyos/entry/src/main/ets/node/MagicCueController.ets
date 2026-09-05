@@ -18,7 +18,7 @@ class MagicCueChatParams {
   idempotencyKey: string = '';
 }
 
-const MAX_CUES = 3;
+const MAX_CUES = 2;
 const RUN_TIMEOUT_MS = 90000;
 const MAX_PAYLOAD_LENGTH = 60000;
 
@@ -169,7 +169,7 @@ export class MagicCueController {
    * syntax/layout items (IfElse, SyntaxItem, Column, bbox, actions) that can
    * exceed 100KB. We extract only visible content/description text in order.
    */
-  private extractScreenText(rawPayload: string): string {
+  private extractScreenText(rawPayload: string, title?: string): string {
     const trimmed = rawPayload.trim();
     if (!trimmed) return '';
 
@@ -182,13 +182,53 @@ export class MagicCueController {
         const val = text.trim();
         if (!val) return;
         if (['OTHERS', 'UiTree', 'Screenshot', 'LoadModule', 'Na', 'FontWeight.Normal'].includes(val)) return;
+        if (/^\d{1,2}:\d{2}$/.test(val) || /^\d{1,2},\s*:\s*,\s*\d{1,2}$/.test(val) || /^\d{1,3}%?$/.test(val)) return;
+        if (val.includes('休息中') || val.includes('有事叫我') || val.includes('帮我回') || val.includes('发送中')) return;
+        if (title && val === title) return;
         if (lines.length === 0 || lines[lines.length - 1] !== val) {
           lines.push(val);
         }
       };
 
+      const getCompTop = (comp: Record<string, Object>): number => {
+        if (typeof comp['top'] === 'number') return comp['top'] as number;
+        if (typeof comp['y'] === 'number') return comp['y'] as number;
+        if (typeof comp['bbox'] === 'object' && comp['bbox'] !== null) {
+          const b = comp['bbox'];
+          if (Array.isArray(b) && b.length >= 2 && typeof b[1] === 'number') return b[1] as number;
+          const bObj = b as Record<string, Object>;
+          if (typeof bObj['top'] === 'number') return bObj['top'] as number;
+          if (typeof bObj['y'] === 'number') return bObj['y'] as number;
+        }
+        const rect = comp['rect'] as Record<string, Object> | undefined;
+        if (rect) {
+          if (typeof rect['top'] === 'number') return rect['top'] as number;
+          if (typeof rect['y'] === 'number') return rect['y'] as number;
+        }
+        const bounds = typeof comp['bounds'] === 'string' ? comp['bounds'] as string : undefined;
+        if (bounds) {
+          const m = bounds.match(/\[\d+,\s*(\d+)\]/);
+          if (m) return parseInt(m[1], 10);
+        }
+        return -1;
+      };
+
       const extractFromComponents = (components: Object[]): void => {
-        for (const item of components) {
+        const sortedComps = [...components];
+        const hasTop = sortedComps.some((item: Object) => {
+          if (typeof item !== 'object' || item === null) return false;
+          return getCompTop(item as Record<string, Object>) >= 0;
+        });
+        if (hasTop) {
+          sortedComps.sort((a: Object, b: Object) => {
+            const topA = (typeof a === 'object' && a !== null) ? getCompTop(a as Record<string, Object>) : -1;
+            const topB = (typeof b === 'object' && b !== null) ? getCompTop(b as Record<string, Object>) : -1;
+            if (topA >= 0 && topB >= 0) return topA - topB;
+            return 0;
+          });
+        }
+
+        for (const item of sortedComps) {
           if (typeof item !== 'object' || item === null) continue;
           const comp = item as Record<string, Object>;
           const content = typeof comp['content'] === 'string' ? (comp['content'] as string) : undefined;
@@ -215,6 +255,9 @@ export class MagicCueController {
               const comps = tree['components'];
               if (Array.isArray(comps)) {
                 extractFromComponents(comps as Object[]);
+                if (lines.length > 0) {
+                  break;
+                }
               }
             } catch (_) {
               // Ignore single tree parse failure
@@ -232,7 +275,7 @@ export class MagicCueController {
       if (lines.length === 0 && typeof parsed['content'] === 'string') {
         addLine(parsed['content'] as string);
       }
-      if (Array.isArray(parsed['paragraphs'])) {
+      if (lines.length === 0 && Array.isArray(parsed['paragraphs'])) {
         for (const p of parsed['paragraphs'] as Object[]) {
           if (typeof p === 'object' && p !== null) {
             const pObj = p as Record<string, Object>;
@@ -243,6 +286,17 @@ export class MagicCueController {
       }
 
       if (lines.length > 0) {
+        // If the last line is an isolated short label/name (e.g. Action Bar title / contact name at the end of UiTree),
+        // remove it from the bottom of chat messages so it cannot be mistaken for a question.
+        if (lines.length > 1) {
+          const last = lines[lines.length - 1];
+          const isQuestionLike = /(吗|谁|哪|多|号|发|请|\?|？|联系|手机|电话|邮箱|微信|日程|时间|在哪)/.test(last);
+          if (last.length <= 4 && !isQuestionLike) {
+            lines.pop();
+          }
+        }
+        hilog.info(MagicCueController.DOMAIN, MagicCueController.TAG, 'extracted screen text (%{public}d lines):\n%{public}s',
+          lines.length, lines.join('\n'));
         return lines.join('\n');
       }
     } catch (_) {
@@ -256,11 +310,21 @@ export class MagicCueController {
     while ((match = contentRegex.exec(trimmed)) !== null) {
       const val = match[1].trim();
       if (!val || ['OTHERS', 'UiTree', 'Screenshot', 'LoadModule', 'Na', 'FontWeight.Normal'].includes(val)) continue;
+      if (title && val === title) continue;
       if (lines.length === 0 || lines[lines.length - 1] !== val) {
         lines.push(val);
       }
     }
     if (lines.length > 0) {
+      if (lines.length > 1) {
+        const last = lines[lines.length - 1];
+        const isQuestionLike = /(吗|谁|哪|多|号|发|请|\?|？|联系|手机|电话|邮箱|微信|日程|时间|在哪)/.test(last);
+        if (last.length <= 4 && !isQuestionLike) {
+          lines.pop();
+        }
+      }
+      hilog.info(MagicCueController.DOMAIN, MagicCueController.TAG, 'extracted screen text regex (%{public}d lines):\n%{public}s',
+        lines.length, lines.join('\n'));
       return lines.join('\n');
     }
 
@@ -268,31 +332,37 @@ export class MagicCueController {
   }
 
   private buildPrompt(screenPayload: string, bundleName: string, title: string): string {
-    const cleanText = this.extractScreenText(screenPayload);
-    // In chat screens, new messages are at the bottom. If the text exceeds the
-    // length limit, retain the tail (most recent messages) instead of cutting
-    // off the latest question from the peer.
+    const cleanText = this.extractScreenText(screenPayload, title);
     let payload = cleanText;
     if (payload.length > MAX_PAYLOAD_LENGTH) {
       payload = `[早期屏幕内容已省略]\n${payload.substring(payload.length - MAX_PAYLOAD_LENGTH)}`;
     }
 
-    return '你是 Bonio 的 Magic Cue 助手。以下是手机当前屏幕的内容（应用：' + bundleName + '，标题：' + title + '）：\n'
+    const titleHint = title ? `会话对象/标题：【${title}】` : '';
+
+    return '你是 Bonio 的 Magic Cue 助手。以下是手机当前屏幕的内容（应用：' + bundleName + (titleHint ? '，' + titleHint : '') + '）：\n'
       + '<屏幕文本>\n' + payload + '\n</屏幕文本>\n\n'
-      + '判断屏幕上的对话是否有人在【询问】以下类别的信息：\n'
-      + '- 联系人（某人的电话/公司/邮箱）\n'
-      + '- 日程安排（某天/某个活动的时间和地点）\n'
-      + '- 记忆（以前记下的内容，如某家餐厅、某个订单、某个地址）\n\n'
-      + '规则：\n'
-      + '1. 只处理“询问”，不是陈述。没人问 → 返回 {"cues":[]}。\n'
-      + '2. 需要数据时调用工具取真实数据：contacts.search（联系人）、calendar.events（日历）、'
-      + 'memo_list（记忆，用 query 关键词过滤）。工具查不到 → 不产出该 cue，禁止编造。\n'
-      + '3. 针对联系人查询：若对方明确询问“手机号/电话号码”，如果通讯录中找到了该联系人但未登记手机号码（phones 为空），'
-      + '不得单独将邮箱当作手机号输出；可在 content 中明确说明“未登记手机号码（可用邮箱：xxx）”或不产出 cue，严禁把邮箱当作电话号码提供。\n'
-      + '4. 排除：验证码、密码、支付/银行卡信息 —— 一律忽略。\n'
-      + '5. 最多 3 条。content 是准备直接发给对方的完整答案文本（如“张三：138xxxx8888”），'
-      + '不是入口或“去日历查看”。\n'
-      + '6. 只输出 JSON，不要输出 Markdown 或多余文字：'
-      + '{"cues":[{"kind":"contact|calendar|memo","title":"…","content":"…"}]}';
+      + '请严格按以下规则分析屏幕对话，决定是否为用户生成快捷回复胶囊：\n\n'
+      + '【核心时序规则：只答复最后一次的问题】\n'
+      + '1. 屏幕文本是按时间从上到下的聊天记录（上方是早前历史消息，下方是最新消息）。\n'
+      + '2. 在整段对话中，找出按时序出现的【最后一次（最底部、最新的一条）】明确向用户询问特定信息的提问（例如索要某人的手机号/电话/邮箱/日程/记忆等）。\n'
+      + '3. 绝对忽略所有历史旧问题！无论历史提问内容是什么，严禁处理或列出历史上更早的问题，绝不在胶囊中混杂历史旧问题的答案！\n'
+      + (title ? '4. 忽略页面顶部的标题栏与会话对象名称【' + title + '】，那只是当前聊天对象姓名或群名，绝对不是提问，严禁对【' + title + '】调用工具或生成胶囊。\n\n' : '4. 忽略页面顶部的标题栏与会话对象名称，严禁对标题名字调用工具或产出胶囊。\n\n')
+      + '【关键规则：已回复检查（如果用户已经回复过了，那就不需要回复了）】\n'
+      + '5. 定位到这【最后一次提问】后，必须检查该提问在对话中是否【已经得到回复】：\n'
+      + '   a. 如果在该提问下方（或紧随其后）已经出现了相应的答复（包括用户手动发出的消息、或者对话中给出的号码/内容），说明该问题【已经回复过了】。\n'
+      + '   b. 如果屏幕最底部的消息本身就是回答、陈述或闲聊，且没有处于等待回复状态的最新提问，说明所有问题均已回复完毕。\n'
+      + '   c. 只要最后一次提问已经回复过了，就【完全不需要再回复】，必须直接返回 {"cues":[]}，绝不能弹出任何旧胶囊！\n'
+      + '   d. 只有当且仅当这【最后一次提问】处于【未回复/等待回答】状态（即其下方尚未出现任何针对该提问的答复）时，才针对该提问生成胶囊。\n\n'
+      + '【单意图与数据真实性】\n'
+      + '6. 如果存在最新未回复的提问，只针对这【一个】最新提问调用工具获取真实数据：\n'
+      + '   contacts.search（联系人）、calendar.events（日历）、memo_list（记忆）。\n'
+      + '   生成 1 条（若有主号/副号等明确备选最多 2 条）针对该提问的答案，严禁跨越多个不同问题混杂输出。\n'
+      + '7. 针对联系人查询：若对方明确要电话/手机号，通讯录中找到了该联系人但未登记手机号码（phones 为空），严禁拿邮箱当作手机号提供；可在 content 中说明“未登记手机号码”或返回 {"cues":[]}。\n'
+      + '8. 排除：验证码、密码、支付转账/银行卡信息 —— 一律忽略。\n\n'
+      + '【输出格式】\n'
+      + '只输出纯 JSON，不要 Markdown 代码块或多余解释文字：\n'
+      + '{"cues":[{"kind":"contact|calendar|memo","title":"…","content":"…"}]}\n'
+      + '若无需回复或未找到，返回 {"cues":[]}。';
   }
 }

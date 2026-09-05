@@ -119,6 +119,7 @@ export class ScreenHandlerImpl implements ScreenHandler {
         originalImageMimeType: snapshot.originalImageMimeType,
         bundleName: snapshot.bundleName,
         appName: snapshot.appName,
+        title: snapshot.title,
       };
     } catch (error) {
       return this.makeAwarenessError(error);
