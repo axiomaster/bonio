@@ -1,0 +1,24 @@
+harmonyos/entry/src/main/ets/common/SecurePrefs.ets
+  s_65a1faaab12715::t_19826060c0ad3c 194
+harmonyos/entry/src/main/ets/entryability/EntryAbility.ets
+  s_65a1faaab12715::t_2a177c1ac0ec24 15
+  s_65a1faaab12715::t_47bdbe1fffb9c4 153-181
+  s_65a1faaab12715::t_e0343ced6a58a1 101-107
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "ac7a93e13c3c050d6223e7566157e54e98f68bd0",
+  "prompts": {},
+  "sessions": {
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 88
+    }
+  }
+}
