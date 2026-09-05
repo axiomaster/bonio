@@ -33,30 +33,32 @@ Google 官方评测中暴露的教训（我们直接吸收为设计约束）：
 | 决策项 | 结论 |
 |---|---|
 | 触发方式（V1） | 双击 avatar 手动触发；被动自动识别列为后续版本 |
-| 备忘录来源 | Bonio 自己的 memo 存储；系统备忘录为后续扩展（当前无公开 API） |
+| 备忘录来源（2026-09-05 更新） | **Bonio 自身 memo 存储 + 手机系统备忘录数据库直读**。针对已 root 设备，由 DSH（root 权限进程）直接读取华为备忘录 SQLite 数据库（`/data/app/el2/100/database/com.huawei.hmos.notepad/rdb/notepad.db-dwr`），打破无公开 API 限制，备忘录开关全面解封并启用 |
+| 短信数据源（2026-09-05 补充确认） | **精准确认为“读取短信”**（`ohos.permission.READ_MESSAGES`，非发短信）。支持通过 DSH 直接读取短信数据库（`/data/app/el2/100/database/com.ohos.telephonydataability/rdb/sms_mms.db`），满足智能体检索与填发短信内容需求 |
+| 通知数据源（2026-09-05 补充确认） | 通过特权权限 `ohos.permission.NOTIFICATION_CONTROLLER`（`system_core` ACL 静态授权）与系统即时通知感知机制，支持对各应用通知的语义感知与即时处理 |
 | 匹配引擎 | 云端 LLM，复用 dsh 链路（与现有双击识别一致） |
 | 点击胶囊行为 | 填入当前聊天输入框并发送（用户原始需求明确） |
-| **Magic Cue 定位（2026-09-05 补充确认）** | **默认功能，无功能开关**。双击 avatar 总是先跑 Magic Cue；没有命中时静默降级为原双击记忆流程，不让用户感知到“功能关掉/开起来” |
-| **设置页展示项（2026-09-05 补充确认）** | **不展示 Magic Cue 开关**；展示的是 Magic Cue 依赖的**数据源授权项**（联系人 Contacts / 日历 Calendar toggle）。Memo 是 Bonio 自有存储，无需授权，不展示 |
-| **授权交互（2026-09-05 补充确认）** | **标准 user_grant**：用户在 Settings 点开某数据源 toggle 时才弹对应授权框；**app 启动绝不自动弹窗**。数据源权限不进 ACL（NORMAL user_grant 必须在系统设置可见可 revoke） |
-| **未授权时的行为** | 数据源未授权 → 该类型不参与推荐（contacts.search / calendar.events 命令不广播给 agent），但 Magic Cue 其余数据源（如 memo）照常工作 |
+| **Magic Cue 定位** | **默认功能，无功能开关**。双击 avatar 总是先跑 Magic Cue；没有命中时静默降级为原双击记忆流程，不让用户感知到“功能关掉/开起来” |
+| **数据源授权展示位置（2026-09-05 重构）** | **从设置页迁移至“自定义页面”（Tab 2, SkillsTab）**底部的**“系统数据授权访问范围”**，统一集中管理 7 项系统数据权限（通讯录、短信、通知、日历、备忘录、图库、文管）；设置页（Tab 3）收敛为底层连接与基础硬件权限，删除冗余 Node Info |
+| **页面极简设计规范（2026-09-05 确认）** | **移除所有页面顶部冗余文字说明**（如 Chat 顶部无文字说明、Memory 顶部去除“记忆”大字直接为搜索框、自定义与设置页面顶部去除说明段落） |
+| **授权交互与 UI 状态机（2026-09-05 攻坚）** | **标准 user_grant + 独立响应式组件**：自定义组件 `SettingToggleRow` 采用 `@Prop @Watch('onPropChange')` + 异步 `Promise<boolean>` 结果反写，解决 ArkTS 原生 Switch 在权限被拒时 UI 回弹不刷新的缺陷；用户开启时按需弹窗授权，**app 启动绝不自动弹窗** |
+| **未授权时的行为** | 数据源未授权 → 该类型不参与推荐（对应命令不广播给 agent），但 Magic Cue 其余数据源照常工作 |
 
 ## 3. 范围
 
 ### V1 目标（in scope）
 
-1. 双击触发识别 + 信息询问匹配（联系人 / 日历 / Bonio memo 三类）
+1. 双击触发识别 + 信息询问匹配（联系人 / 日历 / 备忘录 / 短信 / 记忆等）
 2. 侧边横条胶囊 UI（按 avatar 位置决定弹出方向）
 3. 点击胶囊 → 填入输入框 → 发送
-4. 设置页的 **Magic Cue 数据源授权项**（Contacts / Calendar）与标准运行时授权引导
+4. 自定义页面（Tab 2）的 **系统数据授权访问范围**（通讯录、短信、通知、日历、备忘录、图库、文管共 7 项）集中授权与持久化管理
+5. 特权签名与系统权限集成（`system_core` ACL、`tools/hapsigner` 签名）
 
 ### 非目标（out of scope，V1 不做）
 
 - **被动自动识别**（后台监听屏幕/通知自动弹胶囊）——后续版本
-- **系统备忘录读取**——无公开 API，后续 root 变通方案另立题
-- **短信内容作为数据源**——HarmonyOS 无公开读取 API（权限存在但无接口可调），V1 放弃
 - 验证码 / 密码 / 支付类信息的识别与填充——安全红线，明确排除
-- 桌面端（Flutter）与 Android 端
+- 桌面端（Flutter）与 Android 端（当前以 HarmonyOS 平台为先锋验证）
 
 ## 4. 功能需求
 
@@ -104,32 +106,42 @@ Google 官方评测中暴露的教训（我们直接吸收为设计约束）：
 - 目标输入框位置：默认屏幕底部居中（微信等聊天应用输入栏的典型位置），提供一次性校准入口（用户长按胶囊 2s 进入校准模式，点选输入框位置）。
 - 点击**跳转胶囊**（"查看日历"）→ 打开系统日历应用（不注入、不发送）；打开后胶囊组收起。
 
-### FR6 设置与权限（数据源授权，非功能开关）
+### FR6 设置与系统数据授权访问范围（自定义页面集中管理）
 
-**产品逻辑：** Magic Cue 是 Bonio 的默认能力（双击分析屏幕、命中询问时给答案），**没有“开/关 Magic Cue”的概念**。设置页权限区展示的是 Magic Cue 可选用的**数据源**——用户决定 Bonio 可以读哪些个人数据；不授权某个源，Magic Cue 就不推荐那一类，其余照常工作（例如只开联系人时，日历类询问静默不弹胶囊，联系人/记忆类不受影响）。
+**产品逻辑：** Magic Cue 是 Bonio 的默认能力（双击分析屏幕、命中询问时给出答案），**没有“开/关 Magic Cue”的概念**。原先分散在设置页的权限管理现已重构并升级为**自定义页面（Tab 2, SkillsTab）底部的“系统数据授权访问范围”**——由用户集中控制 Bonio 可以访问哪些个人与系统数据；未授权的数据源不参与推荐，其余已授权项照常工作。
 
-- **设置项**：`Permissions` 区新增两个 toggle——
-  - **Contacts**（通讯录）：授权 `ohos.permission.READ_CONTACTS`（user_grant）；
-  - **Calendar**（日历）：授权 `ohos.permission.READ_CALENDAR`（user_grant）。
-  - 副标题均注明用途（“Magic Cue recommends … when the chat asks”）。
-  - Memo 无需授权（Bonio 自有存储），不设 toggle。
-- **授权交互（标准 user_grant，禁止启动弹窗）**：
-  - toggle **从关→开**时立即 `requestPermissionsFromUser` 弹授权框；拒绝则不开启该源并轻提示。
-  - toggle 状态 = 当前系统授权状态（系统设置里 revoke 后回 App 自动变灰）。
-  - **EntryAbility 不得在启动/冷启动时自动请求任何 user_grant 权限**。
-- **权限级别**：READ_CONTACTS / READ_CALENDAR 均为 **NORMAL 级 user_grant**，**不得写入签名 profile 的 allowed-acls**（否则系统按 ACL 静态授予、设置里无 toggle、底层 dataability 无授权记录——已踩坑，见架构文档 §3.7）。
-- **能力联动**：某数据源授权后才把对应命令（`contacts.search` / `calendar.events`）广播给 dsh agent；未授权不广播 → agent 查不到 → 该类型 cue 自动缺席。toggle 变更后重连 node 会话即时生效。
+- **页面定位与职责划分**：
+  - **自定义页面（Tab 2, SkillsTab）**：用户个性化与数据授权中心，包含 Avatar 皮肤下拉、大模型配置卡片、WeChat 连接、Skills 技能开关，以及底部的**系统数据授权访问范围（7 项开关）**；页面顶部无多余冗余文字说明。
+  - **设置页面（Tab 3, SettingsTab）**：基础底层运行设置，包含 DSH 后端连接、全局桌面宠物悬浮窗开关以及系统底层基础硬件权限（定位、语音唤醒、相机、录屏、屏幕感知）；Node Info 区域与业务数据权限全部移除。
+- **系统数据授权访问范围清单（7 项）**：
+  1. **通讯录**：授权 `ohos.permission.READ_CONTACTS`（user_grant），允许读取联系人信息；
+  2. **短信**：确认为**读取短信**（`ohos.permission.READ_MESSAGES`），允许智能体读取和检索短信内容；底层由 DSH 直读 SQLite 数据库；
+  3. **通知**：授权 `ohos.permission.NOTIFICATION_CONTROLLER`（`system_core` ACL 静态授权），允许智能体感知各应用即时通知；
+  4. **日历**：授权 `ohos.permission.READ_CALENDAR`（user_grant），允许读取日程与日历；
+  5. **备忘录**：允许读取和记录便签备忘；支持 Bonio memo 及 DSH 直接读取华为备忘录 SQLite 数据库（`/data/app/el2/100/database/com.huawei.hmos.notepad/rdb/notepad.db-dwr`），开关全面启用；
+  6. **图库**：授权 `ohos.permission.READ_IMAGEVIDEO`（user_grant），允许读取相册与图片媒体；
+  7. **文管**：授权 `ohos.permission.READ_WRITE_DOCUMENTS_DIRECTORY`（user_grant），允许访问文档与本地文件。
+- **授权交互与 UI 响应式机制（解决 ArkTS 原生 Switch 缺陷）**：
+  - 自定义封装 `@Component struct SettingToggleRow`，绑定 `@Prop @Watch('onPropChange') isOn: boolean` 与内部状态；
+  - `onChange` 扩展为 `Promise<boolean>` 异步模式：用户点击开启时触发 `requestPermissionsFromUser` 或后台使能；若用户在系统弹窗中拒绝授权，Toggle 开关平滑反向动画回弹复位，绝不留存错误视觉状态；
+  - **EntryAbility 启动零弹窗**：应用冷启动时绝不自动申请任何 `user_grant` 权限，完全按需触发。
+- **特权签名与 ACL 配置**：
+  - `ohos.permission.READ_MESSAGES` 与 `ohos.permission.READ_WRITE_DOCUMENTS_DIRECTORY` 写入 `msdpdemo-system-core-profile.json` 的 `allowed-acls` 与 `restricted-permissions`；
+  - 通过 `tools/hapsigner` 签署 `system_core` 权限 profile 与 HAP 包。
+- **能力联动**：某数据源授权后才把对应能力/命令广播给 dsh agent；未授权不广播 → agent 查不到 → 该类型 cue 自动缺席。toggle 变更后调 `refreshNodeCapabilities()` 重连 node 会话即时生效。
 - **双击兜底**：Magic Cue 无命中时静默降级为原双击记忆流程（非死路、不报错）。
 
 ## 5. 数据源可行性（调研结论）
 
-| 数据源 | 可行性 | API / 权限 | 备注 |
+| 数据源 | 可行性 | API / 权限 / 数据路径 | 备注 |
 |---|---|---|---|
-| 联系人 | ✅ | `@ohos.contact` queryContacts 等；`READ_CONTACTS`（**NORMAL 级 user_grant**，**不进 profile allowed-acls**，系统设置可见可 revoke） | 标准运行时弹窗授权（Settings 数据源 toggle 触发） |
-| 日历 | ✅ | `@ohos.calendarManager` getEvents；`READ_CALENDAR`（normal）；全量 `READ_WHOLE_CALENDAR`（system_basic ACL） | V1 先读本应用可见日历；需要全量再升权限 |
-| Bonio memo | ✅ | 现有 `memo.list` / `listMemos`，需加 query 参数 | 双击记忆的历史数据直接可用 |
-| 短信读取 | ❌ | 无公开 API（`READ_MESSAGES` 权限存在但无消费接口） | V1 放弃 |
-| 系统备忘录 | ❌ | 无任何公开 API | 后续扩展 |
+| 联系人 | ✅ | `@ohos.contact` queryContacts 等；`READ_CONTACTS`（**NORMAL 级 user_grant**，系统设置可见可 revoke） | 标准运行时弹窗授权，`contacts.search` 模糊匹配 |
+| 日历 | ✅ | `@ohos.calendarManager` getEvents；`READ_CALENDAR`（normal user_grant）；`calendar.events` | 标准运行时弹窗授权，默认 ±7 天，支持双胶囊（信息+跳转系统日历） |
+| 备忘录 | ✅ | Bonio 本地 `memo_list` + 华为系统备忘录数据库直读（`/data/app/el2/100/database/com.huawei.hmos.notepad/rdb/notepad.db-dwr`） | **2026-09-05 全面解封**：DSH root 直接读取 SQLite 数据库，无需公开 API 即可读取便签待办 |
+| 短信读取 | ✅ | `ohos.permission.READ_MESSAGES`（`system_basic`，声明于 profile `allowed-acls`） + Telephony SQLite 直读（`/data/app/el2/100/database/com.ohos.telephonydataability/rdb/sms_mms.db`） | **2026-09-05 精准落地**：确认为读取短信，DSH root 数据库直读彻底解决商用 PrivacyCenter 拦截弹窗问题 |
+| 通知感知 | ✅ | `ohos.permission.NOTIFICATION_CONTROLLER`（`system_core` ACL 静态授权） + `NotificationSubscriberExtensionAbility` | **2026-09-05 落地**：系统级通知感知，支持来信与各应用通知语义分析 |
+| 图库 | ✅ | `@ohos.file.picker` / `READ_IMAGEVIDEO`（user_grant） | 标准运行时授权，支持读取相册图片多媒体 |
+| 文管 | ✅ | `ohos.permission.READ_WRITE_DOCUMENTS_DIRECTORY`（user_grant / ACL） + DSH 本地文件系统全盘访问 | 访问本地文档与文件 |
 
 ## 6. 隐私
 
