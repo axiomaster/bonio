@@ -1,0 +1,33 @@
+harmonyos/entry/src/main/ets/entryability/EntryAbility.ets
+  h_de08bd40967a17 130-137
+harmonyos/entry/src/main/ets/gateway/GatewaySession.ets
+  h_de08bd40967a17 200,203-204,310,314,452-453,459-460
+harmonyos/entry/src/main/ets/gateway/RawWebSocket.ets
+  h_de08bd40967a17 394-400,402,404
+harmonyos/entry/src/main/ets/node/chat/ChatController.ets
+  h_de08bd40967a17 41-45,105,111-132,154
+harmonyos/entry/src/main/ets/pages/ChatTab.ets
+  h_de08bd40967a17 176,185-187,310,312,329-355
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "73898125b741fc6fefcfeba9f462470bd99b28cf",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  },
+  "sessions": {
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 36
+    }
+  }
+}
