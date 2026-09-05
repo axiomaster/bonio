@@ -247,15 +247,15 @@ export struct ChatTab {
 
         // SPK toggle (right)
         Button() {
-          Row() {
-            Text(this.isSpeakerEnabled ? '🔊' : '🔇')
-              .fontSize(16)
-          }
+          Image(this.isSpeakerEnabled ? $r('app.media.ic_speaker_on') : $r('app.media.ic_speaker_off'))
+            .width(18)
+            .height(18)
+            .fillColor(this.isSpeakerEnabled ? '#0A59F7' : '#888888')
         }
-        .type(ButtonType.Normal)
-        .width(36)
+        .type(ButtonType.Capsule)
+        .width(32)
         .height(28)
-        .borderRadius(8)
+        .borderRadius(14)
         .backgroundColor(this.isSpeakerEnabled ? '#E3F2FD' : '#F0F0F0')
         .onClick(() => {
           this.isSpeakerEnabled = !this.isSpeakerEnabled;
