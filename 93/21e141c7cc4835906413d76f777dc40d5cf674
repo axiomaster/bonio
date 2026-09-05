@@ -1,0 +1,33 @@
+docs/design/prd/20260905-phone-use-sop-prd.md
+  s_65a1faaab12715::t_35728678d5369c 3,5,12,14-18,22-46,54-60,64,66-73
+docs/blog/cn/11-phone-use-and-sop.md
+  s_65a1faaab12715::t_35728678d5369c 3,9,13,43-44,50-53,55,57,61-63,67,69,71-81,87
+docs/design/arch/20260905-phone-use-sop-arch.md
+  s_91a7be1e9195c9::t_a1fdbb7fb1c853 1,5,12-13,15-18,22,24,37,39,41,49-54,60-78,80-96,100,102,104,106-112,114-122,124-196,199-217,221,223,228-229,233-235,237-239,242,245-247,249-257,260-263,265-267,269-275,277-278,280,282-286,288,290-292
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "9321e141c7cc4835906413d76f777dc40d5cf674",
+  "prompts": {},
+  "sessions": {
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "glm-5.3"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 73
+    },
+    "s_91a7be1e9195c9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a2ea17a1bdfedd0a9",
+        "model": "unknown"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 0
+    }
+  }
+}
