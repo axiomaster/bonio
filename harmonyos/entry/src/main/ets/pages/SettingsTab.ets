@@ -29,6 +29,8 @@ export struct SettingsTab {
   @State cameraEnabled: boolean = false;
   @State screenRecordEnabled: boolean = false;
   @State screenAwarenessEnabled: boolean = false;
+  @State contactsEnabled: boolean = false;
+  @State calendarEnabled: boolean = false;
   @State serverName: string = '';
   @State remoteAddress: string = '';
 
@@ -78,6 +80,13 @@ export struct SettingsTab {
         this.cameraEnabled = false;
         this.runtime?.prefs.setCameraEnabled(false);
       }
+
+      // Magic Cue data sources: toggle state mirrors the actual grant. A user
+      // who revokes in system Settings flips the switch off here on next view.
+      const contactsStatus = await atManager.checkAccessToken(tokenID, "ohos.permission.READ_CONTACTS");
+      this.contactsEnabled = contactsStatus === abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED;
+      const calendarStatus = await atManager.checkAccessToken(tokenID, "ohos.permission.READ_CALENDAR");
+      this.calendarEnabled = calendarStatus === abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED;
     } catch (e) {
       hilog.error(0x3D00, 'SettingsTab', `syncWithSystemPermissions failed: ${e}`);
     }
@@ -324,6 +333,38 @@ export struct SettingsTab {
                 this.screenAwarenessEnabled = false;
                 this.runtime?.setScreenAwarenessEnabled(false);
               }
+            })
+        }
+        ListItem() {
+          this.ToggleRow("Contacts", "Magic Cue recommends contacts when the chat asks",
+            this.contactsEnabled,
+            async (enabled: boolean) => {
+              if (enabled) {
+                const granted = await this.requestPermission("ohos.permission.READ_CONTACTS" as Permissions);
+                this.contactsEnabled = granted;
+                this.runtime?.prefs.setContactsEnabled(granted);
+              } else {
+                this.contactsEnabled = false;
+                this.runtime?.prefs.setContactsEnabled(false);
+              }
+              // Re-advertise node commands so the agent sees/forgets contacts.search.
+              this.runtime?.refreshNodeCapabilities();
+            })
+        }
+        ListItem() {
+          this.ToggleRow("Calendar", "Magic Cue recommends calendar events when the chat asks",
+            this.calendarEnabled,
+            async (enabled: boolean) => {
+              if (enabled) {
+                const granted = await this.requestPermission("ohos.permission.READ_CALENDAR" as Permissions);
+                this.calendarEnabled = granted;
+                this.runtime?.prefs.setCalendarEnabled(granted);
+              } else {
+                this.calendarEnabled = false;
+                this.runtime?.prefs.setCalendarEnabled(false);
+              }
+              // Re-advertise node commands so the agent sees/forgets calendar.events.
+              this.runtime?.refreshNodeCapabilities();
             })
         }
       }

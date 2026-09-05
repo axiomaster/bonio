@@ -532,6 +532,21 @@ export class NodeRuntime {
     this.nodeSession.disconnect();
   }
 
+  /**
+   * Reconnect only the node session so its advertised commands (Magic Cue
+   * data sources: contacts.search / calendar.events) reflect the latest
+   * grant state from Settings. The operator session stays untouched.
+   */
+  public refreshNodeCapabilities(): void {
+    if (!this.connectedEndpoint) return;
+    const endpoint = this.connectedEndpoint;
+    const token = this.prefs.getGatewayToken();
+    const nodeOpts = this.connectionManager.buildNodeConnectOptions();
+    this.nodeStatusText = "Connecting…";
+    this.updateStatus();
+    this.nodeSession.connect(endpoint, token, token, nodeOpts);
+  }
+
   public setScreenAwarenessEnabled(enabled: boolean): void {
     this.prefs.setScreenAwarenessEnabled(enabled);
     this.screenHandler.setScreenAwarenessEnabled(enabled);

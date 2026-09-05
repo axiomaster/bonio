@@ -12,7 +12,6 @@ const DOMAIN = 0x3D00;
 export default class EntryAbility extends UIAbility {
   private initPromise: Promise<void> | undefined = undefined;
   private isBackgroundRunning: boolean = false;
-  private magicCuePermsRequested: boolean = false;
 
   async onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): Promise<void> {
     hilog.info(DOMAIN, 'testTag', '!!! EntryAbility onCreate - com.example.msdpdemo STARTING !!!');
@@ -99,12 +98,6 @@ export default class EntryAbility extends UIAbility {
         });
       }, 800);
 
-      // Magic Cue is a default feature: request the contacts/calendar read
-      // permissions automatically on first launch so double-tap answers work
-      // without a settings toggle.
-      setTimeout(() => {
-        void this.requestMagicCuePermissions();
-      }, 1200);
     });
 
     // DSH refactor: auto-connect to the on-device dsh bonio-bridge so the
@@ -147,35 +140,6 @@ export default class EntryAbility extends UIAbility {
       if (runtime.isConnected) {
         this.startBackgroundRunning();
       }
-    }
-  }
-
-  private async requestMagicCuePermissions(): Promise<void> {
-    if (this.magicCuePermsRequested) return;
-    this.magicCuePermsRequested = true;
-    try {
-      const atManager = abilityAccessCtrl.createAtManager();
-      const tokenID = this.context.applicationInfo.accessTokenId;
-      const perms: Permissions[] = [
-        'ohos.permission.READ_CONTACTS' as Permissions,
-        'ohos.permission.READ_CALENDAR' as Permissions,
-      ];
-      const missing: Permissions[] = [];
-      for (const perm of perms) {
-        const grant = await atManager.checkAccessToken(tokenID, perm);
-        if (grant !== abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED) {
-          missing.push(perm);
-        }
-      }
-      if (missing.length === 0) {
-        hilog.info(DOMAIN, 'testTag', 'Magic Cue permissions already granted');
-        return;
-      }
-      const result = await atManager.requestPermissionsFromUser(this.context, missing);
-      hilog.info(DOMAIN, 'testTag', 'Magic Cue auto permission request results: %{public}s',
-        JSON.stringify(result.authResults));
-    } catch (e) {
-      hilog.error(DOMAIN, 'testTag', 'Magic Cue auto permission request failed: %{public}s', JSON.stringify(e));
     }
   }
 

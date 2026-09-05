@@ -125,11 +125,15 @@ export class ConnectionManager {
       list.push(OpenClawSmsCommand.Send);
     }
 
-    // Magic Cue data sources — advertised only once the user enabled Magic Cue
-    // (which requests READ_CONTACTS / READ_CALENDAR). Otherwise the agent sees
-    // UNSUPPORTED_COMMAND and the prompt's fallback keeps it silent.
-    if (this.prefs.getMagicCueEnabled()) {
+    // Magic Cue data sources — each is advertised only when the user granted
+    // that source in Settings (Contacts toggle = READ_CONTACTS, Calendar
+    // toggle = READ_CALENDAR). An ungranted source is not advertised, so the
+    // agent cannot query it and Magic Cue stays silent for that kind while the
+    // rest (e.g. memos) still works.
+    if (this.prefs.getContactsEnabled()) {
       list.push(OpenClawContactsCommand.Search);
+    }
+    if (this.prefs.getCalendarEnabled()) {
       list.push(OpenClawCalendarCommand.Events);
     }
 

@@ -543,14 +543,12 @@ struct FloatWindowPage {
     if (now - this.lastTapAtMs <= DOUBLE_TAP_MS) {
       if (this.clickTimer !== -1) clearTimeout(this.clickTimer);
       this.clickTimer = -1; this.lastTapAtMs = 0;
-      if (this.runtime?.prefs.getMagicCueEnabled()) {
-        this.dismissCues();
-        this.beginInteraction('thinking', '正在识别屏幕…', 30000);
-        void this.captureCues();
-      } else {
-        this.beginInteraction('thinking', '正在采集当前页面…', 30000);
-        void this.captureCurrentScreenMemory();
-      }
+      // Magic Cue is the default double-tap behavior: analyze the screen for an
+      // in-chat question and surface capsule answers; with nothing to recommend
+      // it silently falls back to the normal screen-memory capture.
+      this.dismissCues();
+      this.beginInteraction('thinking', '正在识别屏幕…', 30000);
+      void this.captureCues();
       return;
     }
     this.lastTapAtMs = now;
@@ -566,8 +564,10 @@ struct FloatWindowPage {
       if (!this.runtime) throw new Error('Bonio runtime is unavailable');
       const cues = await this.runtime.captureAvatarCues();
       if (cues.length === 0) {
+        // No in-chat question detected — silently degrade to the normal
+        // double-tap memory capture so the feature is never a dead end.
         this.dismissCues();
-        this.beginInteraction('idle', '没发现朋友在问什么~', 5000);
+        await this.captureCurrentScreenMemory();
         return;
       }
       const side = this.determineCueSide();

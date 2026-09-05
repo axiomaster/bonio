@@ -83,10 +83,14 @@ export class ContactsHandlerImpl implements ContactsHandler {
       const payload: ContactsPayload = { contacts: hits, total: hits.length };
       return { ok: true, payloadJson: JSON.stringify(payload) };
     } catch (e) {
-      const businessError = e as BusinessError;
-      const message = businessError.code === 201
+      const raw = e as Record<string, Object>;
+      const code = typeof raw['code'] === 'number' ? raw['code'] as number : -1;
+      const msgRaw = typeof raw['message'] === 'string'
+        ? raw['message'] as string
+        : (e instanceof Error ? (e as Error).message : JSON.stringify(raw));
+      const message = code === 201
         ? '通讯录权限未授予 (READ_CONTACTS)'
-        : businessError.message || (e as Error).message || String(e);
+        : (msgRaw && msgRaw !== 'null' && msgRaw !== '{}' ? msgRaw : '通讯录查询失败 (code=' + code + ')');
       return this.makeError('CONTACTS_QUERY_FAILED', message);
     }
   }

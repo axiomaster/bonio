@@ -190,12 +190,34 @@ export class SecurePrefs {
     this.putSyncValue('voiceWake.mode', mode as string);
   }
 
+  /**
+   * Magic Cue is a default Bonio feature (double-tap screen analysis). It is
+   * always on; only its DATA SOURCES are user-gated in Settings (Contacts /
+   * Calendar toggles grant READ_CONTACTS / READ_CALENDAR). With no source
+   * granted Magic Cue still works (memos), it just cannot recommend that kind.
+   */
   public getMagicCueEnabled(): boolean {
     return this.getSyncValue('magicCue.enabled', true);
   }
 
   public setMagicCueEnabled(value: boolean): void {
     this.putSyncValue('magicCue.enabled', value);
+  }
+
+  public getContactsEnabled(): boolean {
+    return this.getSyncValue('magicCue.contacts.enabled', false);
+  }
+
+  public setContactsEnabled(value: boolean): void {
+    this.putSyncValue('magicCue.contacts.enabled', value);
+  }
+
+  public getCalendarEnabled(): boolean {
+    return this.getSyncValue('magicCue.calendar.enabled', false);
+  }
+
+  public setCalendarEnabled(value: boolean): void {
+    this.putSyncValue('magicCue.calendar.enabled', value);
   }
 
   public getMagicCueInputPoint(): string {
