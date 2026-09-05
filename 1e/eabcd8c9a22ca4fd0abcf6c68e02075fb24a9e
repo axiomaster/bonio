@@ -1,0 +1,42 @@
+docs/blog/cn/11-phone-use-and-sop.md
+  s_db5152c721e6a3::t_504c6b0ac45f8b 1-85
+docs/design/arch/20260905-phone-use-sop-arch.md
+  s_91a7be1e9195c9::t_29a71e609ceaf7 1-237
+docs/design/prd/20260905-phone-use-sop-prd.md
+  s_dc827d97c21b1d::t_b93ec66bfbb512 1-68
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "1eeabcd8c9a22ca4fd0abcf6c68e02075fb24a9e",
+  "prompts": {},
+  "sessions": {
+    "s_91a7be1e9195c9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a2ea17a1bdfedd0a9",
+        "model": "unknown"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 0
+    },
+    "s_db5152c721e6a3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a5561ce461ac89de3",
+        "model": "unknown"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 0
+    },
+    "s_dc827d97c21b1d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ae3552c43e833587e",
+        "model": "unknown"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 0
+    }
+  }
+}
