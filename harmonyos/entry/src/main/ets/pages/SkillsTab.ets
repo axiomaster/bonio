@@ -2,6 +2,8 @@ import { NodeRuntime } from '../node/NodeRuntime';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { common, abilityAccessCtrl, Permissions } from '@kit.AbilityKit';
 import { SecurePrefs } from '../common/SecurePrefs';
+import { CustomSkinManager, SkinItem } from '../common/CustomSkinManager';
+import { AvatarCreatorDialog } from './AvatarCreatorDialog';
 
 const DOMAIN = 0x3D00;
 
@@ -107,8 +109,21 @@ export struct SkillsTab {
   runtime: NodeRuntime | undefined = undefined;
 
   @State avatarSkin: string = 'cat';
+  @State allSkins: SkinItem[] = [];
   @State skills: SkillEntry[] = [];
   @State isLoading: boolean = false;
+
+  private creatorDialogController: CustomDialogController = new CustomDialogController({
+    builder: AvatarCreatorDialog({
+      onSkinCreated: (newSkin: SkinItem) => {
+        this.loadAvailableSkins();
+        this.selectAvatarSkin(newSkin.id);
+      }
+    }),
+    alignment: DialogAlignment.Center,
+    autoCancel: true,
+    customStyle: true
+  });
   @State errorText: string = '';
   @State isConnected: boolean = false;
   @State statusText: string = 'Offline';
@@ -154,6 +169,7 @@ export struct SkillsTab {
       await SecurePrefs.getInstance().init(context);
     } catch (_) {}
 
+    this.loadAvailableSkins();
     this.avatarSkin = this.runtime?.prefs.getAvatarSkin() || SecurePrefs.getInstance().getAvatarSkin() || 'cat';
     this.refreshStatus();
     this.statusTimer = setInterval(() => {
@@ -232,11 +248,18 @@ export struct SkillsTab {
     }
   }
 
+  private loadAvailableSkins(): void {
+    const manager = CustomSkinManager.getInstance();
+    const context = getContext(this) as common.UIAbilityContext;
+    manager.init(context);
+    this.allSkins = manager.getAllSkins();
+  }
+
   private selectAvatarSkin(skin: string): void {
-    const normalized = (skin === 'kun' || skin === 'mario' || skin === 'messi') ? skin : 'cat';
-    this.avatarSkin = normalized;
-    this.runtime?.prefs.setAvatarSkin(normalized);
-    AppStorage.setOrCreate<string>('avatarSkin', normalized);
+    const valid = (skin === 'kun' || skin === 'mario' || skin === 'messi' || skin.startsWith('custom_')) ? skin : 'cat';
+    this.avatarSkin = valid;
+    this.runtime?.prefs.setAvatarSkin(valid);
+    AppStorage.setOrCreate<string>('avatarSkin', valid);
   }
 
   private async loadModelConfig(): Promise<void> {
@@ -626,42 +649,76 @@ export struct SkillsTab {
   }
 
   @Builder AvatarSkinRow() {
-    Row() {
-      Column() {
-        Text('Skin Style')
-          .fontSize(15)
-          .fontColor('#333333')
-          .fontWeight(FontWeight.Medium)
-        Text(this.getSkinSubtitle())
-          .fontSize(12)
-          .fontColor('#999999')
-          .margin({ top: 3 })
-      }
-      .alignItems(HorizontalAlign.Start)
-      .layoutWeight(1)
+    Column({ space: 12 }) {
+      // 1. Current skin selector & Creator button
+      Row() {
+        Column() {
+          Text('当前皮肤')
+            .fontSize(15)
+            .fontColor('#1D2129')
+            .fontWeight(FontWeight.Medium)
+          Text(this.getSkinSubtitle())
+            .fontSize(12)
+            .fontColor('#86909C')
+            .margin({ top: 3 })
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
 
-      Select([
-        { value: 'Cat (Lottie)' },
-        { value: 'Kun (Pixel)' },
-        { value: 'Mario (Pixel)' },
-        { value: 'Messi (Pixel)' }
-      ])
-        .selected(this.getSkinSelectedIndex())
-        .value(this.getSkinDisplayValue())
-        .font({ size: 14, weight: FontWeight.Medium })
-        .fontColor('#333333')
-        .selectedOptionFont({ size: 14, weight: FontWeight.Medium })
-        .selectedOptionFontColor('#0A59F7')
-        .selectedOptionBgColor('#E8F0FE')
-        .optionFont({ size: 14 })
-        .optionFontColor('#333333')
-        .backgroundColor('#F5F5F5')
-        .borderRadius(8)
-        .height(36)
-        .onSelect((index: number) => {
-          const skins = ['cat', 'kun', 'mario', 'messi'];
-          this.selectAvatarSkin(skins[index] || 'cat');
-        })
+        Button('🎨 制作皮肤')
+          .height(34)
+          .fontSize(13)
+          .fontColor(Color.White)
+          .backgroundColor('#0A59F7')
+          .borderRadius(17)
+          .padding({ left: 14, right: 14 })
+          .onClick(() => {
+            this.creatorDialogController.open();
+          })
+      }
+      .width('100%')
+
+      // 2. Skin Gallery (horizontal scroll of available cards)
+      Scroll() {
+        Row({ space: 10 }) {
+          ForEach(this.allSkins, (skin: SkinItem) => {
+            Column({ space: 6 }) {
+              Row() {
+                Text(skin.name.split(' ')[0])
+                  .fontSize(13)
+                  .fontWeight(this.avatarSkin === skin.id ? FontWeight.Bold : FontWeight.Normal)
+                  .fontColor(this.avatarSkin === skin.id ? '#0A59F7' : '#1D2129')
+                if (!skin.isBuiltin) {
+                  Text('自制')
+                    .fontSize(9)
+                    .fontColor('#FF7D00')
+                    .backgroundColor('#FFF7E8')
+                    .borderRadius(3)
+                    .padding({ left: 4, right: 4, top: 1, bottom: 1 })
+                    .margin({ left: 4 })
+                }
+              }
+
+              Text(skin.subtitle)
+                .fontSize(10)
+                .fontColor('#86909C')
+                .maxLines(1)
+                .textOverflow({ overflow: TextOverflow.Ellipsis })
+            }
+            .width(110)
+            .padding(10)
+            .borderRadius(10)
+            .backgroundColor(this.avatarSkin === skin.id ? '#E8F0FE' : '#F7F8FA')
+            .border({ width: 1.5, color: this.avatarSkin === skin.id ? '#0A59F7' : 'transparent' })
+            .onClick(() => {
+              this.selectAvatarSkin(skin.id);
+            })
+          }, (skin: SkinItem) => `${skin.id}-${skin.name}`)
+        }
+      }
+      .scrollable(ScrollDirection.Horizontal)
+      .scrollBar(BarState.Off)
+      .width('100%')
     }
     .width('100%')
     .padding(16)
@@ -669,29 +726,13 @@ export struct SkillsTab {
   }
 
   private getSkinSubtitle(): string {
+    const current = this.allSkins.find(s => s.id === this.avatarSkin);
+    if (current) return current.subtitle;
     switch (this.avatarSkin) {
-      case 'kun': return 'Pixel-art Kun avatar';
-      case 'mario': return 'Pixel-art Mario avatar';
-      case 'messi': return 'Pixel-art Messi avatar';
-      default: return 'Lottie cat avatar';
-    }
-  }
-
-  private getSkinSelectedIndex(): number {
-    switch (this.avatarSkin) {
-      case 'kun': return 1;
-      case 'mario': return 2;
-      case 'messi': return 3;
-      default: return 0;
-    }
-  }
-
-  private getSkinDisplayValue(): string {
-    switch (this.avatarSkin) {
-      case 'kun': return 'Kun (Pixel)';
-      case 'mario': return 'Mario (Pixel)';
-      case 'messi': return 'Messi (Pixel)';
-      default: return 'Cat (Lottie)';
+      case 'kun': return '经典高密度像素鸡伴侣';
+      case 'mario': return '任天堂经典水管工 HD像素';
+      case 'messi': return '阿根廷10号队长 HD像素';
+      default: return 'Lottie 矢量动效猫咪';
     }
   }
 

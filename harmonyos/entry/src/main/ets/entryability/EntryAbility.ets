@@ -6,6 +6,7 @@ import { SecurePrefs } from '../common/SecurePrefs';
 import { DeviceIdentityStore } from '../common/DeviceIdentityStore';
 import { backgroundTaskManager } from '@kit.BackgroundTasksKit';
 import { FloatWindowManager } from '../common/FloatWindowManager';
+import { CustomSkinManager } from '../common/CustomSkinManager';
 
 const DOMAIN = 0x3D00;
 
@@ -21,6 +22,7 @@ export default class EntryAbility extends UIAbility {
         // Initialize core storage before NodeRuntime
         const prefs = SecurePrefs.getInstance();
         await prefs.init(this.context);
+        CustomSkinManager.getInstance().init(this.context);
         AppStorage.setOrCreate<string>('avatarSkin', prefs.getAvatarSkin());
         const identityStore = new DeviceIdentityStore(this.context);
         await identityStore.loadOrCreate();

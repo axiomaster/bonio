@@ -12,6 +12,7 @@ import lottie, { AnimationItem } from '@ohos/lottie';
 import { NodeRuntime } from '../node/NodeRuntime';
 import { FloatWindowManager } from '../common/FloatWindowManager';
 import { MagicCue } from '../node/MagicCueController';
+import { CustomSkinManager } from '../common/CustomSkinManager';
 
 const DOMAIN = 0x3D00;
 const TAG = 'FloatWindowPage';
@@ -79,6 +80,10 @@ function getAgentBubble(state: string, skin: string = 'cat'): string | undefined
     case 'failed': return skin === 'mario' ? 'Mamma Mia! 出错了 (._.)' : '呜…出错了 (._.)';
     case 'idle': return '休息中~ 有事叫我';
     case 'completed':
+      if (skin.startsWith('custom_')) {
+        const custom = CustomSkinManager.getInstance().getSkinById(skin);
+        if (custom && custom.victoryQuote) return custom.victoryQuote;
+      }
       if (skin === 'mario') return 'Here we go! 任务完成！';
       if (skin === 'messi') return 'Vamos! 胜利完成！';
       if (skin === 'kun') return '完成啦！你干嘛~哎哟';
@@ -266,10 +271,16 @@ struct FloatWindowPage {
   }
 
   private isPixelSkin(): boolean {
-    return this.avatarSkin === 'kun' || this.avatarSkin === 'mario' || this.avatarSkin === 'messi';
+    return this.avatarSkin === 'kun' || this.avatarSkin === 'mario' || this.avatarSkin === 'messi' || this.avatarSkin.startsWith('custom_');
   }
 
-  private getSpriteRawfile(): Resource {
+  private getSpriteSource(): Resource | string {
+    if (this.avatarSkin.startsWith('custom_')) {
+      const customSkin = CustomSkinManager.getInstance().getSkinById(this.avatarSkin);
+      if (customSkin && customSkin.fileUri) {
+        return customSkin.fileUri;
+      }
+    }
     switch (this.avatarSkin) {
       case 'mario': return $rawfile('mario-spritesheet.webp');
       case 'messi': return $rawfile('messi-spritesheet.webp');
@@ -407,7 +418,7 @@ struct FloatWindowPage {
               })
           } else {
             Stack({ alignContent: Alignment.TopStart }) {
-              Image(this.getSpriteRawfile())
+              Image(this.getSpriteSource())
                 .width(`${KUN_SHEET_WIDTH}px`)
                 .height(`${KUN_SHEET_HEIGHT}px`)
                 .objectFit(ImageFit.Fill)

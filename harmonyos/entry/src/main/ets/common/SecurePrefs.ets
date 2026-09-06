@@ -157,12 +157,12 @@ export class SecurePrefs {
 
   public getAvatarSkin(): string {
     const skin = this.getSyncValue<string>('avatar.skin', 'cat');
-    if (skin === 'kun' || skin === 'mario' || skin === 'messi') return skin;
+    if (skin === 'kun' || skin === 'mario' || skin === 'messi' || skin.startsWith('custom_')) return skin;
     return 'cat';
   }
 
   public setAvatarSkin(skin: string): void {
-    const validSkin = (skin === 'kun' || skin === 'mario' || skin === 'messi') ? skin : 'cat';
+    const validSkin = (skin === 'kun' || skin === 'mario' || skin === 'messi' || skin.startsWith('custom_')) ? skin : 'cat';
     this.putSyncValue('avatar.skin', validSkin);
   }
 
