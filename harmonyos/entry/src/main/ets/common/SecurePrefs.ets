@@ -157,11 +157,13 @@ export class SecurePrefs {
 
   public getAvatarSkin(): string {
     const skin = this.getSyncValue<string>('avatar.skin', 'cat');
-    return skin === 'kun' ? 'kun' : 'cat';
+    if (skin === 'kun' || skin === 'mario' || skin === 'messi') return skin;
+    return 'cat';
   }
 
   public setAvatarSkin(skin: string): void {
-    this.putSyncValue('avatar.skin', skin === 'kun' ? 'kun' : 'cat');
+    const validSkin = (skin === 'kun' || skin === 'mario' || skin === 'messi') ? skin : 'cat';
+    this.putSyncValue('avatar.skin', validSkin);
   }
 
   public getFloatingWindowEnabled(): boolean {

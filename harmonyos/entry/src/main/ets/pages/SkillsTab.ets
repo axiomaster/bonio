@@ -233,7 +233,7 @@ export struct SkillsTab {
   }
 
   private selectAvatarSkin(skin: string): void {
-    const normalized = skin === 'kun' ? 'kun' : 'cat';
+    const normalized = (skin === 'kun' || skin === 'mario' || skin === 'messi') ? skin : 'cat';
     this.avatarSkin = normalized;
     this.runtime?.prefs.setAvatarSkin(normalized);
     AppStorage.setOrCreate<string>('avatarSkin', normalized);
@@ -632,7 +632,7 @@ export struct SkillsTab {
           .fontSize(15)
           .fontColor('#333333')
           .fontWeight(FontWeight.Medium)
-        Text(this.avatarSkin === 'kun' ? 'Pixel-art Kun avatar' : 'Lottie cat avatar')
+        Text(this.getSkinSubtitle())
           .fontSize(12)
           .fontColor('#999999')
           .margin({ top: 3 })
@@ -642,10 +642,12 @@ export struct SkillsTab {
 
       Select([
         { value: 'Cat (Lottie)' },
-        { value: 'Kun (Pixel)' }
+        { value: 'Kun (Pixel)' },
+        { value: 'Mario (Pixel)' },
+        { value: 'Messi (Pixel)' }
       ])
-        .selected(this.avatarSkin === 'kun' ? 1 : 0)
-        .value(this.avatarSkin === 'kun' ? 'Kun (Pixel)' : 'Cat (Lottie)')
+        .selected(this.getSkinSelectedIndex())
+        .value(this.getSkinDisplayValue())
         .font({ size: 14, weight: FontWeight.Medium })
         .fontColor('#333333')
         .selectedOptionFont({ size: 14, weight: FontWeight.Medium })
@@ -657,12 +659,40 @@ export struct SkillsTab {
         .borderRadius(8)
         .height(36)
         .onSelect((index: number) => {
-          this.selectAvatarSkin(index === 1 ? 'kun' : 'cat');
+          const skins = ['cat', 'kun', 'mario', 'messi'];
+          this.selectAvatarSkin(skins[index] || 'cat');
         })
     }
     .width('100%')
     .padding(16)
     .backgroundColor(Color.White)
+  }
+
+  private getSkinSubtitle(): string {
+    switch (this.avatarSkin) {
+      case 'kun': return 'Pixel-art Kun avatar';
+      case 'mario': return 'Pixel-art Mario avatar';
+      case 'messi': return 'Pixel-art Messi avatar';
+      default: return 'Lottie cat avatar';
+    }
+  }
+
+  private getSkinSelectedIndex(): number {
+    switch (this.avatarSkin) {
+      case 'kun': return 1;
+      case 'mario': return 2;
+      case 'messi': return 3;
+      default: return 0;
+    }
+  }
+
+  private getSkinDisplayValue(): string {
+    switch (this.avatarSkin) {
+      case 'kun': return 'Kun (Pixel)';
+      case 'mario': return 'Mario (Pixel)';
+      case 'messi': return 'Messi (Pixel)';
+      default: return 'Cat (Lottie)';
+    }
   }
 
   @Builder SkillRow(entry: SkillEntry) {

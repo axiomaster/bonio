@@ -71,14 +71,18 @@ class KunAnimations {
   static readonly thinking = new KunAnimationSpec(8, [150, 150, 150, 150, 150, 280]);
 }
 
-function getAgentBubble(state: string): string | undefined {
+function getAgentBubble(state: string, skin: string = 'cat'): string | undefined {
   switch (state) {
     case 'working': return '努力工作中…';
-    case 'thinking': return '思考中…';
+    case 'thinking': return skin === 'messi' ? '战术思考中…' : '思考中…';
     case 'waiting': return '在等你回复哦~';
-    case 'failed': return '呜…出错了 (._.)';
+    case 'failed': return skin === 'mario' ? 'Mamma Mia! 出错了 (._.)' : '呜…出错了 (._.)';
     case 'idle': return '休息中~ 有事叫我';
-    case 'completed': return '完成啦！你干嘛~哎哟';
+    case 'completed':
+      if (skin === 'mario') return 'Here we go! 任务完成！';
+      if (skin === 'messi') return 'Vamos! 胜利完成！';
+      if (skin === 'kun') return '完成啦！你干嘛~哎哟';
+      return '完成啦！';
     default: return undefined;
   }
 }
@@ -160,7 +164,7 @@ struct FloatWindowPage {
   private syncSkin(): void {
     const selected = AppStorage.get<string>('avatarSkin') || this.runtime?.prefs.getAvatarSkin() || 'cat';
     if (selected === this.avatarSkin) return;
-    this.avatarSkin = selected === 'kun' ? 'kun' : 'cat';
+    this.avatarSkin = (selected === 'kun' || selected === 'mario' || selected === 'messi') ? selected : 'cat';
     this.kunFrame = 0;
     this.destroyCatAnimation();
     if (this.avatarSkin === 'cat') void this.loadCatAnimation();
@@ -194,7 +198,7 @@ struct FloatWindowPage {
     if (normalized === this.visualState) return;
     this.visualState = normalized;
     this.kunFrame = 0;
-    const bubble = getAgentBubble(normalized);
+    const bubble = getAgentBubble(normalized, this.avatarSkin);
     if (bubble) this.setStatusBubble(bubble);
     if (this.avatarSkin === 'cat') void this.loadCatAnimation();
     else this.scheduleKunFrame();
@@ -261,10 +265,22 @@ struct FloatWindowPage {
     this.loadedAsset = '';
   }
 
+  private isPixelSkin(): boolean {
+    return this.avatarSkin === 'kun' || this.avatarSkin === 'mario' || this.avatarSkin === 'messi';
+  }
+
+  private getSpriteRawfile(): Resource {
+    switch (this.avatarSkin) {
+      case 'mario': return $rawfile('mario-spritesheet.webp');
+      case 'messi': return $rawfile('messi-spritesheet.webp');
+      default: return $rawfile('kun-spritesheet.webp');
+    }
+  }
+
   private scheduleKunFrame(): void {
     if (this.kunTimer !== -1) clearTimeout(this.kunTimer);
     this.kunTimer = -1;
-    if (this.avatarSkin !== 'kun' || this.disposed) return;
+    if (!this.isPixelSkin() || this.disposed) return;
     const spec = this.getKunAnimation();
     const delay = spec.frameDurations[this.kunFrame] || 150;
     this.kunTimer = setTimeout(() => {
@@ -391,7 +407,7 @@ struct FloatWindowPage {
               })
           } else {
             Stack({ alignContent: Alignment.TopStart }) {
-              Image($rawfile('kun-spritesheet.webp'))
+              Image(this.getSpriteRawfile())
                 .width(`${KUN_SHEET_WIDTH}px`)
                 .height(`${KUN_SHEET_HEIGHT}px`)
                 .objectFit(ImageFit.Fill)
