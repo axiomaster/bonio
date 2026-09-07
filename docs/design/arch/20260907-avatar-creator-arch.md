@@ -2,7 +2,13 @@
 
 **文档版本:** V1.0  
 **日期:** 2026-09-07  
+**状态:** 暂不支持（挂起 / 移动端已移除，仅保留4套官方预置皮肤；后续再考虑支持）  
 **对应需求文档:** [docs/design/prd/20260907-avatar-creator-prd.md](../prd/20260907-avatar-creator-prd.md)
+
+> [!IMPORTANT]
+> **架构状态说明 (2026-09-07)**：
+> 经评估，皮肤工坊当前不适合作为手机端侧的用户自定义行为。手机端（HarmonyOS）已移除 `AvatarCreatorDialog`、`PixelArtEngine` 与 `ActionBindingEngine` 等端侧生成组件，架构简化为由 `CustomSkinManager` 提供 4 套官方预置皮肤（Cat、Kun、Mario、Messi）。
+> 动态皮肤生成与流水线设计架构转为**暂不支持（挂起）**，后续若支持将优先考虑云端服务或桌面端流水线。
 
 ---
 

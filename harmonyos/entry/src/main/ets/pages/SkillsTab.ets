@@ -3,7 +3,6 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 import { common, abilityAccessCtrl, Permissions } from '@kit.AbilityKit';
 import { SecurePrefs } from '../common/SecurePrefs';
 import { CustomSkinManager, SkinItem } from '../common/CustomSkinManager';
-import { AvatarCreatorDialog } from './AvatarCreatorDialog';
 
 const DOMAIN = 0x3D00;
 
@@ -112,18 +111,6 @@ export struct SkillsTab {
   @State allSkins: SkinItem[] = [];
   @State skills: SkillEntry[] = [];
   @State isLoading: boolean = false;
-
-  private creatorDialogController: CustomDialogController = new CustomDialogController({
-    builder: AvatarCreatorDialog({
-      onSkinCreated: (newSkin: SkinItem) => {
-        this.loadAvailableSkins();
-        this.selectAvatarSkin(newSkin.id);
-      }
-    }),
-    alignment: DialogAlignment.Center,
-    autoCancel: true,
-    customStyle: true
-  });
   @State errorText: string = '';
   @State isConnected: boolean = false;
   @State statusText: string = 'Offline';
@@ -170,7 +157,8 @@ export struct SkillsTab {
     } catch (_) {}
 
     this.loadAvailableSkins();
-    this.avatarSkin = this.runtime?.prefs.getAvatarSkin() || SecurePrefs.getInstance().getAvatarSkin() || 'cat';
+    const current = this.runtime?.prefs.getAvatarSkin() || SecurePrefs.getInstance().getAvatarSkin() || 'cat';
+    this.selectAvatarSkin(current);
     this.refreshStatus();
     this.statusTimer = setInterval(() => {
       if (!this.runtime) {
@@ -256,9 +244,10 @@ export struct SkillsTab {
   }
 
   private selectAvatarSkin(skin: string): void {
-    const valid = (skin === 'kun' || skin === 'mario' || skin === 'messi' || skin.startsWith('custom_')) ? skin : 'cat';
+    const valid = (skin === 'kun' || skin === 'mario' || skin === 'messi') ? skin : 'cat';
     this.avatarSkin = valid;
     this.runtime?.prefs.setAvatarSkin(valid);
+    SecurePrefs.getInstance().setAvatarSkin(valid);
     AppStorage.setOrCreate<string>('avatarSkin', valid);
   }
 
@@ -650,7 +639,7 @@ export struct SkillsTab {
 
   @Builder AvatarSkinRow() {
     Column({ space: 12 }) {
-      // 1. Current skin selector & Creator button
+      // 1. Current skin header
       Row() {
         Column() {
           Text('当前皮肤')
@@ -664,61 +653,18 @@ export struct SkillsTab {
         }
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1)
-
-        Button('🎨 制作皮肤')
-          .height(34)
-          .fontSize(13)
-          .fontColor(Color.White)
-          .backgroundColor('#0A59F7')
-          .borderRadius(17)
-          .padding({ left: 14, right: 14 })
-          .onClick(() => {
-            this.creatorDialogController.open();
-          })
       }
       .width('100%')
 
-      // 2. Skin Gallery (horizontal scroll of available cards)
+      // 2. Preset Skin Gallery (4 preset skins: Cat, Kun, Mario, Messi)
       Scroll() {
         Row({ space: 10 }) {
           ForEach(this.allSkins, (skin: SkinItem) => {
             Column({ space: 6 }) {
-              Row() {
-                Text(skin.name.split(' ')[0])
-                  .fontSize(13)
-                  .fontWeight(this.avatarSkin === skin.id ? FontWeight.Bold : FontWeight.Normal)
-                  .fontColor(this.avatarSkin === skin.id ? '#0A59F7' : '#1D2129')
-                if (!skin.isBuiltin) {
-                  Text('自制')
-                    .fontSize(9)
-                    .fontColor('#FF7D00')
-                    .backgroundColor('#FFF7E8')
-                    .borderRadius(3)
-                    .padding({ left: 4, right: 4, top: 1, bottom: 1 })
-                    .margin({ left: 4 })
-                  Blank()
-                  Text('×')
-                    .fontSize(13)
-                    .fontColor('#C9CDD4')
-                    .padding({ left: 4, right: 4 })
-                    .onClick(() => {
-                      CustomSkinManager.getInstance().deleteCustomSkin(skin.id);
-                      if (this.avatarSkin === skin.id) {
-                        this.selectAvatarSkin('kun');
-                      }
-                      this.loadAvailableSkins();
-                    })
-                }
-              }
-              .width('100%')
-
-              if (skin.previewUri) {
-                Image(skin.previewUri)
-                  .width(36)
-                  .height(40)
-                  .objectFit(ImageFit.Contain)
-                  .interpolation(ImageInterpolation.None)
-              }
+              Text(skin.name.split(' ')[0])
+                .fontSize(13)
+                .fontWeight(this.avatarSkin === skin.id ? FontWeight.Bold : FontWeight.Normal)
+                .fontColor(this.avatarSkin === skin.id ? '#0A59F7' : '#1D2129')
 
               Text(skin.subtitle)
                 .fontSize(10)
@@ -727,14 +673,14 @@ export struct SkillsTab {
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
             }
             .width(115)
-            .padding(10)
+            .padding(12)
             .borderRadius(10)
             .backgroundColor(this.avatarSkin === skin.id ? '#E8F0FE' : '#F7F8FA')
             .border({ width: 1.5, color: this.avatarSkin === skin.id ? '#0A59F7' : 'transparent' })
             .onClick(() => {
               this.selectAvatarSkin(skin.id);
             })
-          }, (skin: SkinItem) => `${skin.id}-${skin.name}`)
+          }, (skin: SkinItem) => skin.id)
         }
       }
       .scrollable(ScrollDirection.Horizontal)

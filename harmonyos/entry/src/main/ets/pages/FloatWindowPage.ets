@@ -9,11 +9,9 @@ import { util } from '@kit.ArkTS';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { display } from '@kit.ArkUI';
 import lottie, { AnimationItem } from '@ohos/lottie';
-import { image } from '@kit.ImageKit';
 import { NodeRuntime } from '../node/NodeRuntime';
 import { FloatWindowManager } from '../common/FloatWindowManager';
 import { MagicCue } from '../node/MagicCueController';
-import { CustomSkinManager } from '../common/CustomSkinManager';
 
 const DOMAIN = 0x3D00;
 const TAG = 'FloatWindowPage';
@@ -81,10 +79,6 @@ function getAgentBubble(state: string, skin: string = 'cat'): string | undefined
     case 'failed': return skin === 'mario' ? 'Mamma Mia! 出错了 (._.)' : '呜…出错了 (._.)';
     case 'idle': return '休息中~ 有事叫我';
     case 'completed':
-      if (skin.startsWith('custom_')) {
-        const custom = CustomSkinManager.getInstance().getSkinById(skin);
-        if (custom && custom.victoryQuote) return custom.victoryQuote;
-      }
       if (skin === 'mario') return 'Here we go! 任务完成！';
       if (skin === 'messi') return 'Vamos! 胜利完成！';
       if (skin === 'kun') return '完成啦！你干嘛~哎哟';
@@ -98,7 +92,6 @@ function getAgentBubble(state: string, skin: string = 'cat'): string | undefined
 struct FloatWindowPage {
   @State visualState: string = 'idle';
   @State avatarSkin: string = 'cat';
-  @State customPixelMap: image.PixelMap | undefined = undefined;
   @State bubbleText: string = '休息中~ 有事叫我';
   @State kunFrame: number = 0;
   @State cuesVisible: boolean = false;
@@ -140,15 +133,10 @@ struct FloatWindowPage {
 
   aboutToAppear(): void {
     this.disposed = false;
-    const context = getContext(this) as common.UIAbilityContext;
-    CustomSkinManager.getInstance().init(context);
     this.runtime = AppStorage.get<NodeRuntime>('nodeRuntime');
     const initSkin = this.runtime?.prefs.getAvatarSkin() || 'cat';
-    const isValid = initSkin === 'kun' || initSkin === 'mario' || initSkin === 'messi' || initSkin.startsWith('custom_');
+    const isValid = initSkin === 'kun' || initSkin === 'mario' || initSkin === 'messi';
     this.avatarSkin = isValid ? initSkin : 'cat';
-    if (this.avatarSkin.startsWith('custom_')) {
-      void this.loadCustomSkinPixelMap(this.avatarSkin);
-    }
     this.baseAgentState = this.runtime?.chatController.avatarAgentState || 'idle';
     this.statusTimer = setInterval(() => this.tickState(), 200);
     if (this.runtime) {
@@ -177,33 +165,16 @@ struct FloatWindowPage {
 
   private syncSkin(): void {
     const selected = AppStorage.get<string>('avatarSkin') || this.runtime?.prefs.getAvatarSkin() || 'cat';
-    const isValid = selected === 'kun' || selected === 'mario' || selected === 'messi' || selected.startsWith('custom_');
+    const isValid = selected === 'kun' || selected === 'mario' || selected === 'messi';
     const targetSkin = isValid ? selected : 'cat';
     if (targetSkin === this.avatarSkin) return;
     this.avatarSkin = targetSkin;
     this.kunFrame = 0;
     this.destroyCatAnimation();
     if (this.avatarSkin === 'cat') {
-      this.customPixelMap = undefined;
       void this.loadCatAnimation();
-    } else if (this.avatarSkin.startsWith('custom_')) {
-      void this.loadCustomSkinPixelMap(this.avatarSkin);
-      this.scheduleKunFrame();
     } else {
-      this.customPixelMap = undefined;
       this.scheduleKunFrame();
-    }
-  }
-
-  private async loadCustomSkinPixelMap(skinId: string): Promise<void> {
-    try {
-      const pm = await CustomSkinManager.getInstance().getSkinPixelMap(skinId);
-      if (!this.disposed && this.avatarSkin === skinId) {
-        this.customPixelMap = pm;
-        hilog.info(DOMAIN, TAG, 'Loaded custom skin pixelMap for %{public}s, success: %{public}s', skinId, String(!!pm));
-      }
-    } catch (err) {
-      hilog.error(DOMAIN, TAG, 'Failed to load custom skin pixelMap: %{public}s', String(err));
     }
   }
 
@@ -302,16 +273,10 @@ struct FloatWindowPage {
   }
 
   private isPixelSkin(): boolean {
-    return this.avatarSkin === 'kun' || this.avatarSkin === 'mario' || this.avatarSkin === 'messi' || this.avatarSkin.startsWith('custom_');
+    return this.avatarSkin === 'kun' || this.avatarSkin === 'mario' || this.avatarSkin === 'messi';
   }
 
-  private getSpriteSource(): Resource | string {
-    if (this.avatarSkin.startsWith('custom_')) {
-      const customSkin = CustomSkinManager.getInstance().getSkinById(this.avatarSkin);
-      if (customSkin && customSkin.fileUri) {
-        return customSkin.fileUri;
-      }
-    }
+  private getSpriteSource(): Resource {
     switch (this.avatarSkin) {
       case 'mario': return $rawfile('mario-spritesheet.webp');
       case 'messi': return $rawfile('messi-spritesheet.webp');
@@ -449,7 +414,7 @@ struct FloatWindowPage {
               })
           } else {
             Stack({ alignContent: Alignment.TopStart }) {
-              Image(this.customPixelMap || this.getSpriteSource())
+              Image(this.getSpriteSource())
                 .width(`${KUN_SHEET_WIDTH}px`)
                 .height(`${KUN_SHEET_HEIGHT}px`)
                 .objectFit(ImageFit.Fill)
