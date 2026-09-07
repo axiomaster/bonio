@@ -1,14 +1,11 @@
 /**
- * Global system-float avatar host. Cat uses Lottie rawfiles; Kun uses the
- * supplied 8x9 WebP spritesheet. The bubble occupies a separate top strip so
+ * Global system-float avatar host. All skins (Cat, Kun, Mario, Messi) use
+ * unified 8x9 WebP pixel spritesheets. The bubble occupies a separate top strip so
  * it never overlays the avatar. All window/content dimensions are physical px.
  */
 
-import { common } from '@kit.AbilityKit';
-import { util } from '@kit.ArkTS';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { display } from '@kit.ArkUI';
-import lottie, { AnimationItem } from '@ohos/lottie';
 import { NodeRuntime } from '../node/NodeRuntime';
 import { FloatWindowManager } from '../common/FloatWindowManager';
 import { MagicCue } from '../node/MagicCueController';
@@ -82,7 +79,7 @@ function getAgentBubble(state: string, skin: string = 'cat'): string | undefined
       if (skin === 'mario') return 'Here we go! 任务完成！';
       if (skin === 'messi') return 'Vamos! 胜利完成！';
       if (skin === 'kun') return '完成啦！你干嘛~哎哟';
-      return '完成啦！';
+      return '喵~ 任务完成啦！';
     default: return undefined;
   }
 }
@@ -98,13 +95,6 @@ struct FloatWindowPage {
   @State cueSide: string = 'right';
   @State cueItems: CueDisplayItem[] = [];
 
-  private catCanvasSettings: RenderingContextSettings = new RenderingContextSettings(true);
-  private catCanvasContext: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.catCanvasSettings);
-  private catAnimation: AnimationItem | undefined = undefined;
-  private readonly animationName: string = 'float_cat_animation';
-  private requestedAsset: string = '';
-  private loadedAsset: string = '';
-  private catCanvasReady: boolean = false;
   private disposed: boolean = false;
   private runtime: NodeRuntime | undefined = undefined;
   private statusTimer: number = -1;
@@ -135,7 +125,7 @@ struct FloatWindowPage {
     this.disposed = false;
     this.runtime = AppStorage.get<NodeRuntime>('nodeRuntime');
     const initSkin = this.runtime?.prefs.getAvatarSkin() || 'cat';
-    const isValid = initSkin === 'kun' || initSkin === 'mario' || initSkin === 'messi';
+    const isValid = initSkin === 'cat' || initSkin === 'kun' || initSkin === 'mario' || initSkin === 'messi';
     this.avatarSkin = isValid ? initSkin : 'cat';
     this.baseAgentState = this.runtime?.chatController.avatarAgentState || 'idle';
     this.statusTimer = setInterval(() => this.tickState(), 200);
@@ -165,17 +155,12 @@ struct FloatWindowPage {
 
   private syncSkin(): void {
     const selected = AppStorage.get<string>('avatarSkin') || this.runtime?.prefs.getAvatarSkin() || 'cat';
-    const isValid = selected === 'kun' || selected === 'mario' || selected === 'messi';
+    const isValid = selected === 'cat' || selected === 'kun' || selected === 'mario' || selected === 'messi';
     const targetSkin = isValid ? selected : 'cat';
     if (targetSkin === this.avatarSkin) return;
     this.avatarSkin = targetSkin;
     this.kunFrame = 0;
-    this.destroyCatAnimation();
-    if (this.avatarSkin === 'cat') {
-      void this.loadCatAnimation();
-    } else {
-      this.scheduleKunFrame();
-    }
+    this.scheduleKunFrame();
   }
 
   private normalizeState(state: string | undefined): string {
@@ -207,19 +192,8 @@ struct FloatWindowPage {
     this.kunFrame = 0;
     const bubble = getAgentBubble(normalized, this.avatarSkin);
     if (bubble) this.setStatusBubble(bubble);
-    if (this.avatarSkin === 'cat') void this.loadCatAnimation();
-    else this.scheduleKunFrame();
+    this.scheduleKunFrame();
     hilog.info(DOMAIN, TAG, 'avatar visual state -> %{public}s', normalized);
-  }
-
-  private getLottieAsset(): string {
-    switch (this.visualState) {
-      case 'listening': return 'cat-listening.json';
-      case 'working': case 'dragLeft': case 'dragRight': return 'cat-working.json';
-      case 'thinking': case 'recording': case 'failed': return 'cat-thinking.json';
-      case 'speaking': case 'interacting': case 'completed': return 'cat-speaking.json';
-      default: return 'cat-idle.json';
-    }
   }
 
   private getKunAnimation(): KunAnimationSpec {
@@ -236,48 +210,9 @@ struct FloatWindowPage {
     }
   }
 
-  private async loadCatAnimation(): Promise<void> {
-    if (this.avatarSkin !== 'cat' || !this.catCanvasReady || this.disposed) return;
-    const asset = this.getLottieAsset();
-    if (asset === this.loadedAsset || asset === this.requestedAsset) return;
-    this.requestedAsset = asset;
-    try {
-      const context = getContext(this) as common.UIAbilityContext;
-      const data = await context.resourceManager.getRawFileContent(asset);
-      if (this.disposed || this.avatarSkin !== 'cat' || !this.catCanvasReady || this.requestedAsset !== asset) return;
-      const decoder = new util.TextDecoder('utf-8');
-      const animationData = JSON.parse(decoder.decode(data)) as Object;
-      this.destroyCatAnimation();
-      this.catAnimation = lottie.loadAnimation({
-        container: this.catCanvasContext, renderer: 'canvas', loop: true, autoplay: false,
-        name: this.animationName, contentMode: 'Contain', animationData: animationData,
-      });
-      this.loadedAsset = asset;
-      this.catAnimation.addEventListener('DOMLoaded', () => {
-        if (!this.disposed && this.avatarSkin === 'cat' && this.loadedAsset === asset) {
-          this.catAnimation?.resize();
-          this.catAnimation?.play();
-        }
-      });
-    } catch (err) {
-      if (this.requestedAsset === asset) this.requestedAsset = '';
-      hilog.error(DOMAIN, TAG, 'failed to load Lottie %{public}s: %{public}s', asset,
-        err instanceof Error ? err.message : String(err));
-    }
-  }
-
-  private destroyCatAnimation(): void {
-    try { lottie.destroy(this.animationName); } catch (_) { /* Not attached yet. */ }
-    this.catAnimation = undefined;
-    this.loadedAsset = '';
-  }
-
-  private isPixelSkin(): boolean {
-    return this.avatarSkin === 'kun' || this.avatarSkin === 'mario' || this.avatarSkin === 'messi';
-  }
-
   private getSpriteSource(): Resource {
     switch (this.avatarSkin) {
+      case 'cat': return $rawfile('cat-spritesheet.webp');
       case 'mario': return $rawfile('mario-spritesheet.webp');
       case 'messi': return $rawfile('messi-spritesheet.webp');
       default: return $rawfile('kun-spritesheet.webp');
@@ -287,7 +222,7 @@ struct FloatWindowPage {
   private scheduleKunFrame(): void {
     if (this.kunTimer !== -1) clearTimeout(this.kunTimer);
     this.kunTimer = -1;
-    if (!this.isPixelSkin() || this.disposed) return;
+    if (this.disposed) return;
     const spec = this.getKunAnimation();
     const delay = spec.frameDurations[this.kunFrame] || 150;
     this.kunTimer = setTimeout(() => {
@@ -372,8 +307,6 @@ struct FloatWindowPage {
     if (this.cueDismissTimer !== -1) clearTimeout(this.cueDismissTimer);
     this.statusTimer = -1; this.bubbleTimer = -1; this.kunTimer = -1;
     this.longPressTimer = -1; this.clickTimer = -1; this.cueDismissTimer = -1;
-    this.requestedAsset = '';
-    this.destroyCatAnimation();
   }
 
   build() {
@@ -402,34 +335,18 @@ struct FloatWindowPage {
           .alignItems(VerticalAlign.Center)
           .padding({ left: '10px', right: '10px' })
         Stack({ alignContent: Alignment.TopStart }) {
-          if (this.avatarSkin === 'cat') {
-            Canvas(this.catCanvasContext)
-              .width(AVATAR_SIZE_PX)
-              .height(AVATAR_SIZE_PX)
-              .onReady(() => {
-                this.catCanvasReady = true;
-                this.catCanvasContext.imageSmoothingEnabled = true;
-                this.catCanvasContext.imageSmoothingQuality = 'high';
-                void this.loadCatAnimation();
-              })
-          } else {
-            Stack({ alignContent: Alignment.TopStart }) {
-              Image(this.getSpriteSource())
-                .width(`${KUN_SHEET_WIDTH}px`)
-                .height(`${KUN_SHEET_HEIGHT}px`)
-                .objectFit(ImageFit.Fill)
-                .position({ x: this.kunImageX(), y: this.kunImageY() })
-                .interpolation(ImageInterpolation.None)
-                // Float-window movement is handled by onTouch below, never by system drag-and-drop.
-                .draggable(false)
-            }
-            .width(AVATAR_SIZE_PX)
-            .height(AVATAR_SIZE_PX)
-            .clip(true)
-          }
+          Image(this.getSpriteSource())
+            .width(`${KUN_SHEET_WIDTH}px`)
+            .height(`${KUN_SHEET_HEIGHT}px`)
+            .objectFit(ImageFit.Fill)
+            .position({ x: this.kunImageX(), y: this.kunImageY() })
+            .interpolation(ImageInterpolation.None)
+            // Float-window movement is handled by onTouch below, never by system drag-and-drop.
+            .draggable(false)
         }
         .width(AVATAR_SIZE_PX)
         .height(AVATAR_SIZE_PX)
+        .clip(true)
       }
       .width(AVATAR_SIZE_PX)
       .height(FLOAT_WINDOW_HEIGHT_PX)

@@ -39,9 +39,11 @@ export class CustomSkinManager {
     return [
       {
         id: 'cat',
-        name: 'Cat (小猫)',
-        subtitle: 'Lottie 矢量动效猫咪',
+        name: 'Cat (像素小猫)',
+        subtitle: '经典元气橘猫 HD像素',
         isBuiltin: true,
+        rawfileName: 'cat-spritesheet.webp',
+        victoryQuote: '喵~ 任务搞定啦！',
         createdAt: 0
       },
       {
