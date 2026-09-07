@@ -696,7 +696,28 @@ export struct SkillsTab {
                     .borderRadius(3)
                     .padding({ left: 4, right: 4, top: 1, bottom: 1 })
                     .margin({ left: 4 })
+                  Blank()
+                  Text('×')
+                    .fontSize(13)
+                    .fontColor('#C9CDD4')
+                    .padding({ left: 4, right: 4 })
+                    .onClick(() => {
+                      CustomSkinManager.getInstance().deleteCustomSkin(skin.id);
+                      if (this.avatarSkin === skin.id) {
+                        this.selectAvatarSkin('kun');
+                      }
+                      this.loadAvailableSkins();
+                    })
                 }
+              }
+              .width('100%')
+
+              if (skin.previewUri) {
+                Image(skin.previewUri)
+                  .width(36)
+                  .height(40)
+                  .objectFit(ImageFit.Contain)
+                  .interpolation(ImageInterpolation.None)
               }
 
               Text(skin.subtitle)
@@ -705,7 +726,7 @@ export struct SkillsTab {
                 .maxLines(1)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
             }
-            .width(110)
+            .width(115)
             .padding(10)
             .borderRadius(10)
             .backgroundColor(this.avatarSkin === skin.id ? '#E8F0FE' : '#F7F8FA')

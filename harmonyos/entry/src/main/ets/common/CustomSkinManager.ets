@@ -7,6 +7,7 @@
 import { common } from '@kit.AbilityKit';
 import { fileIo as fs } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
+import { image } from '@kit.ImageKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 
 const DOMAIN = 0x3D00;
@@ -16,9 +17,10 @@ export interface SkinItem {
   id: string;              // 'cat' | 'kun' | 'mario' | 'messi' | 'custom_<timestamp>'
   name: string;            // Display title
   subtitle: string;        // Short style description
-  isBuiltin: boolean;      // True if stored in 
+  isBuiltin: boolean;      // True if stored in rawfile
   rawfileName?: string;    // E.g. 'mario-spritesheet.webp'
   fileUri?: string;        // E.g. 'file:///data/storage/el2/base/haps/entry/files/avatar_skins/custom_xxx/spritesheet.png'
+  previewUri?: string;     // E.g. 'file:///data/storage/el2/base/haps/entry/files/avatar_skins/custom_xxx/preview.png'
   victoryQuote?: string;   // Optional completion voice/bubble quote
   createdAt: number;       // Creation timestamp
 }
@@ -104,7 +106,12 @@ export class CustomSkinManager {
    * Load custom skins persisted in sandbox.
    */
   public loadCustomSkins(): SkinItem[] {
-    if (!this.skinsDir) return [];
+    if (!this.skinsDir) {
+      if (this.context) {
+        this.init(this.context);
+      }
+      if (!this.skinsDir) return [];
+    }
     try {
       const indexPath = this.skinsDir + '/index.json';
       if (!fs.accessSync(indexPath)) {
@@ -127,9 +134,44 @@ export class CustomSkinManager {
   }
 
   /**
+   * Reads and decodes a custom skin's spritesheet into an image.PixelMap directly from sandbox.
+   */
+  public async getSkinPixelMap(skinId: string): Promise<image.PixelMap | undefined> {
+    if (!skinId.startsWith('custom_') || !this.skinsDir) return undefined;
+    try {
+      const imgPath = this.skinsDir + '/' + skinId + '/spritesheet.png';
+      if (!fs.accessSync(imgPath)) {
+        hilog.warn(DOMAIN, TAG, 'Custom skin image not found: %{public}s', imgPath);
+        return undefined;
+      }
+      const file = fs.openSync(imgPath, fs.OpenMode.READ_ONLY);
+      const stat = fs.statSync(file.fd);
+      const buf = new ArrayBuffer(stat.size);
+      fs.readSync(file.fd, buf);
+      fs.closeSync(file.fd);
+
+      const imageSource = image.createImageSource(buf);
+      const pixelMap = await imageSource.createPixelMap({
+        editable: false
+      });
+      imageSource.release();
+      return pixelMap;
+    } catch (err) {
+      hilog.error(DOMAIN, TAG, 'Failed to decode custom skin pixelMap: %{public}s', String(err));
+      return undefined;
+    }
+  }
+
+  /**
    * Register a newly created skin from local image buffer or copied file.
    */
-  public async saveCustomSkin(name: string, subtitle: string, imageBuffer: ArrayBuffer, victoryQuote?: string): Promise<SkinItem> {
+  public async saveCustomSkin(
+    name: string,
+    subtitle: string,
+    imageBuffer: ArrayBuffer,
+    victoryQuote?: string,
+    previewBuffer?: ArrayBuffer
+  ): Promise<SkinItem> {
     if (!this.skinsDir && this.context) {
       this.init(this.context);
     }
@@ -145,13 +187,23 @@ export class CustomSkinManager {
     fs.writeSync(imgFile.fd, imageBuffer);
     fs.closeSync(imgFile.fd);
 
+    let previewUri: string | undefined = undefined;
+    if (previewBuffer && previewBuffer.byteLength > 0) {
+      const previewPath = skinFolder + '/preview.png';
+      const prevFile = fs.openSync(previewPath, fs.OpenMode.CREATE | fs.OpenMode.READ_WRITE);
+      fs.writeSync(prevFile.fd, previewBuffer);
+      fs.closeSync(prevFile.fd);
+      previewUri = 'file://' + previewPath;
+    }
+
     const fileUri = 'file://' + imagePath;
     const newSkin: SkinItem = {
       id: skinId,
       name: name.trim() || ('自定义皮肤 ' + skinId.slice(-4)),
-      subtitle: subtitle.trim() || 'AI 皮肤工厂创作',
+      subtitle: subtitle.trim() || '高密度像素定制皮肤',
       isBuiltin: false,
       fileUri: fileUri,
+      previewUri: previewUri,
       victoryQuote: victoryQuote || '任务搞定啦！',
       createdAt: timestamp
     };
@@ -176,6 +228,8 @@ export class CustomSkinManager {
         // Remove files
         const imgPath = skinFolder + '/spritesheet.png';
         if (fs.accessSync(imgPath)) fs.unlinkSync(imgPath);
+        const prevPath = skinFolder + '/preview.png';
+        if (fs.accessSync(prevPath)) fs.unlinkSync(prevPath);
         fs.rmdirSync(skinFolder);
       }
       const existing = this.loadCustomSkins().filter(s => s.id !== skinId);
