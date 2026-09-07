@@ -699,7 +699,7 @@ export struct SkillsTab {
       case 'kun': return '经典高密度像素鸡伴侣';
       case 'mario': return '任天堂经典水管工 HD像素';
       case 'messi': return '阿根廷10号队长 HD像素';
-      default: return '经典元气橘猫 HD像素';
+      default: return '经典慵懒肥橘猫 趴地像素';
     }
   }
 

@@ -40,7 +40,7 @@ export class CustomSkinManager {
       {
         id: 'cat',
         name: 'Cat (像素小猫)',
-        subtitle: '经典元气橘猫 HD像素',
+        subtitle: '经典慵懒肥橘猫 趴地像素',
         isBuiltin: true,
         rawfileName: 'cat-spritesheet.webp',
         victoryQuote: '喵~ 任务搞定啦！',
