@@ -1,0 +1,31 @@
+harmonyos/entry/src/main/ets/node/CompanionMemoryController.ets
+  h_de08bd40967a17 149-151
+harmonyos/entry/src/main/ets/node/MagicCueController.ets
+  h_de08bd40967a17 186-187
+harmonyos/entry/src/main/ets/node/NodeRuntime.ets
+  h_de08bd40967a17 337-338,346-356,368-369,407-421
+harmonyos/entry/src/main/ets/pages/FloatWindowPage.ets
+  h_de08bd40967a17 123,322,326-327,335,337,500,510-524,527-580,582,585,590,592-593
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "76e1e9de9c76c1feceb8c157aa1a9abc5fa671dd",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  },
+  "sessions": {
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 36
+    }
+  }
+}
