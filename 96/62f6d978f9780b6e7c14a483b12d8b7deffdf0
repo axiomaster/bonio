@@ -1,0 +1,25 @@
+harmonyos/entry/src/main/ets/system/MsdpScreenAwarenessManager.ets
+  h_de08bd40967a17 85-86,90-94,96-97,114-128,132-133,135-140,144-158,252-256,258-259,262-266
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "9662f6d978f9780b6e7c14a483b12d8b7deffdf0",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  },
+  "sessions": {
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 36
+    }
+  }
+}
