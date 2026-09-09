@@ -14,12 +14,12 @@ class MagicCueChatParams {
   sessionKey: string = MAGIC_CUE_SESSION_KEY;
   message: string = '';
   thinking: string = 'low';
-  timeoutMs: number = 90000;
+  timeoutMs: number = 30000;
   idempotencyKey: string = '';
 }
 
 const MAX_CUES = 2;
-const RUN_TIMEOUT_MS = 90000;
+const RUN_TIMEOUT_MS = 30000;
 const MAX_PAYLOAD_LENGTH = 60000;
 
 /**
@@ -361,6 +361,10 @@ export class MagicCueController {
       + '   生成 1 条（若有主号/副号等明确备选最多 2 条）针对该提问的答案，严禁跨越多个不同问题混杂输出。\n'
       + '7. 针对联系人查询：若对方明确要电话/手机号，通讯录中找到了该联系人但未登记手机号码（phones 为空），严禁拿邮箱当作手机号提供；可在 content 中说明“未登记手机号码”或返回 {"cues":[]}。\n'
       + '8. 排除：验证码、密码、支付转账/银行卡信息 —— 一律忽略。\n\n'
+      + '【极速响应与工具限制】\n'
+      + '9. 本任务为即时快捷胶囊，必须以最快速度完成：\n'
+      + '   a. 若需要调用工具，仅限调用 1 次最直接相关的工具。获得工具结果后必须立即输出最终 JSON，绝对严禁发起第 2 次工具调用或漫无边际的循环发散！\n'
+      + '   b. 严禁在思考过程中输出冗长论述，思考必须直接聚焦于最后一次提问与目标，第一时间输出 JSON。\n\n'
       + '【输出格式】\n'
       + '只输出纯 JSON，不要 Markdown 代码块或多余解释文字：\n'
       + '{"cues":[{"kind":"contact|calendar|memo","title":"…","content":"…"}]}\n'

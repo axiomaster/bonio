@@ -7,7 +7,8 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 const MAX_CONTEXT_TEXT_LENGTH = 12000;
 const MEMORY_COVER_MAX_EDGE = 480;
 const MEMORY_COVER_JPEG_QUALITY = 60;
-const MEMORY_ORIGINAL_IMAGE_FORMAT = 'image/png';
+const MEMORY_ORIGINAL_IMAGE_FORMAT = 'image/jpeg';
+const MEMORY_ORIGINAL_JPEG_QUALITY = 85;
 // SmartEdge is an MSDP capability group, not an individual capability name.
 const SMART_EDGE_CAPABILITY: onScreen.OnscreenAwarenessCap = { groupId: 'SmartEdge' };
 // capture() accepts concrete capabilities; Screenshot is exposed by the device MSDP service.
@@ -301,19 +302,20 @@ export class MsdpScreenAwarenessManager {
           const info = await pixelMap.getImageInfo();
           const longestEdge = Math.max(info.size.width, info.size.height);
           const scale = longestEdge > MEMORY_COVER_MAX_EDGE ? MEMORY_COVER_MAX_EDGE / longestEdge : 1;
-            const original = await image.createImagePacker().packing(pixelMap, {
-              format: MEMORY_ORIGINAL_IMAGE_FORMAT, quality: 100,
+          const packer = image.createImagePacker();
+          const original = await packer.packing(pixelMap, {
+            format: MEMORY_ORIGINAL_IMAGE_FORMAT, quality: MEMORY_ORIGINAL_JPEG_QUALITY,
+          });
+          const coverMap = scale < 1 ? await pixelMap.createScaledPixelMap(scale, scale) : pixelMap;
+          try {
+            const packed = await packer.packing(coverMap, {
+              format: 'image/jpeg', quality: MEMORY_COVER_JPEG_QUALITY,
             });
-            const coverMap = scale < 1 ? await pixelMap.createScaledPixelMap(scale, scale) : pixelMap;
-            try {
-              const packed = await image.createImagePacker().packing(coverMap, {
-                format: 'image/jpeg', quality: MEMORY_COVER_JPEG_QUALITY,
-              });
-              return {
-                coverImageBase64: new util.Base64Helper().encodeToStringSync(new Uint8Array(packed)),
-                originalImageBase64: new util.Base64Helper().encodeToStringSync(new Uint8Array(original)),
-                originalImageMimeType: MEMORY_ORIGINAL_IMAGE_FORMAT,
-              };
+            return {
+              coverImageBase64: new util.Base64Helper().encodeToStringSync(new Uint8Array(packed)),
+              originalImageBase64: new util.Base64Helper().encodeToStringSync(new Uint8Array(original)),
+              originalImageMimeType: MEMORY_ORIGINAL_IMAGE_FORMAT,
+            };
           } finally {
             if (coverMap !== pixelMap) coverMap.release();
           }

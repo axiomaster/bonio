@@ -531,55 +531,83 @@ struct FloatWindowPage {
         throw new Error(`${snapshot.error?.code || 'SCREEN_AWARENESS_FAILED'}: ${snapshot.error?.message || 'SmartEdge trigger failed'}`);
       }
 
+      this.beginInteraction('thinking', '正在分析当前页面…', 30000);
+
       // 2. Concurrently start memory capture and magic-cue analysis
       const memoryPromise = this.runtime.captureAvatarMemoryFromSnapshot(snapshot);
       const cuesPromise = this.runtime.captureAvatarCuesFromSnapshot(snapshot);
 
-      // 3. First wait for memory capture to finish
+      let cuesResolved = false;
+      let memoryResolved = false;
       let memorySucceeded = false;
-      try {
-        await memoryPromise;
-        memorySucceeded = true;
-      } catch (memErr) {
-        const msg = memErr instanceof Error ? memErr.message : String(memErr);
-        hilog.warn(DOMAIN, TAG, 'memory save failed: %{public}s', msg);
-      }
-
-      if (memorySucceeded) {
-        this.beginInteraction('completed', '已记住', 10000);
-      } else {
-        this.beginInteraction('failed', '这页没有成功记下，请重试~', 10000);
-      }
-
-      // Keep "已记住" visible for at least 1500ms before showing cue results
-      const delayPromise = new Promise<void>((resolve) => setTimeout(resolve, 1500));
-
-      // 4. Synchronously await magic-cue analysis
       let cues: MagicCue[] = [];
-      try {
-        const results = await Promise.all([cuesPromise, delayPromise]);
-        cues = results[0] as MagicCue[];
-      } catch (cueErr) {
-        const msg = cueErr instanceof Error ? cueErr.message : String(cueErr);
-        hilog.warn(DOMAIN, TAG, 'magic cue analysis failed: %{public}s', msg);
-        await delayPromise;
-        cues = [];
-      }
 
-      // 5. Present cue result
-      hilog.info(DOMAIN, TAG, 'magic cue resolved: count=%{public}d', cues.length);
-      if (cues.length > 0) {
+      // Helper to display cue capsule immediately
+      const showCueCapsule = async (items: MagicCue[]): Promise<void> => {
         const side = this.determineCueSide();
         this.cueSide = side;
-        this.cueItems = this.buildCueItems(cues);
+        this.cueItems = this.buildCueItems(items);
         this.cuesVisible = true;
         await FloatWindowManager.getInstance().setCueExpanded(side);
         if (this.cueDismissTimer !== -1) clearTimeout(this.cueDismissTimer);
         this.cueDismissTimer = setTimeout(() => this.dismissCues(), CUE_DISMISS_MS);
         this.beginInteraction('idle', '要不要我帮你回？点一下就行~', 10000);
+      };
+
+      // Wrap memory promise so it can complete in parallel
+      const trackedMemoryPromise = memoryPromise.then(() => {
+        memoryResolved = true;
+        memorySucceeded = true;
+        hilog.info(DOMAIN, TAG, 'companion memory succeeded');
+        if (!this.cuesVisible && !cuesResolved) {
+          this.beginInteraction('thinking', '已记下，正在分析推荐…', 30000);
+        }
+      }).catch((memErr: Error) => {
+        memoryResolved = true;
+        memorySucceeded = false;
+        const msg = memErr instanceof Error ? memErr.message : String(memErr);
+        hilog.warn(DOMAIN, TAG, 'companion memory failed: %{public}s', msg);
+      });
+
+      // Wrap cues promise
+      const trackedCuesPromise = cuesPromise.then(async (result: MagicCue[]) => {
+        cuesResolved = true;
+        cues = result;
+        hilog.info(DOMAIN, TAG, 'magic cue resolved: count=%{public}d', cues.length);
+        if (cues.length > 0) {
+          // Immediately pop up capsule without waiting for memory!
+          await showCueCapsule(cues);
+        }
+      }).catch((cueErr: Error) => {
+        cuesResolved = true;
+        cues = [];
+        const msg = cueErr instanceof Error ? cueErr.message : String(cueErr);
+        hilog.warn(DOMAIN, TAG, 'magic cue failed: %{public}s', msg);
+      });
+
+      // Wait for cues to resolve first
+      await trackedCuesPromise;
+
+      if (cues.length > 0) {
+        // Cues are showing on screen! Let memory finish in background.
+        void trackedMemoryPromise;
       } else {
+        // No cues to show; wait for memory if it hasn't resolved yet
+        if (!memoryResolved) {
+          await trackedMemoryPromise;
+        }
+
         this.dismissCues();
-        this.beginInteraction('idle', '当前页面没有什么可以帮你', 4000);
+        if (memorySucceeded) {
+          this.beginInteraction('completed', '已记住', 1200);
+          setTimeout(() => {
+            if (!this.cuesVisible && this.interactionState === 'completed') {
+              this.beginInteraction('idle', '当前页面没有什么可以帮你', 4000);
+            }
+          }, 1200);
+        } else {
+          this.beginInteraction('idle', '当前页面没有什么可以帮你', 4000);
+        }
       }
     } catch (error) {
       this.dismissCues();
