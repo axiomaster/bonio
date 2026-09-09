@@ -1,0 +1,29 @@
+harmonyos/entry/src/main/ets/node/MagicCueController.ets
+  h_de08bd40967a17 17,22,364-367
+harmonyos/entry/src/main/ets/pages/FloatWindowPage.ets
+  h_de08bd40967a17 534-535,540-541,545-546,549,555-593,595-599,601-610
+harmonyos/entry/src/main/ets/system/MsdpScreenAwarenessManager.ets
+  h_de08bd40967a17 10-11,305-312,314-318
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "42439c1489025a6f4ecd29a08cfeec518bc8c406",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  },
+  "sessions": {
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 36
+    }
+  }
+}
