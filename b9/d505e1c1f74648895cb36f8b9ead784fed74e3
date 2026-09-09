@@ -1,0 +1,35 @@
+.gitignore
+  h_de08bd40967a17 3,44-46
+dsh-plugins/bonio-bridge/build/inject.js
+  h_de08bd40967a17 21,23-31,127-170
+dsh-plugins/bonio-bridge/src/inject.ts
+  h_de08bd40967a17 22,26-34,144-196
+tools/bonio-proxy-ime/bonio_proxy_ime.cpp
+  h_de08bd40967a17 1-290
+tools/bonio-proxy-ime/build.sh
+  h_de08bd40967a17 1-25
+tools/deploy-bonio-bridge-ohos.sh
+  h_de08bd40967a17 24-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "b9d505e1c1f74648895cb36f8b9ead784fed74e3",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  },
+  "sessions": {
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 36
+    }
+  }
+}
