@@ -120,6 +120,7 @@ struct FloatWindowPage {
   private dragStartWindowX: number = 0;
   private dragStartWindowY: number = 0;
   private lastTapAtMs: number = 0;
+  private isProcessingDoubleTap: boolean = false;
 
   aboutToAppear(): void {
     this.disposed = false;
@@ -318,12 +319,12 @@ struct FloatWindowPage {
         Row() {
           if (this.bubbleText !== '') {
             Text(this.bubbleText)
-              .fontSize('24px')
+              .fontSize('20px')
               .fontColor('#3D2D18')
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
-              .constraintSize({ maxWidth: '260px' })
-              .padding({ left: '10px', right: '10px', top: '10px', bottom: '10px' })
+              .constraintSize({ maxWidth: '280px' })
+              .padding({ left: '8px', right: '8px', top: '6px', bottom: '6px' })
               .backgroundColor('#FFFFFFFF')
               .border({ width: '1px', color: '#CCCCCC' })
               .borderRadius('8px')
@@ -331,9 +332,9 @@ struct FloatWindowPage {
         }
           .width(AVATAR_SIZE_PX)
           .height(BUBBLE_AREA_HEIGHT_PX)
-          .justifyContent(FlexAlign.Start)
+          .justifyContent(FlexAlign.Center)
           .alignItems(VerticalAlign.Center)
-          .padding({ left: '10px', right: '10px' })
+          .padding({ left: '6px', right: '6px' })
         Stack({ alignContent: Alignment.TopStart }) {
           Image(this.getSpriteSource())
             .width(`${KUN_SHEET_WIDTH}px`)
@@ -496,12 +497,7 @@ struct FloatWindowPage {
     if (now - this.lastTapAtMs <= DOUBLE_TAP_MS) {
       if (this.clickTimer !== -1) clearTimeout(this.clickTimer);
       this.clickTimer = -1; this.lastTapAtMs = 0;
-      // Magic Cue is the default double-tap behavior: analyze the screen for an
-      // in-chat question and surface capsule answers; with nothing to recommend
-      // it silently falls back to the normal screen-memory capture.
-      this.dismissCues();
-      this.beginInteraction('thinking', '正在识别屏幕…', 30000);
-      void this.captureCues();
+      void this.handleDoubleTap();
       return;
     }
     this.lastTapAtMs = now;
@@ -511,39 +507,90 @@ struct FloatWindowPage {
     }, DOUBLE_TAP_MS);
   }
 
-  /** Double-tap → SmartEdge screen → DSH magic-cue analysis → capsule strip. */
-  private async captureCues(): Promise<void> {
+  /**
+   * Double-tap: in all scenarios, capture the screen once, save companion memory
+   * and display "已记住"; concurrently analyze Magic Cue recommendations.
+   * If recommendations exist, surface side capsules; otherwise show
+   * "当前页面没有什么可以帮你" in the bubble.
+   */
+  private async handleDoubleTap(): Promise<void> {
+    if (this.isProcessingDoubleTap) {
+      hilog.warn(DOMAIN, TAG, 'double tap ignored: previous capture still in flight');
+      return;
+    }
+    this.isProcessingDoubleTap = true;
+    this.dismissCues();
+    this.beginInteraction('thinking', '正在采集当前页面…', 30000);
+
     try {
       if (!this.runtime) throw new Error('Bonio runtime is unavailable');
-      const cues = await this.runtime.captureAvatarCues();
-      hilog.info(DOMAIN, TAG, 'magic cue resolved: count=%{public}d, cues=%{public}s',
-        cues.length, JSON.stringify(cues));
-      if (cues.length === 0) {
-        this.dismissCues();
-        const bundle = this.runtime.lastCaptureBundleName;
-        const isChatApp = bundle.includes('wechat') || bundle.includes('mms') || bundle.includes('msg') || bundle.includes('chat');
-        if (isChatApp) {
-          this.beginInteraction('idle', '暂无未回复的提问~', 3000);
-          return;
-        }
-        await this.captureCurrentScreenMemory();
-        return;
+
+      // 1. Single screen awareness capture
+      const snapshot = await this.runtime.triggerScreenAwareness();
+      if (!snapshot.ok || !snapshot.payloadJson) {
+        throw new Error(`${snapshot.error?.code || 'SCREEN_AWARENESS_FAILED'}: ${snapshot.error?.message || 'SmartEdge trigger failed'}`);
       }
-      const side = this.determineCueSide();
-      this.cueSide = side;
-      this.cueItems = this.buildCueItems(cues);
-      this.cuesVisible = true;
-      await FloatWindowManager.getInstance().setCueExpanded(side);
-      if (this.cueDismissTimer !== -1) clearTimeout(this.cueDismissTimer);
-      this.cueDismissTimer = setTimeout(() => this.dismissCues(), CUE_DISMISS_MS);
-      this.beginInteraction('idle', '要不要我帮你回？点一下就行~', 5000);
+
+      // 2. Concurrently start memory capture and magic-cue analysis
+      const memoryPromise = this.runtime.captureAvatarMemoryFromSnapshot(snapshot);
+      const cuesPromise = this.runtime.captureAvatarCuesFromSnapshot(snapshot);
+
+      // 3. First wait for memory capture to finish
+      let memorySucceeded = false;
+      try {
+        await memoryPromise;
+        memorySucceeded = true;
+      } catch (memErr) {
+        const msg = memErr instanceof Error ? memErr.message : String(memErr);
+        hilog.warn(DOMAIN, TAG, 'memory save failed: %{public}s', msg);
+      }
+
+      if (memorySucceeded) {
+        this.beginInteraction('completed', '已记住', 10000);
+      } else {
+        this.beginInteraction('failed', '这页没有成功记下，请重试~', 10000);
+      }
+
+      // Keep "已记住" visible for at least 1500ms before showing cue results
+      const delayPromise = new Promise<void>((resolve) => setTimeout(resolve, 1500));
+
+      // 4. Synchronously await magic-cue analysis
+      let cues: MagicCue[] = [];
+      try {
+        const results = await Promise.all([cuesPromise, delayPromise]);
+        cues = results[0] as MagicCue[];
+      } catch (cueErr) {
+        const msg = cueErr instanceof Error ? cueErr.message : String(cueErr);
+        hilog.warn(DOMAIN, TAG, 'magic cue analysis failed: %{public}s', msg);
+        await delayPromise;
+        cues = [];
+      }
+
+      // 5. Present cue result
+      hilog.info(DOMAIN, TAG, 'magic cue resolved: count=%{public}d', cues.length);
+      if (cues.length > 0) {
+        const side = this.determineCueSide();
+        this.cueSide = side;
+        this.cueItems = this.buildCueItems(cues);
+        this.cuesVisible = true;
+        await FloatWindowManager.getInstance().setCueExpanded(side);
+        if (this.cueDismissTimer !== -1) clearTimeout(this.cueDismissTimer);
+        this.cueDismissTimer = setTimeout(() => this.dismissCues(), CUE_DISMISS_MS);
+        this.beginInteraction('idle', '要不要我帮你回？点一下就行~', 10000);
+      } else {
+        this.dismissCues();
+        this.beginInteraction('idle', '当前页面没有什么可以帮你', 4000);
+      }
     } catch (error) {
+      this.dismissCues();
       const message = error instanceof Error ? error.message : String(error);
       const bubble = message.includes('SCREEN_AWARENESS_DISABLED')
         ? '请先在设置开启屏幕感知~'
         : '当前页面暂时无法读取~';
-      hilog.warn(DOMAIN, TAG, 'magic cue capture failed: %{public}s', message);
+      hilog.warn(DOMAIN, TAG, 'double tap processing failed: %{public}s', message);
       this.beginInteraction('failed', bubble, 4000);
+    } finally {
+      this.isProcessingDoubleTap = false;
     }
   }
 
@@ -608,23 +655,6 @@ struct FloatWindowPage {
       return (pos[0] + AVATAR_SIZE / 2) < (width / 2) ? 'right' : 'left';
     } catch (_) {
       return 'right';
-    }
-  }
-
-  private async captureCurrentScreenMemory(): Promise<void> {
-    try {
-      if (!this.runtime) throw new Error('Bonio runtime is unavailable');
-      const title = await this.runtime.captureAvatarMemory();
-      this.beginInteraction('completed', title ? `已记下：${title}` : '当前页面已记下~', 5000);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const bubble = message.includes('SCREEN_AWARENESS_DISABLED')
-        ? '请先在设置开启屏幕感知~'
-        : message.includes('MEMORY_NOT_SAVED')
-          ? '这页没有成功记下，请再试一次~'
-        : '当前页面暂时无法读取~';
-      hilog.warn(DOMAIN, TAG, 'SmartEdge trigger failed: %{public}s', message);
-      this.beginInteraction('failed', bubble, 4000);
     }
   }
 }

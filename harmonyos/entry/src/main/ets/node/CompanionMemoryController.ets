@@ -146,6 +146,9 @@ export class CompanionMemoryController {
   }
 
   private filterIgnoredApplications(source: string, payloadJson: string): string | undefined {
+    if (source === 'trigger') {
+      return payloadJson;
+    }
     try {
       const parsed = JSON.parse(payloadJson) as Object;
       if (Array.isArray(parsed)) {

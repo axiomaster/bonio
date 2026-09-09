@@ -183,7 +183,8 @@ export class MagicCueController {
         if (!val) return;
         if (['OTHERS', 'UiTree', 'Screenshot', 'LoadModule', 'Na', 'FontWeight.Normal'].includes(val)) return;
         if (/^\d{1,2}:\d{2}$/.test(val) || /^\d{1,2},\s*:\s*,\s*\d{1,2}$/.test(val) || /^\d{1,3}%?$/.test(val)) return;
-        if (val.includes('休息中') || val.includes('有事叫我') || val.includes('帮我回') || val.includes('发送中')) return;
+        if (val.includes('休息中') || val.includes('有事叫我') || val.includes('帮我回') || val.includes('发送中') ||
+            val.includes('已记住') || val.includes('正在采集') || val.includes('没有可以帮你') || val.includes('正在识别')) return;
         if (title && val === title) return;
         if (lines.length === 0 || lines[lines.length - 1] !== val) {
           lines.push(val);

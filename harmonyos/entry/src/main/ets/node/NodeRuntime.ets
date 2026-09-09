@@ -334,13 +334,23 @@ export class NodeRuntime {
     this.canvas.navigate("");
   }
 
-  /** Called by avatar double tap: trigger a foreground SmartEdge recognition. */
-  public async captureAvatarMemory(): Promise<string> {
+  /** Trigger a foreground SmartEdge recognition snapshot once. */
+  public async triggerScreenAwareness(): Promise<InvokeResult> {
     if (!this.isConnected) {
       throw new Error('DSH is not connected');
     }
-
     const capture = await this.screenHandler.handleSmartEdgeTrigger();
+    if (!capture.ok || !capture.payloadJson) {
+      throw new Error(`${capture.error?.code || 'SCREEN_AWARENESS_FAILED'}: ${capture.error?.message || 'SmartEdge trigger failed'}`);
+    }
+    return capture;
+  }
+
+  /** Save a snapshot to companion memory and return memory title. */
+  public async captureAvatarMemoryFromSnapshot(capture: InvokeResult): Promise<string> {
+    if (!this.isConnected) {
+      throw new Error('DSH is not connected');
+    }
     if (!capture.ok || !capture.payloadJson) {
       throw new Error(`${capture.error?.code || 'SCREEN_AWARENESS_FAILED'}: ${capture.error?.message || 'SmartEdge trigger failed'}`);
     }
@@ -355,15 +365,11 @@ export class NodeRuntime {
     return outcome.title;
   }
 
-  /**
-   * Magic Cue: analyze the current screen for an in-chat information request
-   * and return the recommended capsules. Returns [] when nothing to show.
-   */
-  public async captureAvatarCues(): Promise<MagicCue[]> {
+  /** Run Magic Cue analysis on an existing screen snapshot. */
+  public async captureAvatarCuesFromSnapshot(capture: InvokeResult): Promise<MagicCue[]> {
     if (!this.isConnected) {
       throw new Error('DSH is not connected');
     }
-    const capture = await this.screenHandler.handleSmartEdgeTrigger();
     if (!capture.ok || !capture.payloadJson) {
       throw new Error(`${capture.error?.code || 'SCREEN_AWARENESS_FAILED'}: ${capture.error?.message || 'SmartEdge trigger failed'}`);
     }
@@ -396,6 +402,21 @@ export class NodeRuntime {
       title = capture.appName ?? '';
     }
     return await this.magicCueController.run(capture.payloadJson, bundleName, title);
+  }
+
+  /** Called by avatar double tap: trigger a foreground SmartEdge recognition. */
+  public async captureAvatarMemory(): Promise<string> {
+    const capture = await this.triggerScreenAwareness();
+    return await this.captureAvatarMemoryFromSnapshot(capture);
+  }
+
+  /**
+   * Magic Cue: analyze the current screen for an in-chat information request
+   * and return the recommended capsules. Returns [] when nothing to show.
+   */
+  public async captureAvatarCues(): Promise<MagicCue[]> {
+    const capture = await this.triggerScreenAwareness();
+    return await this.captureAvatarCuesFromSnapshot(capture);
   }
 
   /**
