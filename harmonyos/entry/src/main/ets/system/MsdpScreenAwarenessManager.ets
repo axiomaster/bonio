@@ -82,10 +82,19 @@ export class MsdpScreenAwarenessManager {
   private static readonly DOMAIN = 0x3D00;
   private static readonly TAG = 'MsdpScreenAwareness';
   private readonly smartEdgeListener = (results: onScreen.OnscreenAwarenessInfo[]): void => {
+    hilog.info(MsdpScreenAwarenessManager.DOMAIN, MsdpScreenAwarenessManager.TAG,
+      'smartEdgeListener EVENT RECEIVED! count=%{public}d', results ? results.length : -1);
     this.lastSmartEdgeChangeAtMs = results.length > 0 ? Date.now() : this.lastSmartEdgeChangeAtMs;
     void this.reportSmartEdgeResult('subscribe', results);
   };
+  private readonly readingListener = (status: onScreen.ReadingScreenPermissionStatus): void => {
+    hilog.info(MsdpScreenAwarenessManager.DOMAIN, MsdpScreenAwarenessManager.TAG,
+      'readingScreenPermissionStatus: readingState=%{public}d', status.readingState);
+    this.readingState = status.readingState;
+  };
   private smartEdgeSubscribed: boolean = false;
+  private listening: boolean = false;
+  private readingState: number | undefined = undefined;
   private lastSnapshot: ScreenContextSnapshot | undefined = undefined;
   private lastSmartEdgeChangeAtMs: number | undefined = undefined;
   private readonly isEnabled: () => boolean;
@@ -102,21 +111,52 @@ export class MsdpScreenAwarenessManager {
   }
 
   public start(): void {
-    if (this.isEnabled()) this.subscribeSmartEdge();
+    const enabled = this.isEnabled();
+    hilog.info(MsdpScreenAwarenessManager.DOMAIN, MsdpScreenAwarenessManager.TAG,
+      'start() called, isEnabled=%{public}s', enabled ? 'true' : 'false');
+    if (!this.listening) {
+      try {
+        onScreen.onReadingScreenPermissionListener(this.readingListener);
+        this.listening = true;
+        hilog.info(MsdpScreenAwarenessManager.DOMAIN, MsdpScreenAwarenessManager.TAG,
+          'onScreen.onReadingScreenPermissionListener SUCCESS');
+      } catch (err) {
+        hilog.warn(MsdpScreenAwarenessManager.DOMAIN, MsdpScreenAwarenessManager.TAG,
+          'onReadingScreenPermissionListener failed: %{public}s', err instanceof Error ? err.message : String(err));
+      }
+    }
+    if (enabled) this.subscribeSmartEdge();
   }
 
   public setEnabled(enabled: boolean): void {
+    hilog.info(MsdpScreenAwarenessManager.DOMAIN, MsdpScreenAwarenessManager.TAG,
+      'setEnabled(%{public}s)', enabled ? 'true' : 'false');
     if (enabled) {
+      if (!this.listening) {
+        try {
+          onScreen.onReadingScreenPermissionListener(this.readingListener);
+          this.listening = true;
+        } catch (_) {}
+      }
       this.subscribeSmartEdge();
       return;
     }
-    if (!this.smartEdgeSubscribed) return;
-    try {
-      onScreen.unsubscribe(SMART_EDGE_CAPABILITY, this.smartEdgeListener);
-    } catch (_) {
-      // The local preference is still disabled even if the service already removed it.
+    if (this.smartEdgeSubscribed) {
+      try {
+        onScreen.unsubscribe(SMART_EDGE_CAPABILITY, this.smartEdgeListener);
+        hilog.info(MsdpScreenAwarenessManager.DOMAIN, MsdpScreenAwarenessManager.TAG, 'onScreen.unsubscribe SUCCESS');
+      } catch (err) {
+        hilog.warn(MsdpScreenAwarenessManager.DOMAIN, MsdpScreenAwarenessManager.TAG,
+          'onScreen.unsubscribe failed: %{public}s', err instanceof Error ? err.message : String(err));
+      }
+      this.smartEdgeSubscribed = false;
     }
-    this.smartEdgeSubscribed = false;
+    if (this.listening) {
+      try {
+        onScreen.offReadingScreenPermissionListener(this.readingListener);
+      } catch (_) {}
+      this.listening = false;
+    }
   }
 
   public async captureContext(paramsJson: string | undefined): Promise<ScreenContextSnapshot> {
@@ -209,12 +249,21 @@ export class MsdpScreenAwarenessManager {
   }
 
   private subscribeSmartEdge(): void {
-    if (this.smartEdgeSubscribed) return;
+    if (this.smartEdgeSubscribed) {
+      hilog.info(MsdpScreenAwarenessManager.DOMAIN, MsdpScreenAwarenessManager.TAG,
+        'subscribeSmartEdge: already subscribed, skipping');
+      return;
+    }
     try {
+      hilog.info(MsdpScreenAwarenessManager.DOMAIN, MsdpScreenAwarenessManager.TAG,
+        'subscribeSmartEdge: calling onScreen.subscribe(%{public}s)...', JSON.stringify(SMART_EDGE_CAPABILITY));
       onScreen.subscribe(SMART_EDGE_CAPABILITY, this.smartEdgeListener);
       this.smartEdgeSubscribed = true;
-    } catch (_) {
-      // trigger() below reports service errors for the user-initiated capture.
+      hilog.info(MsdpScreenAwarenessManager.DOMAIN, MsdpScreenAwarenessManager.TAG,
+        'subscribeSmartEdge: onScreen.subscribe SUCCESS!');
+    } catch (err) {
+      hilog.error(MsdpScreenAwarenessManager.DOMAIN, MsdpScreenAwarenessManager.TAG,
+        'subscribeSmartEdge: onScreen.subscribe FAILED: %{public}s', err instanceof Error ? `${err.name}: ${err.message}\n${err.stack || ''}` : String(err));
     }
   }
 
