@@ -19,8 +19,18 @@ const run = promisify(execFile);
 const UITEST = '/bin/uitest';
 const AA = '/bin/aa';
 const LAYOUT_PATH = '/data/local/tmp/bonio-cue-layout.json';
+const PROXY_IME = '/data/local/bin/bonio-proxy-ime';
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function hasProxyIme(): Promise<boolean> {
+  try {
+    await fs.access(PROXY_IME, fs.constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export interface InjectOptions {
   /** Text to type into the focused chat input. */
@@ -131,16 +141,65 @@ export async function injectAndSend(options: InjectOptions): Promise<InjectResul
       // open is wrong for later cold runs, so mark it non-cacheable.
       if (found.keyboardOpen) inputLearned = false;
     }
+
+    let sendPoint: { x: number; y: number } | undefined
+      = typeof options.sendX === 'number' && typeof options.sendY === 'number'
+        ? { x: Math.round(options.sendX), y: Math.round(options.sendY) }
+        : undefined;
+
+    // Fast path: use OpenHarmony IMF ProxyIME to silently inject without opening keyboard
+    if (await hasProxyIme()) {
+      const args: string[] = ['--text', options.text];
+      if (inputPoint) {
+        args.push('--input', String(inputPoint.x), String(inputPoint.y));
+      }
+
+      if (options.send === false) {
+        args.push('--no-send');
+        await run(PROXY_IME, args);
+        return { ok: true, stage: 'type', inputPoint: { ...inputPoint, learned: inputLearned } };
+      }
+
+      // If sendPoint is known, execute full inject + send in one atomic shot
+      if (sendPoint) {
+        args.push('--send', String(sendPoint.x), String(sendPoint.y));
+        await run(PROXY_IME, args);
+        return {
+          ok: true,
+          stage: 'click-send',
+          inputPoint: { ...inputPoint, learned: inputLearned },
+          sendPoint: { ...sendPoint, learned: false },
+        };
+      }
+
+      // If sendPoint is NOT yet known: inject text first (without sending),
+      // which causes the chat app to show the send button, then discover its location
+      args.push('--no-send');
+      await run(PROXY_IME, args);
+      await sleep(150); // allow UI to render send button
+
+      sendPoint = (await findSendPoint()) ?? undefined;
+      let learned = true;
+      if (!sendPoint) return { ok: false, stage: 'find-send', error: 'send button not found in live layout' };
+
+      await run(UITEST, ['uiInput', 'click', String(sendPoint.x), String(sendPoint.y)]);
+      await sleep(200);
+
+      return {
+        ok: true,
+        stage: 'click-send',
+        inputPoint: { ...inputPoint, learned: inputLearned },
+        sendPoint: { ...sendPoint, learned },
+      };
+    }
+
+    // Fallback path: uitest keyboard typing (if proxy ime unavailable)
     await run(UITEST, ['uiInput', 'click', String(inputPoint.x), String(inputPoint.y)]);
     await sleep(800); // keyboard animation
     await run(UITEST, ['uiInput', 'text', options.text]);
     await sleep(600);
     if (options.send === false) return { ok: true, stage: 'type', inputPoint: { ...inputPoint, learned: inputLearned } };
 
-    let sendPoint: { x: number; y: number } | undefined
-      = typeof options.sendX === 'number' && typeof options.sendY === 'number'
-        ? { x: Math.round(options.sendX), y: Math.round(options.sendY) }
-        : undefined;
     let learned = false;
     if (!sendPoint) {
       sendPoint = (await findSendPoint()) ?? undefined;

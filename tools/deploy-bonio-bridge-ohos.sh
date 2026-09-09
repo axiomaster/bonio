@@ -21,6 +21,14 @@ log() { printf '\033[1;36m[deploy-bridge]\033[0m %s\n' "$*"; }
 [ -x "$HDC" ] || { echo "hdc not found"; exit 1; }
 "$HDC" list targets | grep -q . || { echo "no device"; exit 1; }
 
+log "Building and deploying bonio-proxy-ime"
+"$SCRIPT_DIR/bonio-proxy-ime/build.sh"
+"$HDC" file send "$SCRIPT_DIR/bonio-proxy-ime/bonio-proxy-ime" /data/local/bin/bonio-proxy-ime
+"$HDC" shell "chmod 755 /data/local/bin/bonio-proxy-ime"
+
+log "Compiling bonio-bridge TypeScript"
+(cd "$BRIDGE_DIR" && npx tsc)
+
 log "Packing bonio-bridge"
 tar -czf /tmp/bonio-bridge.tgz -C "$BRIDGE_DIR" build package.json cordis.patch.yml
 
