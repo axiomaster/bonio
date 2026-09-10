@@ -16,6 +16,7 @@ import os from 'node:os';
 import { SessionRegistry } from './sessions.js';
 import { listMemos, saveMemo } from './memo_store.js';
 import { getLatestTelecomBill, searchSms } from './sms_store.js';
+import { searchContacts } from './contacts_store.js';
 
 export interface ChatEventSink {
   agentDelta(runId: string, sessionKey: string | undefined, delta: string): void;
@@ -625,6 +626,20 @@ export class AgentDriver {
       },
       async execute(args: { command: string; arguments?: Record<string, unknown>; timeoutMs?: number }, exec: unknown) {
         const { command, arguments: cmdArgs = {}, timeoutMs = INVOKE_TIMEOUT_MS } = args ?? {};
+        if (command === 'contacts.search' || command === 'contacts_search') {
+          const q = typeof cmdArgs.query === 'string' ? cmdArgs.query : '';
+          const limit = typeof cmdArgs.limit === 'number' ? cmdArgs.limit : 5;
+          const hits = await searchContacts(q, limit);
+          return { isError: false, value: JSON.parse(JSON.stringify({ contacts: hits, total: hits.length })) };
+        }
+        if (command === 'sms.bill') {
+          const bill = await getLatestTelecomBill();
+          return { isError: false, value: JSON.parse(JSON.stringify({ found: !!bill, bill })) };
+        }
+        if (command === 'sms.search') {
+          const msgs = await searchSms(cmdArgs as any);
+          return { isError: false, value: JSON.parse(JSON.stringify({ messages: msgs, total: msgs.length })) };
+        }
         const node = bridge.registry.getNode();
         if (!node) return { isError: true, error: { message: 'no node session connected to the bonio bridge' } };
         const callId = randomUUID();
@@ -758,6 +773,35 @@ export class AgentDriver {
         if (msgs.length === 0) return { isError: false, value: { messages: [], text: '未找到匹配短信。' } };
         const lines = msgs.map((m) => `[${m.senderNumber}] ${m.content}`).join('\n');
         return { isError: false, value: { messages: msgs, text: lines } };
+      },
+    })));
+
+    disposers.push(register(defineTool({
+      name: 'contacts_search',
+      description: 'Search contacts in the phone address book by name, phone number, or nickname (e.g. 鲍亚永, 张三).',
+      parameters: {
+        query: { type: 'string', required: true, description: 'Contact name, phone number, or keyword to search for.' },
+        limit: { type: 'number', description: 'Max number of contacts to return, default 5.' },
+      },
+      output: {
+        schema: { type: 'object', additionalProperties: true },
+        render(args: Record<string, unknown>, value: unknown) {
+          try { return textContent(JSON.stringify(value)); }
+          catch { return textContent(String(value)); }
+        },
+      },
+      async execute(args: { query?: string; limit?: number }) {
+        const q = typeof args?.query === 'string' ? args.query : '';
+        const limit = typeof args?.limit === 'number' ? args.limit : 5;
+        const hits = await searchContacts(q, limit);
+        if (hits.length === 0) {
+          return { isError: false, value: { contacts: [], text: '未在通讯录中找到匹配联系人。' } };
+        }
+        const lines = hits.map((c) => {
+          const p = c.phones.length > 0 ? c.phones.join(', ') : '无电话号码';
+          return `${c.name}: ${p}${c.nickname ? ` (昵称: ${c.nickname})` : ''}`;
+        }).join('\n');
+        return { isError: false, value: JSON.parse(JSON.stringify({ contacts: hits, text: lines })) };
       },
     })));
 

@@ -48,11 +48,10 @@ export class ContactsHandlerImpl implements ContactsHandler {
     try {
       const all = await contact.queryContacts(this.context);
       let needle = query.trim().toLowerCase();
-      // Strip common query suffixes (e.g. "刘兴临的电话号码" -> "刘兴临")
-      const stripped = needle.replace(/(的)?(手机号码|电话号码|手机号|电话号|手机|电话|号码|联系方式|邮箱|微信)$/g, '').trim();
-      if (stripped.length > 0) {
-        needle = stripped;
-      }
+      // Strip common query suffixes & question words (e.g. "鲍亚永的手机号码是多少？" -> "鲍亚永")
+      needle = needle.replace(/(是多少|是几|多少|是谁|是啥|是哪位|发一下|发下|告诉我|发给我|请发|有吗|有没|有么|吗)[？?！!。.]*$/g, '').trim();
+      needle = needle.replace(/(的)?(手机号码|电话号码|手机号|电话号|手机|电话|号码|联系方式|邮箱|微信)$/g, '').trim();
+      needle = needle.replace(/^(请问|帮我查一下|帮我查下|帮我查|查一下|查下|查询|找一下|找下|找|看看|看下|问下|发一下|发下|发我|发给我|把)/g, '').trim();
 
       const hitMap = new Map<string, ContactHit>();
       for (const c of all) {

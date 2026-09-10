@@ -9,6 +9,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { parseFrame, resOk, resErr, eventFrame, stringify, } from './protocol.js';
 import { deleteMemo, getMemo, listMemos, saveMemo } from './memo_store.js';
 import { getLatestTelecomBill, searchSms } from './sms_store.js';
+import { searchContacts } from './contacts_store.js';
 import { listSkills, setSkillEnabled } from './skills_store.js';
 import { getChannelConfig, setWechatBinding, disableWechat, fetchWechatQrCode, pollWechatQrStatus, } from './channel_store.js';
 import { injectAndSend, openApp } from './inject.js';
@@ -341,6 +342,15 @@ export function startGateway(ctx, config, registry, driver, wechat) {
             });
             send(resOk(frame.id, { ok: true, messages: msgs }));
         };
+        const handleContactsSearch = async (frame) => {
+            if (!requireAuth())
+                return send(resErr(frame.id, 'AUTH_REQUIRED', 'connect first'));
+            const params = (frame.params ?? {});
+            const query = typeof params.query === 'string' ? params.query : '';
+            const limit = typeof params.limit === 'number' ? params.limit : 5;
+            const contacts = await searchContacts(query, limit);
+            send(resOk(frame.id, { ok: true, contacts, total: contacts.length }));
+        };
         const handleMemoryIncrementalSync = async (frame) => {
             if (!requireAuth())
                 return send(resErr(frame.id, 'AUTH_REQUIRED', 'connect first'));
@@ -457,6 +467,9 @@ export function startGateway(ctx, config, registry, driver, wechat) {
                     break;
                 case 'sms.search':
                     void handleSmsSearch(req);
+                    break;
+                case 'contacts.search':
+                    void handleContactsSearch(req);
                     break;
                 case 'memory.incremental_sync':
                     void handleMemoryIncrementalSync(req);

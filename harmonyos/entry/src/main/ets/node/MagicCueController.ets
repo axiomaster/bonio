@@ -20,6 +20,11 @@ class MagicCueChatParams {
 
 class EmptyRpcParams {}
 
+class ContactSearchParams {
+  query: string = '';
+  limit: number = 5;
+}
+
 const MAX_CUES = 2;
 const RUN_TIMEOUT_MS = 30000;
 const MAX_PAYLOAD_LENGTH = 60000;
@@ -102,8 +107,13 @@ export class MagicCueController {
       const cleanText = this.extractScreenText(screenPayload, title);
       let prefetchFact = '';
 
-      // L1 Domain Pre-check: detect if screen mentions bill/telecom/balance/due
-      if (/(话费|欠费|账单|扣费|交费|缴费|停机|余额|运营商|电信|移动|联通)/.test(cleanText)) {
+      // Only inspect the most recent conversation lines (latest turn at the bottom)
+      const allLines = cleanText.split('\n').map((l: string) => l.trim()).filter((l: string) => l.length > 0);
+      const recentSlice = allLines.slice(-4);
+      const recentText = recentSlice.join('\n');
+
+      // L1 Domain Pre-check: detect if recent screen text mentions bill/telecom/balance/due
+      if (/(话费|欠费|账单|扣费|交费|缴费|停机|余额)/.test(recentText)) {
         try {
           const billRes = await this.session.request('sms.bill', new EmptyRpcParams(), 3000);
           if (billRes.ok) {
@@ -133,6 +143,42 @@ export class MagicCueController {
         } catch (e) {
           hilog.warn(MagicCueController.DOMAIN, MagicCueController.TAG, 'prefetch sms.bill failed: %{public}s',
             e instanceof Error ? e.message : String(e));
+        }
+      }
+
+      // L1 Domain Pre-check: detect if recent screen text asks for contact / phone
+      const contactMatch = recentText.match(/(?:请问|帮我查下|帮我查一下|帮我查|查一下|查下|查询|找一下|找下|找|发一下|发下|发我|发给我|把)?([^\s，。？！?,\.]{1,10}?)(?:的)?(?:手机号码|电话号码|手机号|电话号|手机|电话|号码|联系方式)/);
+      if (contactMatch && contactMatch[1]) {
+        const candidateName = contactMatch[1].trim()
+          .replace(/^(请问|帮我查下|帮我查一下|帮我查|查一下|查下|查询|找一下|找下|找|发一下|发下|发我|发给我|把)/, '')
+          .trim();
+        if (candidateName.length >= 1 && candidateName.length <= 10 && !/(这个|那个|什么|哪个|谁|有无|有么|在哪|这里)/.test(candidateName)) {
+          try {
+            const params = new ContactSearchParams();
+            params.query = candidateName;
+            params.limit = 5;
+            const res = await this.session.request('contacts.search', params, 3000);
+            if (res.ok) {
+              const payload = res.payload as Record<string, Object> ||
+                (res.payloadJSON ? JSON.parse(res.payloadJSON) as Record<string, Object> : undefined);
+              const contacts = payload?.['contacts'] as Array<Record<string, Object>> | undefined;
+              if (contacts && contacts.length > 0) {
+                let factStr = '【通讯录查询结果】\n';
+                for (const c of contacts) {
+                  const name = String(c['name'] || '');
+                  const phones = Array.isArray(c['phones']) ? (c['phones'] as string[]).join(', ') : '';
+                  const nickname = c['nickname'] ? String(c['nickname']) : '';
+                  factStr += `姓名：${name}\n电话：${phones || '未登记手机号码'}\n` + (nickname ? `昵称：${nickname}\n` : '');
+                }
+                prefetchFact = prefetchFact ? `${prefetchFact}\n${factStr}` : factStr;
+                hilog.info(MagicCueController.DOMAIN, MagicCueController.TAG,
+                  'prefetched contact fact for %{public}s: %{public}s', candidateName, factStr);
+              }
+            }
+          } catch (e) {
+            hilog.warn(MagicCueController.DOMAIN, MagicCueController.TAG, 'prefetch contacts.search failed: %{public}s',
+              e instanceof Error ? e.message : String(e));
+          }
         }
       }
 
@@ -398,9 +444,9 @@ export class MagicCueController {
       + '   c. 只要最后一次提问已经回复过了，就【完全不需要再回复】，必须直接返回 {"cues":[]}，绝不能弹出任何旧胶囊！\n'
       + '   d. 只有当且仅当这【最后一次提问】处于【未回复/等待回答】状态（即其下方尚未出现任何针对该提问的答复）时，才针对该提问生成胶囊。\n\n'
       + '【单意图与数据真实性】\n'
-      + '6. 若存在【端侧已知事实】（如运营商账单/欠费状态），必须直接优先采用已知事实中的准确数字组织答复，严禁再发起无谓工具调用！\n'
+      + '6. 若存在【端侧已知事实】（如运营商账单/欠费状态/通讯录联系人信息），必须直接优先采用已知事实中的准确数字与内容组织答复，严禁再发起无谓工具调用！\n'
       + '7. 若未提供端侧已知事实但需要查询真实数据：仅限调用 1 次最直接相关的工具：\n'
-      + '   sms_bill（查询运营商账单/话费/欠费）、sms_search（短信搜索）、contacts.search（联系人）、calendar.events（日历）、memo_list（记忆）。\n'
+      + '   contacts_search（查询通讯录联系人姓名/电话）、sms_bill（查询运营商账单/话费/欠费）、sms_search（短信搜索）、calendar.events（日历）、memo_list（记忆）。\n'
       + '   生成 1 条针对该提问的明确答案，获得工具结果后必须立即输出最终 JSON，绝对严禁发起第 2 次工具调用或漫无边际发散。\n'
       + '8. 针对联系人查询：若对方明确要电话/手机号，通讯录中找到了该联系人但未登记手机号码（phones 为空），严禁拿邮箱当作手机号提供；可在 content 中说明“未登记手机号码”或返回 {"cues":[]}。\n'
       + '9. 排除：验证码、密码、支付转账/银行卡信息 —— 一律忽略。\n\n'
