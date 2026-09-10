@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import { parseFrame, resOk, resErr, eventFrame, stringify, } from './protocol.js';
 import { deleteMemo, getMemo, listMemos, saveMemo } from './memo_store.js';
+import { getLatestTelecomBill, searchSms } from './sms_store.js';
 import { listSkills, setSkillEnabled } from './skills_store.js';
 import { getChannelConfig, setWechatBinding, disableWechat, fetchWechatQrCode, pollWechatQrStatus, } from './channel_store.js';
 import { injectAndSend, openApp } from './inject.js';
@@ -323,6 +324,30 @@ export function startGateway(ctx, config, registry, driver, wechat) {
                 return send(resErr(frame.id, 'MEMO_NOT_FOUND', 'memory not found'));
             send(resOk(frame.id, { deleted: true }));
         };
+        const handleSmsBill = async (frame) => {
+            if (!requireAuth())
+                return send(resErr(frame.id, 'AUTH_REQUIRED', 'connect first'));
+            const bill = await getLatestTelecomBill();
+            send(resOk(frame.id, { ok: true, bill }));
+        };
+        const handleSmsSearch = async (frame) => {
+            if (!requireAuth())
+                return send(resErr(frame.id, 'AUTH_REQUIRED', 'connect first'));
+            const params = (frame.params ?? {});
+            const msgs = await searchSms({
+                query: typeof params.query === 'string' ? params.query : undefined,
+                sender: typeof params.sender === 'string' ? params.sender : undefined,
+                limit: typeof params.limit === 'number' ? params.limit : undefined,
+            });
+            send(resOk(frame.id, { ok: true, messages: msgs }));
+        };
+        const handleMemoryIncrementalSync = async (frame) => {
+            if (!requireAuth())
+                return send(resErr(frame.id, 'AUTH_REQUIRED', 'connect first'));
+            console.log('[gateway] charging-triggered incremental sync requested');
+            // Incremental summarization and indexing trigger
+            send(resOk(frame.id, { ok: true, synced: true, timestamp: Date.now() }));
+        };
         const handleVoiceWakeGet = (frame) => {
             send(resOk(frame.id, { triggers: [] }));
         };
@@ -426,6 +451,15 @@ export function startGateway(ctx, config, registry, driver, wechat) {
                     break;
                 case 'memo.delete':
                     void handleMemoDelete(req);
+                    break;
+                case 'sms.bill':
+                    void handleSmsBill(req);
+                    break;
+                case 'sms.search':
+                    void handleSmsSearch(req);
+                    break;
+                case 'memory.incremental_sync':
+                    void handleMemoryIncrementalSync(req);
                     break;
                 case 'health':
                     handleHealth(req);

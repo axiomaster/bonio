@@ -15,6 +15,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { SessionRegistry } from './sessions.js';
 import { listMemos, saveMemo } from './memo_store.js';
+import { getLatestTelecomBill, searchSms } from './sms_store.js';
 
 export interface ChatEventSink {
   agentDelta(runId: string, sessionKey: string | undefined, delta: string): void;
@@ -716,6 +717,47 @@ export class AgentDriver {
       },
       async execute() {
         return { isError: false, value: { platform: process.platform, arch: process.arch, node: process.versions.node, dsh: 'bonio-bridge 0.1', os: process.env.OS || 'HarmonyOS/OpenHarmony' } };
+      },
+    })));
+
+    disposers.push(register(defineTool({
+      name: 'sms_bill',
+      description: 'Get the latest telecom bill, phone balance, or overdue status from carrier SMS (China Telecom 10000, China Mobile 10086, China Unicom 10010).',
+      parameters: {},
+      output: {
+        schema: { type: 'object', additionalProperties: true },
+        render(args: Record<string, unknown>, value: unknown) {
+          try { return textContent(JSON.stringify(value)); }
+          catch { return textContent(String(value)); }
+        },
+      },
+      async execute() {
+        const bill = await getLatestTelecomBill();
+        if (!bill) return { isError: false, value: { found: false, message: '未找到近期运营商账单短信。' } };
+        return { isError: false, value: { found: true, ...bill } };
+      },
+    })));
+
+    disposers.push(register(defineTool({
+      name: 'sms_search',
+      description: 'Search SMS messages by keyword or sender (e.g. 账单, 欠费, 验证码, 10000, 10086).',
+      parameters: {
+        query: { type: 'string', description: 'Keyword to search for.' },
+        sender: { type: 'string', description: 'Sender number, e.g. 10000, 10086.' },
+        limit: { type: 'number', description: 'Max number of messages, default 5.' },
+      },
+      output: {
+        schema: { type: 'object', additionalProperties: true },
+        render(args: Record<string, unknown>, value: unknown) {
+          try { return textContent(JSON.stringify(value)); }
+          catch { return textContent(String(value)); }
+        },
+      },
+      async execute(args: { query?: string; sender?: string; limit?: number }) {
+        const msgs = await searchSms(args ?? {});
+        if (msgs.length === 0) return { isError: false, value: { messages: [], text: '未找到匹配短信。' } };
+        const lines = msgs.map((m) => `[${m.senderNumber}] ${m.content}`).join('\n');
+        return { isError: false, value: { messages: msgs, text: lines } };
       },
     })));
 

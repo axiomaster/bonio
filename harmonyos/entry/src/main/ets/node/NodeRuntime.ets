@@ -40,6 +40,7 @@ import { MemoryService } from './MemoryService';
 import { CompanionMemoryController } from './CompanionMemoryController';
 import { MagicCueController, MagicCue } from './MagicCueController';
 import { UiTreeParser, Point2D } from './UiTreeParser';
+import { ChargingTriggeredScheduler } from './ChargingTriggeredScheduler';
 
 export class NodeRuntime {
   private static readonly DOMAIN = 0x3D00;
@@ -81,6 +82,7 @@ export class NodeRuntime {
   // Phase 4: on-device feature coordination (intent / health / notifications).
   public featureManager: FeatureManager;
   public healthScheduler: HealthScheduler;
+  public chargingScheduler: ChargingTriggeredScheduler;
   /** Sink for avatar.command payloads produced by features (set by FloatWindowPage). */
   public avatarCommandSink: ((payloadJson: string) => void) | undefined = undefined;
   
@@ -200,6 +202,11 @@ export class NodeRuntime {
       this.operatorSession,
       () => this.isConnected,
     );
+    this.chargingScheduler = new ChargingTriggeredScheduler(
+      this.operatorSession,
+      () => this.isConnected,
+    );
+    this.chargingScheduler.start();
     this.screenHandler.startScreenAwareness();
 
     this.voiceWakeManager = new VoiceWakeManager(async (command) => {

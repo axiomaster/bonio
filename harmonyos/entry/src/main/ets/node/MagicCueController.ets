@@ -18,6 +18,8 @@ class MagicCueChatParams {
   idempotencyKey: string = '';
 }
 
+class EmptyRpcParams {}
+
 const MAX_CUES = 2;
 const RUN_TIMEOUT_MS = 30000;
 const MAX_PAYLOAD_LENGTH = 60000;
@@ -97,8 +99,45 @@ export class MagicCueController {
 
   private async startActive(screenPayload: string, bundleName: string, title: string): Promise<void> {
     try {
+      const cleanText = this.extractScreenText(screenPayload, title);
+      let prefetchFact = '';
+
+      // L1 Domain Pre-check: detect if screen mentions bill/telecom/balance/due
+      if (/(话费|欠费|账单|扣费|交费|缴费|停机|余额|运营商|电信|移动|联通)/.test(cleanText)) {
+        try {
+          const billRes = await this.session.request('sms.bill', new EmptyRpcParams(), 3000);
+          if (billRes.ok) {
+            const billPayload = billRes.payload as Record<string, Object> ||
+              (billRes.payloadJSON ? JSON.parse(billRes.payloadJSON) as Record<string, Object> : undefined);
+            const bill = billPayload?.['bill'] as Record<string, Object> | undefined;
+            if (bill) {
+              const carrier = String(bill['carrier'] || '');
+              const cycle = String(bill['billingCycle'] || '');
+              const total = bill['totalBill'];
+              const due = bill['amountDue'];
+              const pastDue = Boolean(bill['isPastDue']);
+              const phone = String(bill['phoneNumber'] || '');
+              const summary = String(bill['summary'] || '');
+              prefetchFact = `【运营商最新账单事实】\n`
+                + `运营商：${carrier}\n`
+                + (cycle ? `账期：${cycle}\n` : '')
+                + (phone ? `对应号码：${phone}\n` : '')
+                + (total !== undefined ? `账单合计：${total}元\n` : '')
+                + (due !== undefined ? `实际应付/待缴：${due}元\n` : '')
+                + `状态：${pastDue ? '欠费/存在待缴账单' : '正常/无欠费'}\n`
+                + `摘要：${summary}\n`;
+              hilog.info(MagicCueController.DOMAIN, MagicCueController.TAG,
+                'prefetched telecom bill fact: %{public}s', summary);
+            }
+          }
+        } catch (e) {
+          hilog.warn(MagicCueController.DOMAIN, MagicCueController.TAG, 'prefetch sms.bill failed: %{public}s',
+            e instanceof Error ? e.message : String(e));
+        }
+      }
+
       const params = new MagicCueChatParams();
-      params.message = this.buildPrompt(screenPayload, bundleName, title);
+      params.message = this.buildPrompt(cleanText, bundleName, title, prefetchFact);
       params.idempotencyKey = `magic-cue-${Date.now()}`;
       const response = await this.session.request('chat.send', params);
       const payload = response.payload as Record<string, Object> ||
@@ -151,7 +190,7 @@ export class MagicCueController {
         const kind = typeof c['kind'] === 'string' ? (c['kind'] as string) : '';
         const title = typeof c['title'] === 'string' ? (c['title'] as string).trim() : '';
         const content = typeof c['content'] === 'string' ? (c['content'] as string).trim() : '';
-        if (!['contact', 'calendar', 'memo'].includes(kind) || !title || !content) continue;
+        if (!['contact', 'calendar', 'memo', 'bill', 'text', 'sms'].includes(kind) || !title || !content) continue;
         cues.push({ kind, title, content });
         if (cues.length >= MAX_CUES) break;
       }
@@ -332,21 +371,24 @@ export class MagicCueController {
     return trimmed;
   }
 
-  private buildPrompt(screenPayload: string, bundleName: string, title: string): string {
-    const cleanText = this.extractScreenText(screenPayload, title);
+  private buildPrompt(cleanText: string, bundleName: string, title: string, prefetchContext?: string): string {
     let payload = cleanText;
     if (payload.length > MAX_PAYLOAD_LENGTH) {
       payload = `[早期屏幕内容已省略]\n${payload.substring(payload.length - MAX_PAYLOAD_LENGTH)}`;
     }
 
     const titleHint = title ? `会话对象/标题：【${title}】` : '';
+    const factHint = prefetchContext && prefetchContext.trim()
+      ? `\n<端侧已知事实>\n${prefetchContext.trim()}\n</端侧已知事实>\n`
+      : '';
 
     return '你是 Bonio 的 Magic Cue 助手。以下是手机当前屏幕的内容（应用：' + bundleName + (titleHint ? '，' + titleHint : '') + '）：\n'
-      + '<屏幕文本>\n' + payload + '\n</屏幕文本>\n\n'
+      + '<屏幕文本>\n' + payload + '\n</屏幕文本>\n'
+      + factHint + '\n'
       + '请严格按以下规则分析屏幕对话，决定是否为用户生成快捷回复胶囊：\n\n'
       + '【核心时序规则：只答复最后一次的问题】\n'
       + '1. 屏幕文本是按时间从上到下的聊天记录（上方是早前历史消息，下方是最新消息）。\n'
-      + '2. 在整段对话中，找出按时序出现的【最后一次（最底部、最新的一条）】明确向用户询问特定信息的提问（例如索要某人的手机号/电话/邮箱/日程/记忆等）。\n'
+      + '2. 在整段对话中，找出按时序出现的【最后一次（最底部、最新的一条）】明确的提问（例如询问手机是否欠费/话费账单、索要某人电话/邮箱/日程/记忆等疑问，无论谁发出，只要处于待解答状态）。\n'
       + '3. 绝对忽略所有历史旧问题！无论历史提问内容是什么，严禁处理或列出历史上更早的问题，绝不在胶囊中混杂历史旧问题的答案！\n'
       + (title ? '4. 忽略页面顶部的标题栏与会话对象名称【' + title + '】，那只是当前聊天对象姓名或群名，绝对不是提问，严禁对【' + title + '】调用工具或生成胶囊。\n\n' : '4. 忽略页面顶部的标题栏与会话对象名称，严禁对标题名字调用工具或产出胶囊。\n\n')
       + '【关键规则：已回复检查（如果用户已经回复过了，那就不需要回复了）】\n'
@@ -356,18 +398,15 @@ export class MagicCueController {
       + '   c. 只要最后一次提问已经回复过了，就【完全不需要再回复】，必须直接返回 {"cues":[]}，绝不能弹出任何旧胶囊！\n'
       + '   d. 只有当且仅当这【最后一次提问】处于【未回复/等待回答】状态（即其下方尚未出现任何针对该提问的答复）时，才针对该提问生成胶囊。\n\n'
       + '【单意图与数据真实性】\n'
-      + '6. 如果存在最新未回复的提问，只针对这【一个】最新提问调用工具获取真实数据：\n'
-      + '   contacts.search（联系人）、calendar.events（日历）、memo_list（记忆）。\n'
-      + '   生成 1 条（若有主号/副号等明确备选最多 2 条）针对该提问的答案，严禁跨越多个不同问题混杂输出。\n'
-      + '7. 针对联系人查询：若对方明确要电话/手机号，通讯录中找到了该联系人但未登记手机号码（phones 为空），严禁拿邮箱当作手机号提供；可在 content 中说明“未登记手机号码”或返回 {"cues":[]}。\n'
-      + '8. 排除：验证码、密码、支付转账/银行卡信息 —— 一律忽略。\n\n'
-      + '【极速响应与工具限制】\n'
-      + '9. 本任务为即时快捷胶囊，必须以最快速度完成：\n'
-      + '   a. 若需要调用工具，仅限调用 1 次最直接相关的工具。获得工具结果后必须立即输出最终 JSON，绝对严禁发起第 2 次工具调用或漫无边际的循环发散！\n'
-      + '   b. 严禁在思考过程中输出冗长论述，思考必须直接聚焦于最后一次提问与目标，第一时间输出 JSON。\n\n'
+      + '6. 若存在【端侧已知事实】（如运营商账单/欠费状态），必须直接优先采用已知事实中的准确数字组织答复，严禁再发起无谓工具调用！\n'
+      + '7. 若未提供端侧已知事实但需要查询真实数据：仅限调用 1 次最直接相关的工具：\n'
+      + '   sms_bill（查询运营商账单/话费/欠费）、sms_search（短信搜索）、contacts.search（联系人）、calendar.events（日历）、memo_list（记忆）。\n'
+      + '   生成 1 条针对该提问的明确答案，获得工具结果后必须立即输出最终 JSON，绝对严禁发起第 2 次工具调用或漫无边际发散。\n'
+      + '8. 针对联系人查询：若对方明确要电话/手机号，通讯录中找到了该联系人但未登记手机号码（phones 为空），严禁拿邮箱当作手机号提供；可在 content 中说明“未登记手机号码”或返回 {"cues":[]}。\n'
+      + '9. 排除：验证码、密码、支付转账/银行卡信息 —— 一律忽略。\n\n'
       + '【输出格式】\n'
       + '只输出纯 JSON，不要 Markdown 代码块或多余解释文字：\n'
-      + '{"cues":[{"kind":"contact|calendar|memo","title":"…","content":"…"}]}\n'
+      + '{"cues":[{"kind":"bill|contact|calendar|memo|text","title":"…","content":"…"}]}\n'
       + '若无需回复或未找到，返回 {"cues":[]}。';
   }
 }
