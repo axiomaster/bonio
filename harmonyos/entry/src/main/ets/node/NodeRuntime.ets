@@ -421,8 +421,7 @@ export class NodeRuntime {
 
   /**
    * Magic Cue: write a capsule's answer into the chat input and send it.
-   * Uses cached input/send points (learned once by the bridge) so later
-   * injections are a fixed tap sequence instead of re-discovering layout.
+   * Coordinates are dynamically resolved from the live view tree by bonio-bridge.
    */
   public async injectCue(text: string): Promise<void> {
     if (!this.isConnected) {
@@ -430,21 +429,14 @@ export class NodeRuntime {
     }
     const params = new CueInjectParams();
     params.text = text;
-    const input = this.parsePoint(this.prefs.getMagicCueInputPoint());
-    if (input) {
-      params.inputX = input[0];
-      params.inputY = input[1];
-    }
-    const send = this.parsePoint(this.prefs.getMagicCueSendPoint());
-    if (send) {
-      params.sendX = send[0];
-      params.sendY = send[1];
-    }
+    // Clear obsolete static coordinates to ensure clean state
+    this.prefs.setMagicCueInputPoint('');
+    this.prefs.setMagicCueSendPoint('');
+
     const response = await this.operatorSession.request('cue.inject', params, 15000);
     if (!response.ok) {
       throw new Error(response.error?.message || 'CUE_INJECT_FAILED');
     }
-    this.cacheCuePoints(response.payload);
   }
 
   /** Magic Cue: launch an app (e.g. the system calendar). */
@@ -458,28 +450,6 @@ export class NodeRuntime {
     const response = await this.operatorSession.request('cue.open', params, 15000);
     if (!response.ok) {
       throw new Error(response.error?.message || 'CUE_OPEN_FAILED');
-    }
-  }
-
-  private parsePoint(raw: string): number[] | undefined {
-    const parts = raw.split(',');
-    if (parts.length !== 2) return undefined;
-    const x = Number(parts[0]);
-    const y = Number(parts[1]);
-    if (!Number.isFinite(x) || !Number.isFinite(y)) return undefined;
-    return [x, y];
-  }
-
-  private cacheCuePoints(payload: Object | undefined): void {
-    if (!payload) return;
-    const p = payload as Record<string, Object>;
-    const input = p['inputPoint'] as Record<string, Object> | undefined;
-    const send = p['sendPoint'] as Record<string, Object> | undefined;
-    if (input && input['learned'] === true) {
-      this.prefs.setMagicCueInputPoint(`${input['x']},${input['y']}`);
-    }
-    if (send && send['learned'] === true) {
-      this.prefs.setMagicCueSendPoint(`${send['x']},${send['y']}`);
     }
   }
 

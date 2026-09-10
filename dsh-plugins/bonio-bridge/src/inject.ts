@@ -66,14 +66,17 @@ async function findSendPoint(): Promise<{ x: number; y: number } | null> {
     await run(UITEST, ['dumpLayout', '-p', LAYOUT_PATH]);
     const root = JSON.parse(await fs.readFile(LAYOUT_PATH, 'utf8')) as LayoutNode | LayoutNode[];
     let point: { x: number; y: number } | null = null;
+    const match = (val: string) => val === '发送' || /^(发送|send|发送消息|点击发送)$/i.test(val);
     const walk = (node: LayoutNode | LayoutNode[]): void => {
       if (Array.isArray(node)) { node.forEach(walk); return; }
       if (!node || typeof node !== 'object') return;
       const at = node.attributes ?? {};
       const text = typeof at.text === 'string' ? at.text.trim() : '';
+      const desc = typeof at.description === 'string' ? at.description.trim() : '';
+      const orig = typeof at.originalText === 'string' ? at.originalText.trim() : '';
       // The 发送 label itself reports clickable:false (its parent Button owns
       // the hit test), but tapping the label's coordinates still delivers.
-      if ((text === '发送' || /^send$/i.test(text)) && typeof at.bounds === 'string') {
+      if ((match(text) || match(desc) || match(orig)) && typeof at.bounds === 'string') {
         const m = at.bounds.match(/\[(\d+),(\d+)\]\[(\d+),(\d+)\]/);
         if (m) point = { x: Math.round((+m[1] + +m[3]) / 2), y: Math.round((+m[2] + +m[4]) / 2) };
       }
@@ -125,27 +128,22 @@ async function findInputPoint(): Promise<{ point: { x: number; y: number } | nul
 
 export async function injectAndSend(options: InjectOptions): Promise<InjectResult> {
   try {
-    let inputPoint: { x: number; y: number } | undefined
-      = typeof options.inputX === 'number' && typeof options.inputY === 'number'
-        ? { x: Math.round(options.inputX), y: Math.round(options.inputY) }
-        : undefined;
+    let inputPoint: { x: number; y: number } | undefined;
     let inputLearned = false;
-    if (!inputPoint) {
-      // No cached point: discover once from the live layout (keyboard closed
-      // in the normal case). The caller caches it, so this dump is one-time.
-      const found = await findInputPoint();
+
+    // Dynamically locate the input box from the live view tree
+    const foundInput = await findInputPoint();
+    if (foundInput.point) {
+      inputPoint = foundInput.point;
       inputLearned = true;
-      inputPoint = found.point ?? undefined;
-      if (!inputPoint) return { ok: false, stage: 'find-input', error: 'chat input not found in live layout' };
-      // A keyboard relocates the input row; a point learned with the keyboard
-      // open is wrong for later cold runs, so mark it non-cacheable.
-      if (found.keyboardOpen) inputLearned = false;
+      if (foundInput.keyboardOpen) inputLearned = false;
+    } else if (typeof options.inputX === 'number' && typeof options.inputY === 'number') {
+      inputPoint = { x: Math.round(options.inputX), y: Math.round(options.inputY) };
     }
 
-    let sendPoint: { x: number; y: number } | undefined
-      = typeof options.sendX === 'number' && typeof options.sendY === 'number'
-        ? { x: Math.round(options.sendX), y: Math.round(options.sendY) }
-        : undefined;
+    if (!inputPoint) {
+      return { ok: false, stage: 'find-input', error: 'chat input not found in live layout' };
+    }
 
     // Fast path: use OpenHarmony IMF ProxyIME to silently inject without opening keyboard
     if (await hasProxyIme()) {
@@ -154,33 +152,22 @@ export async function injectAndSend(options: InjectOptions): Promise<InjectResul
         args.push('--input', String(inputPoint.x), String(inputPoint.y));
       }
 
+      // Inject text first via ProxyIME without sending
+      args.push('--no-send');
+      await run(PROXY_IME, args);
+
       if (options.send === false) {
-        args.push('--no-send');
-        await run(PROXY_IME, args);
         return { ok: true, stage: 'type', inputPoint: { ...inputPoint, learned: inputLearned } };
       }
 
-      // If sendPoint is known, execute full inject + send in one atomic shot
-      if (sendPoint) {
-        args.push('--send', String(sendPoint.x), String(sendPoint.y));
-        await run(PROXY_IME, args);
-        return {
-          ok: true,
-          stage: 'click-send',
-          inputPoint: { ...inputPoint, learned: inputLearned },
-          sendPoint: { ...sendPoint, learned: false },
-        };
+      // Allow UI a moment to update and render the send button (switch from '+' to '发送')
+      await sleep(150);
+
+      // Dynamically locate the real Send button from the live view tree
+      const sendPoint = await findSendPoint();
+      if (!sendPoint) {
+        return { ok: false, stage: 'find-send', error: 'send button not found in live layout after inject' };
       }
-
-      // If sendPoint is NOT yet known: inject text first (without sending),
-      // which causes the chat app to show the send button, then discover its location
-      args.push('--no-send');
-      await run(PROXY_IME, args);
-      await sleep(150); // allow UI to render send button
-
-      sendPoint = (await findSendPoint()) ?? undefined;
-      let learned = true;
-      if (!sendPoint) return { ok: false, stage: 'find-send', error: 'send button not found in live layout' };
 
       await run(UITEST, ['uiInput', 'click', String(sendPoint.x), String(sendPoint.y)]);
       await sleep(200);
@@ -189,7 +176,7 @@ export async function injectAndSend(options: InjectOptions): Promise<InjectResul
         ok: true,
         stage: 'click-send',
         inputPoint: { ...inputPoint, learned: inputLearned },
-        sendPoint: { ...sendPoint, learned },
+        sendPoint: { ...sendPoint, learned: true },
       };
     }
 
@@ -200,19 +187,15 @@ export async function injectAndSend(options: InjectOptions): Promise<InjectResul
     await sleep(600);
     if (options.send === false) return { ok: true, stage: 'type', inputPoint: { ...inputPoint, learned: inputLearned } };
 
-    let learned = false;
-    if (!sendPoint) {
-      sendPoint = (await findSendPoint()) ?? undefined;
-      learned = true;
-      if (!sendPoint) return { ok: false, stage: 'find-send', error: 'send button not found in live layout' };
-    }
+    const sendPoint = await findSendPoint();
+    if (!sendPoint) return { ok: false, stage: 'find-send', error: 'send button not found in live layout' };
     await run(UITEST, ['uiInput', 'click', String(sendPoint.x), String(sendPoint.y)]);
     await sleep(300);
     return {
       ok: true,
       stage: 'click-send',
       inputPoint: { ...inputPoint, learned: inputLearned },
-      sendPoint: { ...sendPoint, learned },
+      sendPoint: { ...sendPoint, learned: true },
     };
   } catch (error) {
     return { ok: false, stage: 'click-send', error: error instanceof Error ? error.message : String(error) };
