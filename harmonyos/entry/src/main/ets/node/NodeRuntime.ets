@@ -39,6 +39,7 @@ import { WakeWords } from '../common/WakeWords';
 import { MemoryService } from './MemoryService';
 import { CompanionMemoryController } from './CompanionMemoryController';
 import { MagicCueController, MagicCue } from './MagicCueController';
+import { UiTreeParser, Point2D } from './UiTreeParser';
 
 export class NodeRuntime {
   private static readonly DOMAIN = 0x3D00;
@@ -73,6 +74,8 @@ export class NodeRuntime {
   public companionMemoryController: CompanionMemoryController;
   public magicCueController: MagicCueController;
   public lastCaptureBundleName: string = '';
+  public lastSnapshotInputPoint: Point2D | undefined = undefined;
+  public lastSnapshotSendPoint: Point2D | undefined = undefined;
   public onChatUpdate: (() => void) | undefined = undefined;
 
   // Phase 4: on-device feature coordination (intent / health / notifications).
@@ -401,6 +404,23 @@ export class NodeRuntime {
     if (!title) {
       title = capture.appName ?? '';
     }
+
+    // Resolve input box and send button coordinates dynamically from the MSDP snapshot
+    try {
+      const points = UiTreeParser.resolveUiTreePoints(capture.payloadJson);
+      this.lastSnapshotInputPoint = points.inputPoint;
+      this.lastSnapshotSendPoint = points.sendPoint;
+      hilog.info(NodeRuntime.DOMAIN, 'NodeRuntime',
+        'MSDP snapshot resolved coordinates: input=(%{public}d, %{public}d), send=(%{public}d, %{public}d)',
+        this.lastSnapshotInputPoint ? this.lastSnapshotInputPoint.x : -1,
+        this.lastSnapshotInputPoint ? this.lastSnapshotInputPoint.y : -1,
+        this.lastSnapshotSendPoint ? this.lastSnapshotSendPoint.x : -1,
+        this.lastSnapshotSendPoint ? this.lastSnapshotSendPoint.y : -1);
+    } catch (parseErr) {
+      hilog.warn(NodeRuntime.DOMAIN, 'NodeRuntime', 'failed to parse snapshot points: %{public}s',
+        parseErr instanceof Error ? parseErr.message : String(parseErr));
+    }
+
     return await this.magicCueController.run(capture.payloadJson, bundleName, title);
   }
 
@@ -429,9 +449,21 @@ export class NodeRuntime {
     }
     const params = new CueInjectParams();
     params.text = text;
+    if (this.lastSnapshotInputPoint) {
+      params.inputX = this.lastSnapshotInputPoint.x;
+      params.inputY = this.lastSnapshotInputPoint.y;
+    }
+    if (this.lastSnapshotSendPoint) {
+      params.sendX = this.lastSnapshotSendPoint.x;
+      params.sendY = this.lastSnapshotSendPoint.y;
+    }
     // Clear obsolete static coordinates to ensure clean state
     this.prefs.setMagicCueInputPoint('');
     this.prefs.setMagicCueSendPoint('');
+
+    hilog.info(NodeRuntime.DOMAIN, 'NodeRuntime',
+      'injectCue calling cue.inject with text="%{public}s", input=(%{public}s, %{public}s), send=(%{public}s, %{public}s)',
+      text, String(params.inputX), String(params.inputY), String(params.sendX), String(params.sendY));
 
     const response = await this.operatorSession.request('cue.inject', params, 15000);
     if (!response.ok) {

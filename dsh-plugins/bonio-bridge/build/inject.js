@@ -112,16 +112,18 @@ export async function injectAndSend(options) {
     try {
         let inputPoint;
         let inputLearned = false;
-        // Dynamically locate the input box from the live view tree
-        const foundInput = await findInputPoint();
-        if (foundInput.point) {
-            inputPoint = foundInput.point;
-            inputLearned = true;
-            if (foundInput.keyboardOpen)
-                inputLearned = false;
-        }
-        else if (typeof options.inputX === 'number' && typeof options.inputY === 'number') {
+        // Use caller-provided input coordinates (from MSDP uiTree) or dynamically discover from live layout
+        if (typeof options.inputX === 'number' && typeof options.inputY === 'number') {
             inputPoint = { x: Math.round(options.inputX), y: Math.round(options.inputY) };
+        }
+        else {
+            const foundInput = await findInputPoint();
+            if (foundInput.point) {
+                inputPoint = foundInput.point;
+                inputLearned = true;
+                if (foundInput.keyboardOpen)
+                    inputLearned = false;
+            }
         }
         if (!inputPoint) {
             return { ok: false, stage: 'find-input', error: 'chat input not found in live layout' };
@@ -139,14 +141,20 @@ export async function injectAndSend(options) {
                 return { ok: true, stage: 'type', inputPoint: { ...inputPoint, learned: inputLearned } };
             }
             // Allow UI a moment to update and render the send button (switch from '+' to '发送')
-            await sleep(150);
-            // Dynamically locate the real Send button from the live view tree
-            const sendPoint = await findSendPoint();
+            await sleep(100);
+            // Determine send point: use caller-provided sendPoint if available, otherwise dumpLayout
+            let sendPoint = null;
+            if (typeof options.sendX === 'number' && typeof options.sendY === 'number') {
+                sendPoint = { x: Math.round(options.sendX), y: Math.round(options.sendY) };
+            }
+            else {
+                sendPoint = await findSendPoint();
+            }
             if (!sendPoint) {
                 return { ok: false, stage: 'find-send', error: 'send button not found in live layout after inject' };
             }
             await run(UITEST, ['uiInput', 'click', String(sendPoint.x), String(sendPoint.y)]);
-            await sleep(200);
+            await sleep(150);
             return {
                 ok: true,
                 stage: 'click-send',
@@ -161,7 +169,13 @@ export async function injectAndSend(options) {
         await sleep(600);
         if (options.send === false)
             return { ok: true, stage: 'type', inputPoint: { ...inputPoint, learned: inputLearned } };
-        const sendPoint = await findSendPoint();
+        let sendPoint = null;
+        if (typeof options.sendX === 'number' && typeof options.sendY === 'number') {
+            sendPoint = { x: Math.round(options.sendX), y: Math.round(options.sendY) };
+        }
+        else {
+            sendPoint = await findSendPoint();
+        }
         if (!sendPoint)
             return { ok: false, stage: 'find-send', error: 'send button not found in live layout' };
         await run(UITEST, ['uiInput', 'click', String(sendPoint.x), String(sendPoint.y)]);
