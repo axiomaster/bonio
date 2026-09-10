@@ -1,0 +1,27 @@
+docs/design/arch/20260910-memory-hierarchical-rag-and-charging-vectorization-arch.md
+  h_de08bd40967a17 1-159
+docs/design/arch/magic-cue-arch-20260905.md
+  h_de08bd40967a17 285-309
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "eec56395caa7a12744e17d7c9ac43f5df00b7db3",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  },
+  "sessions": {
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 36
+    }
+  }
+}
