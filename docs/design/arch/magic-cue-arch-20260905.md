@@ -283,3 +283,27 @@ Magic Cue 是默认系统级能力（`magicCue.enabled` 默认 `true`，双击�
 - **端到端实测**：
   - 7 项数据开关逐项验证：授权成功显示开启，拒绝授权平滑回弹复位；
   - 联系人、日历、备忘录（本地与数据库直读）、短信数据库直读均已通过真实数据验证。
+
+## 10. 性能与交互极致优化（2026-09-10 落地）
+
+针对注入过程中“软键盘弹起遮挡界面”与“dumpLayout 时延过长”两项体验痛点进行了专项突破：
+
+### 10.1 OpenHarmony IMF ProxyIME 免弹软键盘静默文字注入
+1. **背景**：传统 `uitest uiInput click` 触发编辑框获焦必然强行拉起系统软键盘，不仅遮挡下半屏幕破坏视觉连续性，还会引起底栏按钮向上重排漂移（需要增加 800ms 等待动画并容易误触头像）。
+2. **突破机制**：
+   - 逆向分析 OpenHarmony 输入法框架（IMF），发现系统服务允许 UID 7101（`AI_PROXY_IME`）注册代理输入法。
+   - 开发轻量级 C++ 原生工具 `tools/bonio-proxy-ime`，调用 `InputMethodAbility::RegisterProxyIme` 并实现 `InputMethodEngineListener::IsEnable` 返回 `true`。
+   - 当目标编辑框获焦时，系统 IMSA 直接将输入上下文通道绑定到 ProxyIME，**彻底阻断物理软键盘的创建与弹出**。
+   - 获焦后调用 `InsertText` 静默写入文字，发送完毕后注销代理恢复系统默认输入法，整个过程零键盘跳动、零界面重排。
+
+### 10.2 MSDP UI Tree 内存动态寻址（彻底跳过 dumpLayout 2.8s 时延）
+1. **背景**：原方案中为了确定动态输入框与发送按钮位置，在注入前和注入后各调用一次 `/bin/uitest dumpLayout`，每次耗时约 1.4 秒，导致端到端注入总时延高达 3.5 秒以上。
+2. **优化方案**：
+   - 双击 Avatar 时系统 MSDP 已即刻上报当前屏幕快照（包含完整的多边形包围盒 `uiTree`）。
+   - 新建 `harmonyos/entry/src/main/ets/node/UiTreeParser.ets`，毫秒级内存解析 View Tree：
+     - 最底部 `RichEditor` / `TextInput` 确定为输入框坐标；
+     - 输入框同行右侧操作区域确定为发送按钮坐标（空白时为 `+` 图标，注入文字后切换为发送按钮，物理位置完全重合）。
+   - 在触发 `cue.inject` 时客户端随路传递 `(inputX, inputY, sendX, sendY)`，服务端 `bonio-bridge` 检测到动态坐标后直接走快速通道，**完全跳过 2 次 dumpLayout**。
+3. **效果收益**：
+   - 端到端注入发送时延从 **~3.5s 骤降至 ~0.3s**（性能提升 10 倍以上）；
+   - 彻底消除了因软键盘漂移导致的头像误触问题。
