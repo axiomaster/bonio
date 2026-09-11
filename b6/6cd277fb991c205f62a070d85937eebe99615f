@@ -1,0 +1,33 @@
+docs/design/prd/android-port-prd-20260911.md
+  s_539b59f41bad53::t_2f2bfdc4147d62 1-92
+docs/design/arch/android-port-arch-20260911.md
+  s_539b59f41bad53::t_45c94ec0aa8b2c 1-136
+docs/design/rr/android-port-20260911.md
+  s_539b59f41bad53::t_617b69cef818cb 1-55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "b66cd277fb991c205f62a070d85937eebe99615f",
+  "prompts": {},
+  "sessions": {
+    "s_539b59f41bad53": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8f431abe-980e-474d-af47-4ff9172028a6",
+        "model": "glm-5.1"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 0
+    },
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 36
+    }
+  }
+}
