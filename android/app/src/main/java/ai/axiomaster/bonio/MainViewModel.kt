@@ -54,6 +54,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
   val manualPort: StateFlow<Int> = runtime.manualPort
   val manualTls: StateFlow<Boolean> = runtime.manualTls
   val gatewayToken: StateFlow<String> = runtime.gatewayToken
+  val localEnabled: StateFlow<Boolean> = runtime.localEnabled
+  val localPort: StateFlow<Int> = runtime.localPort
+  val localEngineState: StateFlow<ai.axiomaster.bonio.local.LocalEngineController.State> =
+    (app as BonioApp).localEngine.state
   val locationPreciseEnabled: StateFlow<Boolean> = runtime.locationPreciseEnabled
   val preventSleep: StateFlow<Boolean> = runtime.preventSleep
   val canvasDebugStatusEnabled: StateFlow<Boolean> = runtime.canvasDebugStatusEnabled
@@ -237,6 +241,25 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
   fun connect(endpoint: GatewayEndpoint) {
     runtime.connect(endpoint)
+  }
+
+  fun setLocalEnabled(enabled: Boolean) {
+    runtime.prefs.setLocalEnabled(enabled)
+    val engine = (getApplication<BonioApp>()).localEngine
+    if (enabled) {
+      engine.ensureStarted()
+      runtime.connectLocal()
+    } else {
+      runtime.disconnect()
+      engine.stop()
+    }
+  }
+
+  fun connectLocal() {
+    if (runtime.prefs.localEnabled.value) {
+      (getApplication<BonioApp>()).localEngine.ensureStarted()
+    }
+    runtime.connectLocal()
   }
 
   fun disconnect() {

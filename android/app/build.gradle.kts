@@ -26,6 +26,14 @@ android {
         noCompress += listOf(".lottie", "lottie")
     }
 
+    // Extract native libs to disk so the bundled hiclaw engine binary
+    // (jniLibs/arm64-v8a/libhiclaw.so) can be exec'd from nativeLibraryDir.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false

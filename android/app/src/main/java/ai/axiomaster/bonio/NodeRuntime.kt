@@ -296,7 +296,7 @@ class NodeRuntime(context: Context) {
   }
 
   fun setForeground(v: Boolean) { _isForeground.value = v }
-  fun connect(endpoint: GatewayEndpoint) {
+  fun connect(endpoint: GatewayEndpoint, tokenOverride: String? = null) {
     DeviceNotificationListenerService.setNodeEventSink { event, payload ->
       scope.launch {
         operatorSession.sendNodeEvent(event, payload)
@@ -315,11 +315,26 @@ class NodeRuntime(context: Context) {
       return
     }
     connectedEndpoint = endpoint
-    val token = prefs.loadGatewayToken()
+    val token = tokenOverride ?: prefs.loadGatewayToken()
     val pwd = prefs.loadGatewayPassword()
     operatorSession.connect(endpoint, token, pwd, connectionManager.buildOperatorConnectOptions(), tls)
     nodeSession.connect(endpoint, token, pwd, connectionManager.buildNodeConnectOptions(), tls)
     startDeviceStatusReporting()
+  }
+
+  fun localEndpoint(port: Int = prefs.localPort.value): GatewayEndpoint =
+    GatewayEndpoint(
+      stableId = "local|127.0.0.1|$port",
+      name = "Local Engine (127.0.0.1:$port)",
+      host = "127.0.0.1",
+      port = port,
+      tlsEnabled = false,
+      tlsFingerprintSha256 = null,
+    )
+
+  /** Connect to the embedded local hiclaw engine on 127.0.0.1. */
+  fun connectLocal() {
+    connect(localEndpoint(), prefs.loadLocalToken())
   }
 
   fun disconnect() {
@@ -465,6 +480,8 @@ class NodeRuntime(context: Context) {
   val manualPort: StateFlow<Int> = prefs.manualPort
   val manualTls: StateFlow<Boolean> = prefs.manualTls
   val gatewayToken: StateFlow<String> = prefs.gatewayToken
+  val localEnabled: StateFlow<Boolean> = prefs.localEnabled
+  val localPort: StateFlow<Int> = prefs.localPort
   val locationPreciseEnabled: StateFlow<Boolean> = prefs.locationPreciseEnabled
   val preventSleep: StateFlow<Boolean> = prefs.preventSleep
   val canvasDebugStatusEnabled: StateFlow<Boolean> = prefs.canvasDebugStatusEnabled

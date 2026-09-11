@@ -30,6 +30,9 @@ class NodeForegroundService : Service() {
     startForegroundWithTypes(notification = initial, requiresMic = false)
 
     val runtime = (application as BonioApp).runtime
+    if (runtime.prefs.localEnabled.value) {
+      (application as BonioApp).localEngine.ensureStarted()
+    }
     notificationJob =
       scope.launch {
         combine(
@@ -56,6 +59,7 @@ class NodeForegroundService : Service() {
     when (intent?.action) {
       ACTION_STOP -> {
         (application as BonioApp).runtime.disconnect()
+        (application as BonioApp).localEngine.stop()
         stopSelf()
         return START_NOT_STICKY
       }

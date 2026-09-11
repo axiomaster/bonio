@@ -2082,7 +2082,18 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
   });
 
   try {
-    server.listen(static_cast<uint16_t>(port));
+    // Bind to a specific address when gateway.host names one (e.g. 127.0.0.1 for
+    // the on-device embedded engine); empty/0.0.0.0/*/:: keeps listen-all behavior.
+    const std::string& bind_host = config.gateway.host;
+    websocketpp::lib::asio::error_code addr_ec;
+    auto bind_addr = websocketpp::lib::asio::ip::make_address(bind_host, addr_ec);
+    if (!bind_host.empty() && !addr_ec && bind_host != "0.0.0.0" && bind_host != "*" &&
+        bind_host != "::") {
+      server.listen(
+          websocketpp::lib::asio::ip::tcp::endpoint(bind_addr, static_cast<uint16_t>(port)));
+    } else {
+      server.listen(static_cast<uint16_t>(port));
+    }
     server.start_accept();
   } catch (std::exception const& e) {
     std::cerr << "HiClaw gateway: listen failed: " << e.what() << "\n";

@@ -73,6 +73,14 @@ class SecurePrefs(context: Context) {
     MutableStateFlow(plainPrefs.getBoolean("gateway.manual.tls", true))
   val manualTls: StateFlow<Boolean> = _manualTls
 
+  private val _localEnabled =
+    MutableStateFlow(plainPrefs.getBoolean("gateway.local.enabled", true))
+  val localEnabled: StateFlow<Boolean> = _localEnabled
+
+  private val _localPort =
+    MutableStateFlow(plainPrefs.getInt("gateway.local.port", 10724))
+  val localPort: StateFlow<Int> = _localPort
+
   private val _gatewayToken = MutableStateFlow("")
   val gatewayToken: StateFlow<String> = _gatewayToken
 
@@ -157,6 +165,25 @@ class SecurePrefs(context: Context) {
   fun setManualTls(value: Boolean) {
     plainPrefs.edit { putBoolean("gateway.manual.tls", value) }
     _manualTls.value = value
+  }
+
+  fun setLocalEnabled(value: Boolean) {
+    plainPrefs.edit { putBoolean("gateway.local.enabled", value) }
+    _localEnabled.value = value
+  }
+
+  fun setLocalPort(value: Int) {
+    plainPrefs.edit { putInt("gateway.local.port", value) }
+    _localPort.value = value
+  }
+
+  fun loadLocalToken(): String? {
+    val stored = securePrefs.getString("gateway.local.token", null)?.trim()
+    return stored?.takeIf { it.isNotEmpty() }
+  }
+
+  fun saveLocalToken(token: String) {
+    securePrefs.edit { putString("gateway.local.token", token.trim()) }
   }
 
   fun setGatewayToken(value: String) {

@@ -85,10 +85,11 @@ ProcessBuilder(nativeLibraryDir/libhiclaw.so,
 
 ### 2.5 本机连接（app 侧改动）
 
-- `SecurePrefs` 新增键：`local.enabled`（默认 false）、`local.port`（默认 10724）、`local.token`（secure 存储，= pairing_code）
-- 连接分支（ServerTab）：本地模式开启时 Connect → `GatewayEndpoint.manual("127.0.0.1", localPort)` + TLS off（`ConnectionManager.resolveTlsParamsForEndpoint` 对 manual+关 TLS 已返回 null → 纯 ws）+ token = `local.token`
-- NodeRuntime.connect（NodeRuntime.kt:299）加本地模式取 token 分支
-- 断线重连：现有 `GatewaySession.runLoop` 指数退避直接复用；引擎重启后 15s 内自动重连成功
+- `SecurePrefs` 新增键：`gateway.local.enabled`（**默认 true**）、`gateway.local.port`（默认 10724）、`gateway.local.token`（secure 存储，= pairing_code）
+- **安装即用，无手动连接**：`BonioApp.onCreate` 在 localEnabled 时自动 `ensureStarted()` + `connectLocal()`；GatewaySession 自带指数退避重连，引擎未就绪时发起连接会自动补连
+- 连接端点：`stableId="local|127.0.0.1:<port>"`、TLS off（`ConnectionManager.resolveTlsParamsForEndpoint` 无存储指纹且无 TLS hint → 返回 null → 纯 ws）、token = `gateway.local.token`
+- ServerTab 移除远程 Gateway Connection 卡片与 Connect 按钮（后端不再暴露局域网访问，远程连接形态暂不保留）；本地引擎卡片仅展示引擎/连接状态，保留启用开关（关闭 = 断开 + 停引擎）
+- 断线重连：现有 `GatewaySession.runLoop` 指数退避直接复用；引擎被 watchdog 重启后自动重连成功
 - Node 会话（tool call → InvokeDispatcher：相机/截屏/定位/通知等）与远程模式完全同构，零改动
 
 ### 2.6 Server 端变更清单

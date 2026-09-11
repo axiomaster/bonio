@@ -14,7 +14,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ai.axiomaster.bonio.MainViewModel
-import ai.axiomaster.bonio.remote.gateway.GatewayEndpoint
 import ai.axiomaster.bonio.ui.screens.chat.*
 
 @Composable
@@ -23,13 +22,11 @@ fun ServerTab(
   modifier: Modifier = Modifier
 ) {
   // Connection state
-  val manualHost by viewModel.manualHost.collectAsState()
-  val manualPort by viewModel.manualPort.collectAsState()
-  val manualTls by viewModel.manualTls.collectAsState()
-  val gatewayToken by viewModel.gatewayToken.collectAsState()
   val isConnected by viewModel.isConnected.collectAsState()
   val statusText by viewModel.statusText.collectAsState()
   val serverConfig by viewModel.serverConfig.collectAsState()
+  val localEnabled by viewModel.localEnabled.collectAsState()
+  val localEngineState by viewModel.localEngineState.collectAsState()
 
   var showModelConfig by remember { mutableStateOf(false) }
 
@@ -44,7 +41,7 @@ fun ServerTab(
     ) {
 
 
-      // Gateway Connection Card
+      // Local Engine Card (embedded hiclaw on 127.0.0.1, auto-started and auto-connected)
       item {
         Card(
           modifier = Modifier.fillMaxWidth().border(1.dp, mobileBorder, RoundedCornerShape(16.dp)),
@@ -52,53 +49,21 @@ fun ServerTab(
           colors = CardDefaults.cardColors(containerColor = Color.White)
         ) {
           Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Gateway Connection", style = mobileHeadline, color = mobileAccent)
-            Text("Status: $statusText", style = mobileCallout, color = if (isConnected) mobileSuccess else mobileText)
-
-            OutlinedTextField(
-              value = manualHost,
-              onValueChange = { viewModel.setManualHost(it) },
-              label = { Text("Gateway Host", style = mobileCaption1) },
-              modifier = Modifier.fillMaxWidth(),
-              textStyle = mobileBody,
-              colors = settingsTextFieldColors()
+            Text("本地引擎", style = mobileHeadline, color = mobileAccent)
+            Text(
+              "Engine: $localEngineState",
+              style = mobileCallout,
+              color = if (localEngineState == ai.axiomaster.bonio.local.LocalEngineController.State.Running) mobileSuccess else mobileText
             )
-
-            OutlinedTextField(
-              value = manualPort.toString(),
-              onValueChange = { viewModel.setManualPort(it.toIntOrNull() ?: 0) },
-              label = { Text("Port", style = mobileCaption1) },
-              modifier = Modifier.fillMaxWidth(),
-              textStyle = mobileBody,
-              colors = settingsTextFieldColors()
-            )
-
-            OutlinedTextField(
-              value = gatewayToken,
-              onValueChange = { viewModel.setGatewayToken(it) },
-              label = { Text("Token", style = mobileCaption1) },
-              modifier = Modifier.fillMaxWidth(),
-              textStyle = mobileBody,
-              colors = settingsTextFieldColors()
+            Text(
+              "连接状态: $statusText",
+              style = mobileCallout,
+              color = if (isConnected) mobileSuccess else mobileText
             )
 
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-              Text("Enable TLS", style = mobileCallout, fontWeight = FontWeight.Medium)
-              Switch(checked = manualTls, onCheckedChange = { viewModel.setManualTls(it) })
-            }
-
-            Button(
-              onClick = {
-                if (isConnected) viewModel.disconnect()
-                else if (manualHost.isNotBlank() && manualPort in 1..65535) {
-                  viewModel.connect(GatewayEndpoint.manual(host = manualHost, port = manualPort))
-                }
-              },
-              modifier = Modifier.fillMaxWidth().height(48.dp),
-              shape = RoundedCornerShape(12.dp),
-              colors = if (isConnected) settingsDangerButtonColors() else settingsPrimaryButtonColors()
-            ) {
-              Text(if (isConnected) "Disconnect" else "Connect", style = mobileHeadline, color = Color.White)
+              Text("启用本地引擎", style = mobileCallout, fontWeight = FontWeight.Medium)
+              Switch(checked = localEnabled, onCheckedChange = { viewModel.setLocalEnabled(it) })
             }
           }
         }
