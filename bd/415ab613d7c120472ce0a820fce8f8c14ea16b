@@ -1,0 +1,44 @@
+android/app/src/main/java/ai/axiomaster/bonio/FloatingWindowService.kt
+  h_de08bd40967a17 45,691,694-715,730-739,742,1100-1107,1166-1173
+android/app/src/main/java/ai/axiomaster/bonio/NodeRuntime.kt
+  h_de08bd40967a17 286-321
+android/app/src/main/java/ai/axiomaster/bonio/remote/memory/CompanionMemoryController.kt
+  h_de08bd40967a17 62-75,130-131
+android/app/src/main/java/ai/axiomaster/bonio/remote/memory/MemoryRepository.kt
+  h_de08bd40967a17 66-68,101-103
+android/app/src/main/java/ai/axiomaster/bonio/remote/node/BonioAccessibilityService.kt
+  h_de08bd40967a17 15-18,22,508-578
+android/app/src/main/res/xml/accessibility_service_config.xml
+  h_de08bd40967a17 8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "bd415ab613d7c120472ce0a820fce8f8c14ea16b",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  },
+  "sessions": {
+    "s_539b59f41bad53": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8f431abe-980e-474d-af47-4ff9172028a6",
+        "model": "glm-5.1"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 2
+    },
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 36
+    }
+  }
+}
