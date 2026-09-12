@@ -427,7 +427,7 @@ static void process_sse_line(const std::string& line,
               if (tc_delta.contains("function") && tc_delta["function"].is_object()) {
                 auto& func = tc_delta["function"];
                 if (func.contains("name") && !func["name"].is_null()) {
-                  acc.name = func["name"].get<std::string>();
+                  acc.name = providers::decode_tool_name(func["name"].get<std::string>());
                   acc.has_name = true;
                 }
                 if (func.contains("arguments") && !func["arguments"].is_null()) {
@@ -532,6 +532,7 @@ RunResult run_streaming(const config::Config& config,
   req_body["temperature"] = temp;
 
   req_body["tools"] = tools_array();
+  providers::encode_request_tool_names(req_body);
 
   // Build URL
   std::string url = base_url;
@@ -770,6 +771,7 @@ RunResult run_streaming_with_history(
     if (!tools_str.empty()) {
       req_body["tools"] = json::parse(tools_str);
     }
+    providers::encode_request_tool_names(req_body);
 
     // Build URL
     std::string url = base_url;

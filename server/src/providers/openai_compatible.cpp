@@ -11,6 +11,57 @@ namespace {
 
 using json = nlohmann::json;
 
+}  // namespace
+
+std::string encode_tool_name(const std::string& name) {
+  std::string out;
+  out.reserve(name.size());
+  for (char c : name) {
+    if (c == '.')
+      out += "__";
+    else
+      out += c;
+  }
+  return out;
+}
+
+std::string decode_tool_name(const std::string& name) {
+  std::string out;
+  out.reserve(name.size());
+  for (size_t i = 0; i < name.size(); ++i) {
+    if (name[i] == '_' && i + 1 < name.size() && name[i + 1] == '_') {
+      out += '.';
+      ++i;
+    } else {
+      out += name[i];
+    }
+  }
+  return out;
+}
+
+void encode_request_tool_names(nlohmann::json& body) {
+  auto encode_function_name = [](json* fn) {
+    if (fn && fn->is_object() && fn->contains("name") && (*fn)["name"].is_string()) {
+      (*fn)["name"] = encode_tool_name((*fn)["name"].get<std::string>());
+    }
+  };
+  if (body.contains("tools") && body["tools"].is_array()) {
+    for (auto& t : body["tools"]) {
+      if (t.is_object()) encode_function_name(t.contains("function") ? &t["function"] : nullptr);
+    }
+  }
+  if (body.contains("messages") && body["messages"].is_array()) {
+    for (auto& m : body["messages"]) {
+      if (!m.is_object() || !m.contains("tool_calls") || !m["tool_calls"].is_array()) continue;
+      for (auto& tc : m["tool_calls"]) {
+        if (tc.is_object()) encode_function_name(tc.contains("function") ? &tc["function"] : nullptr);
+      }
+    }
+  }
+}
+
+namespace {
+
 std::string build_openai_body(const std::string& model,
                               const std::vector<std::string>& messages_json,
                               double temperature,
@@ -33,6 +84,7 @@ std::string build_openai_body(const std::string& model,
       // leave tools out on parse error
     }
   }
+  encode_request_tool_names(j);
   return j.dump();
 }
 
@@ -68,7 +120,7 @@ void parse_tool_calls(const std::string& body, std::vector<types::ToolCall>& out
       if (el.contains("id") && el["id"].is_string()) tc.id = el["id"].get<std::string>();
       if (el.contains("function") && el["function"].is_object()) {
         const json& fn = el["function"];
-        if (fn.contains("name") && fn["name"].is_string()) tc.name = fn["name"].get<std::string>();
+        if (fn.contains("name") && fn["name"].is_string()) tc.name = decode_tool_name(fn["name"].get<std::string>());
         if (fn.contains("arguments") && fn["arguments"].is_string()) tc.arguments = fn["arguments"].get<std::string>();
       }
       if (!tc.name.empty()) out.push_back(std::move(tc));
