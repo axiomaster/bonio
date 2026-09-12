@@ -770,10 +770,15 @@ class FloatingWindowService : Service() {
                     content = obj.optString("content"),
                     rawJson = ctxRes.payloadJson,
                 )
+
+                val isWechat = screen.packageName == WECHAT_PACKAGE
                 var cues: List<ai.axiomaster.bonio.remote.cue.MagicCue>? = null
                 var remembered = false
                 kotlinx.coroutines.coroutineScope {
-                    launch { cues = withContext(Dispatchers.Default) { runtime.magicCue.runCue(screen) } }
+                    // Only run LLM magic cue analysis for WeChat; all other apps just screenshot+save
+                    if (isWechat) {
+                        launch { cues = withContext(Dispatchers.Default) { runtime.magicCue.runCue(screen) } }
+                    }
                     launch {
                         remembered = withContext(Dispatchers.Default) {
                             runtime.companionMemory.capture(
@@ -786,10 +791,10 @@ class FloatingWindowService : Service() {
                     }
                 }
                 magicCuePending = false
-                ai.axiomaster.bonio.util.AppLogger.i(TAG, "runMagicCue completed: cues=${cues?.size} remembered=$remembered hasScreenshot=${!screenshotBase64.isNullOrEmpty()}")
+                ai.axiomaster.bonio.util.AppLogger.i(TAG, "runMagicCue completed: isWechat=$isWechat cues=${cues?.size} remembered=$remembered hasScreenshot=${!screenshotBase64.isNullOrEmpty()}")
                 when {
                     !cues.isNullOrEmpty() -> showCues(cues!!)
-                    remembered -> {
+                    remembered || !isWechat -> {
                         cueEpoch += 1
                         val epoch = cueEpoch
                         avatarController.setActivity(AgentState.Happy)
@@ -1398,6 +1403,7 @@ class FloatingWindowService : Service() {
         private const val SUGGESTION_DISPLAY_MS = 15_000L
         private const val SUGGESTION_BG_COLOR = 0xE62D303E.toInt()
         private const val DRAG_THRESHOLD_DP = 10f
+        private const val WECHAT_PACKAGE = "com.tencent.mm"
         private const val PREFS_NAME = "bonio_floating_window"
         private const val KEY_POS_X = "pos_x"
         private const val KEY_POS_Y = "pos_y"
