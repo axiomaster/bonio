@@ -1,0 +1,47 @@
+android/app/src/main/java/ai/axiomaster/bonio/FloatingWindowService.kt
+  s_539b59f41bad53::t_dbc07012787747 901,903-910,913
+  s_539b59f41bad53::t_62ed500b16c22f 781
+  s_539b59f41bad53::t_43c8c2b9e5e4bd 878,881,885-896
+  s_539b59f41bad53::t_18c3f13edf34df 208
+  s_539b59f41bad53::t_8a971a12426b99 857-870
+  s_539b59f41bad53::t_ae81db1dae30f3 879
+android/app/src/main/java/ai/axiomaster/bonio/remote/cue/MagicCueController.kt
+  s_539b59f41bad53::t_1442b84363ea1d 248,254-260
+  s_539b59f41bad53::t_d9b075a4c1fa4a 119-133
+  s_539b59f41bad53::t_707d3980a4f206 81-84,86,88-90,93,95-100
+  s_539b59f41bad53::t_bfa7159ee08840 11
+android/app/src/main/java/ai/axiomaster/bonio/remote/node/BonioAccessibilityService.kt
+  s_539b59f41bad53::t_8aeed09e191646 389-390
+  s_539b59f41bad53::t_6854daee619a63 393-396
+  s_539b59f41bad53::t_7a3e4b989c00a4 412-413
+  s_539b59f41bad53::t_d08785751445e7 350-388,391-392,397-411,414-422,429-432,436,438-454,456-458,460-461,463-485
+  s_539b59f41bad53::t_5d57e0fd41adfa 423-428,433-435,437,455,459,462
+  s_539b59f41bad53::t_4f1311406c32f2 261-273
+  s_539b59f41bad53::t_dd8c685ae30a62 18-20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "f7654af715b8355161cc9058fb425df9c10f7895",
+  "prompts": {},
+  "sessions": {
+    "s_539b59f41bad53": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8f431abe-980e-474d-af47-4ff9172028a6",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 31
+    },
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 36
+    }
+  }
+}
