@@ -233,9 +233,14 @@ private fun AddMemoDialog(onDismiss: () -> Unit, onSave: (String, String) -> Uni
           label = { Text("标题", style = mobileCaption1) },
           singleLine = true,
           modifier = Modifier.fillMaxWidth(),
+          textStyle = mobileBody.copy(color = mobileText),
           colors = OutlinedTextFieldDefaults.colors(
+            focusedTextColor = mobileText,
+            unfocusedTextColor = mobileText,
             focusedBorderColor = mobileAccent,
             unfocusedBorderColor = mobileBorder,
+            focusedLabelColor = mobileTextSecondary,
+            unfocusedLabelColor = mobileTextSecondary,
             cursorColor = mobileAccent,
           ),
         )
@@ -245,9 +250,14 @@ private fun AddMemoDialog(onDismiss: () -> Unit, onSave: (String, String) -> Uni
           label = { Text("内容", style = mobileCaption1) },
           minLines = 3,
           modifier = Modifier.fillMaxWidth(),
+          textStyle = mobileBody.copy(color = mobileText),
           colors = OutlinedTextFieldDefaults.colors(
+            focusedTextColor = mobileText,
+            unfocusedTextColor = mobileText,
             focusedBorderColor = mobileAccent,
             unfocusedBorderColor = mobileBorder,
+            focusedLabelColor = mobileTextSecondary,
+            unfocusedLabelColor = mobileTextSecondary,
             cursorColor = mobileAccent,
           ),
         )
