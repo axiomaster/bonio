@@ -49,8 +49,9 @@ class ChatController(
   private val _streamingAssistantText = MutableStateFlow<String?>(null)
   val streamingAssistantText: StateFlow<String?> = _streamingAssistantText.asStateFlow()
 
-  var onAssistantSpoke: ((String) -> Unit)? = null
   var onAssistantReply: ((String) -> Unit)? = null
+  var onAssistantSpoke: ((String) -> Unit)? = null
+  var onMemoChanged: (() -> Unit)? = null
 
   private val pendingToolCallsById = ConcurrentHashMap<String, ChatPendingToolCall>()
   private val _pendingToolCalls = MutableStateFlow<List<ChatPendingToolCall>>(emptyList())
@@ -499,6 +500,9 @@ class ChatController(
         } else if (phase == "result") {
           pendingToolCallsById.remove(toolCallId)
           publishPendingToolCalls()
+          if (name == "memo.save" || name.startsWith("memo.")) {
+            onMemoChanged?.invoke()
+          }
         }
       }
       "error" -> {

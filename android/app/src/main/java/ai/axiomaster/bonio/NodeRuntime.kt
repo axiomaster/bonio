@@ -194,6 +194,7 @@ class NodeRuntime(context: Context) {
         _remoteAddress.value = remote
         applyMainSessionKey(mainSessionKey)
         chat.refresh()
+        memoryRepository.refresh()
         updateStatus()
         Log.i("Bonio", "Operator connected: $name ($remote)")
         scope.launch { refreshBrandingFromGateway() }
@@ -217,6 +218,14 @@ class NodeRuntime(context: Context) {
         }
         if (event == "intent.execute") {
           floatingWindowIntentHandler?.invoke(payloadJson)
+        }
+        if (event == "memo.saved" || event == "memo.changed") {
+          memoryRepository.refresh()
+        }
+        if (event == "agent" && payloadJson != null) {
+          if (payloadJson.contains("\"memo.save\"") && payloadJson.contains("\"result\"")) {
+            memoryRepository.refresh()
+          }
         }
         magicCue.handleGatewayEvent(event, payloadJson)
         companionMemory.handleGatewayEvent(event, payloadJson)
@@ -274,13 +283,13 @@ class NodeRuntime(context: Context) {
   suspend fun captureScreenContext(maxTextLength: Int = 6000): GatewaySession.InvokeResult =
     invokeDispatcher.handleInvoke("screen.context", """{"maxTextLength":$maxTextLength}""")
 
-  /** 记一记 (memo) storage for the Memory tab. */
-  val memoryRepository: ai.axiomaster.bonio.remote.memory.MemoryRepository by lazy {
-    ai.axiomaster.bonio.remote.memory.MemoryRepository(operatorSession, scope)
+  val memoryService: ai.axiomaster.bonio.remote.memory.MemoryService by lazy {
+    ai.axiomaster.bonio.remote.memory.MemoryService(operatorSession)
   }
 
-  private val memoryService: ai.axiomaster.bonio.remote.memory.MemoryService by lazy {
-    ai.axiomaster.bonio.remote.memory.MemoryService(operatorSession)
+  /** 记一记 (memo) storage for the Memory tab. */
+  val memoryRepository: ai.axiomaster.bonio.remote.memory.MemoryRepository by lazy {
+    ai.axiomaster.bonio.remote.memory.MemoryRepository(memoryService, scope)
   }
 
   /** Companion memory: double-tap → decide & remember the page (hidden session). */
@@ -316,6 +325,9 @@ class NodeRuntime(context: Context) {
     ai.axiomaster.bonio.remote.skills.SkillRepository(operatorSession)
 
   init {
+    chat.onMemoChanged = {
+      memoryRepository.refresh()
+    }
     chargingTriggeredSync.start()
     scope.launch { prefs.loadGatewayToken() }
     scope.launch {

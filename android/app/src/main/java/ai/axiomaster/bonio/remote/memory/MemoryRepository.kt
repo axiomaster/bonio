@@ -41,6 +41,19 @@ data class BonioMemo(
 class MemoryService(private val session: GatewaySession) {
 
   private val json = Json { ignoreUnknownKeys = true }
+  private val changeListeners = java.util.concurrent.CopyOnWriteArrayList<() -> Unit>()
+
+  fun addChangeListener(listener: () -> Unit) {
+    if (!changeListeners.contains(listener)) changeListeners.add(listener)
+  }
+
+  fun removeChangeListener(listener: () -> Unit) {
+    changeListeners.remove(listener)
+  }
+
+  fun notifyChanged() {
+    changeListeners.forEach { runCatching { it.invoke() } }
+  }
 
   data class SaveParams(
     val title: String,
@@ -87,6 +100,7 @@ class MemoryService(private val session: GatewaySession) {
     val obj = json.parseToJsonElement(payload).asObjectOrNull()
     val saved = (obj?.get("saved") as? JsonPrimitive)?.content?.toBooleanStrictOrNull() ?: false
     if (!saved) error("memo.save unexpected response")
+    notifyChanged()
     Unit
   }
 
@@ -109,6 +123,7 @@ class MemoryService(private val session: GatewaySession) {
 
   suspend fun delete(id: String): Result<Unit> = runCatching {
     session.request("memo.delete", """{"id":${JsonPrimitive(id)}}""", timeoutMs = 15_000)
+    notifyChanged()
     Unit
   }
 }
@@ -117,10 +132,16 @@ class MemoryService(private val session: GatewaySession) {
  * UI-facing state holder for the Memory tab: memo list + load/save/delete.
  */
 class MemoryRepository(
-  session: GatewaySession,
+  val service: MemoryService,
   private val scope: CoroutineScope,
 ) {
-  private val service = MemoryService(session)
+  constructor(session: GatewaySession, scope: CoroutineScope) : this(MemoryService(session), scope)
+
+  init {
+    service.addChangeListener {
+      refresh()
+    }
+  }
 
   private val _memos = MutableStateFlow<List<BonioMemo>>(emptyList())
   val memos: StateFlow<List<BonioMemo>> = _memos.asStateFlow()
@@ -136,7 +157,10 @@ class MemoryRepository(
       _loading.value = true
       _error.value = null
       service.list()
-        .onSuccess { _memos.value = it }
+        .onSuccess {
+          Log.i("MemoryRepository", "refresh() called, successfully loaded ${it.size} memos")
+          _memos.value = it
+        }
         .onFailure {
           Log.w("MemoryRepository", "memo.list failed", it)
           _error.value = it.message

@@ -19,6 +19,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -66,6 +67,12 @@ fun MainScreen(
             currentDestination?.hierarchy?.any { it.route == screen.route } == true
         }.coerceAtLeast(0)
 
+        LaunchedEffect(currentDestination?.route) {
+            if (currentDestination?.route == Screen.Memory.route) {
+                viewModel.memoryRepository.refresh()
+            }
+        }
+
         Scaffold(
             modifier = modifier.fillMaxSize(),
             topBar = {
@@ -91,6 +98,9 @@ fun MainScreen(
                         Tab(
                             selected = isSelected,
                             onClick = {
+                                if (screen == Screen.Memory) {
+                                    viewModel.memoryRepository.refresh()
+                                }
                                 navController.navigate(screen.route) {
                                     popUpTo(navController.graph.findStartDestination().id) {
                                         saveState = true
