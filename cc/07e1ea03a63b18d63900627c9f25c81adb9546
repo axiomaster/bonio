@@ -1,0 +1,47 @@
+android/app/src/main/java/ai/axiomaster/bonio/remote/memory/MemoryRepository.kt
+  s_539b59f41bad53::t_3a4ce72529ca7c 130,136-137
+  s_539b59f41bad53::t_8a6b31111e63f0 1-64,67-129,131-135,138-151
+  s_539b59f41bad53::t_a75f7eb8227a09 65-66
+android/app/src/main/java/ai/axiomaster/bonio/remote/memory/CompanionMemoryController.kt
+  s_539b59f41bad53::t_f463c5aa6dc02c 1-186
+android/app/src/main/java/ai/axiomaster/bonio/FloatingWindowService.kt
+  s_539b59f41bad53::t_d7b6cf692e8c18 728-733,736-750
+android/app/src/main/java/ai/axiomaster/bonio/ui/screens/MainScreen.kt
+  s_539b59f41bad53::t_c65fcb5e2c91b0 94
+  s_539b59f41bad53::t_c7e074490d37ab 34,42
+  s_539b59f41bad53::t_3dc0e656f2ebaa 11
+android/app/src/main/java/ai/axiomaster/bonio/MainViewModel.kt
+  s_539b59f41bad53::t_f5d157ddd4ef05 35-36
+android/app/src/main/java/ai/axiomaster/bonio/ui/screens/MemoryTab.kt
+  s_539b59f41bad53::t_e8d8b6cfb45eab 1-199,201-268
+  s_539b59f41bad53::t_c87614911a25a8 200
+android/app/src/main/java/ai/axiomaster/bonio/NodeRuntime.kt
+  s_539b59f41bad53::t_e9e3469f7b1186 275-288
+  s_539b59f41bad53::t_ed5603f5b58ff7 222
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "cc07e1ea03a63b18d63900627c9f25c81adb9546",
+  "prompts": {},
+  "sessions": {
+    "s_539b59f41bad53": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8f431abe-980e-474d-af47-4ff9172028a6",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 21
+    },
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 36
+    }
+  }
+}
