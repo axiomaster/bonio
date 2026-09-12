@@ -82,6 +82,7 @@ class FloatingWindowService : Service() {
     private var magicCuePending = false
     private var actionableCues: List<ai.axiomaster.bonio.remote.cue.MagicCue> = emptyList()
     private var cueEpoch = 0
+    private var headStatusUntil = 0L
     private var pendingAccessibilityPrompt = false
 
     private fun openAccessibilitySettings() {
@@ -213,6 +214,19 @@ class FloatingWindowService : Service() {
             } else {
                 sendActionableSuggestion()
             }
+        }
+        // Zero-duration taps (and some overlay relayout races) can drop the
+        // click; handle ACTION_UP explicitly so a real finger always triggers.
+        bubbleContainer.setOnTouchListener { v, e ->
+            if (e.actionMasked == MotionEvent.ACTION_UP) {
+                val rect = android.graphics.Rect().also(v::getHitRect)
+                ai.axiomaster.bonio.util.AppLogger.i(
+                    TAG,
+                    "bubble touch UP raw=(${e.rawX.toInt()},${e.rawY.toInt()}) hitRect=$rect cues=${actionableCues.size}",
+                )
+                v.performClick()
+            }
+            true
         }
 
         val savedX = prefs.getInt(KEY_POS_X, 0)
@@ -381,9 +395,7 @@ class FloatingWindowService : Service() {
         serviceScope.launch {
             stateManager.currentTextBubble.collect { text: String? ->
                 if (text.isNullOrEmpty()) {
-                    if (bubbleLabel.visibility != View.VISIBLE) {
-                        hideBubbleAnimated()
-                    }
+                    hideBubbleAnimated()
                     textBubbleScroll.visibility = View.GONE
                     textBubbleScroll.layoutParams = textBubbleScroll.layoutParams.apply {
                         height = ViewGroup.LayoutParams.WRAP_CONTENT
@@ -439,8 +451,18 @@ class FloatingWindowService : Service() {
     }
 
     private fun updatePosition(state: AvatarState) {
-        val newX = state.position.x.toInt()
+        var newX = state.position.x.toInt()
         val newY = state.position.y.toInt()
+        // With the horizontal layout the window grows sideways: when the capsule
+        // sits to the pet's left, shift the window left by the bubble width so
+        // the PET stays visually anchored at its position.
+        if (bubbleContainer.visibility == View.VISIBLE &&
+            ::floatingRoot.isInitialized &&
+            floatingRoot.indexOfChild(bubbleContainer) == 0
+        ) {
+            val endMargin = (bubbleContainer.layoutParams as? LinearLayout.LayoutParams)?.marginEnd ?: 0
+            newX -= (bubbleContainer.width + endMargin)
+        }
         if (layoutParams.x != newX || layoutParams.y != newY) {
             layoutParams.x = newX
             layoutParams.y = newY
@@ -468,17 +490,33 @@ class FloatingWindowService : Service() {
     }
 
     private fun updateBubbleForActivity(state: AvatarState) {
+        // State pill ("休息中…", "Thinking…" etc.) lives above the head and is
+        // independent of the magic-cue capsule container.
+        if (android.os.SystemClock.uptimeMillis() < headStatusUntil) return
         val labelText = bubbleLabelTextForActivity(state)
         if (labelText != null) {
             bubbleLabel.text = labelText
             bubbleLabel.visibility = View.VISIBLE
-            showBubbleAnimated()
         } else {
             bubbleLabel.visibility = View.GONE
-            if (textBubbleScroll.visibility != View.VISIBLE) {
-                hideBubbleAnimated()
-            }
         }
+    }
+
+    /**
+     * Transient process/feedback text ("正在分析屏幕…", "已粘贴…" etc.) replaces
+     * the head state pill for [durationMs], then falls back to the state label.
+     * Per design only the final magic-cue result uses the side capsule.
+     */
+    private fun setHeadStatus(text: String, durationMs: Long = 2500) {
+        headStatusUntil = android.os.SystemClock.uptimeMillis() + durationMs
+        bubbleLabel.text = text
+        bubbleLabel.visibility = View.VISIBLE
+        mainHandler.postDelayed({
+            if (android.os.SystemClock.uptimeMillis() >= headStatusUntil) {
+                headStatusUntil = 0L
+                updateBubbleForActivity(avatarController.avatarState.value)
+            }
+        }, durationMs)
     }
 
     private fun showBubbleAnimated() {
@@ -502,10 +540,39 @@ class FloatingWindowService : Service() {
             .setDuration(250)
             .setInterpolator(OvershootInterpolator(1.5f))
             .start()
+        // Re-run the anchor compensation once the bubble has been measured.
+        bubbleContainer.post {
+            updatePosition(avatarController.avatarState.value)
+            val rect = android.graphics.Rect().also(bubbleContainer::getGlobalVisibleRect)
+            ai.axiomaster.bonio.util.AppLogger.i(
+                TAG,
+                "capsule shown: window=(${layoutParams.x},${layoutParams.y}) capsuleRect=$rect",
+            )
+        }
     }
 
     private fun positionBubbleBesideAvatar() {
-        // Bubble is positioned directly above pixel avatar in vertical root
+        // Horizontal root: keep the capsule at the avatar's SIDE (HarmonyOS
+        // design) — left of the pet when the pet is on the right half of the
+        // screen, right of it otherwise — and swap the spacing margin.
+        if (!::floatingRoot.isInitialized || !::pixelAvatarView.isInitialized) return
+        val showOnLeft = avatarController.avatarState.value.position.x >
+            resources.displayMetrics.widthPixels / 2f
+        val desiredIndex = if (showOnLeft) 0 else 1
+        if (floatingRoot.indexOfChild(bubbleContainer) != desiredIndex) {
+            floatingRoot.removeView(bubbleContainer)
+            floatingRoot.addView(bubbleContainer, desiredIndex)
+        }
+        val spacing = (6 * resources.displayMetrics.density).toInt()
+        (bubbleContainer.layoutParams as? LinearLayout.LayoutParams)?.let { params ->
+            params.setMargins(
+                if (showOnLeft) 0 else spacing,
+                0,
+                if (showOnLeft) spacing else 0,
+                0,
+            )
+            bubbleContainer.layoutParams = params
+        }
     }
 
     private fun hideBubbleAnimated() {
@@ -643,7 +710,7 @@ class FloatingWindowService : Service() {
         avatarController.clearBubble()
         actionableSuggestion = null
         avatarController.setActivity(AgentState.Thinking)
-        avatarController.setBubble("正在理解当前屏幕…")
+        setHeadStatus("正在理解当前屏幕…", 15_000)
         serviceScope.launch {
             try {
                 val uiTree = withContext(Dispatchers.Default) {
@@ -657,7 +724,7 @@ class FloatingWindowService : Service() {
                 }
                 if (suggestion == null) {
                     avatarController.setActivity(AgentState.Confused)
-                    avatarController.setBubble("暂时没有匹配的建议")
+                    setHeadStatus("暂时没有匹配的建议")
                     delay(2500)
                     avatarController.clearBubble()
                     avatarController.setActivity(AgentState.Idle)
@@ -687,17 +754,17 @@ class FloatingWindowService : Service() {
         val suggestion = actionableSuggestion?.takeIf { it.isNotBlank() } ?: return
         actionableSuggestion = null
         avatarController.setActivity(AgentState.Working)
-        avatarController.setBubble("正在发送…")
+        setHeadStatus("正在发送…", 15_000)
         serviceScope.launch {
             val accessibility = ai.axiomaster.bonio.remote.node.BonioAccessibilityService.instance
             val filled = accessibility?.fillActiveReplyField(suggestion) == true
             if (filled) {
                 avatarController.setActivity(AgentState.Happy)
-                avatarController.setBubble("已写入回复框")
+                setHeadStatus("已写入回复框")
             } else {
                 actionableSuggestion = suggestion
                 avatarController.setActivity(AgentState.Confused)
-                avatarController.setBubble("未找到回复框，点此重试")
+                setHeadStatus("未找到回复框，点此重试")
             }
             delay(1800)
             avatarController.clearBubble()
@@ -712,7 +779,7 @@ class FloatingWindowService : Service() {
         val runtime = (application as BonioApp).runtime
         if (!runtime.isConnected.value) {
             avatarController.setActivity(AgentState.Confused)
-            avatarController.setBubble("后端未连接")
+            setHeadStatus("后端未连接")
             mainHandler.postDelayed({ avatarController.clearBubble(); avatarController.setActivity(AgentState.Idle) }, 2000)
             return
         }
@@ -720,7 +787,7 @@ class FloatingWindowService : Service() {
         val a11y = ai.axiomaster.bonio.remote.node.BonioAccessibilityService.instance
         if (a11y == null) {
             avatarController.setActivity(AgentState.Confused)
-            avatarController.setBubble("未开启无障碍服务\n点我前往系统设置")
+            setHeadStatus("未开启无障碍服务 点我前往系统设置", 6000)
             pendingAccessibilityPrompt = true
             mainHandler.postDelayed({
                 if (pendingAccessibilityPrompt) {
@@ -758,7 +825,7 @@ class FloatingWindowService : Service() {
                 } finally {
                     floatingView.visibility = View.VISIBLE
                     avatarController.setActivity(AgentState.Thinking)
-                    avatarController.setBubble("正在分析屏幕…")
+                    setHeadStatus("正在分析屏幕…", 60_000)
                 }
 
                 if (!ctxRes.ok || ctxRes.payloadJson == null) {
@@ -799,7 +866,7 @@ class FloatingWindowService : Service() {
                         cueEpoch += 1
                         val epoch = cueEpoch
                         avatarController.setActivity(AgentState.Happy)
-                        avatarController.setBubble("已记住 ✅", SUGGESTION_BG_COLOR, android.graphics.Color.WHITE)
+                        setHeadStatus("已记住 ✅", 2000)
                         mainHandler.postDelayed({
                             if (cueEpoch == epoch) {
                                 avatarController.clearBubble()
@@ -843,8 +910,8 @@ class FloatingWindowService : Service() {
 
     private fun showCueFailure(message: String) {
         avatarController.setActivity(AgentState.Confused)
-        avatarController.setBubble(message)
-        mainHandler.postDelayed({ avatarController.clearBubble(); avatarController.setActivity(AgentState.Idle) }, 2500)
+        setHeadStatus(message, 2500)
+        mainHandler.postDelayed({ avatarController.setActivity(AgentState.Idle) }, 2500)
     }
 
     private fun applyMagicCue(customCue: MagicCue? = null) {
@@ -852,14 +919,14 @@ class FloatingWindowService : Service() {
         cueEpoch += 1
         actionableCues = emptyList()
         avatarController.setActivity(AgentState.Working)
-        avatarController.setBubble("正在发送…")
+        setHeadStatus("正在发送…", 15_000)
         serviceScope.launch {
             try {
                 applyCueInner(cue)
             } catch (e: Throwable) {
                 ai.axiomaster.bonio.util.AppLogger.e(TAG, "applyMagicCue failed", e)
                 avatarController.setActivity(AgentState.Confused)
-                avatarController.setBubble("已复制，长按输入框可粘贴")
+                setHeadStatus("已复制，长按输入框可粘贴", 6000)
                 delay(2500)
                 avatarController.clearBubble()
                 avatarController.setActivity(AgentState.Idle)
@@ -871,7 +938,7 @@ class FloatingWindowService : Service() {
             if (cue.kind == "calendar") {
                 openCalendarApp()
                 avatarController.setActivity(AgentState.Happy)
-                avatarController.setBubble("已打开日历")
+                setHeadStatus("已打开日历")
                 delay(1500)
             } else {
                 val accessibility = ai.axiomaster.bonio.remote.node.BonioAccessibilityService.instance
@@ -881,7 +948,7 @@ class FloatingWindowService : Service() {
                 val sent = !treeBlocked && accessibility?.sendTextToActiveChat(cue.content) == true
                 if (sent) {
                     avatarController.setActivity(AgentState.Happy)
-                    avatarController.setBubble("已发送 ✅")
+                    setHeadStatus("已发送 ✅")
                 } else if (treeBlocked) {
                     // Apps like WeChat return stub node trees; do NOT blind-tap the
                     // node-based path (it would raise the keyboard). Paste via
@@ -889,24 +956,24 @@ class FloatingWindowService : Service() {
                     val pasted = accessibility?.fillViaClipboardPaste(cue.content) == true
                     if (pasted) {
                         avatarController.setActivity(AgentState.Happy)
-                        avatarController.setBubble("已粘贴到输入框，请点发送")
+                        setHeadStatus("已粘贴到输入框，请点发送", 5000)
                     } else {
                         avatarController.setActivity(AgentState.Confused)
-                        avatarController.setBubble("已复制，长按输入框可粘贴")
+                        setHeadStatus("已复制，长按输入框可粘贴", 6000)
                     }
                 } else {
                     val filled = accessibility?.fillActiveReplyField(cue.content) == true
                     if (filled) {
                         avatarController.setActivity(AgentState.Happy)
-                        avatarController.setBubble("已填入回复框，点发送即可")
+                        setHeadStatus("已填入回复框，点发送即可", 5000)
                     } else {
                         val pasted = accessibility?.fillViaClipboardPaste(cue.content) == true
                         if (pasted) {
                             avatarController.setActivity(AgentState.Happy)
-                            avatarController.setBubble("已粘贴到输入框，请点发送")
+                            setHeadStatus("已粘贴到输入框，请点发送", 5000)
                         } else {
                             avatarController.setActivity(AgentState.Confused)
-                            avatarController.setBubble("已复制，长按输入框可粘贴")
+                            setHeadStatus("已复制，长按输入框可粘贴", 6000)
                         }
                     }
                 }
@@ -1170,7 +1237,7 @@ class FloatingWindowService : Service() {
         try {
             withContext(Dispatchers.Main) {
                 avatarController.setActivity(AgentState.Speaking)
-                avatarController.setBubble("Let me have my clone read it")
+                setHeadStatus("Let me have my clone read it", 4000)
             }
 
             CloneManager.showClone(applicationContext)
@@ -1234,7 +1301,7 @@ class FloatingWindowService : Service() {
             CloneManager.hideClone(applicationContext)
             withContext(Dispatchers.Main) {
                 avatarController.setActivity(AgentState.Confused)
-                avatarController.setBubble("Reading failed")
+                setHeadStatus("Reading failed")
             }
             delay(2000)
             withContext(Dispatchers.Main) {

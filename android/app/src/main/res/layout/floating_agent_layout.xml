@@ -4,14 +4,45 @@
     android:id="@+id/floating_root"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:gravity="center_horizontal">
+    android:orientation="horizontal"
+    android:gravity="center_vertical">
 
+    <!-- Pet column: state pill fixed above the head, pet below -->
+    <LinearLayout
+        android:id="@+id/pet_column"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center_horizontal">
+
+        <TextView
+            android:id="@+id/bubble_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="2dp"
+            android:background="@drawable/state_pill_bg"
+            android:paddingLeft="8dp"
+            android:paddingRight="8dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            android:textColor="#3D2D18"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <ai.axiomaster.bonio.avatar.PixelAvatarView
+            android:id="@+id/pixel_avatar"
+            android:layout_width="100dp"
+            android:layout_height="100dp" />
+
+    </LinearLayout>
+
+    <!-- Magic cue capsule: shown at the avatar's side, tap to apply -->
     <androidx.cardview.widget.CardView
         android:id="@+id/bubble_container"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="4dp"
+        android:layout_marginStart="6dp"
         android:visibility="gone"
         android:clickable="true"
         android:focusable="true"
@@ -23,45 +54,23 @@
         app:contentPaddingTop="4dp"
         app:contentPaddingBottom="4dp">
 
-        <LinearLayout
+        <ScrollView
+            android:id="@+id/text_bubble_scroll"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:gravity="center_horizontal">
+            android:scrollbars="none"
+            android:fillViewport="true">
 
             <TextView
-                android:id="@+id/bubble_label"
+                android:id="@+id/text_bubble"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:maxWidth="160dp"
                 android:textColor="#3D2D18"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:visibility="gone" />
+                android:textSize="13sp" />
 
-            <ScrollView
-                android:id="@+id/text_bubble_scroll"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:scrollbars="none"
-                android:fillViewport="true">
-
-                <TextView
-                    android:id="@+id/text_bubble"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:maxWidth="160dp"
-                    android:textColor="#3D2D18"
-                    android:textSize="13sp" />
-
-            </ScrollView>
-
-        </LinearLayout>
+        </ScrollView>
 
     </androidx.cardview.widget.CardView>
-
-    <ai.axiomaster.bonio.avatar.PixelAvatarView
-        android:id="@+id/pixel_avatar"
-        android:layout_width="100dp"
-        android:layout_height="100dp" />
 
 </LinearLayout>
