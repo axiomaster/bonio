@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ai.axiomaster.bonio.MainViewModel
+import ai.axiomaster.bonio.i18n.LocalAppStrings
 import ai.axiomaster.bonio.remote.chat.ChatSessionEntry
 import ai.axiomaster.bonio.remote.chat.OutgoingAttachment
 import ai.axiomaster.bonio.remote.memory.CompanionMemoryController
@@ -47,6 +48,7 @@ fun ChatTab(
 ) {
     val context = LocalContext.current
 
+    val strings = LocalAppStrings.current
     val messages by viewModel.chatMessages.collectAsState()
     val errorText by viewModel.chatError.collectAsState()
     val pendingRunCount by viewModel.pendingRunCount.collectAsState()
@@ -140,7 +142,7 @@ fun ChatTab(
                             color = if (healthOk) Color(0xFF2ECC71) else Color(0xFFF39C12)
                         )
                         Text(
-                            text = if (healthOk) "Connected" else "Offline",
+                            text = if (healthOk) strings.statusConnected else strings.statusOffline,
                             fontSize = 11.sp,
                             color = Color(0xFF999999)
                         )
@@ -159,6 +161,12 @@ fun ChatTab(
                 ) {
                     listOf("chat", "memory", "wechat").forEach { label ->
                         val active = sessionLabel == label
+                        val displayLabel = when (label) {
+                            "chat" -> strings.sessionChat
+                            "memory" -> strings.sessionMemory
+                            "wechat" -> strings.sessionWechat
+                            else -> label
+                        }
                         Surface(
                             onClick = {
                                 when (label) {
@@ -175,7 +183,7 @@ fun ChatTab(
                             color = if (active) Color(0xFF0A59F7) else Color(0xFFE8ECF0),
                         ) {
                             Text(
-                                text = label,
+                                text = displayLabel,
                                 fontSize = 13.sp,
                                 color = if (active) Color.White else Color(0xFF333333),
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)

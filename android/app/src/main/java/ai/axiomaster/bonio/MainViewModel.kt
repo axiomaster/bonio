@@ -82,6 +82,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
   private val _isSpeakerEnabled = MutableStateFlow(true)
   val isSpeakerEnabled: StateFlow<Boolean> = _isSpeakerEnabled
 
+  private val appPrefs = app.getSharedPreferences("bonio_app_settings", android.content.Context.MODE_PRIVATE)
+  private val _appLanguage = MutableStateFlow(
+      ai.axiomaster.bonio.i18n.AppLanguage.fromCode(appPrefs.getString("app_language", "zh") ?: "zh")
+  )
+  val appLanguage: StateFlow<ai.axiomaster.bonio.i18n.AppLanguage> = _appLanguage
+
+  fun setAppLanguage(lang: ai.axiomaster.bonio.i18n.AppLanguage) {
+      _appLanguage.value = lang
+      appPrefs.edit().putString("app_language", lang.code).apply()
+  }
+
   private val avatarPrefs = app.getSharedPreferences("bonio_avatar", android.content.Context.MODE_PRIVATE)
 
   private val _catWanderingEnabled = MutableStateFlow(avatarPrefs.getBoolean("cat_wandering", false))

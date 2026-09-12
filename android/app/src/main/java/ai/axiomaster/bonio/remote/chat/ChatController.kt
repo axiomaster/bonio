@@ -121,6 +121,8 @@ class ChatController(
     if (key.isEmpty()) return
     if (key == _sessionKey.value) return
     _sessionKey.value = key
+    _messages.value = emptyList()
+    _streamingAssistantText.value = null
     scope.launch { bootstrap(forceHealth = true) }
   }
 
@@ -322,21 +324,9 @@ class ChatController(
       val historyJson = session.request("chat.history", """{"sessionKey":"$key"}""")
       Log.d("ChatController", "bootstrap: Parsed history length = ${historyJson.length}")
       val history = parseHistory(historyJson, sessionKey = key)
-      
-      // PROTECTIVE: Merge history instead of full overwrite
-      // This preserves local messages if the server returns an incomplete list
-      val current = _messages.value
-      if (history.messages.isEmpty()) {
-        Log.d("ChatController", "bootstrap: Server history empty, keeping local messages (${current.size})")
-      } else {
-        Log.d("ChatController", "bootstrap: Merging server history (${history.messages.size}) with local (${current.size})")
-        // Simple merge: trust server if it has more, else preserve local
-        if (history.messages.size >= current.size) {
-          _messages.value = history.messages
-        }
-        _sessionId.value = history.sessionId
-        history.thinkingLevel?.trim()?.takeIf { it.isNotEmpty() }?.let { _thinkingLevel.value = it }
-      }
+      _messages.value = history.messages
+      _sessionId.value = history.sessionId
+      history.thinkingLevel?.trim()?.takeIf { it.isNotEmpty() }?.let { _thinkingLevel.value = it }
 
       // If history worked, we are essentially "healthy" at the protocol level
       _healthOk.value = true

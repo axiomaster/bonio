@@ -38,6 +38,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ai.axiomaster.bonio.ai.AgentManager
 import ai.axiomaster.bonio.ai.AgentState
+import ai.axiomaster.bonio.i18n.AppStrings
+import ai.axiomaster.bonio.i18n.LocalAppStrings
 import ai.axiomaster.bonio.ui.screens.PendingImageAttachment
 
 @Composable
@@ -62,6 +64,7 @@ fun ChatComposer(
     var showThinkingMenu by remember { mutableStateOf(false) }
     var showAttachmentMenu by remember { mutableStateOf(false) }
 
+    val strings = LocalAppStrings.current
     val agentState by AgentManager.stateManager.currentState.collectAsState()
 
     val canSend = pendingRunCount == 0 && (input.trim().isNotEmpty() || attachments.isNotEmpty()) && healthOk
@@ -105,7 +108,7 @@ fun ChatComposer(
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(
-                            text = "Thinking: ${thinkingLabel(thinkingLevel)}",
+                            text = thinkingLabel(thinkingLevel, strings),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
                             color = Color(0xFF666666)
@@ -117,10 +120,10 @@ fun ChatComposer(
                     expanded = showThinkingMenu,
                     onDismissRequest = { showThinkingMenu = false }
                 ) {
-                    ThinkingMenuItem("off", thinkingLevel, onSetThinkingLevel) { showThinkingMenu = false }
-                    ThinkingMenuItem("low", thinkingLevel, onSetThinkingLevel) { showThinkingMenu = false }
-                    ThinkingMenuItem("medium", thinkingLevel, onSetThinkingLevel) { showThinkingMenu = false }
-                    ThinkingMenuItem("high", thinkingLevel, onSetThinkingLevel) { showThinkingMenu = false }
+                    ThinkingMenuItem("off", thinkingLevel, strings, onSetThinkingLevel) { showThinkingMenu = false }
+                    ThinkingMenuItem("low", thinkingLevel, strings, onSetThinkingLevel) { showThinkingMenu = false }
+                    ThinkingMenuItem("medium", thinkingLevel, strings, onSetThinkingLevel) { showThinkingMenu = false }
+                    ThinkingMenuItem("high", thinkingLevel, strings, onSetThinkingLevel) { showThinkingMenu = false }
                 }
             }
 
@@ -140,7 +143,7 @@ fun ChatComposer(
                     ) {
                         Text("■", fontSize = 10.sp, color = Color(0xFFE53935))
                         Text(
-                            text = "Stop",
+                            text = if (strings == AppStrings.ZH) "停止" else "Stop",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
                             color = Color(0xFFE53935)
@@ -222,7 +225,7 @@ fun ChatComposer(
                             )
                         } else {
                             Text(
-                                text = "Listening…",
+                                text = strings.voiceListening,
                                 fontSize = 13.sp,
                                 color = Color(0xFF999999),
                                 modifier = Modifier.weight(1f)
@@ -297,7 +300,7 @@ fun ChatComposer(
                             decorationBox = { innerTextField ->
                                 if (input.isEmpty()) {
                                     Text(
-                                        text = "Ask anything...",
+                                        text = strings.inputPlaceholder,
                                         fontSize = 14.sp,
                                         color = Color(0xFF999999)
                                     )
@@ -433,11 +436,12 @@ private fun AttachmentMenuItem(
 private fun ThinkingMenuItem(
     value: String,
     current: String,
+    strings: AppStrings,
     onSet: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     DropdownMenuItem(
-        text = { Text(thinkingLabel(value), color = Color(0xFF333333), fontSize = 13.sp) },
+        text = { Text(thinkingLabel(value, strings), color = Color(0xFF333333), fontSize = 13.sp) },
         onClick = {
             onSet(value)
             onDismiss()
@@ -455,11 +459,11 @@ private fun ThinkingMenuItem(
     )
 }
 
-private fun thinkingLabel(raw: String): String {
+private fun thinkingLabel(raw: String, strings: AppStrings): String {
     return when (raw.trim().lowercase()) {
-        "low" -> "Low"
-        "medium" -> "Medium"
-        "high" -> "High"
-        else -> "Off"
+        "low" -> strings.thinkingLow
+        "medium" -> strings.thinkingMedium
+        "high" -> strings.thinkingHigh
+        else -> strings.thinkingOff
     }
 }

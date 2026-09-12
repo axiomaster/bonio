@@ -1,0 +1,235 @@
+package ai.axiomaster.bonio.i18n
+
+import androidx.compose.runtime.staticCompositionLocalOf
+
+enum class AppLanguage(val code: String, val displayName: String) {
+    ZH("zh", "简体中文"),
+    EN("en", "English");
+
+    companion object {
+        fun fromCode(code: String): AppLanguage {
+            return entries.firstOrNull { it.code.equals(code, ignoreCase = true) } ?: ZH
+        }
+    }
+}
+
+data class AppStrings(
+    // Bottom Nav Tabs
+    val tabChat: String,
+    val tabMemory: String,
+    val tabPersonalization: String,
+    val tabSettings: String,
+
+    // Chat Tab & Sessions
+    val statusConnected: String,
+    val statusOffline: String,
+    val sessionChat: String,
+    val sessionMemory: String,
+    val sessionWechat: String,
+    val speakerToggle: String,
+    val emptyChat: String,
+    val emptyChatOffline: String,
+    val emptyWechatTitle: String,
+    val emptyWechatSubtitle: String,
+    val inputPlaceholder: String,
+    val thinkingOff: String,
+    val thinkingLow: String,
+    val thinkingMedium: String,
+    val thinkingHigh: String,
+    val voiceHoldToTalk: String,
+    val voiceReleaseToSend: String,
+    val voiceSwipeUpToCancel: String,
+    val voiceListening: String,
+
+    // Memory Tab
+    val searchMemoryPlaceholder: String,
+    val memoryTagAll: String,
+    val memoryEmpty: String,
+    val memoryDetailTitle: String,
+    val memoryDelete: String,
+    val memoryDeleteConfirmTitle: String,
+    val memoryDeleteConfirmMessage: String,
+    val memoryDeleteConfirm: String,
+    val memoryDeleteCancel: String,
+    val memoryOpenSource: String,
+    val memoryTagsLabel: String,
+    val memorySourceLabel: String,
+    val memoryTimeJustNow: String,
+    val memoryTimeMinutesAgo: String,
+    val memoryTimeHoursAgo: String,
+    val memoryTimeYesterday: String,
+
+    // Personalization Tab
+    val personalizationTitle: String,
+    val avatarSkinSection: String,
+    val modelSettingsSection: String,
+    val defaultModel: String,
+    val wechatBindingSection: String,
+    val wechatBoundStatus: String,
+    val wechatBound: String,
+    val wechatUnbound: String,
+    val wechatScanQrCode: String,
+    val skillsSection: String,
+    val permissionsSection: String,
+
+    // Settings Tab
+    val settingsTitle: String,
+    val languageSection: String,
+    val languageChinese: String,
+    val languageEnglish: String,
+    val voiceSettingsSection: String,
+    val ttsSettingTitle: String,
+    val ttsSettingDesc: String,
+    val aboutSection: String,
+    val appVersion: String,
+    val gatewayStatus: String,
+    val deviceId: String,
+    val copySuccess: String,
+) {
+    companion object {
+        val ZH = AppStrings(
+            tabChat = "对话",
+            tabMemory = "记忆",
+            tabPersonalization = "个性化",
+            tabSettings = "设置",
+
+            statusConnected = "已连接",
+            statusOffline = "离线",
+            sessionChat = "对话",
+            sessionMemory = "记忆",
+            sessionWechat = "微信",
+            speakerToggle = "语音播放",
+            emptyChat = "暂无消息，发送一条消息开始吧！",
+            emptyChatOffline = "网关离线，正在连接中...",
+            emptyWechatTitle = "暂无微信消息",
+            emptyWechatSubtitle = "发送至已绑定微信号的消息将在此处同步显示",
+            inputPlaceholder = "输入消息...",
+            thinkingOff = "关闭思考",
+            thinkingLow = "轻度思考",
+            thinkingMedium = "适度思考",
+            thinkingHigh = "深度思考",
+            voiceHoldToTalk = "按住说话",
+            voiceReleaseToSend = "松开发送",
+            voiceSwipeUpToCancel = "松开取消",
+            voiceListening = "正在倾听...",
+
+            searchMemoryPlaceholder = "搜索记忆...",
+            memoryTagAll = "全部",
+            memoryEmpty = "暂无记忆内容",
+            memoryDetailTitle = "记忆详情",
+            memoryDelete = "删除",
+            memoryDeleteConfirmTitle = "删除记忆",
+            memoryDeleteConfirmMessage = "确定要删除这条记忆吗？此操作无法撤回。",
+            memoryDeleteConfirm = "删除",
+            memoryDeleteCancel = "取消",
+            memoryOpenSource = "打开来源",
+            memoryTagsLabel = "标签",
+            memorySourceLabel = "来源",
+            memoryTimeJustNow = "刚刚",
+            memoryTimeMinutesAgo = "分钟前",
+            memoryTimeHoursAgo = "小时前",
+            memoryTimeYesterday = "昨天",
+
+            personalizationTitle = "个性化",
+            avatarSkinSection = "宠物形象",
+            modelSettingsSection = "大模型设置",
+            defaultModel = "默认模型",
+            wechatBindingSection = "微信通道绑定",
+            wechatBoundStatus = "绑定状态",
+            wechatBound = "已绑定",
+            wechatUnbound = "未绑定",
+            wechatScanQrCode = "扫码绑定个人微信",
+            skillsSection = "技能管理",
+            permissionsSection = "系统权限",
+
+            settingsTitle = "设置",
+            languageSection = "语言设置",
+            languageChinese = "简体中文",
+            languageEnglish = "English",
+            voiceSettingsSection = "语音与声音",
+            ttsSettingTitle = "语音朗读 (TTS)",
+            ttsSettingDesc = "完成回复后自动语音朗读回答内容",
+            aboutSection = "关于",
+            appVersion = "版本",
+            gatewayStatus = "网关状态",
+            deviceId = "设备标识",
+            copySuccess = "已复制到剪贴板",
+        )
+
+        val EN = AppStrings(
+            tabChat = "Chat",
+            tabMemory = "Memory",
+            tabPersonalization = "Personalize",
+            tabSettings = "Settings",
+
+            statusConnected = "Connected",
+            statusOffline = "Offline",
+            sessionChat = "Chat",
+            sessionMemory = "Memory",
+            sessionWechat = "WeChat",
+            speakerToggle = "Speaker",
+            emptyChat = "No messages yet. Send a prompt to start!",
+            emptyChatOffline = "Gateway offline. Connecting...",
+            emptyWechatTitle = "No WeChat messages yet",
+            emptyWechatSubtitle = "Messages sent to the bound WeChat account will appear here",
+            inputPlaceholder = "Type a message...",
+            thinkingOff = "Thinking Off",
+            thinkingLow = "Thinking Low",
+            thinkingMedium = "Thinking Med",
+            thinkingHigh = "Thinking High",
+            voiceHoldToTalk = "Hold to talk",
+            voiceReleaseToSend = "Release to send",
+            voiceSwipeUpToCancel = "Release to cancel",
+            voiceListening = "Listening...",
+
+            searchMemoryPlaceholder = "Search memory...",
+            memoryTagAll = "All",
+            memoryEmpty = "No memories found",
+            memoryDetailTitle = "Memory Detail",
+            memoryDelete = "Delete",
+            memoryDeleteConfirmTitle = "Delete Memory",
+            memoryDeleteConfirmMessage = "Are you sure you want to delete this memory? This action cannot be undone.",
+            memoryDeleteConfirm = "Delete",
+            memoryDeleteCancel = "Cancel",
+            memoryOpenSource = "Open Source",
+            memoryTagsLabel = "Tags",
+            memorySourceLabel = "Source",
+            memoryTimeJustNow = "Just now",
+            memoryTimeMinutesAgo = "m ago",
+            memoryTimeHoursAgo = "h ago",
+            memoryTimeYesterday = "Yesterday",
+
+            personalizationTitle = "Personalization",
+            avatarSkinSection = "Avatar Skin",
+            modelSettingsSection = "Model Settings",
+            defaultModel = "Default Model",
+            wechatBindingSection = "WeChat Integration",
+            wechatBoundStatus = "Status",
+            wechatBound = "Bound",
+            wechatUnbound = "Not Bound",
+            wechatScanQrCode = "Scan QR Code to bind",
+            skillsSection = "Skills",
+            permissionsSection = "Permissions",
+
+            settingsTitle = "Settings",
+            languageSection = "Language",
+            languageChinese = "简体中文",
+            languageEnglish = "English",
+            voiceSettingsSection = "Voice & Audio",
+            ttsSettingTitle = "Text-to-Speech (TTS)",
+            ttsSettingDesc = "Automatically read assistant replies aloud",
+            aboutSection = "About",
+            appVersion = "Version",
+            gatewayStatus = "Gateway Status",
+            deviceId = "Device ID",
+            copySuccess = "Copied to clipboard",
+        )
+
+        fun forLanguage(lang: AppLanguage): AppStrings = when (lang) {
+            AppLanguage.ZH -> ZH
+            AppLanguage.EN -> EN
+        }
+    }
+}
+
+val LocalAppStrings = staticCompositionLocalOf { AppStrings.ZH }

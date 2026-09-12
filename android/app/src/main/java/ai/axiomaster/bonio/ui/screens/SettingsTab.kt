@@ -7,26 +7,34 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import ai.axiomaster.bonio.BuildConfig
 import ai.axiomaster.bonio.MainViewModel
+import ai.axiomaster.bonio.i18n.AppLanguage
+import ai.axiomaster.bonio.i18n.LocalAppStrings
 import ai.axiomaster.bonio.remote.LocationMode
 
 @Composable
@@ -35,27 +43,20 @@ fun SettingsTab(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val strings = LocalAppStrings.current
+    val clipboardManager = LocalClipboardManager.current
+
+    // App Language state
+    val currentLanguage by viewModel.appLanguage.collectAsState()
 
     // Connection states
     val isConnected by viewModel.isConnected.collectAsState()
-    val statusText by viewModel.statusText.collectAsState()
-    val manualHost by viewModel.manualHost.collectAsState()
-    val manualPort by viewModel.manualPort.collectAsState()
-    val manualTls by viewModel.manualTls.collectAsState()
-    val gatewayToken by viewModel.gatewayToken.collectAsState()
-    val localEnabled by viewModel.localEnabled.collectAsState()
-    val localEngineState by viewModel.localEngineState.collectAsState()
 
-    var hostInput by remember(manualHost) { mutableStateOf(manualHost) }
-    var portInput by remember(manualPort) { mutableStateOf(manualPort.toString()) }
-    var tokenInput by remember(gatewayToken) { mutableStateOf(gatewayToken) }
-    var tlsInput by remember(manualTls) { mutableStateOf(manualTls) }
+    // Voice & Audio
+    val isSpeakerEnabled by viewModel.isSpeakerEnabled.collectAsState()
 
     // Floating window state
     val showAvatarOverlay by viewModel.showAvatarOverlay.collectAsState()
-    var overlayPermissionGranted by remember {
-        mutableStateOf(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.canDrawOverlays(context) else true)
-    }
 
     // Permission states
     val cameraEnabled by viewModel.cameraEnabled.collectAsState()
@@ -99,11 +100,11 @@ fun SettingsTab(
             .fillMaxSize()
             .background(Color(0xFFFAFAFA))
             .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp)
     ) {
-        // ── 1. Gateway Connection Section ──
-        item { SectionHeader(title = "Gateway Connection") }
+        // ── 1. Language Setting Section ──
+        item { SectionHeader(title = strings.languageSection) }
         item {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
@@ -111,112 +112,24 @@ fun SettingsTab(
                 color = Color.White,
                 border = BorderStroke(1.dp, Color(0xFFE5E6EB))
             ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = "Status: $statusText",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = if (isConnected) Color(0xFF2ECC71) else Color(0xFF333333)
+                Column {
+                    LanguageOptionRow(
+                        title = strings.languageChinese,
+                        isSelected = currentLanguage == AppLanguage.ZH,
+                        onClick = { viewModel.setAppLanguage(AppLanguage.ZH) }
                     )
-
-                    OutlinedTextField(
-                        value = hostInput,
-                        onValueChange = {
-                            hostInput = it
-                            viewModel.setManualHost(it)
-                        },
-                        placeholder = { Text("Gateway Host (e.g. 192.168.1.100)", fontSize = 13.sp) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp)
-                    )
-
-                    OutlinedTextField(
-                        value = portInput,
-                        onValueChange = {
-                            portInput = it
-                            it.toIntOrNull()?.let { p -> viewModel.setManualPort(p) }
-                        },
-                        placeholder = { Text("Port (e.g. 10724)", fontSize = 13.sp) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp)
-                    )
-
-                    OutlinedTextField(
-                        value = tokenInput,
-                        onValueChange = {
-                            tokenInput = it
-                            viewModel.setGatewayToken(it)
-                        },
-                        placeholder = { Text("Token (optional)", fontSize = 13.sp) },
-                        singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(),
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp)
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("Enable TLS", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color(0xFF333333))
-                        Switch(
-                            checked = tlsInput,
-                            onCheckedChange = {
-                                tlsInput = it
-                                viewModel.setManualTls(it)
-                            },
-                            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Color(0xFF0A59F7))
-                        )
-                    }
-
-                    Button(
-                        onClick = {
-                            if (isConnected) {
-                                viewModel.disconnect()
-                            } else {
-                                viewModel.connectManual()
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth().height(44.dp),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isConnected) Color(0xFFE53935) else Color(0xFF0A59F7)
-                        )
-                    ) {
-                        Text(
-                            text = if (isConnected) "Disconnect" else "Connect",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
-
                     HorizontalDivider(color = Color(0xFFF2F3F5), thickness = 0.5.dp)
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Text("启用本地引擎 (Embedded)", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color(0xFF333333))
-                            Text("Engine: $localEngineState", fontSize = 11.sp, color = if (localEngineState.name == "Running") Color(0xFF2ECC71) else Color(0xFF999999))
-                        }
-                        Switch(
-                            checked = localEnabled,
-                            onCheckedChange = { viewModel.setLocalEnabled(it) },
-                            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Color(0xFF0A59F7))
-                        )
-                    }
+                    LanguageOptionRow(
+                        title = strings.languageEnglish,
+                        isSelected = currentLanguage == AppLanguage.EN,
+                        onClick = { viewModel.setAppLanguage(AppLanguage.EN) }
+                    )
                 }
             }
         }
 
-        // ── 2. Floating Window Section ──
-        item { SectionHeader(title = "Floating Window") }
+        // ── 2. Voice & Audio Section ──
+        item { SectionHeader(title = strings.voiceSettingsSection) }
         item {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
@@ -225,8 +138,26 @@ fun SettingsTab(
                 border = BorderStroke(1.dp, Color(0xFFE5E6EB))
             ) {
                 ToggleRow(
-                    title = "Enable Avatar Overlay",
-                    subtitle = "Floating desktop pet and Magic Cue companion",
+                    title = strings.ttsSettingTitle,
+                    subtitle = strings.ttsSettingDesc,
+                    isOn = isSpeakerEnabled,
+                    onToggle = { viewModel.setSpeakerEnabled(it) }
+                )
+            }
+        }
+
+        // ── 3. Floating Window Section ──
+        item { SectionHeader(title = if (currentLanguage == AppLanguage.ZH) "悬浮窗口" else "Floating Window") }
+        item {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                color = Color.White,
+                border = BorderStroke(1.dp, Color(0xFFE5E6EB))
+            ) {
+                ToggleRow(
+                    title = if (currentLanguage == AppLanguage.ZH) "启用桌面宠物悬浮窗" else "Enable Avatar Overlay",
+                    subtitle = if (currentLanguage == AppLanguage.ZH) "常驻桌面互动与交互" else "Floating desktop pet and companion",
                     isOn = showAvatarOverlay,
                     onToggle = { enable ->
                         if (enable && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
@@ -240,8 +171,8 @@ fun SettingsTab(
             }
         }
 
-        // ── 3. System Permissions Section ──
-        item { SectionHeader(title = "System Permissions") }
+        // ── 4. System Permissions Section ──
+        item { SectionHeader(title = strings.permissionsSection) }
         item {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
@@ -251,8 +182,8 @@ fun SettingsTab(
             ) {
                 Column {
                     ToggleRow(
-                        title = "Location",
-                        subtitle = "GPS location sharing",
+                        title = if (currentLanguage == AppLanguage.ZH) "地理位置权限" else "Location",
+                        subtitle = if (currentLanguage == AppLanguage.ZH) "定位信息分享" else "GPS location sharing",
                         isOn = locationMode != LocationMode.Off,
                         onToggle = { enable ->
                             if (enable) {
@@ -266,8 +197,8 @@ fun SettingsTab(
                     )
                     HorizontalDivider(color = Color(0xFFF2F3F5), thickness = 0.5.dp)
                     ToggleRow(
-                        title = "Voice Wake",
-                        subtitle = "Wake word listening",
+                        title = if (currentLanguage == AppLanguage.ZH) "麦克风与语音" else "Voice Wake & STT",
+                        subtitle = if (currentLanguage == AppLanguage.ZH) "语音唤醒与输入识别" else "Voice recognition and wake word",
                         isOn = micPermissionGranted,
                         onToggle = { enable ->
                             if (enable) audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
@@ -276,8 +207,8 @@ fun SettingsTab(
                     )
                     HorizontalDivider(color = Color(0xFFF2F3F5), thickness = 0.5.dp)
                     ToggleRow(
-                        title = "Camera Access",
-                        subtitle = "Allow remote photo/video",
+                        title = if (currentLanguage == AppLanguage.ZH) "相机权限" else "Camera Access",
+                        subtitle = if (currentLanguage == AppLanguage.ZH) "允许拍照与视频环境感知" else "Allow remote photo/video",
                         isOn = cameraEnabled,
                         onToggle = { enable ->
                             if (enable) permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
@@ -286,15 +217,15 @@ fun SettingsTab(
                     )
                     HorizontalDivider(color = Color(0xFFF2F3F5), thickness = 0.5.dp)
                     ToggleRow(
-                        title = "Screen Recording",
-                        subtitle = "Allow remote screen view",
+                        title = if (currentLanguage == AppLanguage.ZH) "屏幕录制感知" else "Screen Recording",
+                        subtitle = if (currentLanguage == AppLanguage.ZH) "允许实时屏幕交互流" else "Allow remote screen view",
                         isOn = screenRecordActive,
                         onToggle = { /* Managed dynamically by screen recording session */ }
                     )
                     HorizontalDivider(color = Color(0xFFF2F3F5), thickness = 0.5.dp)
                     ToggleRow(
-                        title = "Screen Awareness",
-                        subtitle = "Allow on-demand reading of the current page",
+                        title = if (currentLanguage == AppLanguage.ZH) "屏幕理解 (Screen Awareness)" else "Screen Awareness",
+                        subtitle = if (currentLanguage == AppLanguage.ZH) "按需分析读取当前屏幕内容" else "Allow on-demand reading of current page",
                         isOn = screenAwarenessEnabled,
                         onToggle = { screenAwarenessEnabled = it }
                     )
@@ -302,8 +233,8 @@ fun SettingsTab(
             }
         }
 
-        // ── 4. Device Information Section ──
-        item { SectionHeader(title = "Device Information") }
+        // ── 5. About & Device Information Section ──
+        item { SectionHeader(title = strings.aboutSection) }
         item {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
@@ -311,12 +242,81 @@ fun SettingsTab(
                 color = Color.White,
                 border = BorderStroke(1.dp, Color(0xFFE5E6EB))
             ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    InfoRow(label = "Device", value = deviceModel)
-                    InfoRow(label = "Instance ID", value = instanceId.take(12) + "...")
-                    InfoRow(label = "Version", value = appVersion)
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    InfoRow(
+                        label = strings.gatewayStatus,
+                        value = if (isConnected) strings.statusConnected else strings.statusOffline,
+                        valueColor = if (isConnected) Color(0xFF2ECC71) else Color(0xFFF39C12)
+                    )
+                    InfoRow(
+                        label = if (currentLanguage == AppLanguage.ZH) "设备型号" else "Device",
+                        value = deviceModel
+                    )
+                    InfoRow(
+                        label = strings.appVersion,
+                        value = appVersion
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(strings.deviceId, fontSize = 13.sp, color = Color(0xFF999999))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.clickable {
+                                clipboardManager.setText(AnnotatedString(instanceId))
+                                Toast.makeText(context, strings.copySuccess, Toast.LENGTH_SHORT).show()
+                            }
+                        ) {
+                            Text(
+                                text = if (instanceId.length > 16) instanceId.take(16) + "..." else instanceId,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color(0xFF333333)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.Default.ContentCopy,
+                                contentDescription = "Copy",
+                                tint = Color(0xFF0A59F7),
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun LanguageOptionRow(
+    title: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = title,
+            fontSize = 15.sp,
+            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (isSelected) Color(0xFF0A59F7) else Color(0xFF333333)
+        )
+        if (isSelected) {
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = "Selected",
+                tint = Color(0xFF0A59F7),
+                modifier = Modifier.size(18.dp)
+            )
         }
     }
 }
@@ -340,7 +340,9 @@ private fun ToggleRow(
     onToggle: (Boolean) -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
@@ -357,13 +359,17 @@ private fun ToggleRow(
 }
 
 @Composable
-private fun InfoRow(label: String, value: String) {
+private fun InfoRow(
+    label: String,
+    value: String,
+    valueColor: Color = Color(0xFF333333)
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(label, fontSize = 13.sp, color = Color(0xFF999999))
-        Text(value, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Color(0xFF333333))
+        Text(value, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = valueColor)
     }
 }

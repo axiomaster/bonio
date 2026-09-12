@@ -33,6 +33,7 @@ import androidx.core.content.ContextCompat
 import ai.axiomaster.bonio.MainViewModel
 import ai.axiomaster.bonio.avatar.CustomSkinManager
 import ai.axiomaster.bonio.avatar.SkinItem
+import ai.axiomaster.bonio.i18n.LocalAppStrings
 import ai.axiomaster.bonio.remote.config.ModelConfig
 import ai.axiomaster.bonio.remote.skills.SkillInfo
 import ai.axiomaster.bonio.ui.screens.chat.*
@@ -43,6 +44,7 @@ fun PersonalizationTab(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val strings = LocalAppStrings.current
     val isConnected by viewModel.isConnected.collectAsState()
     val currentSkin by viewModel.avatarSkin.collectAsState()
     val serverConfig by viewModel.serverConfig.collectAsState()
@@ -122,7 +124,7 @@ fun PersonalizationTab(
         contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp)
     ) {
         // ── 1. Avatar 皮肤 Section ──
-        item { SectionHeader(title = "Avatar 皮肤") }
+        item { SectionHeader(title = strings.avatarSkinSection) }
         item {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
@@ -192,7 +194,7 @@ fun PersonalizationTab(
         }
 
         // ── 2. 大模型 Section ──
-        item { SectionHeader(title = "大模型") }
+        item { SectionHeader(title = strings.modelSettingsSection) }
         item {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
@@ -343,7 +345,7 @@ fun PersonalizationTab(
         }
 
         // ── 3. WeChat 连接 Section ──
-        item { SectionHeader(title = "WeChat 连接") }
+        item { SectionHeader(title = strings.wechatBindingSection) }
         item {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
@@ -359,7 +361,7 @@ fun PersonalizationTab(
                     Column(modifier = Modifier.weight(1f)) {
                         Text("微信 iLink", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Color(0xFF333333))
                         Text(
-                            "扫码绑定个人微信，消息将桥接到 agent",
+                            strings.wechatScanQrCode,
                             fontSize = 12.sp,
                             color = Color(0xFF999999),
                             modifier = Modifier.padding(top = 3.dp)
@@ -371,7 +373,7 @@ fun PersonalizationTab(
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF07C160)),
                         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
                     ) {
-                        Text("扫码绑定", color = Color.White, fontSize = 13.sp)
+                        Text(if (strings == ai.axiomaster.bonio.i18n.AppStrings.ZH) "扫码绑定" else "Bind", color = Color.White, fontSize = 13.sp)
                     }
                 }
             }
@@ -385,7 +387,7 @@ fun PersonalizationTab(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Skills 技能 (${skills.size})",
+                    text = "${strings.skillsSection} (${skills.size})",
                     fontSize = 13.sp,
                     color = Color(0xFF0A59F7),
                     fontWeight = FontWeight.Medium
@@ -405,7 +407,7 @@ fun PersonalizationTab(
                     border = BorderStroke(1.dp, Color(0xFFE5E6EB))
                 ) {
                     Text(
-                        text = if (isConnected) "未安装第三方技能" else "连接后端后查看技能列表",
+                        text = if (isConnected) (if (strings == ai.axiomaster.bonio.i18n.AppStrings.ZH) "未安装第三方技能" else "No third-party skills installed") else (if (strings == ai.axiomaster.bonio.i18n.AppStrings.ZH) "连接后端后查看技能列表" else "Connect gateway to view skills"),
                         fontSize = 13.sp,
                         color = Color(0xFF999999),
                         modifier = Modifier.padding(20.dp)
@@ -419,7 +421,7 @@ fun PersonalizationTab(
         }
 
         // ── 5. 系统数据授权访问范围 Section ──
-        item { SectionHeader(title = "系统数据授权访问范围") }
+        item { SectionHeader(title = strings.permissionsSection) }
         item {
             Surface(
                 modifier = Modifier.fillMaxWidth(),

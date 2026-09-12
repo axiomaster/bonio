@@ -17,7 +17,7 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** One saved memo (记一记 entry) as returned by the memo.list RPC. */
+/** One saved memo (记一记 entry) as returned by the memo.list / memo.get RPC. */
 data class BonioMemo(
   val id: String,
   val title: String,
@@ -25,8 +25,12 @@ data class BonioMemo(
   val source: String,
   val createdAt: Long?,
   val tags: List<String>,
-  val sourceApp: String?,
-  val pageTitle: String?,
+  val sourceApp: String? = null,
+  val pageTitle: String? = null,
+  val pageLink: String? = null,
+  val coverImage: String? = null,
+  val originalImage: String? = null,
+  val originalImageMimeType: String? = null,
 )
 
 /**
@@ -47,6 +51,25 @@ class MemoryService(private val session: GatewaySession) {
     val pageTitle: String? = null,
     val pageLink: String? = null,
   )
+
+  private fun parseMemo(m: JsonObject): BonioMemo? {
+    val id = m["id"].asStringOrNull() ?: return null
+    return BonioMemo(
+      id = id,
+      title = m["title"].asStringOrNull().orEmpty(),
+      content = m["content"].asStringOrNull().orEmpty(),
+      source = m["source"].asStringOrNull().orEmpty(),
+      createdAt = (m["createdAt"] as? JsonPrimitive)?.content?.toLongOrNull()
+        ?: (m["timestamp"] as? JsonPrimitive)?.content?.toLongOrNull(),
+      tags = (m["tags"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content } ?: emptyList(),
+      sourceApp = m["sourceApp"].asStringOrNull(),
+      pageTitle = m["pageTitle"].asStringOrNull(),
+      pageLink = m["pageLink"].asStringOrNull(),
+      coverImage = m["coverImage"].asStringOrNull(),
+      originalImage = m["originalImage"].asStringOrNull(),
+      originalImageMimeType = m["originalImageMimeType"].asStringOrNull(),
+    )
+  }
 
   suspend fun save(params: SaveParams): Result<Unit> = runCatching {
     val body = buildJsonObject {
@@ -73,18 +96,15 @@ class MemoryService(private val session: GatewaySession) {
     val arr = obj?.get("memos") as? JsonArray ?: return Result.success(emptyList())
     arr.mapNotNull { el ->
       val m = el as? JsonObject ?: return@mapNotNull null
-      BonioMemo(
-        id = m["id"].asStringOrNull() ?: return@mapNotNull null,
-        title = m["title"].asStringOrNull().orEmpty(),
-        content = m["content"].asStringOrNull().orEmpty(),
-        source = m["source"].asStringOrNull().orEmpty(),
-        createdAt = (m["createdAt"] as? JsonPrimitive)?.content?.toLongOrNull()
-          ?: (m["timestamp"] as? JsonPrimitive)?.content?.toLongOrNull(),
-        tags = (m["tags"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content } ?: emptyList(),
-        sourceApp = m["sourceApp"].asStringOrNull(),
-        pageTitle = m["pageTitle"].asStringOrNull(),
-      )
+      parseMemo(m)
     }
+  }
+
+  suspend fun get(id: String): Result<BonioMemo?> = runCatching {
+    val payload = session.request("memo.get", """{"id":${JsonPrimitive(id)}}""", timeoutMs = 15_000)
+    val obj = json.parseToJsonElement(payload).asObjectOrNull()
+    val m = obj?.get("memo") as? JsonObject ?: return@runCatching null
+    parseMemo(m)
   }
 
   suspend fun delete(id: String): Result<Unit> = runCatching {
@@ -147,5 +167,9 @@ class MemoryRepository(
           _error.value = it.message
         }
     }
+  }
+
+  suspend fun get(id: String): BonioMemo? {
+    return service.get(id).getOrNull()
   }
 }

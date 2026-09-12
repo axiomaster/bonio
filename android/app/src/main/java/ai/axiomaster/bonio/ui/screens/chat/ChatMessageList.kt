@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ai.axiomaster.bonio.i18n.LocalAppStrings
 import ai.axiomaster.bonio.remote.chat.ChatMessage
 import ai.axiomaster.bonio.remote.chat.ChatPendingToolCall
 import java.io.File
@@ -43,6 +44,8 @@ fun ChatMessageList(
             listState.animateScrollToItem(index = 0)
         }
     }
+
+    val strings = LocalAppStrings.current
 
     Box(modifier = modifier.fillMaxWidth()) {
         LazyColumn(
@@ -86,13 +89,13 @@ fun ChatMessageList(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "No WeChat messages yet",
+                        text = strings.emptyWechatTitle,
                         fontSize = 14.sp,
                         color = Color(0xFF999999)
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Messages sent to the bound WeChat account will appear here",
+                        text = strings.emptyWechatSubtitle,
                         fontSize = 12.sp,
                         color = Color(0xFFBBBBBB)
                     )
@@ -104,7 +107,7 @@ fun ChatMessageList(
                         .padding(32.dp)
                 ) {
                     Text(
-                        text = if (healthOk) "No messages yet. Send a prompt!" else "Gateway offline. Please connect in Settings.",
+                        text = if (healthOk) strings.emptyChat else strings.emptyChatOffline,
                         color = Color(0xFF999999),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium
