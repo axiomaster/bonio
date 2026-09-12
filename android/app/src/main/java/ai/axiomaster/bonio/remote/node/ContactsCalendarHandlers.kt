@@ -91,12 +91,19 @@ class ContactsHandler(private val context: Context) {
   private fun hasReadContacts(): Boolean =
     ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
 
-  /** Strip common query suffixes & question words (e.g. "鲍亚永的手机号码是多少？" -> "鲍亚永"). */
+  /** Strip common query suffixes & question words (e.g. "“鲍亚永”的手机号码是多少？" -> "鲍亚永", "我爸" -> "爸"). */
   private fun cleanQuery(raw: String): String {
     var needle = raw.trim().lowercase()
+    needle = needle.replace(Regex("[\"“”'‘’]"), "").trim()
     needle = Regex("(是多少|是几|多少|是谁|是啥|是哪位|发一下|发下|告诉我|发给我|请发|有吗|有没|有么|吗)[？?！!。.]*$").replace(needle, "").trim()
     needle = Regex("(的)?(手机号码|电话号码|手机号|电话号|手机|电话|号码|联系方式|邮箱|微信)$").replace(needle, "").trim()
     needle = Regex("^(请问|帮我查一下|帮我查下|帮我查|查一下|查下|查询|找一下|找下|找|看看|看下|问下|发一下|发下|发我|发给我|把)").replace(needle, "").trim()
+    if (needle.startsWith("我") && needle.length > 1 && (needle.startsWith("我爸") || needle.startsWith("我妈") || needle.startsWith("我哥") || needle.startsWith("我姐") || needle.startsWith("我弟") || needle.startsWith("我妹"))) {
+      needle = needle.removePrefix("我")
+    }
+    if (needle.endsWith("的") && needle.length > 1) {
+      needle = needle.removeSuffix("的").trim()
+    }
     if (needle.isEmpty()) needle = raw.trim().lowercase()
     return needle
   }
@@ -116,30 +123,37 @@ class ContactsHandler(private val context: Context) {
       ),
       null, null, null,
     )?.use { c ->
-      val iId = c.getColumnIndexOrThrow(ContactsContract.Contacts._ID)
-      val iName = c.getColumnIndexOrThrow(ContactsContract.Contacts.DISPLAY_NAME)
-      val iPhon = c.getColumnIndexOrThrow(ContactsContract.Contacts.PHONETIC_NAME)
+      val iId = c.getColumnIndex(ContactsContract.Contacts._ID)
+      val iName = c.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME)
+      val iPhon = c.getColumnIndex(ContactsContract.Contacts.PHONETIC_NAME)
       while (c.moveToNext()) {
-        entries.add(
-          Entry(
-            id = c.getLong(iId),
-            name = c.getString(iName)?.trim().orEmpty(),
-            phonetic = c.getString(iPhon)?.trim()?.lowercase().orEmpty(),
-          ),
-        )
+        val id = if (iId >= 0) c.getLong(iId) else -1L
+        val name = if (iName >= 0) c.getString(iName)?.trim().orEmpty() else ""
+        val phonetic = if (iPhon >= 0) c.getString(iPhon)?.trim()?.lowercase().orEmpty() else ""
+        if (id >= 0) {
+          entries.add(
+            Entry(
+              id = id,
+              name = name,
+              phonetic = phonetic,
+            ),
+          )
+        }
       }
     }
 
     val digits = needle.filter { it.isDigit() }
     val looksLikeNumber = digits.length >= 3 && needle.any { it.isDigit() }
+    val cleanNeedle = needle.replace(" ", "").lowercase()
 
     val matched = linkedMapOf<Long, ContactHit>()
     for (e in entries) {
       val haystack = e.name.lowercase()
+      val cleanHaystack = haystack.replace(" ", "")
       val contactName = e.name.ifEmpty { "未命名" }
-      val nameMatch = haystack.contains(needle) ||
-        (e.name.isNotEmpty() && haystack.startsWith(needle)) ||
-        (needle.length >= 2 && e.phonetic.contains(needle))
+      val nameMatch = cleanHaystack.contains(cleanNeedle) ||
+        (cleanHaystack.isNotEmpty() && cleanNeedle.contains(cleanHaystack)) ||
+        (cleanNeedle.length >= 2 && e.phonetic.replace(" ", "").contains(cleanNeedle))
       if (nameMatch && !matched.containsKey(e.id)) {
         matched[e.id] = ContactHit(contactName)
       }

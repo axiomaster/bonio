@@ -43,12 +43,15 @@ class CompanionMemoryController(
     val runId = payload["runId"].asStringOrNull() ?: return
     val state = payload["state"].asStringOrNull() ?: return
     if (state != "final" && state != "error" && state != "aborted") return
-    val deferred = synchronized(pendingRuns) { pendingRuns.remove(runId) } ?: return
+    val deferred = synchronized(pendingRuns) {
+      pendingRuns.remove(runId)
+    } ?: return
     val text = if (state == "final") {
       payload["message"].asStringOrNull() ?: payload["text"].asStringOrNull()
     } else {
       null
     }
+    ai.axiomaster.bonio.util.AppLogger.i(TAG, "handleGatewayEvent matched runId=$runId text=${text?.take(60)}")
     deferred.complete(text)
   }
 
@@ -59,7 +62,7 @@ class CompanionMemoryController(
   suspend fun capture(screen: MagicCueController.ScreenContext, explicit: Boolean): Boolean {
     val text = screen.content
     if (text.isBlank()) return false
-    Log.i(TAG, "capture: explicit=$explicit text=${text.length}ch")
+    ai.axiomaster.bonio.util.AppLogger.i(TAG, "capture: explicit=$explicit text=${text.length}ch")
 
     try {
       session.request("sessions.reset", """{"sessionKey":"$SESSION_KEY"}""", timeoutMs = 5_000)
@@ -79,16 +82,28 @@ class CompanionMemoryController(
         put("timeoutMs", JsonPrimitive(RUN_TIMEOUT_MS))
         put("idempotencyKey", JsonPrimitive(runId))
       }
-      try {
+      val res = try {
         session.request("chat.send", params.toString(), timeoutMs = 15_000)
       } catch (e: Throwable) {
-        Log.w(TAG, "chat.send failed: ${e.message}")
+        ai.axiomaster.bonio.util.AppLogger.e(TAG, "chat.send failed: ${e.message}", e)
         return false
+      }
+      val resObj = try { json.parseToJsonElement(res).asObjectOrNull() } catch (_: Throwable) { null }
+      val payloadObj = resObj?.get("payload")?.asObjectOrNull()
+      val actualRunId = payloadObj?.get("runId")?.asStringOrNull() ?: resObj?.get("runId")?.asStringOrNull()
+      ai.axiomaster.bonio.util.AppLogger.i(TAG, "chat.send response: actualRunId=$actualRunId (local=$runId)")
+      if (!actualRunId.isNullOrEmpty() && actualRunId != runId) {
+        synchronized(pendingRuns) {
+          if (pendingRuns.containsKey(runId)) {
+            pendingRuns.remove(runId)
+            pendingRuns[actualRunId] = deferred
+          }
+        }
       }
       val reply = try {
         withTimeout(RUN_TIMEOUT_MS) { deferred.await() }
       } catch (_: TimeoutCancellationException) {
-        Log.w(TAG, "companion memory run timed out")
+        ai.axiomaster.bonio.util.AppLogger.w(TAG, "companion memory run timed out")
         return false
       } ?: return false
 
@@ -105,7 +120,9 @@ class CompanionMemoryController(
       )
       return memoryService.save(saveParams).isSuccess
     } finally {
-      synchronized(pendingRuns) { pendingRuns.remove(runId) }
+      synchronized(pendingRuns) {
+        pendingRuns.remove(runId)
+      }
     }
   }
 

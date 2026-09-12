@@ -540,6 +540,7 @@ class GatewaySession(
         payload["paramsJSON"].asStringOrNull()
           ?: payload["params"]?.let { value -> if (value is JsonNull) null else value.toString() }
       val timeoutMs = payload["timeoutMs"].asLongOrNull()
+      ai.axiomaster.bonio.util.AppLogger.i(loggerTag, "handleInvokeEvent: id=$id command=$command params=$params")
       scope.launch {
         val result =
           try {
@@ -558,6 +559,7 @@ class GatewaySession(
       result: InvokeResult,
       invokeTimeoutMs: Long?,
     ) {
+      ai.axiomaster.bonio.util.AppLogger.i(loggerTag, "sendInvokeResult: id=$id ok=${result.ok} error=${result.error?.message}")
       val parsedPayload = result.payloadJson?.let { parseJsonOrNull(it) }
       val params =
         buildJsonObject {

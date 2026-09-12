@@ -52,7 +52,7 @@ class ScreenHandler(
         val text = n.optString("text").trim()
         val desc = n.optString("description").trim()
         val value = text.ifEmpty { desc }
-        if (value.isEmpty() || value.length <= 1) continue
+        if (value.isEmpty()) continue
         val bounds = n.optString("bounds").split(",").mapNotNull { it.toIntOrNull() }
         lines.add(
           Line(
@@ -76,6 +76,11 @@ class ScreenHandler(
         if (content.isNotEmpty()) content.append('\n')
         content.append(line.text)
       }
+
+      ai.axiomaster.bonio.util.AppLogger.i(
+        "ScreenHandler",
+        "screen.context: pkg=${obj.optString("package")} title=${obj.optString("window_title")} total_nodes=${nodes.length()} lines=${lines.size} content_len=${content.length}\n${content.take(300)}"
+      )
 
       val payload = JSONObject()
         .put("source", "accessibility")

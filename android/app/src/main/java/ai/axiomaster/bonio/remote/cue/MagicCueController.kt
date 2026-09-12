@@ -62,12 +62,15 @@ class MagicCueController(
     val runId = payload["runId"].asStringOrNull() ?: return
     val state = payload["state"].asStringOrNull() ?: return
     if (state != "final" && state != "error" && state != "aborted") return
-    val deferred = synchronized(pendingRuns) { pendingRuns.remove(runId) } ?: return
+    val deferred = synchronized(pendingRuns) {
+      pendingRuns.remove(runId)
+    } ?: return
     val text = if (state == "final") {
       payload["message"].asStringOrNull() ?: payload["text"].asStringOrNull()
     } else {
       payload["errorMessage"].asStringOrNull()
     }
+    ai.axiomaster.bonio.util.AppLogger.i(TAG, "handleGatewayEvent matched runId=$runId text=${text?.take(60)}")
     deferred.complete(text)
   }
 
@@ -77,11 +80,14 @@ class MagicCueController(
    */
   suspend fun runCue(screen: ScreenContext): List<MagicCue>? {
     val screenText = screen.content
-    if (screenText.isBlank()) return emptyList()
+    if (screenText.isBlank()) {
+      ai.axiomaster.bonio.util.AppLogger.w(TAG, "runCue: screenText is blank, pkg=${screen.packageName}")
+      return emptyList()
+    }
 
     val facts = collectFacts(screenText)
     val prompt = buildPrompt(screen, facts)
-    Log.i(TAG, "runCue: screenText=${screenText.length}ch facts=${facts?.length ?: 0}ch")
+    ai.axiomaster.bonio.util.AppLogger.i(TAG, "runCue: screenText=${screenText.length}ch facts=${facts?.length ?: 0}ch")
 
     // Keep the cue session ephemeral: one conversation per run.
     try {
@@ -101,28 +107,44 @@ class MagicCueController(
         put("timeoutMs", JsonPrimitive(RUN_TIMEOUT_MS))
         put("idempotencyKey", JsonPrimitive(runId))
       }
-      try {
+      val res = try {
         session.request("chat.send", params.toString(), timeoutMs = 15_000)
       } catch (e: Throwable) {
-        Log.w(TAG, "chat.send failed: ${e.message}")
+        ai.axiomaster.bonio.util.AppLogger.e(TAG, "chat.send failed: ${e.message}", e)
         return null
+      }
+      val resObj = try { json.parseToJsonElement(res).asObjectOrNull() } catch (_: Throwable) { null }
+      val payloadObj = resObj?.get("payload")?.asObjectOrNull()
+      val actualRunId = payloadObj?.get("runId")?.asStringOrNull() ?: resObj?.get("runId")?.asStringOrNull()
+      ai.axiomaster.bonio.util.AppLogger.i(TAG, "chat.send response: actualRunId=$actualRunId (local=$runId)")
+      if (!actualRunId.isNullOrEmpty() && actualRunId != runId) {
+        synchronized(pendingRuns) {
+          if (pendingRuns.containsKey(runId)) {
+            pendingRuns.remove(runId)
+            pendingRuns[actualRunId] = deferred
+          }
+        }
       }
       val reply = try {
         withTimeout(RUN_TIMEOUT_MS) { deferred.await() }
       } catch (_: TimeoutCancellationException) {
-        Log.w(TAG, "cue run timed out")
+        ai.axiomaster.bonio.util.AppLogger.w(TAG, "cue run timed out")
         null
       }
+      ai.axiomaster.bonio.util.AppLogger.i(TAG, "cue reply: ${reply?.take(100)}")
       return reply?.let { parseCues(it) }
     } finally {
-      synchronized(pendingRuns) { pendingRuns.remove(runId) }
+      synchronized(pendingRuns) {
+        pendingRuns.remove(runId)
+      }
     }
   }
 
   // ── L1 domain pre-check: fetch on-device facts before invoking the LLM ──
 
   private suspend fun collectFacts(screenText: String): String? {
-    val tail = screenText.lines().takeLast(4).joinToString("\n")
+    val allLines = screenText.lines().map { it.trim() }.filter { it.isNotEmpty() }
+    val tail = allLines.takeLast(20).joinToString("\n")
     var facts: String? = null
 
     if (BILL_HINT_REGEX.containsMatchIn(tail)) {
@@ -136,14 +158,16 @@ class MagicCueController(
           }
         }
       } catch (e: Throwable) {
-        Log.d(TAG, "sms.bill pre-check failed: ${e.message}")
+        ai.axiomaster.bonio.util.AppLogger.w(TAG, "sms.bill pre-check failed: ${e.message}")
       }
     }
 
     val contactName = matchContactQuery(tail)
+    ai.axiomaster.bonio.util.AppLogger.i(TAG, "collectFacts: matchedContact=$contactName from tail_len=${tail.length}")
     if (contactName != null) {
       try {
         val res = withTimeout(3_000) { contactsSearch(contactName, 5) }
+        ai.axiomaster.bonio.util.AppLogger.i(TAG, "contactsSearch res.ok=${res.ok} payload=${res.payloadJson?.take(100)}")
         if (res.ok && res.payloadJson != null) {
           val obj = JSONObject(res.payloadJson)
           val contacts = obj.optJSONArray("contacts")
@@ -152,7 +176,7 @@ class MagicCueController(
           }
         }
       } catch (e: Throwable) {
-        Log.d(TAG, "contacts.search pre-check failed: ${e.message}")
+        ai.axiomaster.bonio.util.AppLogger.w(TAG, "contacts.search pre-check failed: ${e.message}")
       }
     }
     return facts
@@ -180,7 +204,14 @@ class MagicCueController(
       val c = contacts.optJSONObject(i) ?: continue
       sb.append("姓名：").append(c.optString("name")).append('\n')
       val phones = c.optJSONArray("phones")
-      val phone = if (phones != null && phones.length() > 0) phones.optString(0) else ""
+      val phoneList = mutableListOf<String>()
+      if (phones != null) {
+        for (j in 0 until phones.length()) {
+          val p = phones.optString(j).trim()
+          if (p.isNotEmpty()) phoneList.add(p)
+        }
+      }
+      val phone = phoneList.joinToString(", ")
       sb.append("电话：").append(phone.ifEmpty { "未登记手机号码" }).append('\n')
       c.optString("org", "").takeIf { it.isNotEmpty() }?.let { sb.append("公司：").append(it).append('\n') }
     }
@@ -250,13 +281,21 @@ class MagicCueController(
 
     private val BILL_HINT_REGEX = Regex("(话费|欠费|账单|扣费|交费|缴费|停机|余额)")
     private val CONTACT_REGEX =
-      Regex("(?:请问|帮我查下|帮我查一下|帮我查|查一下|查下|帮我找一下|帮我找下|帮我找|找一下|找下|看看|看下|问下|发一下|发下|发我|发给我|把)?([^\\s，。？！?,\\.!？:：]{1,10}?)(?:的)?(?:手机号码|电话号码|手机号|电话号|手机|电话|号码|联系方式)")
-    private val CONTACT_NOISE = Regex("(这个|那个|什么|哪个|谁|有无|有么|在哪|这里)")
+      Regex("(?:请问|帮我查下|帮我查一下|帮我查|查一下|查下|帮我找一下|帮我找下|帮我找|找一下|找下|看看|看下|问下|发一下|发下|发我|发给我|把|谁有)?([^\\s，。？！?,\\.!？:：\"“”'‘’]{1,10}?)(?:的)?(?:手机号码|电话号码|手机号|电话号|手机|电话|号码|联系方式)(?!(?:银行|营业厅|应用|客户端|商城|充值|设置|卡|网络|配件|壳|膜|支架|壁纸|主题|专卖店|售后|维修))")
+    private val CONTACT_NOISE = Regex("(这个|那个|什么|哪个|谁|有无|有么|在哪|这里|登录|注册|打开|下载|安装|进入|点击|使用|管理|办理|查询|支持|短信|银行|账号|账户|密码|验证码)")
 
     /** Extract the contact name for the pre-check from the visible question. */
     fun matchContactQuery(text: String): String? {
-      val match = CONTACT_REGEX.find(text) ?: return null
-      val name = match.groupValues[1].trim()
+      val match = CONTACT_REGEX.findAll(text).lastOrNull() ?: return null
+      var name = match.groupValues[1].trim()
+      name = name.replace(Regex("[\"“”'‘’]"), "").trim()
+      name = Regex("^(请问|帮我查下|帮我查一下|帮我查|查一下|查下|查询|找一下|找下|找|看看|看下|问下|发一下|发下|发我|发给我|把|谁有)").replace(name, "").trim()
+      if (name.startsWith("我") && name.length > 1 && (name.startsWith("我爸") || name.startsWith("我妈") || name.startsWith("我哥") || name.startsWith("我姐") || name.startsWith("我弟") || name.startsWith("我妹"))) {
+        name = name.removePrefix("我")
+      }
+      if (name.endsWith("的") && name.length > 1) {
+        name = name.removeSuffix("的").trim()
+      }
       if (name.isEmpty() || name.length > 10) return null
       if (CONTACT_NOISE.containsMatchIn(name)) return null
       return name

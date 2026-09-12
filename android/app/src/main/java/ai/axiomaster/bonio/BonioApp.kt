@@ -10,6 +10,8 @@ class BonioApp : Application() {
 
   override fun onCreate() {
     super.onCreate()
+    ai.axiomaster.bonio.util.AppLogger.init(this)
+    ai.axiomaster.bonio.util.AppLogger.i("BonioApp", "BonioApp onCreate started")
     if (BuildConfig.DEBUG) {
       StrictMode.setThreadPolicy(
         StrictMode.ThreadPolicy.Builder()

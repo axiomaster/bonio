@@ -131,7 +131,7 @@ class SmsHandler(private val context: Context) {
 
   suspend fun handleSmsBill(p: String?): GatewaySession.InvokeResult {
     val candidates = queryBillCandidates()
-    val billSms = candidates.firstOrNull { isBillSms(it.content) }
+    val billSms = candidates.firstOrNull { isBillSms(it.content) && resolveCarrier(it.senderNumber, it.content) != "未知运营商" }
       ?: return GatewaySession.InvokeResult.ok(
         buildJsonObject {
           put("found", false)
@@ -165,8 +165,7 @@ class SmsHandler(private val context: Context) {
       args.add("%$query%")
     }
     if (sender.isNotEmpty()) {
-      selections.add("(${Telephony.Sms.ADDRESS} LIKE ? OR ${Telephony.Sms.ADDRESS} LIKE ?)")
-      args.add("%$sender%")
+      selections.add("${Telephony.Sms.ADDRESS} LIKE ?")
       args.add("%${sender.trimStart('+')}%")
     }
     return querySms(
@@ -179,18 +178,16 @@ class SmsHandler(private val context: Context) {
 
   private fun queryBillCandidates(): List<SmsRecord> {
     ensureReadPermission()?.let { return emptyList() }
-    val selections = mutableListOf<String>()
-    val args = mutableListOf<String>()
-    selections.add("${Telephony.Sms.ADDRESS} IN (?,?,?)")
-    args.addAll(listOf("10000", "10086", "10010"))
-    for (keyword in listOf("账单", "欠费", "话费", "应付", "余额")) {
-      selections.add("${Telephony.Sms.BODY} LIKE ?")
-      args.add("%$keyword%")
-    }
+    val carriers = listOf("10000", "10086", "10010")
+    val keywords = listOf("账单", "欠费", "话费", "应付", "余额", "消费")
+    val placeholders = carriers.joinToString(",") { "?" }
+    val keywordClauses = keywords.joinToString(" OR ") { "${Telephony.Sms.BODY} LIKE ?" }
+    val selection = "(${Telephony.Sms.ADDRESS} IN ($placeholders)) AND ($keywordClauses)"
+    val args = (carriers + keywords.map { "%$it%" }).toTypedArray()
     return querySms(
       Telephony.Sms.CONTENT_URI,
-      selections.joinToString(" OR "),
-      args.toTypedArray(),
+      selection,
+      args,
       10,
     )
   }
@@ -226,7 +223,7 @@ class SmsHandler(private val context: Context) {
   // ── bill parsing (ported from sms_store.ts) ──
 
   private fun isBillSms(content: String): Boolean =
-    Regex("(账单|欠费|话费|应付|余额|停机)").containsMatchIn(content)
+    Regex("(账单|欠费|话费|应付|余额|停机|消费)").containsMatchIn(content)
 
   private fun resolveCarrier(sender: String, content: String): String {
     if (sender == "10000" || content.contains("中国电信") || content.contains("电信")) return "中国电信"
@@ -238,11 +235,13 @@ class SmsHandler(private val context: Context) {
   private fun parseBill(sms: SmsRecord): TelecomBillInfo {
     val content = sms.content
     val carrier = resolveCarrier(sms.senderNumber, content)
-    val amountDue = Regex("实际应付(?:\\s*)([\\d\\.]+)元").find(content)?.groupValues?.get(1)?.toDoubleOrNull()
-    val totalBill = Regex("账单合计(?:\\s*)([\\d\\.]+)元").find(content)?.groupValues?.get(1)?.toDoubleOrNull()
+    val amountDue = Regex("(?:实际应付|待缴金额|应付)(?:\\s*)([\\d\\.]+)元").find(content)?.groupValues?.get(1)?.toDoubleOrNull()
+    val totalBill = Regex("(?:账单合计|共消费|消费合计|总消费|消费)(?:\\s*)([\\d\\.]+)元").find(content)?.groupValues?.get(1)?.toDoubleOrNull()
     val balance = Regex("(?:当前)?余额(?:\\s*)([\\d\\.-]+)元").find(content)?.groupValues?.get(1)?.toDoubleOrNull()
-    val billingCycle = Regex("账单周期为?([^\\s，,。\r\n]+)").find(content)?.groupValues?.get(1)
-    val phoneNumber = Regex("号码为?([0-9*xX]{7,13})").find(content)?.groupValues?.get(1)
+    val billingCycle = Regex("(?:账单周期为?|您)([0-9]{2}月[0-9]{2}日-[0-9]{2}月[0-9]{2}日|[^\\s，,。\r\n]+(?:至|-)[^\\s，,。\r\n]+)").find(content)?.groupValues?.get(1)
+      ?: Regex("账单周期为?([^\\s，,。\r\n]+)").find(content)?.groupValues?.get(1)
+    val phoneNumber = Regex("(?:号码为?|尊敬的|用户)([0-9*xX]{7,13})").find(content)?.groupValues?.get(1)
+      ?: Regex("([0-9*xX]{7,13})客户").find(content)?.groupValues?.get(1)
     val isPastDue = (amountDue ?: 0.0) > 0 || (balance ?: 0.0) < 0 || content.contains("欠费") || content.contains("停机")
 
     val parts = mutableListOf(carrier)
@@ -251,7 +250,11 @@ class SmsHandler(private val context: Context) {
     totalBill?.let { parts.add("账单合计${it}元") }
     amountDue?.let { parts.add("实际应付${it}元") }
     balance?.let { parts.add("当前余额${it}元") }
-    parts.add(if (isPastDue) "当前状态：欠费" else "当前状态：待缴费")
+    if (isPastDue) {
+      parts.add("当前状态：待缴费/欠费")
+    } else {
+      parts.add("当前状态：正常")
+    }
 
     return TelecomBillInfo(
       carrier = carrier,

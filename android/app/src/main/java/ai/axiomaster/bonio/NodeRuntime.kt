@@ -224,6 +224,8 @@ class NodeRuntime(context: Context) {
           chat.handleGatewayEvent(event, payloadJson)
         }
       },
+      onInvoke = { req -> invokeDispatcher.handleInvoke(req.command, req.paramsJson) },
+      onTlsFingerprint = { id, fp -> prefs.saveGatewayTlsFingerprint(id, fp) },
     )
 
   private val nodeSession =
@@ -314,6 +316,7 @@ class NodeRuntime(context: Context) {
     ai.axiomaster.bonio.remote.skills.SkillRepository(operatorSession)
 
   init {
+    chargingTriggeredSync.start()
     scope.launch { prefs.loadGatewayToken() }
     scope.launch {
       combine(canvasDebugStatusEnabled, statusText, serverName, remoteAddress) { d, s, sv, r ->

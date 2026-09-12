@@ -5,16 +5,16 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.BatteryManager
-import android.util.Log
+import ai.axiomaster.bonio.util.AppLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 /**
  * Charging-triggered incremental memory sync. Listens to
- * ACTION_BATTERY_CHANGED and calls the backend's memory.incremental_sync RPC
+ * ACTION_BATTERY_CHANGED / ACTION_POWER_CONNECTED and calls the backend's memory.incremental_sync RPC
  * when the device is plugged in (reason=plugged_in) or periodically while
- * charging (reason=periodic_charging, ≥5 min apart). Ported from harmonyos
- * ChargingTriggeredScheduler.ets (30s poll → battery broadcast push).
+ * charging (reason=periodic_charging, >=5 min apart). Ported from harmonyos
+ * ChargingTriggeredScheduler.ets (30s poll -> battery broadcast push).
  */
 class ChargingTriggeredSync(
   private val context: Context,
@@ -29,48 +29,69 @@ class ChargingTriggeredSync(
 
   private val receiver = object : BroadcastReceiver() {
     override fun onReceive(ctx: Context, intent: Intent) {
-      if (intent.action != Intent.ACTION_BATTERY_CHANGED) return
-      val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-      val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+      val action = intent.action ?: return
+      val batteryIntent = if (action == Intent.ACTION_BATTERY_CHANGED) {
+        intent
+      } else {
+        context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+      } ?: return
+
+      val level = batteryIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+      val scale = batteryIntent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
       val soc = if (level >= 0 && scale > 0) level * 100 / scale else -1
-      val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
-      val plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0)
+      val status = batteryIntent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+      val plugged = batteryIntent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0)
       val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
         status == BatteryManager.BATTERY_STATUS_FULL ||
-        plugged != 0
+        plugged != 0 ||
+        action == Intent.ACTION_POWER_CONNECTED
 
+      val now = System.currentTimeMillis()
       if (firstEvent) {
-        // The sticky broadcast replays current state on register; record it
-        // without triggering so reconnecting while charged doesn't fire.
         firstEvent = false
         wasCharging = isCharging
+        AppLogger.i(TAG, "initial battery state: isCharging=$isCharging soc=$soc%")
+        if (isCharging) {
+          triggerSync("initial_charging", soc, now)
+        }
         return
       }
 
-      val now = System.currentTimeMillis()
       val reason = when {
         isCharging && !wasCharging -> "plugged_in"
-        isCharging && now - lastTriggerAt >= COOLDOWN_MS -> "periodic_charging"
+        isCharging && (now - lastTriggerAt >= COOLDOWN_MS) -> "periodic_charging"
         else -> null
       }
       wasCharging = isCharging
-      if (reason == null) return
-      if (!isConnected()) {
-        Log.d(TAG, "skip incremental_sync ($reason): backend not connected")
-        return
+      if (reason != null) {
+        triggerSync(reason, soc, now)
       }
-      lastTriggerAt = now
-      scope.launch {
-        val ok = sync(reason, soc, now)
-        Log.i(TAG, "incremental_sync reason=$reason soc=$soc ok=$ok")
-      }
+    }
+  }
+
+  private fun triggerSync(reason: String, soc: Int, now: Long) {
+    if (!isConnected()) {
+      AppLogger.d(TAG, "skip incremental_sync ($reason): backend not connected")
+      return
+    }
+    lastTriggerAt = now
+    AppLogger.i(TAG, "charging detected ($reason, soc=$soc%); triggering incremental sync & vectorization")
+    scope.launch {
+      val ok = sync(reason, soc, now)
+      AppLogger.i(TAG, "incremental_sync reason=$reason soc=$soc ok=$ok")
     }
   }
 
   fun start() {
     if (registered) return
-    context.registerReceiver(receiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+    val filter = IntentFilter().apply {
+      addAction(Intent.ACTION_BATTERY_CHANGED)
+      addAction(Intent.ACTION_POWER_CONNECTED)
+      addAction(Intent.ACTION_POWER_DISCONNECTED)
+    }
+    context.registerReceiver(receiver, filter)
     registered = true
+    AppLogger.i(TAG, "ChargingTriggeredSync registered and started")
   }
 
   fun stop() {
@@ -78,6 +99,7 @@ class ChargingTriggeredSync(
     runCatching { context.unregisterReceiver(receiver) }
     registered = false
     firstEvent = true
+    AppLogger.i(TAG, "ChargingTriggeredSync stopped")
   }
 
   companion object {

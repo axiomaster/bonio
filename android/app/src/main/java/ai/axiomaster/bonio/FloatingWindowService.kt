@@ -38,6 +38,7 @@ import androidx.core.content.ContextCompat
 import com.airbnb.lottie.LottieAnimationView
 import com.airbnb.lottie.LottieDrawable
 import ai.axiomaster.bonio.remote.chat.OutgoingAttachment
+import ai.axiomaster.bonio.remote.cue.MagicCue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -250,6 +251,15 @@ class FloatingWindowService : Service() {
                         showClone(asset)
                     }
                     CloneManager.ACTION_HIDE_CLONE -> hideClone()
+                    ACTION_TRIGGER_CUE -> runMagicCue()
+                    ACTION_APPLY_CUE -> {
+                        val extraText = intent.getStringExtra("text") ?: intent.getStringExtra("content")
+                        if (!extraText.isNullOrEmpty()) {
+                            applyMagicCue(MagicCue(title = "快捷回复", content = extraText, kind = "reply"))
+                        } else {
+                            applyMagicCue()
+                        }
+                    }
                 }
             }
         }
@@ -257,9 +267,11 @@ class FloatingWindowService : Service() {
         val filter = IntentFilter().apply {
             addAction(CloneManager.ACTION_SHOW_CLONE)
             addAction(CloneManager.ACTION_HIDE_CLONE)
+            addAction(ACTION_TRIGGER_CUE)
+            addAction(ACTION_APPLY_CUE)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
         } else {
             registerReceiver(receiver, filter)
         }
@@ -732,6 +744,7 @@ class FloatingWindowService : Service() {
                     launch { remembered = withContext(Dispatchers.Default) { runtime.companionMemory.capture(screen, explicit = true) } }
                 }
                 magicCuePending = false
+                ai.axiomaster.bonio.util.AppLogger.i(TAG, "runMagicCue completed: cues=${cues?.size} remembered=$remembered")
                 when {
                     !cues.isNullOrEmpty() -> showCues(cues!!)
                     remembered -> {
@@ -762,7 +775,13 @@ class FloatingWindowService : Service() {
         cueEpoch += 1
         val epoch = cueEpoch
         val first = cues.first()
-        val prompt = if (cues.size > 1) "有 ${cues.size} 条建议，点我采纳" else first.title
+        val prompt = if (cues.size > 1) {
+            "有 ${cues.size} 条建议，点我发送"
+        } else if (first.title.isNotEmpty() && first.title != first.content) {
+            "${first.title}\n${first.content}"
+        } else {
+            first.content
+        }
         avatarController.setActivity(AgentState.Speaking)
         avatarController.setBubble(prompt, SUGGESTION_BG_COLOR, android.graphics.Color.WHITE)
         mainHandler.postDelayed({
@@ -780,12 +799,12 @@ class FloatingWindowService : Service() {
         mainHandler.postDelayed({ avatarController.clearBubble(); avatarController.setActivity(AgentState.Idle) }, 2500)
     }
 
-    private fun applyMagicCue() {
-        val cue = actionableCues.firstOrNull() ?: return
+    private fun applyMagicCue(customCue: MagicCue? = null) {
+        val cue = customCue ?: actionableCues.firstOrNull() ?: return
         cueEpoch += 1
         actionableCues = emptyList()
         avatarController.setActivity(AgentState.Working)
-        avatarController.setBubble("正在应用…")
+        avatarController.setBubble("正在发送…")
         serviceScope.launch {
             if (cue.kind == "calendar") {
                 openCalendarApp()
@@ -794,13 +813,21 @@ class FloatingWindowService : Service() {
                 delay(1500)
             } else {
                 val accessibility = ai.axiomaster.bonio.remote.node.BonioAccessibilityService.instance
-                val filled = accessibility?.fillActiveReplyField(cue.content) == true
-                if (filled) {
+                // Try sending directly (silent text injection + dynamic send button click)
+                val sent = accessibility?.sendTextToActiveChat(cue.content) == true
+                if (sent) {
                     avatarController.setActivity(AgentState.Happy)
-                    avatarController.setBubble("已填入回复框")
+                    avatarController.setBubble("已发送 ✅")
                 } else {
-                    avatarController.setActivity(AgentState.Confused)
-                    avatarController.setBubble("未找到回复框，点此重试")
+                    // Fallback to fill active reply field if send button wasn't found
+                    val filled = accessibility?.fillActiveReplyField(cue.content) == true
+                    if (filled) {
+                        avatarController.setActivity(AgentState.Happy)
+                        avatarController.setBubble("已填入回复框")
+                    } else {
+                        avatarController.setActivity(AgentState.Confused)
+                        avatarController.setBubble("未找到回复框，点此重试")
+                    }
                 }
                 delay(1800)
             }
@@ -1315,9 +1342,11 @@ class FloatingWindowService : Service() {
     }
 
     companion object {
+        const val ACTION_TRIGGER_CUE = "ai.axiomaster.bonio.ACTION_MAGIC_CUE"
+        const val ACTION_APPLY_CUE = "ai.axiomaster.bonio.ACTION_APPLY_CUE"
         private const val TAG = "BonioApp"
         private const val LONG_PRESS_THRESHOLD_MS = 600L
-        private const val DOUBLE_TAP_THRESHOLD_MS = 350L
+        private const val DOUBLE_TAP_THRESHOLD_MS = 500L
         private const val SUGGESTION_DISPLAY_MS = 15_000L
         private const val SUGGESTION_BG_COLOR = 0xE62D303E.toInt()
         private const val DRAG_THRESHOLD_DP = 10f

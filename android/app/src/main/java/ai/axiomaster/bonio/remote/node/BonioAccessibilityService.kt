@@ -13,23 +13,24 @@ import android.view.accessibility.AccessibilityWindowInfo
 import org.json.JSONArray
 import org.json.JSONObject
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeout
 
 class BonioAccessibilityService : AccessibilityService() {
   private val recentEventText = ArrayDeque<String>()
 
   override fun onServiceConnected() {
-    val info =
-      AccessibilityServiceInfo().apply {
-        eventTypes = AccessibilityEvent.TYPES_ALL_MASK
-        feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
-        flags =
-          AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or
-            AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
-        notificationTimeout = 100
-      }
+    val info = serviceInfo ?: AccessibilityServiceInfo()
+    info.eventTypes = AccessibilityEvent.TYPES_ALL_MASK
+    info.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC or AccessibilityServiceInfo.FEEDBACK_SPOKEN
+    info.flags = info.flags or
+      AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or
+      AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS or
+      AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
+    info.notificationTimeout = 100
     serviceInfo = info
     instance = this
-    Log.i(TAG, "Bonio Accessibility Service connected")
+    ai.axiomaster.bonio.util.AppLogger.i(TAG, "Bonio Accessibility Service connected flags=${info.flags}")
   }
 
   override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -57,28 +58,48 @@ class BonioAccessibilityService : AccessibilityService() {
 
   /**
    * Find the currently focused editable node (input field). Returns the node and its screen bounds, or null if no
-   * input is focused.
+   * input is focused. Searches across all active interactive windows.
    */
   @Suppress("DEPRECATION")
   fun findFocusedInput(): InputFieldInfo? {
-    val root = rootInActiveWindow ?: return null
-    val focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-    root.recycle()
-    if (focused == null) return null
-    if (!focused.isEditable) {
-      // Walk up to find an editable parent
-      var node: AccessibilityNodeInfo? = focused
-      while (node != null && !node.isEditable) {
-        node = node.parent
+    val roots = mutableListOf<AccessibilityNodeInfo>()
+    rootInActiveWindow?.let(roots::add)
+    for (w in windows) {
+      val r = w.root
+      if (r != null && roots.none { it == r }) {
+        roots.add(r)
+      } else {
+        r?.recycle()
       }
-      if (node == null || !node.isEditable) return null
-      val rect = Rect()
-      node.getBoundsInScreen(rect)
-      return InputFieldInfo(node, rect)
     }
-    val rect = Rect()
-    focused.getBoundsInScreen(rect)
-    return InputFieldInfo(focused, rect)
+
+    try {
+      for (root in roots) {
+        val focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+        if (focused != null) {
+          if (!focused.isEditable) {
+            var node: AccessibilityNodeInfo? = focused
+            while (node != null && !node.isEditable) {
+              val parent = node.parent
+              node.recycle()
+              node = parent
+            }
+            if (node != null && node.isEditable) {
+              val rect = Rect()
+              node.getBoundsInScreen(rect)
+              return InputFieldInfo(node, rect)
+            }
+          } else {
+            val rect = Rect()
+            focused.getBoundsInScreen(rect)
+            return InputFieldInfo(focused, rect)
+          }
+        }
+      }
+    } finally {
+      for (r in roots) r.recycle()
+    }
+    return null
   }
 
   /** Set text on a specific node using ACTION_SET_TEXT. */
@@ -91,74 +112,218 @@ class BonioAccessibilityService : AccessibilityService() {
   /** Set text on the currently focused input field. */
   fun setTextOnFocusedInput(text: String): Boolean {
     val info = findFocusedInput() ?: return false
-    return setTextOnNode(info.node, text)
+    val res = setTextOnNode(info.node, text)
+    info.node.recycle()
+    return res
+  }
+
+  /** Find the bottommost editable node in the active window (chat input field is always at bottom). */
+  fun findBottommostEditor(root: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+    val queue = ArrayDeque<AccessibilityNodeInfo>()
+    for (index in 0 until root.childCount) root.getChild(index)?.let(queue::add)
+    var bottommost: AccessibilityNodeInfo? = null
+    var maxBottom = -1
+    val rect = Rect()
+    while (queue.isNotEmpty()) {
+      val node = queue.removeFirst()
+      if (node.isEditable && node.isEnabled) {
+        node.getBoundsInScreen(rect)
+        if (rect.bottom > maxBottom) {
+          maxBottom = rect.bottom
+          bottommost?.recycle()
+          bottommost = AccessibilityNodeInfo.obtain(node)
+        }
+      }
+      for (index in 0 until node.childCount) node.getChild(index)?.let(queue::add)
+      node.recycle()
+    }
+    return bottommost
   }
 
   /** Inserts text into the active app editor and activates its send action. */
   suspend fun sendTextToActiveChat(text: String): Boolean {
-    val root = externalApplicationRoot() ?: return false
-    val editor = findFirstNode(root) { it.isEditable && it.isEnabled }
-    root.recycle()
-    if (editor == null || !setTextOnNode(editor, text)) {
-      editor?.recycle()
+    val root = externalApplicationRoot()
+    val editor = if (root != null) {
+      val found = findBottommostEditor(root) ?: findFirstNode(root) { it.isEditable && it.isEnabled }
+      root.recycle()
+      found
+    } else null
+
+    val editorRect = Rect()
+    var textInjected = false
+
+    if (editor != null) {
+      editor.getBoundsInScreen(editorRect)
+      textInjected = setTextOnNode(editor, text)
+      if (!textInjected) {
+        editor.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+        delay(100)
+        textInjected = setTextOnNode(editor, text)
+      }
+      editor.recycle()
+    }
+
+    // Fallback: tap bottom input area if editor not found or injection failed
+    if (!textInjected) {
+      val dm = resources.displayMetrics
+      val tapX = (dm.widthPixels * 0.35f)
+      val tapY = (dm.heightPixels * 0.95f)
+      ai.axiomaster.bonio.util.AppLogger.i(TAG, "sendTextToActiveChat: tapping input area fallback at ($tapX, $tapY)")
+      val tapOk = tapScreenPoint(tapX, tapY)
+      if (tapOk) {
+        delay(350)
+        val focused = findFocusedInput()
+        if (focused != null) {
+          textInjected = setTextOnNode(focused.node, text)
+          editorRect.set(focused.bounds)
+          focused.node.recycle()
+        }
+      }
+    }
+
+    if (!textInjected) {
+      ai.axiomaster.bonio.util.AppLogger.w(TAG, "sendTextToActiveChat: failed to inject text")
       return false
     }
-    editor.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
-    editor.recycle()
+
+    // Allow UI a moment to update and render the send button (e.g. '+' switches to '发送')
     delay(250)
 
-    val refreshedRoot = externalApplicationRoot() ?: return false
-    val sendNode = findFirstNode(refreshedRoot) { node ->
-      val label = listOf(node.text, node.contentDescription)
-        .joinToString(" ") { it?.toString().orEmpty() }.trim()
-      node.isEnabled && (label == "发送" || label.equals("send", ignoreCase = true))
+    // Re-check focused editor bounds after keyboard may have shifted layout
+    val activeEditor = findFocusedInput()
+    if (activeEditor != null) {
+      if (activeEditor.bounds.centerY() > 0) {
+        editorRect.set(activeEditor.bounds)
+      }
+      activeEditor.node.recycle()
     }
-    refreshedRoot.recycle()
-    var clickable = sendNode
-    while (clickable != null && !clickable.isClickable) {
-      val parent = clickable.parent
-      clickable.recycle()
-      clickable = parent
+
+    val refreshedRoot = externalApplicationRoot()
+    val sendNode = if (refreshedRoot != null) {
+      val found = findFirstNode(refreshedRoot) { node ->
+        val label = listOf(node.text, node.contentDescription, node.viewIdResourceName)
+          .joinToString(" ") { it?.toString().orEmpty() }.trim()
+        node.isEnabled && (
+          label == "发送" || label.equals("send", ignoreCase = true) ||
+          label.contains("发送") || label.contains("btn_send", ignoreCase = true) ||
+          label.contains("send_button", ignoreCase = true)
+        )
+      }
+      refreshedRoot.recycle()
+      found
+    } else null
+
+    var sent = false
+    if (sendNode != null) {
+      val sendRect = Rect()
+      sendNode.getBoundsInScreen(sendRect)
+
+      var clickable: AccessibilityNodeInfo? = sendNode
+      while (clickable != null && !clickable.isClickable) {
+        val parent = clickable.parent
+        clickable.recycle()
+        clickable = parent
+      }
+      sent = clickable?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
+      clickable?.recycle()
+
+      if (!sent && sendRect.width() > 0 && sendRect.height() > 0) {
+        ai.axiomaster.bonio.util.AppLogger.i(TAG, "sendTextToActiveChat: tapping sendNode bounds at (${sendRect.centerX()}, ${sendRect.centerY()})")
+        sent = tapScreenPoint(sendRect.centerX().toFloat(), sendRect.centerY().toFloat())
+      }
     }
-    val sent = clickable?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
-    clickable?.recycle()
+
+    // Fallback: if send button node not found, tap right edge of editor row
+    if (!sent) {
+      val dm = resources.displayMetrics
+      val fallbackX = if (editorRect.right > 0 && editorRect.right < dm.widthPixels) {
+        (editorRect.right + dm.widthPixels) / 2f
+      } else {
+        dm.widthPixels * 0.92f
+      }
+      val fallbackY = if (editorRect.centerY() > 0) editorRect.centerY().toFloat() else (dm.heightPixels * 0.95f)
+      ai.axiomaster.bonio.util.AppLogger.i(TAG, "sendTextToActiveChat: fallback tap send area at ($fallbackX, $fallbackY)")
+      sent = tapScreenPoint(fallbackX, fallbackY)
+    }
+
+    ai.axiomaster.bonio.util.AppLogger.i(TAG, "sendTextToActiveChat: result=$sent")
     return sent
   }
 
   /** Writes text to the active app's reply field without sending it. */
   suspend fun fillActiveReplyField(text: String): Boolean {
-    var root = externalApplicationRoot() ?: return false
-    val targetPackage = root.packageName?.toString() ?: return false
-    root.recycle()
-    val metrics = resources.displayMetrics
-    val path = Path().apply {
-      moveTo(metrics.widthPixels * 0.45f, metrics.heightPixels * 0.87f)
+    val root = externalApplicationRoot()
+    val editor = if (root != null) {
+      val found = findBottommostEditor(root) ?: findFirstNode(root) { it.isEditable && it.isEnabled }
+      root.recycle()
+      found
+    } else null
+
+    if (editor != null) {
+      val rect = Rect()
+      editor.getBoundsInScreen(rect)
+      val accepted = setTextOnNode(editor, text)
+      editor.recycle()
+      if (accepted) {
+        ai.axiomaster.bonio.util.AppLogger.i(TAG, "fillActiveReplyField: setTextOnNode succeeded directly")
+        return true
+      }
+
+      // Tap editor then retry
+      if (rect.width() > 0 && rect.height() > 0) {
+        tapScreenPoint(rect.centerX().toFloat(), rect.centerY().toFloat())
+        delay(300)
+        val focused = findFocusedInput()
+        if (focused != null) {
+          val res = setTextOnNode(focused.node, text)
+          focused.node.recycle()
+          ai.axiomaster.bonio.util.AppLogger.i(TAG, "fillActiveReplyField: setTextOnFocusedInput result=$res")
+          return res
+        }
+      }
     }
+
+    // Dynamic tap bottom area fallback
+    val dm = resources.displayMetrics
+    val tapX = (dm.widthPixels * 0.35f)
+    val tapY = (dm.heightPixels * 0.95f)
+    ai.axiomaster.bonio.util.AppLogger.i(TAG, "fillActiveReplyField: fallback tap at ($tapX, $tapY)")
+    tapScreenPoint(tapX, tapY)
+    delay(300)
+    val focused = findFocusedInput()
+    if (focused != null) {
+      val res = setTextOnNode(focused.node, text)
+      focused.node.recycle()
+      ai.axiomaster.bonio.util.AppLogger.i(TAG, "fillActiveReplyField: focused text result=$res")
+      return res
+    }
+    return false
+  }
+
+  private suspend fun tapScreenPoint(x: Float, y: Float): Boolean {
+    val path = Path().apply {
+      moveTo(x, y)
+    }
+    val gestureOk = CompletableDeferred<Boolean>()
     dispatchGesture(
       GestureDescription.Builder()
-        .addStroke(GestureDescription.StrokeDescription(path, 0, 80))
+        .addStroke(GestureDescription.StrokeDescription(path, 0, 50))
         .build(),
-      null,
+      object : GestureResultCallback() {
+        override fun onCompleted(gestureDescription: GestureDescription?) {
+          gestureOk.complete(true)
+        }
+        override fun onCancelled(gestureDescription: GestureDescription?) {
+          gestureOk.complete(false)
+        }
+      },
       null,
     )
-    delay(450)
-    root = applicationRoot(targetPackage) ?: return false
-    val editor = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-      ?: findFirstNode(root) { it.isEditable && it.isEnabled && it.isFocused }
-    root.recycle()
-    if (editor == null) return false
-    editor.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
-    val accepted = setTextOnNode(editor, text)
-    editor.recycle()
-    if (!accepted) return false
-    delay(250)
-    val verifiedRoot = applicationRoot(targetPackage) ?: return false
-    val verifiedEditor = verifiedRoot.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-      ?: findFirstNode(verifiedRoot) { it.isEditable && it.isEnabled }
-    verifiedRoot.recycle()
-    val actualText = verifiedEditor?.text?.toString().orEmpty()
-    verifiedEditor?.recycle()
-    return actualText.contains(text)
+    return try {
+      withTimeout(600) { gestureOk.await() }
+    } catch (_: Throwable) {
+      false
+    }
   }
 
   private fun findFirstNode(
@@ -180,18 +345,67 @@ class BonioAccessibilityService : AccessibilityService() {
   }
 
   /** Returns a compact, privacy-conscious UI tree snapshot for server-side screen understanding. */
-  fun dumpActiveWindow(maxNodes: Int = 180, maxTextLength: Int = 240): String? {
-    val window = windows
-      .sortedByDescending { it.layer }
-      .firstOrNull { candidate ->
-        candidate.root?.let { root ->
-          val isExternal = candidate.type == AccessibilityWindowInfo.TYPE_APPLICATION &&
-            root.packageName?.toString() != packageName
-          root.recycle()
-          isExternal
-        } == true
+  fun dumpActiveWindow(maxNodes: Int = 250, maxTextLength: Int = 240): String? {
+    val currentWindows = windows.sortedByDescending { it.layer }
+    ai.axiomaster.bonio.util.AppLogger.i(TAG, "dumpActiveWindow: total windows=${currentWindows.size}")
+
+    data class WindowCandidate(
+      val window: AccessibilityWindowInfo?,
+      val root: AccessibilityNodeInfo,
+      val isFromActive: Boolean
+    )
+    val candidates = mutableListOf<WindowCandidate>()
+
+    for (w in currentWindows) {
+      if (w.type == AccessibilityWindowInfo.TYPE_APPLICATION) {
+        val r = w.root
+        if (r != null) {
+          if (r.packageName?.toString() != packageName) {
+            candidates.add(WindowCandidate(w, r, false))
+          } else {
+            r.recycle()
+          }
+        }
       }
-    val root = window?.root ?: rootInActiveWindow ?: return null
+    }
+    rootInActiveWindow?.let { r ->
+      if (r.packageName?.toString() != packageName) {
+        candidates.add(WindowCandidate(null, r, true))
+      } else {
+        r.recycle()
+      }
+    }
+
+    if (candidates.isEmpty()) {
+      ai.axiomaster.bonio.util.AppLogger.w(TAG, "dumpActiveWindow: no external application root found")
+      return null
+    }
+
+    for ((idx, c) in candidates.withIndex()) {
+      ai.axiomaster.bonio.util.AppLogger.i(
+        TAG,
+        "dumpActiveWindow candidate #$idx: pkg=${c.root.packageName} class=${c.root.className} childCount=${c.root.childCount} title=${c.window?.title} isFocused=${c.window?.isFocused} isActive=${c.window?.isActive} isFromActive=${c.isFromActive}"
+      )
+    }
+
+    // Pick candidate: prefer childCount > 0 or has text, otherwise first candidate
+    val chosen = candidates.firstOrNull { it.root.childCount > 0 || !it.root.text.isNullOrEmpty() }
+      ?: candidates.first()
+
+    val matchedWindow = chosen.window
+    val root = chosen.root
+
+    for (c in candidates) {
+      if (c.root !== root) {
+        c.root.recycle()
+      }
+    }
+
+    ai.axiomaster.bonio.util.AppLogger.i(
+      TAG,
+      "dumpActiveWindow chosen: pkg=${root.packageName} windowTitle=${matchedWindow?.title} childCount=${root.childCount}"
+    )
+
     val nodes = JSONArray()
     val queue = ArrayDeque<Pair<AccessibilityNodeInfo, Int>>()
     queue.add(root to 0)
@@ -214,9 +428,10 @@ class BonioAccessibilityService : AccessibilityService() {
         }
         if (node !== root) node.recycle()
       }
+      ai.axiomaster.bonio.util.AppLogger.i(TAG, "dumpActiveWindow collected nodes=${nodes.length()}")
       return JSONObject()
         .put("package", root.packageName?.toString().orEmpty())
-        .put("window_title", window?.title?.toString().orEmpty())
+        .put("window_title", matchedWindow?.title?.toString().orEmpty())
         .put("recent_events", JSONArray(synchronized(recentEventText) { recentEventText.toList() }))
         .put("nodes", nodes)
         .toString()
@@ -227,12 +442,31 @@ class BonioAccessibilityService : AccessibilityService() {
   }
 
   private fun externalApplicationRoot(): AccessibilityNodeInfo? {
-    return windows
-      .sortedByDescending { it.layer }
-      .firstNotNullOfOrNull { candidate ->
-        if (candidate.type != AccessibilityWindowInfo.TYPE_APPLICATION) return@firstNotNullOfOrNull null
-        candidate.root?.takeIf { it.packageName?.toString() != packageName }
-      } ?: rootInActiveWindow
+    val candidates = mutableListOf<AccessibilityNodeInfo>()
+    for (candidate in windows.sortedByDescending { it.layer }) {
+      if (candidate.type == AccessibilityWindowInfo.TYPE_APPLICATION) {
+        val r = candidate.root
+        if (r != null) {
+          if (r.packageName?.toString() != packageName) {
+            candidates.add(r)
+          } else {
+            r.recycle()
+          }
+        }
+      }
+    }
+    rootInActiveWindow?.let { r ->
+      if (r.packageName?.toString() != packageName) {
+        candidates.add(r)
+      } else {
+        r.recycle()
+      }
+    }
+    val chosen = candidates.firstOrNull { it.childCount > 0 || it.isEditable } ?: candidates.firstOrNull()
+    for (c in candidates) {
+      if (c !== chosen) c.recycle()
+    }
+    return chosen
   }
 
   private fun applicationRoot(targetPackage: String): AccessibilityNodeInfo? {
