@@ -283,6 +283,42 @@ class NodeRuntime(context: Context) {
   suspend fun captureScreenContext(maxTextLength: Int = 6000): GatewaySession.InvokeResult =
     invokeDispatcher.handleInvoke("screen.context", """{"maxTextLength":$maxTextLength}""")
 
+  /**
+   * Captures screen as JPEG Base64.
+   * Prefers BonioAccessibilityService (silent, no MediaProjection prompt).
+   * Falls back to ScreenCaptureManager if MediaProjection is authorized.
+   */
+  suspend fun captureScreenshot(maxEdge: Int = 1080, quality: Int = 80): String? {
+    // 1. Accessibility Service silent screenshot
+    val a11y = BonioAccessibilityService.instance
+    if (a11y != null) {
+      try {
+        val base64 = a11y.takeScreenshotBase64(maxEdge = maxEdge, quality = quality)
+        if (!base64.isNullOrEmpty()) {
+          ai.axiomaster.bonio.util.AppLogger.i("NodeRuntime", "Screenshot captured via AccessibilityService (${base64.length} chars)")
+          return base64
+        }
+      } catch (e: Throwable) {
+        ai.axiomaster.bonio.util.AppLogger.w("NodeRuntime", "AccessibilityService takeScreenshot failed: ${e.message}")
+      }
+    }
+
+    // 2. Fallback to ScreenCaptureManager (MediaProjection)
+    try {
+      val payload = screenCaptureManager.capture("""{"maxWidth":$maxEdge,"quality":$quality}""")
+      val obj = org.json.JSONObject(payload.payloadJson)
+      val base64 = obj.optString("base64")
+      if (base64.isNotEmpty()) {
+        ai.axiomaster.bonio.util.AppLogger.i("NodeRuntime", "Screenshot captured via ScreenCaptureManager (${base64.length} chars)")
+        return base64
+      }
+    } catch (e: Throwable) {
+      ai.axiomaster.bonio.util.AppLogger.d("NodeRuntime", "ScreenCaptureManager fallback capture unavailable: ${e.message}")
+    }
+
+    return null
+  }
+
   val memoryService: ai.axiomaster.bonio.remote.memory.MemoryService by lazy {
     ai.axiomaster.bonio.remote.memory.MemoryService(operatorSession)
   }

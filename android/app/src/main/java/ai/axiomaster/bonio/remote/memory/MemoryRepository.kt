@@ -63,6 +63,9 @@ class MemoryService(private val session: GatewaySession) {
     val sourceApp: String? = null,
     val pageTitle: String? = null,
     val pageLink: String? = null,
+    val coverImage: String? = null,
+    val originalImage: String? = null,
+    val originalImageMimeType: String? = null,
   )
 
   private fun parseMemo(m: JsonObject): BonioMemo? {
@@ -95,6 +98,9 @@ class MemoryService(private val session: GatewaySession) {
       params.sourceApp?.let { put("sourceApp", JsonPrimitive(it)) }
       params.pageTitle?.let { put("pageTitle", JsonPrimitive(it)) }
       params.pageLink?.let { put("pageLink", JsonPrimitive(it)) }
+      params.coverImage?.let { put("coverImage", JsonPrimitive(it)) }
+      params.originalImage?.let { put("originalImage", JsonPrimitive(it)) }
+      params.originalImageMimeType?.let { put("originalImageMimeType", JsonPrimitive(it)) }
     }
     val payload = session.request("memo.save", body.toString(), timeoutMs = 15_000)
     val obj = json.parseToJsonElement(payload).asObjectOrNull()

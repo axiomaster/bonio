@@ -12,9 +12,14 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import org.json.JSONArray
 import org.json.JSONObject
+import android.graphics.Bitmap
+import android.view.Display
+import android.util.Base64
+import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 
 class BonioAccessibilityService : AccessibilityService() {
   private val recentEventText = ArrayDeque<String>()
@@ -498,6 +503,77 @@ class BonioAccessibilityService : AccessibilityService() {
       delay(charDelayMs)
     }
     return true
+  }
+
+  /**
+   * Captures a screenshot of the current default display silently via accessibility API.
+   * Requires android:canTakeScreenshot="true" in service XML.
+   */
+  suspend fun takeScreenshotBitmap(): Bitmap? = withTimeoutOrNull(4000) {
+    val deferred = CompletableDeferred<Bitmap?>()
+    try {
+      takeScreenshot(
+        Display.DEFAULT_DISPLAY,
+        mainExecutor,
+        object : TakeScreenshotCallback {
+          override fun onSuccess(screenshot: ScreenshotResult) {
+            val hwBuffer = screenshot.hardwareBuffer
+            val colorSpace = screenshot.colorSpace
+            try {
+              val hwBitmap = Bitmap.wrapHardwareBuffer(hwBuffer, colorSpace)
+              val softBitmap = hwBitmap?.copy(Bitmap.Config.ARGB_8888, false)
+              hwBitmap?.recycle()
+              deferred.complete(softBitmap)
+            } catch (e: Throwable) {
+              Log.w(TAG, "Failed to copy screenshot bitmap: ${e.message}", e)
+              deferred.complete(null)
+            } finally {
+              hwBuffer.close()
+            }
+          }
+
+          override fun onFailure(errorCode: Int) {
+            Log.w(TAG, "takeScreenshot onFailure errorCode=$errorCode")
+            deferred.complete(null)
+          }
+        }
+      )
+    } catch (e: Throwable) {
+      Log.w(TAG, "takeScreenshot exception: ${e.message}", e)
+      deferred.complete(null)
+    }
+    deferred.await()
+  }
+
+  /**
+   * Captures screen and returns scaled JPEG Base64 string.
+   */
+  suspend fun takeScreenshotBase64(maxEdge: Int = 1080, quality: Int = 80): String? {
+    val bitmap = takeScreenshotBitmap() ?: return null
+    return try {
+      val width = bitmap.width
+      val height = bitmap.height
+      val longest = maxOf(width, height)
+      val scaledBitmap = if (longest > maxEdge) {
+        val scale = maxEdge.toFloat() / longest
+        val newW = (width * scale).toInt().coerceAtLeast(1)
+        val newH = (height * scale).toInt().coerceAtLeast(1)
+        Bitmap.createScaledBitmap(bitmap, newW, newH, true)
+      } else {
+        bitmap
+      }
+      val out = ByteArrayOutputStream()
+      scaledBitmap.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), out)
+      if (scaledBitmap != bitmap) {
+        scaledBitmap.recycle()
+      }
+      Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
+    } catch (e: Throwable) {
+      Log.e(TAG, "Failed to compress screenshot: ${e.message}", e)
+      null
+    } finally {
+      bitmap.recycle()
+    }
   }
 
   data class InputFieldInfo(val node: AccessibilityNodeInfo, val bounds: Rect)

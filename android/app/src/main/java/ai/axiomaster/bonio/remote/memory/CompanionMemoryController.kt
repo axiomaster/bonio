@@ -59,10 +59,20 @@ class CompanionMemoryController(
    * Analyze the screen and remember it if worthwhile. Returns true when a
    * memo was saved (only meaningful for explicit captures).
    */
-  suspend fun capture(screen: MagicCueController.ScreenContext, explicit: Boolean): Boolean {
-    val text = screen.content
-    if (text.isBlank()) return false
-    ai.axiomaster.bonio.util.AppLogger.i(TAG, "capture: explicit=$explicit text=${text.length}ch")
+  suspend fun capture(
+    screen: MagicCueController.ScreenContext,
+    explicit: Boolean,
+    coverImage: String? = null,
+    originalImage: String? = null,
+  ): Boolean {
+    val text = screen.content.ifBlank {
+      if (explicit) screen.title.ifBlank { "应用: ${screen.packageName}" } else ""
+    }
+    if (text.isBlank() && coverImage.isNullOrEmpty()) return false
+    ai.axiomaster.bonio.util.AppLogger.i(
+      TAG,
+      "capture: explicit=$explicit text=${text.length}ch hasCover=${!coverImage.isNullOrEmpty()}"
+    )
 
     try {
       session.request("sessions.reset", """{"sessionKey":"$SESSION_KEY"}""", timeoutMs = 5_000)
@@ -117,6 +127,8 @@ class CompanionMemoryController(
         tags = summary.tags.take(3),
         sourceApp = summary.sourceApp ?: screen.packageName,
         pageTitle = summary.pageTitle ?: screen.title,
+        coverImage = coverImage,
+        originalImage = originalImage ?: coverImage,
       )
       return memoryService.save(saveParams).isSuccess
     } finally {

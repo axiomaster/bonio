@@ -42,6 +42,7 @@ import ai.axiomaster.bonio.remote.cue.MagicCue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -687,11 +688,31 @@ class FloatingWindowService : Service() {
         actionableCues = emptyList()
         cueEpoch += 1
         avatarController.clearBubble()
-        avatarController.setActivity(AgentState.Thinking)
-        avatarController.setBubble("正在分析屏幕…")
+
         serviceScope.launch {
             try {
-                val ctxRes = withContext(Dispatchers.Default) { runtime.captureScreenContext(6000) }
+                // Briefly hide the floating avatar so the captured screenshot does not have the overlay blocking content
+                var screenshotBase64: String? = null
+                val ctxRes = try {
+                    val prevVis = floatingView.visibility
+                    floatingView.visibility = View.INVISIBLE
+                    delay(50)
+                    kotlinx.coroutines.coroutineScope {
+                        val screenshotDef = async(Dispatchers.Default) {
+                            runtime.captureScreenshot(maxEdge = 1080, quality = 80)
+                        }
+                        val textDef = async(Dispatchers.Default) {
+                            runtime.captureScreenContext(6000)
+                        }
+                        screenshotBase64 = screenshotDef.await()
+                        textDef.await()
+                    }
+                } finally {
+                    floatingView.visibility = View.VISIBLE
+                    avatarController.setActivity(AgentState.Thinking)
+                    avatarController.setBubble("正在分析屏幕…")
+                }
+
                 if (!ctxRes.ok || ctxRes.payloadJson == null) {
                     throw IllegalStateException(ctxRes.error?.message ?: "无法读取屏幕内容")
                 }
@@ -706,10 +727,19 @@ class FloatingWindowService : Service() {
                 var remembered = false
                 kotlinx.coroutines.coroutineScope {
                     launch { cues = withContext(Dispatchers.Default) { runtime.magicCue.runCue(screen) } }
-                    launch { remembered = withContext(Dispatchers.Default) { runtime.companionMemory.capture(screen, explicit = true) } }
+                    launch {
+                        remembered = withContext(Dispatchers.Default) {
+                            runtime.companionMemory.capture(
+                                screen = screen,
+                                explicit = true,
+                                coverImage = screenshotBase64,
+                                originalImage = screenshotBase64,
+                            )
+                        }
+                    }
                 }
                 magicCuePending = false
-                ai.axiomaster.bonio.util.AppLogger.i(TAG, "runMagicCue completed: cues=${cues?.size} remembered=$remembered")
+                ai.axiomaster.bonio.util.AppLogger.i(TAG, "runMagicCue completed: cues=${cues?.size} remembered=$remembered hasScreenshot=${!screenshotBase64.isNullOrEmpty()}")
                 when {
                     !cues.isNullOrEmpty() -> showCues(cues!!)
                     remembered -> {
@@ -1067,11 +1097,14 @@ class FloatingWindowService : Service() {
                 avatarController.clearBubble()
             }
 
-            val capturer = runtime.screenCaptureManager
-            val payload = capturer.capture(null)
-
-            val payloadObj = jsonLenient.parseToJsonElement(payload.payloadJson) as? JsonObject
-            val base64 = payloadObj?.get("base64")?.jsonPrimitive?.content ?: ""
+            val base64 = runtime.captureScreenshot(maxEdge = 1080, quality = 80)
+                ?: run {
+                    val capturer = runtime.screenCaptureManager
+                    val payload = capturer.capture(null)
+                    val payloadObj = jsonLenient.parseToJsonElement(payload.payloadJson) as? JsonObject
+                    payloadObj?.get("base64")?.jsonPrimitive?.content ?: ""
+                }
+            if (base64.isBlank()) throw IllegalStateException("Screenshot unavailable")
 
             val message = if (userText.isNotBlank()) userText else "Please summarize what's on the screen"
             val attachment = OutgoingAttachment(
@@ -1130,11 +1163,14 @@ class FloatingWindowService : Service() {
         try {
             avatarController.setBubble("Taking screenshot...")
 
-            val capturer = runtime.screenCaptureManager
-            val payload = capturer.capture(null)
-
-            val payloadObj = jsonLenient.parseToJsonElement(payload.payloadJson) as? JsonObject
-            val base64 = payloadObj?.get("base64")?.jsonPrimitive?.content ?: ""
+            val base64 = runtime.captureScreenshot(maxEdge = 1080, quality = 80)
+                ?: run {
+                    val capturer = runtime.screenCaptureManager
+                    val payload = capturer.capture(null)
+                    val payloadObj = jsonLenient.parseToJsonElement(payload.payloadJson) as? JsonObject
+                    payloadObj?.get("base64")?.jsonPrimitive?.content ?: ""
+                }
+            if (base64.isBlank()) throw IllegalStateException("Screenshot unavailable")
 
             avatarController.setBubble("Analyzing screen...")
 
