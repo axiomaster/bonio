@@ -286,6 +286,27 @@ class NodeRuntime(context: Context) {
     ai.axiomaster.bonio.remote.memory.CompanionMemoryController(operatorSession, memoryService)
   }
 
+  private val chargingTriggeredSync: ai.axiomaster.bonio.remote.memory.ChargingTriggeredSync by lazy {
+    ai.axiomaster.bonio.remote.memory.ChargingTriggeredSync(
+      context = appContext,
+      scope = scope,
+      isConnected = { _isConnected.value },
+      sync = { reason, soc, timestamp ->
+        try {
+          operatorSession.request(
+            "memory.incremental_sync",
+            """{"reason":"$reason","soc":$soc,"timestamp":$timestamp}""",
+            timeoutMs = 15_000,
+          )
+          true
+        } catch (e: Throwable) {
+          Log.w("Bonio", "memory.incremental_sync failed: ${e.message}")
+          false
+        }
+      },
+    )
+  }
+
   val serverConfigRepository: ai.axiomaster.bonio.remote.config.ConfigRepository =
     ai.axiomaster.bonio.remote.config.ConfigRepository(operatorSession)
 
@@ -350,6 +371,7 @@ class NodeRuntime(context: Context) {
     operatorSession.connect(endpoint, token, pwd, connectionManager.buildOperatorConnectOptions(), tls)
     nodeSession.connect(endpoint, token, pwd, connectionManager.buildNodeConnectOptions(), tls)
     startDeviceStatusReporting()
+    chargingTriggeredSync.start()
   }
 
   fun localEndpoint(port: Int = prefs.localPort.value): GatewayEndpoint =
@@ -373,6 +395,7 @@ class NodeRuntime(context: Context) {
     connectedEndpoint = null
     operatorSession.disconnect()
     nodeSession.disconnect()
+    chargingTriggeredSync.stop()
   }
 
   private fun startDeviceStatusReporting() {
