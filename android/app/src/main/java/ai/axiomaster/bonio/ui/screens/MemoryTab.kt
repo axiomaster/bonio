@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -44,6 +45,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MemoryTab(
     viewModel: MainViewModel,
@@ -105,30 +107,62 @@ fun MemoryTab(
                     .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedTextField(
+                val searchInteractionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                BasicTextField(
                     value = searchText,
                     onValueChange = { searchText = it },
-                    placeholder = {
-                        Text(
-                            text = strings.searchMemoryPlaceholder,
-                            fontSize = 14.sp,
-                            color = colors.textTertiary
-                        )
-                    },
                     singleLine = true,
-                    shape = RoundedCornerShape(8.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = colors.inputBackground,
-                        unfocusedContainerColor = colors.inputBackground,
-                        disabledContainerColor = colors.inputBackground,
-                        focusedBorderColor = colors.border,
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedTextColor = colors.textPrimary,
-                        unfocusedTextColor = colors.textPrimary
+                    textStyle = androidx.compose.ui.text.TextStyle(
+                        fontSize = 14.sp,
+                        color = colors.textPrimary
                     ),
+                    cursorBrush = androidx.compose.ui.graphics.SolidColor(colors.accent),
+                    interactionSource = searchInteractionSource,
                     modifier = Modifier
                         .weight(1f)
-                        .height(48.dp)
+                        .height(48.dp),
+                    decorationBox = @Composable { innerTextField ->
+                        OutlinedTextFieldDefaults.DecorationBox(
+                            value = searchText,
+                            innerTextField = innerTextField,
+                            enabled = true,
+                            singleLine = true,
+                            visualTransformation = androidx.compose.ui.text.input.VisualTransformation.None,
+                            interactionSource = searchInteractionSource,
+                            placeholder = {
+                                Text(
+                                    text = strings.searchMemoryPlaceholder,
+                                    fontSize = 14.sp,
+                                    color = colors.textTertiary
+                                )
+                            },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = colors.inputBackground,
+                                unfocusedContainerColor = colors.inputBackground,
+                                disabledContainerColor = colors.inputBackground,
+                                focusedBorderColor = colors.border,
+                                unfocusedBorderColor = Color.Transparent,
+                                focusedTextColor = colors.textPrimary,
+                                unfocusedTextColor = colors.textPrimary
+                            ),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                            container = {
+                                OutlinedTextFieldDefaults.Container(
+                                    enabled = true,
+                                    isError = false,
+                                    interactionSource = searchInteractionSource,
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedContainerColor = colors.inputBackground,
+                                        unfocusedContainerColor = colors.inputBackground,
+                                        disabledContainerColor = colors.inputBackground,
+                                        focusedBorderColor = colors.border,
+                                        unfocusedBorderColor = Color.Transparent
+                                    ),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                            }
+                        )
+                    }
                 )
 
                 IconButton(

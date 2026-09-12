@@ -169,6 +169,16 @@ fun ChatTab(
                             "wechat" -> strings.sessionWechat
                             else -> label
                         }
+                        val bgColor by androidx.compose.animation.animateColorAsState(
+                            targetValue = if (active) colors.accent else colors.surfaceVariant,
+                            animationSpec = androidx.compose.animation.core.tween(200),
+                            label = "capsule_bg_$label"
+                        )
+                        val textColor by androidx.compose.animation.animateColorAsState(
+                            targetValue = if (active) Color.White else colors.textPrimary,
+                            animationSpec = androidx.compose.animation.core.tween(200),
+                            label = "capsule_text_$label"
+                        )
                         Surface(
                             onClick = {
                                 when (label) {
@@ -182,12 +192,12 @@ fun ChatTab(
                                 }
                             },
                             shape = RoundedCornerShape(14.dp),
-                            color = if (active) colors.accent else colors.surfaceVariant,
+                            color = bgColor,
                         ) {
                             Text(
                                 text = displayLabel,
                                 fontSize = 13.sp,
-                                color = if (active) Color.White else colors.textPrimary,
+                                color = textColor,
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
                             )
                         }
