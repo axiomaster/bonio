@@ -130,8 +130,8 @@ ProcessBuilder(nativeLibraryDir/libhiclaw.so,
 
 ## 6. 后续里程碑（对应 PRD P1/P2）
 
-1. P1：contacts/calendar/sms 实装（标准 API 替换 Stubs.kt）
-2. P1：无障碍树 dump → screen.context；UiTreeParser 等价
-3. P1：MagicCue / CompanionMemory / MemoryTab 移植
-4. P1：充电触发（ACTION_BATTERY_CHANGED）+ 层级 RAG 域预检
+1. ✅ P1：contacts/calendar/sms 实装（标准 API 替换 Stubs.kt；sms.search/sms.bill 端侧账单解析已入 node.invoke，hiclaw 侧已补齐 sms.send/sms.search/sms.bill/screen.context 工具 schema）
+2. ✅ P1：无障碍树 dump → screen.context（content 扁平文本 + nodes 原始树，供 cue 坐标解析）
+3. ✅ P1：MagicCue / CompanionMemory / MemoryTab 移植（隐藏会话 `system:magic-cue` / `system:companion-memory`，每次运行前 sessions.reset 保持一次性；双击头像并行跑 cue + 伴随记忆，长按保留本地规则建议）
+4. ✅ P1：充电触发（ACTION_BATTERY_CHANGED → memory.incremental_sync，plugged_in / periodic_charging 两档；hiclaw 侧新增同协议 RPC ack）
 5. P2：后台存活适配、隐私合规、皮肤素材、授权引导页
