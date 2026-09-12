@@ -1,0 +1,34 @@
+server/src/agent/agent.cpp
+  s_539b59f41bad53::t_e44a74ba0c1663 146-153
+server/src/net/gateway.cpp
+  s_539b59f41bad53::t_2304882b9d7f30 376-394
+  s_539b59f41bad53::t_51132243643196 834-862
+android/app/src/main/jniLibs/arm64-v8a/libhiclaw.so
+  s_539b59f41bad53::t_c4b3910818b977 2-3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "19e8fa3e97b5f480b3198a91c03422995dcf20c0",
+  "prompts": {},
+  "sessions": {
+    "s_539b59f41bad53": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8f431abe-980e-474d-af47-4ff9172028a6",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 7
+    },
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 36
+    }
+  }
+}
