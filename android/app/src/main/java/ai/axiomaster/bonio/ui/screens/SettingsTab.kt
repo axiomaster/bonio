@@ -1,6 +1,7 @@
 package ai.axiomaster.bonio.ui.screens
 
 import android.Manifest
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -8,6 +9,7 @@ import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.text.TextUtils
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -32,13 +34,38 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import ai.axiomaster.bonio.BuildConfig
 import ai.axiomaster.bonio.MainViewModel
 import ai.axiomaster.bonio.i18n.AppLanguage
 import ai.axiomaster.bonio.i18n.LocalAppStrings
 import ai.axiomaster.bonio.remote.LocationMode
+import ai.axiomaster.bonio.remote.node.BonioAccessibilityService
+import ai.axiomaster.bonio.ui.components.BonioSwitch
 import ai.axiomaster.bonio.ui.theme.LocalAppColors
 import ai.axiomaster.bonio.ui.theme.ThemeMode
+
+private fun isAccessibilityEnabled(context: Context): Boolean {
+    if (BonioAccessibilityService.instance != null) return true
+    val expectedComponentName = ComponentName(context, BonioAccessibilityService::class.java)
+    val enabledServices = Settings.Secure.getString(
+        context.contentResolver,
+        Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+    ) ?: return false
+    val colonSplitter = TextUtils.SimpleStringSplitter(':')
+    colonSplitter.setString(enabledServices)
+    while (colonSplitter.hasNext()) {
+        val componentNameString = colonSplitter.next()
+        val enabledComponent = ComponentName.unflattenFromString(componentNameString)
+        if (enabledComponent != null && (enabledComponent == expectedComponentName ||
+            componentNameString.contains(context.packageName + "/" + BonioAccessibilityService::class.java.canonicalName))) {
+            return true
+        }
+    }
+    return false
+}
 
 @Composable
 fun SettingsTab(
@@ -106,7 +133,23 @@ fun SettingsTab(
             Toast.makeText(context, strings.screenRecordDeniedToast, Toast.LENGTH_SHORT).show()
         }
     }
-    var screenAwarenessEnabled by remember { mutableStateOf(true) }
+
+    var isAccessibilityGranted by remember { mutableStateOf(isAccessibilityEnabled(context)) }
+    var showA11yDialog by remember { mutableStateOf(false) }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                isAccessibilityGranted = isAccessibilityEnabled(context)
+                micPermissionGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     val instanceId by viewModel.instanceId.collectAsState()
     val deviceModel = remember {
@@ -285,8 +328,21 @@ fun SettingsTab(
                     ToggleRow(
                         title = strings.permScreenAwarenessTitle,
                         subtitle = strings.permScreenAwarenessDesc,
-                        isOn = screenAwarenessEnabled,
-                        onToggle = { screenAwarenessEnabled = it }
+                        isOn = isAccessibilityGranted,
+                        onToggle = { enable ->
+                            if (enable || !isAccessibilityGranted) {
+                                showA11yDialog = true
+                            } else {
+                                try {
+                                    val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                    }
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, strings.a11yServicePromptToast, Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
                     )
                 }
             }
@@ -329,10 +385,10 @@ fun SettingsTab(
                             }
                         ) {
                             Text(
-                                text = if (instanceId.length > 16) instanceId.take(16) + "..." else instanceId,
+                                text = if (instanceId.length > 12) "${instanceId.take(8)}..." else instanceId,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = colors.textPrimary
+                                color = colors.accent
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Icon(
@@ -346,6 +402,71 @@ fun SettingsTab(
                 }
             }
         }
+    }
+
+    if (showA11yDialog) {
+        AlertDialog(
+            onDismissRequest = { showA11yDialog = false },
+            containerColor = colors.cardBackground,
+            title = {
+                Text(
+                    text = strings.a11yDialogTitle,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.textPrimary
+                )
+            },
+            text = {
+                Text(
+                    text = strings.a11yDialogDesc,
+                    fontSize = 14.sp,
+                    color = colors.textSecondary,
+                    lineHeight = 20.sp
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showA11yDialog = false
+                        try {
+                            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                            }
+                            context.startActivity(intent)
+                            Toast.makeText(context, strings.a11yServicePromptToast, Toast.LENGTH_LONG).show()
+                        } catch (e: Exception) {
+                            // ignore
+                        }
+                    }
+                ) {
+                    Text(strings.a11yDialogGoSettings, color = colors.accent, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(
+                        onClick = {
+                            showA11yDialog = false
+                            try {
+                                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                    data = Uri.parse("package:${context.packageName}")
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                }
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                // ignore
+                            }
+                        }
+                    ) {
+                        Text(strings.a11yDialogAppInfo, color = colors.textSecondary)
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    TextButton(onClick = { showA11yDialog = false }) {
+                        Text(strings.a11yDialogCancel, color = colors.textTertiary)
+                    }
+                }
+            }
+        )
     }
 }
 
@@ -441,19 +562,13 @@ private fun ToggleRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Column(modifier = Modifier.weight(1f)) {
+        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
             Text(title, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
             Text(subtitle, fontSize = 12.sp, color = colors.textSecondary, modifier = Modifier.padding(top = 2.dp))
         }
-        Switch(
+        BonioSwitch(
             checked = isOn,
-            onCheckedChange = onToggle,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = colors.accent,
-                uncheckedThumbColor = colors.surfaceVariant,
-                uncheckedTrackColor = colors.border
-            )
+            onCheckedChange = onToggle
         )
     }
 }

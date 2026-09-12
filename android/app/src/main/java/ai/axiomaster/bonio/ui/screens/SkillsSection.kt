@@ -2,6 +2,7 @@ package ai.axiomaster.bonio.ui.screens
 
 import ai.axiomaster.bonio.MainViewModel
 import ai.axiomaster.bonio.remote.skills.SkillInfo
+import ai.axiomaster.bonio.ui.components.BonioSwitch
 import ai.axiomaster.bonio.ui.screens.chat.*
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
@@ -218,10 +219,9 @@ fun SkillCard(
                     }
                     Spacer(Modifier.width(4.dp))
                 }
-                Switch(
+                BonioSwitch(
                     checked = skill.enabled,
-                    onCheckedChange = { onToggle() },
-                    colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = mobileAccent, uncheckedThumbColor = Color.White, uncheckedTrackColor = mobileSurfaceStrong),
+                    onCheckedChange = { onToggle() }
                 )
             }
             if (expanded && skill.description.isNotBlank()) {

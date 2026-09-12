@@ -21,6 +21,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.provider.Settings
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -81,6 +82,26 @@ class FloatingWindowService : Service() {
     private var magicCuePending = false
     private var actionableCues: List<ai.axiomaster.bonio.remote.cue.MagicCue> = emptyList()
     private var cueEpoch = 0
+    private var pendingAccessibilityPrompt = false
+
+    private fun openAccessibilitySettings() {
+        pendingAccessibilityPrompt = false
+        avatarController.clearBubble()
+        avatarController.setActivity(AgentState.Idle)
+        try {
+            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            startActivity(intent)
+            android.widget.Toast.makeText(
+                applicationContext,
+                "请在已安装的应用中找到 Bonio 并开启无障碍服务",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to open accessibility settings", e)
+        }
+    }
 
     private var currentAssetPath: String? = null
     private var isPlayingTransition = false
@@ -184,7 +205,13 @@ class FloatingWindowService : Service() {
         textBubble = floatingView.findViewById(R.id.text_bubble)
         textBubbleScroll = floatingView.findViewById(R.id.text_bubble_scroll)
         bubbleContainer.setOnClickListener {
-            if (actionableCues.isNotEmpty()) applyMagicCue() else sendActionableSuggestion()
+            if (pendingAccessibilityPrompt) {
+                openAccessibilitySettings()
+            } else if (actionableCues.isNotEmpty()) {
+                applyMagicCue()
+            } else {
+                sendActionableSuggestion()
+            }
         }
 
         val savedX = prefs.getInt(KEY_POS_X, 0)
@@ -573,19 +600,23 @@ class FloatingWindowService : Service() {
                                 runMagicCue()
                             } else {
                                 lastTapAt = now
-                                pixelAvatarView.setVisualState("wave")
-                                val skin = pixelAvatarView.getSkin()
-                                val greeting = when (skin) {
-                                    "kun" -> "你干嘛~哎哟"
-                                    "mario" -> "Here we go!"
-                                    "messi" -> "Vamos!"
-                                    else -> "喵~ 休息中~ 有事叫我"
+                                if (pendingAccessibilityPrompt) {
+                                    openAccessibilitySettings()
+                                } else {
+                                    pixelAvatarView.setVisualState("wave")
+                                    val skin = pixelAvatarView.getSkin()
+                                    val greeting = when (skin) {
+                                        "kun" -> "你干嘛~哎哟"
+                                        "mario" -> "Here we go!"
+                                        "messi" -> "Vamos!"
+                                        else -> "喵~ 休息中~ 有事叫我"
+                                    }
+                                    avatarController.setBubble(greeting)
+                                    mainHandler.postDelayed({
+                                        avatarController.clearBubble()
+                                        updateAnimation(avatarController.avatarState.value)
+                                    }, 2400)
                                 }
-                                avatarController.setBubble(greeting)
-                                mainHandler.postDelayed({
-                                    avatarController.clearBubble()
-                                    updateAnimation(avatarController.avatarState.value)
-                                }, 2400)
                             }
                         }
                         return true
@@ -684,6 +715,22 @@ class FloatingWindowService : Service() {
             mainHandler.postDelayed({ avatarController.clearBubble(); avatarController.setActivity(AgentState.Idle) }, 2000)
             return
         }
+
+        val a11y = ai.axiomaster.bonio.remote.node.BonioAccessibilityService.instance
+        if (a11y == null) {
+            avatarController.setActivity(AgentState.Confused)
+            avatarController.setBubble("未开启无障碍服务\n点我前往系统设置")
+            pendingAccessibilityPrompt = true
+            mainHandler.postDelayed({
+                if (pendingAccessibilityPrompt) {
+                    pendingAccessibilityPrompt = false
+                    avatarController.clearBubble()
+                    avatarController.setActivity(AgentState.Idle)
+                }
+            }, 6000)
+            return
+        }
+
         magicCuePending = true
         actionableCues = emptyList()
         cueEpoch += 1

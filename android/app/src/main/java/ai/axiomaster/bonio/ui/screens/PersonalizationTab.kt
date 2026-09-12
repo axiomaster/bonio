@@ -37,6 +37,7 @@ import ai.axiomaster.bonio.avatar.SkinItem
 import ai.axiomaster.bonio.i18n.LocalAppStrings
 import ai.axiomaster.bonio.remote.config.ModelConfig
 import ai.axiomaster.bonio.remote.skills.SkillInfo
+import ai.axiomaster.bonio.ui.components.BonioSwitch
 import ai.axiomaster.bonio.ui.screens.chat.*
 import ai.axiomaster.bonio.ui.theme.LocalAppColors
 
@@ -573,15 +574,9 @@ private fun SkillRow(
                 }
             }
 
-            Switch(
+            BonioSwitch(
                 checked = skill.enabled,
-                onCheckedChange = onToggle,
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = Color.White,
-                    checkedTrackColor = colors.accent,
-                    uncheckedThumbColor = colors.surfaceVariant,
-                    uncheckedTrackColor = colors.border
-                )
+                onCheckedChange = onToggle
             )
         }
     }
@@ -600,19 +595,13 @@ private fun DataPermissionRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Column(modifier = Modifier.weight(1f)) {
+        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
             Text(title, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
             Text(subtitle, fontSize = 12.sp, color = colors.textSecondary, modifier = Modifier.padding(top = 2.dp))
         }
-        Switch(
+        BonioSwitch(
             checked = isOn,
-            onCheckedChange = onToggle,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = colors.accent,
-                uncheckedThumbColor = colors.surfaceVariant,
-                uncheckedTrackColor = colors.border
-            )
+            onCheckedChange = onToggle
         )
     }
 }
