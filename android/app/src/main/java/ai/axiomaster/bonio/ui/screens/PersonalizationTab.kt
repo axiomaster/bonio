@@ -17,6 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -37,6 +38,7 @@ import ai.axiomaster.bonio.i18n.LocalAppStrings
 import ai.axiomaster.bonio.remote.config.ModelConfig
 import ai.axiomaster.bonio.remote.skills.SkillInfo
 import ai.axiomaster.bonio.ui.screens.chat.*
+import ai.axiomaster.bonio.ui.theme.LocalAppColors
 
 @Composable
 fun PersonalizationTab(
@@ -45,6 +47,7 @@ fun PersonalizationTab(
 ) {
     val context = LocalContext.current
     val strings = LocalAppStrings.current
+    val colors = LocalAppColors.current
     val isConnected by viewModel.isConnected.collectAsState()
     val currentSkin by viewModel.avatarSkin.collectAsState()
     val serverConfig by viewModel.serverConfig.collectAsState()
@@ -118,7 +121,7 @@ fun PersonalizationTab(
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFFAFAFA))
+            .background(colors.background)
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
         contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp)
@@ -129,8 +132,8 @@ fun PersonalizationTab(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
-                color = Color.White,
-                border = BorderStroke(1.dp, Color(0xFFE5E6EB))
+                color = colors.cardBackground,
+                border = BorderStroke(1.dp, colors.border)
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Column {
@@ -138,13 +141,13 @@ fun PersonalizationTab(
                             text = "当前皮肤",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Medium,
-                            color = Color(0xFF1D2129)
+                            color = colors.textPrimary
                         )
                         val activeSkinItem = CustomSkinManager.getSkinById(currentSkin)
                         Text(
                             text = activeSkinItem.subtitle,
                             fontSize = 12.sp,
-                            color = Color(0xFF86909C),
+                            color = colors.textSecondary,
                             modifier = Modifier.padding(top = 3.dp)
                         )
                     }
@@ -162,10 +165,10 @@ fun PersonalizationTab(
                                 onClick = { viewModel.setAvatarSkin(skin.id) },
                                 modifier = Modifier.width(115.dp),
                                 shape = RoundedCornerShape(10.dp),
-                                color = if (isSelected) Color(0xFFE8F0FE) else Color(0xFFF7F8FA),
+                                color = if (isSelected) (if (colors.isDark) Color(0xFF1E2D4A) else Color(0xFFE8F0FE)) else colors.surfaceVariant,
                                 border = BorderStroke(
                                     1.5.dp,
-                                    if (isSelected) Color(0xFF0A59F7) else Color.Transparent
+                                    if (isSelected) colors.accent else Color.Transparent
                                 )
                             ) {
                                 Column(
@@ -176,12 +179,12 @@ fun PersonalizationTab(
                                         text = skin.name.substringBefore(" "),
                                         fontSize = 13.sp,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (isSelected) Color(0xFF0A59F7) else Color(0xFF1D2129)
+                                        color = if (isSelected) colors.accent else colors.textPrimary
                                     )
                                     Text(
                                         text = skin.subtitle,
                                         fontSize = 10.sp,
-                                        color = Color(0xFF86909C),
+                                        color = colors.textSecondary,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -199,8 +202,8 @@ fun PersonalizationTab(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
-                color = Color.White,
-                border = BorderStroke(1.dp, Color(0xFFE5E6EB))
+                color = colors.cardBackground,
+                border = BorderStroke(1.dp, colors.border)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     val defaultModel = serverConfig?.defaultModel ?: "glm-4.7"
@@ -218,12 +221,12 @@ fun PersonalizationTab(
                                 text = "默认大模型",
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = Color(0xFF333333)
+                                color = colors.textPrimary
                             )
                             Text(
                                 text = "当前智能体使用的模型",
                                 fontSize = 12.sp,
-                                color = Color(0xFF999999),
+                                color = colors.textSecondary,
                                 modifier = Modifier.padding(top = 3.dp)
                             )
                         }
@@ -232,27 +235,42 @@ fun PersonalizationTab(
                             Surface(
                                 onClick = { modelDropdownExpanded = true },
                                 shape = RoundedCornerShape(8.dp),
-                                color = Color(0xFFF5F5F5)
+                                color = colors.surfaceVariant,
+                                border = BorderStroke(1.dp, colors.border)
                             ) {
-                                Text(
-                                    text = defaultModel,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Color(0xFF333333),
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                ) {
+                                    Text(
+                                        text = defaultModel,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = colors.textPrimary
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowDropDown,
+                                        contentDescription = "Select model",
+                                        tint = colors.textSecondary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
                             DropdownMenu(
                                 expanded = modelDropdownExpanded,
-                                onDismissRequest = { modelDropdownExpanded = false }
+                                onDismissRequest = { modelDropdownExpanded = false },
+                                containerColor = colors.dropdownContainer,
+                                border = BorderStroke(1.dp, colors.border)
                             ) {
                                 allModelIds.forEach { mid ->
+                                    val isSelected = mid == defaultModel
                                     DropdownMenuItem(
                                         text = {
                                             Text(
                                                 mid,
-                                                fontWeight = if (mid == defaultModel) FontWeight.Bold else FontWeight.Normal,
-                                                color = if (mid == defaultModel) Color(0xFF0A59F7) else Color(0xFF333333)
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (isSelected) colors.accent else colors.dropdownItemText
                                             )
                                         },
                                         onClick = {
@@ -350,8 +368,8 @@ fun PersonalizationTab(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
-                color = Color.White,
-                border = BorderStroke(1.dp, Color(0xFFE5E6EB))
+                color = colors.cardBackground,
+                border = BorderStroke(1.dp, colors.border)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -359,11 +377,11 @@ fun PersonalizationTab(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("微信 iLink", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Color(0xFF333333))
+                        Text("微信 iLink", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
                         Text(
                             strings.wechatScanQrCode,
                             fontSize = 12.sp,
-                            color = Color(0xFF999999),
+                            color = colors.textSecondary,
                             modifier = Modifier.padding(top = 3.dp)
                         )
                     }
@@ -389,11 +407,11 @@ fun PersonalizationTab(
                 Text(
                     text = "${strings.skillsSection} (${skills.size})",
                     fontSize = 13.sp,
-                    color = Color(0xFF0A59F7),
+                    color = colors.accent,
                     fontWeight = FontWeight.Medium
                 )
                 IconButton(onClick = { viewModel.refreshSkills() }, enabled = isConnected && !skillsLoading) {
-                    Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = Color(0xFF0A59F7), modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = colors.accent, modifier = Modifier.size(20.dp))
                 }
             }
         }
@@ -403,13 +421,13 @@ fun PersonalizationTab(
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),
-                    color = Color.White,
-                    border = BorderStroke(1.dp, Color(0xFFE5E6EB))
+                    color = colors.cardBackground,
+                    border = BorderStroke(1.dp, colors.border)
                 ) {
                     Text(
                         text = if (isConnected) (if (strings == ai.axiomaster.bonio.i18n.AppStrings.ZH) "未安装第三方技能" else "No third-party skills installed") else (if (strings == ai.axiomaster.bonio.i18n.AppStrings.ZH) "连接后端后查看技能列表" else "Connect gateway to view skills"),
                         fontSize = 13.sp,
-                        color = Color(0xFF999999),
+                        color = colors.textSecondary,
                         modifier = Modifier.padding(20.dp)
                     )
                 }
@@ -426,8 +444,8 @@ fun PersonalizationTab(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
-                color = Color.White,
-                border = BorderStroke(1.dp, Color(0xFFE5E6EB))
+                color = colors.cardBackground,
+                border = BorderStroke(1.dp, colors.border)
             ) {
                 Column {
                     DataPermissionRow(
@@ -439,7 +457,7 @@ fun PersonalizationTab(
                             else contactsGranted = false
                         }
                     )
-                    HorizontalDivider(color = Color(0xFFF2F3F5), thickness = 0.5.dp)
+                    HorizontalDivider(color = colors.divider, thickness = 0.5.dp)
                     DataPermissionRow(
                         title = "短信",
                         subtitle = "允许智能体读取和检索短信内容",
@@ -449,14 +467,14 @@ fun PersonalizationTab(
                             else smsGranted = false
                         }
                     )
-                    HorizontalDivider(color = Color(0xFFF2F3F5), thickness = 0.5.dp)
+                    HorizontalDivider(color = colors.divider, thickness = 0.5.dp)
                     DataPermissionRow(
                         title = "通知",
                         subtitle = "允许智能体感知各应用即时通知",
                         isOn = notificationEnabled,
                         onToggle = { notificationEnabled = it }
                     )
-                    HorizontalDivider(color = Color(0xFFF2F3F5), thickness = 0.5.dp)
+                    HorizontalDivider(color = colors.divider, thickness = 0.5.dp)
                     DataPermissionRow(
                         title = "日历",
                         subtitle = "允许智能体读取日程与日历",
@@ -466,14 +484,14 @@ fun PersonalizationTab(
                             else calendarGranted = false
                         }
                     )
-                    HorizontalDivider(color = Color(0xFFF2F3F5), thickness = 0.5.dp)
+                    HorizontalDivider(color = colors.divider, thickness = 0.5.dp)
                     DataPermissionRow(
                         title = "备忘录",
                         subtitle = "允许智能体读取和记录便签备忘",
                         isOn = memoEnabled,
                         onToggle = { memoEnabled = it }
                     )
-                    HorizontalDivider(color = Color(0xFFF2F3F5), thickness = 0.5.dp)
+                    HorizontalDivider(color = colors.divider, thickness = 0.5.dp)
                     DataPermissionRow(
                         title = "图库",
                         subtitle = "允许智能体读取相册与图片媒体",
@@ -483,7 +501,7 @@ fun PersonalizationTab(
                             else photosGranted = false
                         }
                     )
-                    HorizontalDivider(color = Color(0xFFF2F3F5), thickness = 0.5.dp)
+                    HorizontalDivider(color = colors.divider, thickness = 0.5.dp)
                     DataPermissionRow(
                         title = "文管",
                         subtitle = "允许智能体访问文档与本地文件",
@@ -498,11 +516,12 @@ fun PersonalizationTab(
 
 @Composable
 private fun SectionHeader(title: String) {
+    val colors = LocalAppColors.current
     Text(
         text = title,
         fontSize = 13.sp,
         fontWeight = FontWeight.Medium,
-        color = Color(0xFF0A59F7),
+        color = colors.accent,
         modifier = Modifier.padding(top = 10.dp, bottom = 4.dp)
     )
 }
@@ -512,11 +531,12 @@ private fun SkillRow(
     skill: SkillInfo,
     onToggle: (Boolean) -> Unit
 ) {
+    val colors = LocalAppColors.current
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        color = Color.White,
-        border = BorderStroke(1.dp, Color(0xFFE5E6EB))
+        color = colors.cardBackground,
+        border = BorderStroke(1.dp, colors.border)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
@@ -525,17 +545,17 @@ private fun SkillRow(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(skill.name, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Color(0xFF333333))
+                    Text(skill.name, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
                     if (skill.builtin) {
                         Surface(
                             shape = RoundedCornerShape(4.dp),
-                            color = Color(0xFFE8F0FE),
+                            color = if (colors.isDark) Color(0xFF1E2D4A) else Color(0xFFE8F0FE),
                             modifier = Modifier.padding(start = 8.dp)
                         ) {
                             Text(
                                 text = "内置",
                                 fontSize = 10.sp,
-                                color = Color(0xFF0A59F7),
+                                color = colors.accent,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
@@ -545,7 +565,7 @@ private fun SkillRow(
                     Text(
                         text = skill.description,
                         fontSize = 12.sp,
-                        color = Color(0xFF999999),
+                        color = colors.textSecondary,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(top = 3.dp)
@@ -556,7 +576,12 @@ private fun SkillRow(
             Switch(
                 checked = skill.enabled,
                 onCheckedChange = onToggle,
-                colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Color(0xFF0A59F7))
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = colors.accent,
+                    uncheckedThumbColor = colors.surfaceVariant,
+                    uncheckedTrackColor = colors.border
+                )
             )
         }
     }
@@ -569,19 +594,25 @@ private fun DataPermissionRow(
     isOn: Boolean,
     onToggle: (Boolean) -> Unit
 ) {
+    val colors = LocalAppColors.current
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Color(0xFF333333))
-            Text(subtitle, fontSize = 12.sp, color = Color(0xFF999999), modifier = Modifier.padding(top = 2.dp))
+            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
+            Text(subtitle, fontSize = 12.sp, color = colors.textSecondary, modifier = Modifier.padding(top = 2.dp))
         }
         Switch(
             checked = isOn,
             onCheckedChange = onToggle,
-            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Color(0xFF0A59F7))
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = colors.accent,
+                uncheckedThumbColor = colors.surfaceVariant,
+                uncheckedTrackColor = colors.border
+            )
         )
     }
 }

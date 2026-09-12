@@ -74,6 +74,10 @@ data class AppStrings(
 
     // Settings Tab
     val settingsTitle: String,
+    val themeSection: String,
+    val themeSystem: String,
+    val themeLight: String,
+    val themeDark: String,
     val languageSection: String,
     val languageChinese: String,
     val languageEnglish: String,
@@ -155,6 +159,10 @@ data class AppStrings(
             permissionsSection = "系统权限",
 
             settingsTitle = "设置",
+            themeSection = "深色模式与主题",
+            themeSystem = "跟随系统",
+            themeLight = "浅色模式",
+            themeDark = "深色模式",
             languageSection = "语言设置",
             languageChinese = "简体中文",
             languageEnglish = "English",
@@ -236,6 +244,10 @@ data class AppStrings(
             permissionsSection = "Permissions",
 
             settingsTitle = "Settings",
+            themeSection = "Appearance & Dark Mode",
+            themeSystem = "Follow System",
+            themeLight = "Light Mode",
+            themeDark = "Dark Mode",
             languageSection = "Language",
             languageChinese = "简体中文",
             languageEnglish = "English",

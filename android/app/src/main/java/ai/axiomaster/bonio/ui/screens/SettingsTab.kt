@@ -37,6 +37,8 @@ import ai.axiomaster.bonio.MainViewModel
 import ai.axiomaster.bonio.i18n.AppLanguage
 import ai.axiomaster.bonio.i18n.LocalAppStrings
 import ai.axiomaster.bonio.remote.LocationMode
+import ai.axiomaster.bonio.ui.theme.LocalAppColors
+import ai.axiomaster.bonio.ui.theme.ThemeMode
 
 @Composable
 fun SettingsTab(
@@ -45,7 +47,11 @@ fun SettingsTab(
 ) {
     val context = LocalContext.current
     val strings = LocalAppStrings.current
+    val colors = LocalAppColors.current
     val clipboardManager = LocalClipboardManager.current
+
+    // App Theme state
+    val currentThemeMode by viewModel.themeMode.collectAsState()
 
     // App Language state
     val currentLanguage by viewModel.appLanguage.collectAsState()
@@ -113,19 +119,50 @@ fun SettingsTab(
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFFAFAFA))
+            .background(colors.background)
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp)
     ) {
-        // ── 1. Language Setting Section ──
+        // ── 1. Theme Setting Section ──
+        item { SectionHeader(title = strings.themeSection) }
+        item {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                color = colors.cardBackground,
+                border = BorderStroke(1.dp, colors.border)
+            ) {
+                Column {
+                    ThemeOptionRow(
+                        title = strings.themeSystem,
+                        isSelected = currentThemeMode == ThemeMode.SYSTEM,
+                        onClick = { viewModel.setThemeMode(ThemeMode.SYSTEM) }
+                    )
+                    HorizontalDivider(color = colors.divider, thickness = 0.5.dp)
+                    ThemeOptionRow(
+                        title = strings.themeLight,
+                        isSelected = currentThemeMode == ThemeMode.LIGHT,
+                        onClick = { viewModel.setThemeMode(ThemeMode.LIGHT) }
+                    )
+                    HorizontalDivider(color = colors.divider, thickness = 0.5.dp)
+                    ThemeOptionRow(
+                        title = strings.themeDark,
+                        isSelected = currentThemeMode == ThemeMode.DARK,
+                        onClick = { viewModel.setThemeMode(ThemeMode.DARK) }
+                    )
+                }
+            }
+        }
+
+        // ── 2. Language Setting Section ──
         item { SectionHeader(title = strings.languageSection) }
         item {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
-                color = Color.White,
-                border = BorderStroke(1.dp, Color(0xFFE5E6EB))
+                color = colors.cardBackground,
+                border = BorderStroke(1.dp, colors.border)
             ) {
                 Column {
                     LanguageOptionRow(
@@ -133,7 +170,7 @@ fun SettingsTab(
                         isSelected = currentLanguage == AppLanguage.ZH,
                         onClick = { viewModel.setAppLanguage(AppLanguage.ZH) }
                     )
-                    HorizontalDivider(color = Color(0xFFF2F3F5), thickness = 0.5.dp)
+                    HorizontalDivider(color = colors.divider, thickness = 0.5.dp)
                     LanguageOptionRow(
                         title = strings.languageEnglish,
                         isSelected = currentLanguage == AppLanguage.EN,
@@ -143,14 +180,14 @@ fun SettingsTab(
             }
         }
 
-        // ── 2. Voice & Audio Section ──
+        // ── 3. Voice & Audio Section ──
         item { SectionHeader(title = strings.voiceSettingsSection) }
         item {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
-                color = Color.White,
-                border = BorderStroke(1.dp, Color(0xFFE5E6EB))
+                color = colors.cardBackground,
+                border = BorderStroke(1.dp, colors.border)
             ) {
                 ToggleRow(
                     title = strings.ttsSettingTitle,
@@ -161,14 +198,14 @@ fun SettingsTab(
             }
         }
 
-        // ── 3. Floating Window Section ──
+        // ── 4. Floating Window Section ──
         item { SectionHeader(title = if (currentLanguage == AppLanguage.ZH) "悬浮窗口" else "Floating Window") }
         item {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
-                color = Color.White,
-                border = BorderStroke(1.dp, Color(0xFFE5E6EB))
+                color = colors.cardBackground,
+                border = BorderStroke(1.dp, colors.border)
             ) {
                 ToggleRow(
                     title = if (currentLanguage == AppLanguage.ZH) "启用桌面宠物悬浮窗" else "Enable Avatar Overlay",
@@ -186,14 +223,14 @@ fun SettingsTab(
             }
         }
 
-        // ── 4. System Permissions Section ──
+        // ── 5. System Permissions Section ──
         item { SectionHeader(title = strings.permissionsSection) }
         item {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
-                color = Color.White,
-                border = BorderStroke(1.dp, Color(0xFFE5E6EB))
+                color = colors.cardBackground,
+                border = BorderStroke(1.dp, colors.border)
             ) {
                 Column {
                     ToggleRow(
@@ -210,7 +247,7 @@ fun SettingsTab(
                             }
                         }
                     )
-                    HorizontalDivider(color = Color(0xFFF2F3F5), thickness = 0.5.dp)
+                    HorizontalDivider(color = colors.divider, thickness = 0.5.dp)
                     ToggleRow(
                         title = strings.permMicTitle,
                         subtitle = strings.permMicDesc,
@@ -220,7 +257,7 @@ fun SettingsTab(
                             else micPermissionGranted = false
                         }
                     )
-                    HorizontalDivider(color = Color(0xFFF2F3F5), thickness = 0.5.dp)
+                    HorizontalDivider(color = colors.divider, thickness = 0.5.dp)
                     ToggleRow(
                         title = strings.permCameraTitle,
                         subtitle = strings.permCameraDesc,
@@ -230,7 +267,7 @@ fun SettingsTab(
                             else viewModel.setCameraEnabled(false)
                         }
                     )
-                    HorizontalDivider(color = Color(0xFFF2F3F5), thickness = 0.5.dp)
+                    HorizontalDivider(color = colors.divider, thickness = 0.5.dp)
                     ToggleRow(
                         title = strings.permScreenRecordTitle,
                         subtitle = strings.permScreenRecordDesc,
@@ -244,7 +281,7 @@ fun SettingsTab(
                             }
                         }
                     )
-                    HorizontalDivider(color = Color(0xFFF2F3F5), thickness = 0.5.dp)
+                    HorizontalDivider(color = colors.divider, thickness = 0.5.dp)
                     ToggleRow(
                         title = strings.permScreenAwarenessTitle,
                         subtitle = strings.permScreenAwarenessDesc,
@@ -255,14 +292,14 @@ fun SettingsTab(
             }
         }
 
-        // ── 5. About & Device Information Section ──
+        // ── 6. About & Device Information Section ──
         item { SectionHeader(title = strings.aboutSection) }
         item {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
-                color = Color.White,
-                border = BorderStroke(1.dp, Color(0xFFE5E6EB))
+                color = colors.cardBackground,
+                border = BorderStroke(1.dp, colors.border)
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     InfoRow(
@@ -283,7 +320,7 @@ fun SettingsTab(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(strings.deviceId, fontSize = 13.sp, color = Color(0xFF999999))
+                        Text(strings.deviceId, fontSize = 13.sp, color = colors.textSecondary)
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.clickable {
@@ -295,13 +332,13 @@ fun SettingsTab(
                                 text = if (instanceId.length > 16) instanceId.take(16) + "..." else instanceId,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = Color(0xFF333333)
+                                color = colors.textPrimary
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Icon(
                                 imageVector = Icons.Default.ContentCopy,
                                 contentDescription = "Copy",
-                                tint = Color(0xFF0A59F7),
+                                tint = colors.accent,
                                 modifier = Modifier.size(14.dp)
                             )
                         }
@@ -313,11 +350,12 @@ fun SettingsTab(
 }
 
 @Composable
-private fun LanguageOptionRow(
+private fun ThemeOptionRow(
     title: String,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
+    val colors = LocalAppColors.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -330,13 +368,45 @@ private fun LanguageOptionRow(
             text = title,
             fontSize = 15.sp,
             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (isSelected) Color(0xFF0A59F7) else Color(0xFF333333)
+            color = if (isSelected) colors.accent else colors.textPrimary
         )
         if (isSelected) {
             Icon(
                 imageVector = Icons.Default.Check,
                 contentDescription = "Selected",
-                tint = Color(0xFF0A59F7),
+                tint = colors.accent,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun LanguageOptionRow(
+    title: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val colors = LocalAppColors.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = title,
+            fontSize = 15.sp,
+            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (isSelected) colors.accent else colors.textPrimary
+        )
+        if (isSelected) {
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = "Selected",
+                tint = colors.accent,
                 modifier = Modifier.size(18.dp)
             )
         }
@@ -345,11 +415,12 @@ private fun LanguageOptionRow(
 
 @Composable
 private fun SectionHeader(title: String) {
+    val colors = LocalAppColors.current
     Text(
         text = title,
         fontSize = 13.sp,
         fontWeight = FontWeight.Medium,
-        color = Color(0xFF0A59F7),
+        color = colors.accent,
         modifier = Modifier.padding(top = 10.dp, bottom = 4.dp)
     )
 }
@@ -361,6 +432,7 @@ private fun ToggleRow(
     isOn: Boolean,
     onToggle: (Boolean) -> Unit
 ) {
+    val colors = LocalAppColors.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -370,13 +442,18 @@ private fun ToggleRow(
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Color(0xFF333333))
-            Text(subtitle, fontSize = 12.sp, color = Color(0xFF999999), modifier = Modifier.padding(top = 2.dp))
+            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
+            Text(subtitle, fontSize = 12.sp, color = colors.textSecondary, modifier = Modifier.padding(top = 2.dp))
         }
         Switch(
             checked = isOn,
             onCheckedChange = onToggle,
-            colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Color(0xFF0A59F7))
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = colors.accent,
+                uncheckedThumbColor = colors.surfaceVariant,
+                uncheckedTrackColor = colors.border
+            )
         )
     }
 }
@@ -385,14 +462,15 @@ private fun ToggleRow(
 private fun InfoRow(
     label: String,
     value: String,
-    valueColor: Color = Color(0xFF333333)
+    valueColor: Color? = null
 ) {
+    val colors = LocalAppColors.current
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, fontSize = 13.sp, color = Color(0xFF999999))
-        Text(value, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = valueColor)
+        Text(label, fontSize = 13.sp, color = colors.textSecondary)
+        Text(value, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = valueColor ?: colors.textPrimary)
     }
 }

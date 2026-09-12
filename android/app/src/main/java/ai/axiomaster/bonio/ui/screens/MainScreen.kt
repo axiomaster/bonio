@@ -1,5 +1,7 @@
 package ai.axiomaster.bonio.ui.screens
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,6 +17,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.runtime.Composable
@@ -35,6 +38,7 @@ import androidx.navigation.compose.rememberNavController
 import ai.axiomaster.bonio.MainViewModel
 import ai.axiomaster.bonio.i18n.AppStrings
 import ai.axiomaster.bonio.i18n.LocalAppStrings
+import ai.axiomaster.bonio.ui.theme.LocalAppColors
 
 sealed class Screen(val route: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     object Chat : Screen("chat", Icons.Default.ChatBubble)
@@ -57,6 +61,7 @@ fun MainScreen(
 ) {
     val currentLanguage by viewModel.appLanguage.collectAsState()
     val strings = remember(currentLanguage) { AppStrings.forLanguage(currentLanguage) }
+    val colors = LocalAppColors.current
 
     CompositionLocalProvider(LocalAppStrings provides strings) {
         val navController = rememberNavController()
@@ -75,6 +80,7 @@ fun MainScreen(
 
         Scaffold(
             modifier = modifier.fillMaxSize(),
+            containerColor = colors.background,
             topBar = {
                 TabRow(
                     selectedTabIndex = selectedIndex,
@@ -82,8 +88,8 @@ fun MainScreen(
                         .windowInsetsPadding(WindowInsets.statusBars)
                         .fillMaxWidth()
                         .height(48.dp),
-                    containerColor = Color(0xFFF8F8F8),
-                    contentColor = Color(0xFF0A59F7),
+                    containerColor = colors.surface,
+                    contentColor = colors.accent,
                     indicator = {},
                     divider = {}
                 ) {
@@ -98,15 +104,17 @@ fun MainScreen(
                         Tab(
                             selected = isSelected,
                             onClick = {
-                                if (screen == Screen.Memory) {
-                                    viewModel.memoryRepository.refresh()
-                                }
-                                navController.navigate(screen.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
+                                if (!isSelected) {
+                                    if (screen == Screen.Memory) {
+                                        viewModel.memoryRepository.refresh()
                                     }
-                                    launchSingleTop = true
-                                    restoreState = true
+                                    navController.navigate(screen.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
                                 }
                             },
                             icon = {
@@ -114,7 +122,7 @@ fun MainScreen(
                                     screen.icon,
                                     contentDescription = title,
                                     modifier = Modifier.size(22.dp),
-                                    tint = if (isSelected) Color(0xFF0A59F7) else Color(0xFF999999)
+                                    tint = if (isSelected) colors.accent else colors.textTertiary
                                 )
                             }
                         )
@@ -122,15 +130,25 @@ fun MainScreen(
                 }
             }
         ) { innerPadding ->
-            NavHost(
-                navController = navController,
-                startDestination = Screen.Chat.route,
-                modifier = Modifier.padding(innerPadding)
+            Surface(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                color = colors.background
             ) {
-                composable(Screen.Chat.route) { ChatTab(viewModel = viewModel) }
-                composable(Screen.Memory.route) { MemoryTab(viewModel = viewModel) }
-                composable(Screen.Personalization.route) { PersonalizationTab(viewModel = viewModel) }
-                composable(Screen.Settings.route) { SettingsTab(viewModel = viewModel) }
+                NavHost(
+                    navController = navController,
+                    startDestination = Screen.Chat.route,
+                    enterTransition = { EnterTransition.None },
+                    exitTransition = { ExitTransition.None },
+                    popEnterTransition = { EnterTransition.None },
+                    popExitTransition = { ExitTransition.None }
+                ) {
+                    composable(Screen.Chat.route) { ChatTab(viewModel = viewModel) }
+                    composable(Screen.Memory.route) { MemoryTab(viewModel = viewModel) }
+                    composable(Screen.Personalization.route) { PersonalizationTab(viewModel = viewModel) }
+                    composable(Screen.Settings.route) { SettingsTab(viewModel = viewModel) }
+                }
             }
         }
     }

@@ -14,6 +14,8 @@ import androidx.activity.viewModels
 import androidx.activity.enableEdgeToEdge
 import androidx.core.content.ContextCompat
 
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import android.provider.Settings
 import ai.axiomaster.bonio.ui.screens.MainScreen
 import kotlinx.coroutines.CoroutineScope
@@ -43,7 +45,14 @@ class MainActivity : ComponentActivity() {
         requestTelephonyPermissions()
 
         setContent {
-            BonioTheme {
+            val themeMode by viewModel.themeMode.collectAsState()
+            BonioTheme(themeMode = themeMode) {
+                val colors = ai.axiomaster.bonio.ui.theme.LocalAppColors.current
+                androidx.compose.runtime.SideEffect {
+                    window.decorView.setBackgroundColor(
+                        if (colors.isDark) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+                    )
+                }
                 MainScreen(viewModel = viewModel)
             }
         }

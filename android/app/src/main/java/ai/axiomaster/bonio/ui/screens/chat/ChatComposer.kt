@@ -41,6 +41,7 @@ import ai.axiomaster.bonio.ai.AgentState
 import ai.axiomaster.bonio.i18n.AppStrings
 import ai.axiomaster.bonio.i18n.LocalAppStrings
 import ai.axiomaster.bonio.ui.screens.PendingImageAttachment
+import ai.axiomaster.bonio.ui.theme.LocalAppColors
 
 @Composable
 fun ChatComposer(
@@ -65,6 +66,7 @@ fun ChatComposer(
     var showAttachmentMenu by remember { mutableStateOf(false) }
 
     val strings = LocalAppStrings.current
+    val colors = LocalAppColors.current
     val agentState by AgentManager.stateManager.currentState.collectAsState()
 
     val canSend = pendingRunCount == 0 && (input.trim().isNotEmpty() || attachments.isNotEmpty()) && healthOk
@@ -74,7 +76,7 @@ fun ChatComposer(
         modifier = Modifier
             .fillMaxWidth()
             .background(
-                color = Color(0xFFF0F4F8),
+                color = colors.surface,
                 shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
             )
             .padding(horizontal = 10.dp, vertical = 6.dp)
@@ -98,8 +100,8 @@ fun ChatComposer(
                 Surface(
                     onClick = { showThinkingMenu = true },
                     shape = RoundedCornerShape(14.dp),
-                    color = Color.White,
-                    border = BorderStroke(1.dp, Color(0xFFCCCCCC)),
+                    color = colors.surfaceVariant,
+                    border = BorderStroke(1.dp, colors.border),
                     modifier = Modifier.height(28.dp)
                 ) {
                     Row(
@@ -111,14 +113,16 @@ fun ChatComposer(
                             text = thinkingLabel(thinkingLevel, strings),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
-                            color = Color(0xFF666666)
+                            color = colors.textSecondary
                         )
                     }
                 }
 
                 DropdownMenu(
                     expanded = showThinkingMenu,
-                    onDismissRequest = { showThinkingMenu = false }
+                    onDismissRequest = { showThinkingMenu = false },
+                    containerColor = colors.dropdownContainer,
+                    border = BorderStroke(1.dp, colors.border)
                 ) {
                     ThinkingMenuItem("off", thinkingLevel, strings, onSetThinkingLevel) { showThinkingMenu = false }
                     ThinkingMenuItem("low", thinkingLevel, strings, onSetThinkingLevel) { showThinkingMenu = false }
@@ -204,8 +208,8 @@ fun ChatComposer(
                 Surface(
                     modifier = Modifier.weight(1f).height(36.dp),
                     shape = RoundedCornerShape(12.dp),
-                    color = Color.White,
-                    border = BorderStroke(1.dp, Color(0xFFE0E0E0))
+                    color = colors.inputBackground,
+                    border = BorderStroke(1.dp, colors.border)
                 ) {
                     Row(
                         modifier = Modifier
@@ -218,7 +222,7 @@ fun ChatComposer(
                             Text(
                                 text = partialSttText,
                                 fontSize = 13.sp,
-                                color = Color(0xFF333333),
+                                color = colors.textPrimary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f)
@@ -227,7 +231,7 @@ fun ChatComposer(
                             Text(
                                 text = strings.voiceListening,
                                 fontSize = 13.sp,
-                                color = Color(0xFF999999),
+                                color = colors.textTertiary,
                                 modifier = Modifier.weight(1f)
                             )
                         }
@@ -251,7 +255,7 @@ fun ChatComposer(
                                         .width(3.dp)
                                         .height(16.dp * scale)
                                         .clip(CircleShape)
-                                        .background(Color(0xFF0A59F7))
+                                        .background(colors.accent)
                                 )
                             }
                         }
@@ -278,8 +282,8 @@ fun ChatComposer(
                 Surface(
                     modifier = Modifier.weight(1f).height(36.dp),
                     shape = RoundedCornerShape(12.dp),
-                    color = Color.White,
-                    border = BorderStroke(1.dp, Color(0xFFE0E0E0))
+                    color = colors.inputBackground,
+                    border = BorderStroke(1.dp, colors.border)
                 ) {
                     Box(
                         modifier = Modifier
@@ -293,16 +297,16 @@ fun ChatComposer(
                             modifier = Modifier.fillMaxWidth(),
                             textStyle = androidx.compose.ui.text.TextStyle(
                                 fontSize = 14.sp,
-                                color = Color(0xFF333333)
+                                color = colors.textPrimary
                             ),
-                            cursorBrush = SolidColor(Color(0xFF0A59F7)),
+                            cursorBrush = SolidColor(colors.accent),
                             maxLines = 4,
                             decorationBox = { innerTextField ->
                                 if (input.isEmpty()) {
                                     Text(
                                         text = strings.inputPlaceholder,
                                         fontSize = 14.sp,
-                                        color = Color(0xFF999999)
+                                        color = colors.textTertiary
                                     )
                                 }
                                 innerTextField()
@@ -315,14 +319,14 @@ fun ChatComposer(
                 Surface(
                     onClick = { showAttachmentMenu = !showAttachmentMenu },
                     shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFFE3F2FD),
+                    color = if (colors.isDark) Color(0xFF1E2D4A) else Color(0xFFE3F2FD),
                     modifier = Modifier.size(36.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Default.Add,
                             contentDescription = "Attachments",
-                            tint = Color(0xFF0A59F7),
+                            tint = colors.accent,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -333,14 +337,14 @@ fun ChatComposer(
                     onClick = onStartVoice,
                     enabled = healthOk && pendingRunCount == 0,
                     shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFFE3F2FD),
+                    color = if (colors.isDark) Color(0xFF1E2D4A) else Color(0xFFE3F2FD),
                     modifier = Modifier.size(36.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Default.Mic,
                             contentDescription = "Voice input",
-                            tint = Color(0xFF0A59F7),
+                            tint = colors.accent,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -357,7 +361,7 @@ fun ChatComposer(
                     },
                     enabled = canSend,
                     shape = RoundedCornerShape(12.dp),
-                    color = if (canSend) Color(0xFF0A59F7) else Color(0xFFE3F2FD),
+                    color = if (canSend) colors.accent else (if (colors.isDark) Color(0xFF1E2D4A) else Color(0xFFE3F2FD)),
                     modifier = Modifier.size(36.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
@@ -372,7 +376,7 @@ fun ChatComposer(
                                 text = "↑",
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (canSend) Color.White else Color(0xFF0A59F7)
+                                color = if (canSend) Color.White else colors.accent
                             )
                         }
                     }
@@ -408,6 +412,7 @@ private fun AttachmentMenuItem(
     label: String,
     onClick: () -> Unit
 ) {
+    val colors = LocalAppColors.current
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -415,8 +420,8 @@ private fun AttachmentMenuItem(
     ) {
         Surface(
             shape = RoundedCornerShape(14.dp),
-            color = Color.White,
-            border = BorderStroke(1.dp, Color(0xFFE0E0E0)),
+            color = colors.cardBackground,
+            border = BorderStroke(1.dp, colors.border),
             modifier = Modifier.size(48.dp)
         ) {
             Box(contentAlignment = Alignment.Center) {
@@ -424,11 +429,11 @@ private fun AttachmentMenuItem(
                     icon,
                     contentDescription = label,
                     modifier = Modifier.size(22.dp),
-                    tint = Color(0xFF333333)
+                    tint = colors.textPrimary
                 )
             }
         }
-        Text(text = label, fontSize = 11.sp, color = Color(0xFF666666))
+        Text(text = label, fontSize = 11.sp, color = colors.textSecondary)
     }
 }
 
@@ -440,18 +445,27 @@ private fun ThinkingMenuItem(
     onSet: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val colors = LocalAppColors.current
+    val isSelected = value == current.trim().lowercase()
     DropdownMenuItem(
-        text = { Text(thinkingLabel(value, strings), color = Color(0xFF333333), fontSize = 13.sp) },
+        text = {
+            Text(
+                thinkingLabel(value, strings),
+                color = if (isSelected) colors.accent else colors.dropdownItemText,
+                fontSize = 13.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+            )
+        },
         onClick = {
             onSet(value)
             onDismiss()
         },
         trailingIcon = {
-            if (value == current.trim().lowercase()) {
+            if (isSelected) {
                 Icon(
                     Icons.Default.Check,
                     contentDescription = null,
-                    tint = Color(0xFF0A59F7),
+                    tint = colors.accent,
                     modifier = Modifier.size(16.dp)
                 )
             }

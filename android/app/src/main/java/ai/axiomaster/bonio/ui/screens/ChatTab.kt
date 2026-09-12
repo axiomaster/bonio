@@ -27,6 +27,7 @@ import ai.axiomaster.bonio.remote.chat.ChatSessionEntry
 import ai.axiomaster.bonio.remote.chat.OutgoingAttachment
 import ai.axiomaster.bonio.remote.memory.CompanionMemoryController
 import ai.axiomaster.bonio.ui.screens.chat.*
+import ai.axiomaster.bonio.ui.theme.LocalAppColors
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -49,6 +50,7 @@ fun ChatTab(
     val context = LocalContext.current
 
     val strings = LocalAppStrings.current
+    val colors = LocalAppColors.current
     val messages by viewModel.chatMessages.collectAsState()
     val errorText by viewModel.chatError.collectAsState()
     val pendingRunCount by viewModel.pendingRunCount.collectAsState()
@@ -114,7 +116,7 @@ fun ChatTab(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFFAFAFA))
+            .background(colors.background)
     ) {
         Column(
             modifier = Modifier.fillMaxSize()
@@ -129,7 +131,7 @@ fun ChatTab(
                 // Connection status pill
                 Surface(
                     shape = RoundedCornerShape(8.dp),
-                    color = Color(0xFFE8ECF0),
+                    color = colors.surfaceVariant,
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
@@ -144,7 +146,7 @@ fun ChatTab(
                         Text(
                             text = if (healthOk) strings.statusConnected else strings.statusOffline,
                             fontSize = 11.sp,
-                            color = Color(0xFF999999)
+                            color = colors.textSecondary
                         )
                     }
                 }
@@ -180,12 +182,12 @@ fun ChatTab(
                                 }
                             },
                             shape = RoundedCornerShape(14.dp),
-                            color = if (active) Color(0xFF0A59F7) else Color(0xFFE8ECF0),
+                            color = if (active) colors.accent else colors.surfaceVariant,
                         ) {
                             Text(
                                 text = displayLabel,
                                 fontSize = 13.sp,
-                                color = if (active) Color.White else Color(0xFF333333),
+                                color = if (active) Color.White else colors.textPrimary,
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
                             )
                         }
@@ -198,7 +200,7 @@ fun ChatTab(
                 Surface(
                     onClick = { viewModel.setSpeakerEnabled(!isSpeakerEnabled) },
                     shape = RoundedCornerShape(14.dp),
-                    color = if (isSpeakerEnabled) Color(0xFFE3F2FD) else Color(0xFFF0F0F0),
+                    color = if (isSpeakerEnabled) (if (colors.isDark) Color(0xFF1E2D4A) else Color(0xFFE3F2FD)) else colors.surfaceVariant,
                     modifier = Modifier.size(width = 36.dp, height = 28.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
@@ -206,7 +208,7 @@ fun ChatTab(
                             imageVector = if (isSpeakerEnabled) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
                             contentDescription = "Speaker Toggle",
                             modifier = Modifier.size(16.dp),
-                            tint = if (isSpeakerEnabled) Color(0xFF0A59F7) else Color(0xFF888888)
+                            tint = if (isSpeakerEnabled) colors.accent else colors.textTertiary
                         )
                     }
                 }

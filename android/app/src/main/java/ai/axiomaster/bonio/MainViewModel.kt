@@ -95,6 +95,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
       appPrefs.edit().putString("app_language", lang.code).apply()
   }
 
+  private val _themeMode = MutableStateFlow(
+      ai.axiomaster.bonio.ui.theme.ThemeMode.fromCode(appPrefs.getString("app_theme_mode", "system") ?: "system")
+  )
+  val themeMode: StateFlow<ai.axiomaster.bonio.ui.theme.ThemeMode> = _themeMode
+
+  fun setThemeMode(mode: ai.axiomaster.bonio.ui.theme.ThemeMode) {
+      _themeMode.value = mode
+      appPrefs.edit().putString("app_theme_mode", mode.code).apply()
+  }
+
   private val avatarPrefs = app.getSharedPreferences("bonio_avatar", android.content.Context.MODE_PRIVATE)
 
   private val _catWanderingEnabled = MutableStateFlow(avatarPrefs.getBoolean("cat_wandering", false))

@@ -1,5 +1,6 @@
 package ai.axiomaster.bonio.ui.screens.chat
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -24,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import ai.axiomaster.bonio.i18n.LocalAppStrings
 import ai.axiomaster.bonio.remote.chat.ChatMessage
 import ai.axiomaster.bonio.remote.chat.ChatPendingToolCall
+import ai.axiomaster.bonio.ui.theme.LocalAppColors
 import java.io.File
 import java.util.Locale
 
@@ -46,6 +48,7 @@ fun ChatMessageList(
     }
 
     val strings = LocalAppStrings.current
+    val colors = LocalAppColors.current
 
     Box(modifier = modifier.fillMaxWidth()) {
         LazyColumn(
@@ -91,13 +94,13 @@ fun ChatMessageList(
                     Text(
                         text = strings.emptyWechatTitle,
                         fontSize = 14.sp,
-                        color = Color(0xFF999999)
+                        color = colors.textSecondary
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = strings.emptyWechatSubtitle,
                         fontSize = 12.sp,
-                        color = Color(0xFFBBBBBB)
+                        color = colors.textTertiary
                     )
                 }
             } else {
@@ -108,7 +111,7 @@ fun ChatMessageList(
                 ) {
                     Text(
                         text = if (healthOk) strings.emptyChat else strings.emptyChatOffline,
-                        color = Color(0xFF999999),
+                        color = colors.textSecondary,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium
                     )
@@ -120,6 +123,7 @@ fun ChatMessageList(
 
 @Composable
 fun ChatMessageBubble(message: ChatMessage) {
+    val colors = LocalAppColors.current
     val role = message.role.trim().lowercase(Locale.US)
     val isUser = role == "user"
 
@@ -131,7 +135,8 @@ fun ChatMessageBubble(message: ChatMessage) {
     ) {
         Surface(
             shape = RoundedCornerShape(16.dp),
-            color = if (isUser) Color(0xFF1A9E96) else Color(0xFFE8ECF0),
+            color = if (isUser) Color(0xFF1A9E96) else colors.cardBackground,
+            border = if (isUser) null else BorderStroke(1.dp, colors.border),
             modifier = Modifier.widthIn(max = 340.dp).fillMaxWidth(0.85f),
         ) {
             Column(
@@ -145,7 +150,7 @@ fun ChatMessageBubble(message: ChatMessage) {
                             if (text != "[Voice Message]") {
                                 ChatMarkdown(
                                     text = text,
-                                    textColor = if (isUser) Color.White else Color(0xFF333333)
+                                    textColor = if (isUser) Color.White else colors.textPrimary
                                 )
                             }
                         }
@@ -166,6 +171,7 @@ fun ChatMessageBubble(message: ChatMessage) {
 
 @Composable
 fun ChatStreamingAssistantBubble(text: String) {
+    val colors = LocalAppColors.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -174,14 +180,15 @@ fun ChatStreamingAssistantBubble(text: String) {
     ) {
         Surface(
             shape = RoundedCornerShape(16.dp),
-            color = Color(0xFFE8ECF0),
+            color = colors.cardBackground,
+            border = BorderStroke(1.dp, colors.border),
             modifier = Modifier.fillMaxWidth(0.92f),
         ) {
             Column(
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                ChatMarkdown(text = text, textColor = Color(0xFF333333))
+                ChatMarkdown(text = text, textColor = colors.textPrimary)
             }
         }
     }
@@ -189,6 +196,7 @@ fun ChatStreamingAssistantBubble(text: String) {
 
 @Composable
 fun TypingIndicator() {
+    val colors = LocalAppColors.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -197,18 +205,19 @@ fun TypingIndicator() {
     ) {
         Surface(
             shape = RoundedCornerShape(16.dp),
-            color = Color(0xFFE8ECF0),
+            color = colors.cardBackground,
+            border = BorderStroke(1.dp, colors.border),
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text("●", fontSize = 8.sp, color = Color(0xFF999999).copy(alpha = 0.4f))
-                Text("●", fontSize = 8.sp, color = Color(0xFF999999).copy(alpha = 0.65f))
-                Text("●", fontSize = 8.sp, color = Color(0xFF999999).copy(alpha = 0.9f))
+                Text("●", fontSize = 8.sp, color = colors.textTertiary.copy(alpha = 0.4f))
+                Text("●", fontSize = 8.sp, color = colors.textTertiary.copy(alpha = 0.65f))
+                Text("●", fontSize = 8.sp, color = colors.textTertiary.copy(alpha = 0.9f))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("Thinking…", fontSize = 14.sp, color = Color(0xFF999999))
+                Text("Thinking…", fontSize = 14.sp, color = colors.textTertiary)
             }
         }
     }
@@ -216,6 +225,7 @@ fun TypingIndicator() {
 
 @Composable
 fun ChatPendingToolsBubble(toolCalls: List<ChatPendingToolCall>) {
+    val colors = LocalAppColors.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -224,7 +234,8 @@ fun ChatPendingToolsBubble(toolCalls: List<ChatPendingToolCall>) {
     ) {
         Surface(
             shape = RoundedCornerShape(16.dp),
-            color = Color(0xFFE8ECF0),
+            color = colors.cardBackground,
+            border = BorderStroke(1.dp, colors.border),
             modifier = Modifier.fillMaxWidth(0.85f),
         ) {
             Column(
@@ -234,7 +245,7 @@ fun ChatPendingToolsBubble(toolCalls: List<ChatPendingToolCall>) {
                 Text(
                     text = "Running tools: ${toolCalls.joinToString { it.name }}...",
                     fontSize = 13.sp,
-                    color = Color(0xFF666666)
+                    color = colors.textSecondary
                 )
             }
         }

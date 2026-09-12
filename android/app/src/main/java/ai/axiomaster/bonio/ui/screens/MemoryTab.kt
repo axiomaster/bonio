@@ -38,6 +38,7 @@ import ai.axiomaster.bonio.MainViewModel
 import ai.axiomaster.bonio.i18n.AppStrings
 import ai.axiomaster.bonio.i18n.LocalAppStrings
 import ai.axiomaster.bonio.remote.memory.BonioMemo
+import ai.axiomaster.bonio.ui.theme.LocalAppColors
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -49,6 +50,7 @@ fun MemoryTab(
     modifier: Modifier = Modifier
 ) {
     val strings = LocalAppStrings.current
+    val colors = LocalAppColors.current
     val memos by viewModel.memoryRepository.memos.collectAsState()
     val loading by viewModel.memoryRepository.loading.collectAsState()
     val error by viewModel.memoryRepository.error.collectAsState()
@@ -94,7 +96,7 @@ fun MemoryTab(
         Column(
             modifier = modifier
                 .fillMaxSize()
-                .background(Color.White)
+                .background(colors.background)
         ) {
             // ── Search Bar + Refresh Button ──
             Row(
@@ -110,17 +112,19 @@ fun MemoryTab(
                         Text(
                             text = strings.searchMemoryPlaceholder,
                             fontSize = 14.sp,
-                            color = Color(0xFF98A2B3)
+                            color = colors.textTertiary
                         )
                     },
                     singleLine = true,
                     shape = RoundedCornerShape(8.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color(0xFFEFF3F8),
-                        unfocusedContainerColor = Color(0xFFEFF3F8),
-                        disabledContainerColor = Color(0xFFEFF3F8),
-                        focusedBorderColor = Color.Transparent,
-                        unfocusedBorderColor = Color.Transparent
+                        focusedContainerColor = colors.inputBackground,
+                        unfocusedContainerColor = colors.inputBackground,
+                        disabledContainerColor = colors.inputBackground,
+                        focusedBorderColor = colors.border,
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedTextColor = colors.textPrimary,
+                        unfocusedTextColor = colors.textPrimary
                     ),
                     modifier = Modifier
                         .weight(1f)
@@ -136,7 +140,7 @@ fun MemoryTab(
                     Icon(
                         imageVector = Icons.Default.Refresh,
                         contentDescription = "Refresh",
-                        tint = Color(0xFF0A59F7)
+                        tint = colors.accent
                     )
                 }
             }
@@ -319,13 +323,14 @@ private fun TagChip(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
+    val colors = LocalAppColors.current
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(15.dp),
-        color = if (isSelected) Color(0xFF0A59F7) else Color.White,
+        color = if (isSelected) colors.accent else colors.surfaceVariant,
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
-            if (isSelected) Color(0xFF0A59F7) else Color(0xFFD8E1EF)
+            if (isSelected) colors.accent else colors.border
         ),
         modifier = Modifier.height(30.dp)
     ) {
@@ -337,7 +342,7 @@ private fun TagChip(
                 text = text,
                 fontSize = 12.sp,
                 fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
-                color = if (isSelected) Color.White else Color(0xFF4D5B70)
+                color = if (isSelected) Color.White else colors.textSecondary
             )
         }
     }
@@ -349,6 +354,7 @@ private fun MemoryRow(
     strings: AppStrings,
     onClick: () -> Unit
 ) {
+    val colors = LocalAppColors.current
     val coverBitmap = rememberBase64Image(memo.coverImage)
 
     Row(
@@ -374,13 +380,13 @@ private fun MemoryRow(
                 modifier = Modifier
                     .size(50.dp)
                     .clip(RoundedCornerShape(6.dp))
-                    .background(Color(0xFFE8F1FF)),
+                    .background(if (colors.isDark) Color(0xFF1E2D4A) else Color(0xFFE8F1FF)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = if (isMsdp) "◇" else "▤",
                     fontSize = 22.sp,
-                    color = Color(0xFF0A59F7),
+                    color = colors.accent,
                     textAlign = TextAlign.Center
                 )
             }
@@ -397,7 +403,7 @@ private fun MemoryRow(
                     text = memo.title.ifBlank { "无标题" },
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium,
-                    color = Color(0xFF1D2939),
+                    color = colors.textPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
@@ -405,7 +411,7 @@ private fun MemoryRow(
                 Text(
                     text = formatMemoryDate(memo.createdAt, strings),
                     fontSize = 11.sp,
-                    color = Color(0xFF8A97A9),
+                    color = colors.textTertiary,
                     modifier = Modifier.padding(start = 8.dp)
                 )
             }
@@ -413,7 +419,7 @@ private fun MemoryRow(
             Text(
                 text = memo.content,
                 fontSize = 13.sp,
-                color = Color(0xFF667085),
+                color = colors.textSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(top = 4.dp)
@@ -432,12 +438,12 @@ private fun MemoryRow(
                         val isBehavior = tag.startsWith("行为:")
                         Surface(
                             shape = RoundedCornerShape(3.dp),
-                            color = if (isBehavior) Color(0xFFECFDF3) else Color(0xFFE8F1FF)
+                            color = if (isBehavior) (if (colors.isDark) Color(0xFF133824) else Color(0xFFECFDF3)) else (if (colors.isDark) Color(0xFF1E2D4A) else Color(0xFFE8F1FF))
                         ) {
                             Text(
                                 text = tag,
                                 fontSize = 11.sp,
-                                color = if (isBehavior) Color(0xFF027A48) else Color(0xFF0A59F7),
+                                color = if (isBehavior) (if (colors.isDark) Color(0xFF34D399) else Color(0xFF027A48)) else colors.accent,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
@@ -446,7 +452,7 @@ private fun MemoryRow(
             }
         }
     }
-    HorizontalDivider(thickness = 1.dp, color = Color(0xFFE8EDF5))
+    HorizontalDivider(thickness = 1.dp, color = colors.divider)
 }
 
 @Composable
@@ -457,12 +463,13 @@ private fun MemoryDetailView(
     onDelete: () -> Unit,
     onOpenSource: (String) -> Unit
 ) {
+    val colors = LocalAppColors.current
     val originalBitmap = rememberBase64Image(memory.originalImage ?: memory.coverImage)
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(colors.background)
     ) {
         // ── Detail Top Bar ──
         Row(
@@ -476,7 +483,7 @@ private fun MemoryDetailView(
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back",
-                    tint = Color(0xFF0A59F7)
+                    tint = colors.accent
                 )
             }
 
@@ -484,7 +491,7 @@ private fun MemoryDetailView(
                 text = strings.memoryDetailTitle,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF172033),
+                color = colors.textPrimary,
                 modifier = Modifier
                     .weight(1f)
                     .padding(horizontal = 8.dp)
@@ -511,21 +518,21 @@ private fun MemoryDetailView(
                 text = memory.title.ifBlank { "无标题" },
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF172033)
+                color = colors.textPrimary
             )
 
             val sourceName = memory.pageTitle ?: memory.sourceApp ?: memory.source.ifBlank { "屏幕内容" }
             Text(
                 text = "${strings.memorySourceLabel}: $sourceName",
                 fontSize = 13.sp,
-                color = Color(0xFF667085),
+                color = colors.textSecondary,
                 modifier = Modifier.padding(top = 8.dp)
             )
 
             Text(
                 text = formatMemoryDate(memory.createdAt, strings),
                 fontSize = 12.sp,
-                color = Color(0xFF98A2B3),
+                color = colors.textTertiary,
                 modifier = Modifier.padding(top = 4.dp)
             )
 
@@ -553,12 +560,12 @@ private fun MemoryDetailView(
                     memory.tags.forEach { tag ->
                         Surface(
                             shape = RoundedCornerShape(4.dp),
-                            color = Color(0xFFE8F1FF)
+                            color = if (colors.isDark) Color(0xFF1E2D4A) else Color(0xFFE8F1FF)
                         ) {
                             Text(
                                 text = tag,
                                 fontSize = 12.sp,
-                                color = Color(0xFF0A59F7),
+                                color = colors.accent,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             )
                         }
@@ -569,13 +576,13 @@ private fun MemoryDetailView(
             HorizontalDivider(
                 modifier = Modifier.padding(vertical = 20.dp),
                 thickness = 1.dp,
-                color = Color(0xFFE8EDF5)
+                color = colors.divider
             )
 
             Text(
                 text = memory.content,
                 fontSize = 16.sp,
-                color = Color(0xFF344054),
+                color = colors.textPrimary,
                 lineHeight = 24.sp
             )
 
@@ -585,8 +592,8 @@ private fun MemoryDetailView(
                     onClick = { onOpenSource(memory.pageLink) },
                     shape = RoundedCornerShape(6.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFE8F1FF),
-                        contentColor = Color(0xFF0A59F7)
+                        containerColor = if (colors.isDark) Color(0xFF1E2D4A) else Color(0xFFE8F1FF),
+                        contentColor = colors.accent
                     )
                 ) {
                     Text(strings.memoryOpenSource, fontSize = 13.sp, fontWeight = FontWeight.Medium)
@@ -595,7 +602,7 @@ private fun MemoryDetailView(
                 Text(
                     text = memory.pageLink,
                     fontSize = 12.sp,
-                    color = Color(0xFF667085),
+                    color = colors.textSecondary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 8.dp)
