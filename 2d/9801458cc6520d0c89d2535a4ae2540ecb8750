@@ -1,0 +1,54 @@
+android/app/src/main/java/ai/axiomaster/bonio/MainActivity.kt
+  h_de08bd40967a17 17-18,48-55
+android/app/src/main/java/ai/axiomaster/bonio/MainViewModel.kt
+  h_de08bd40967a17 98-107
+android/app/src/main/java/ai/axiomaster/bonio/i18n/AppLanguage.kt
+  h_de08bd40967a17 77-80,162-165,247-250
+android/app/src/main/java/ai/axiomaster/bonio/ui/screens/ChatTab.kt
+  h_de08bd40967a17 30,53,119,134,149,185,190,203,211
+android/app/src/main/java/ai/axiomaster/bonio/ui/screens/MainScreen.kt
+  h_de08bd40967a17 3-4,20,41,64,83,91-92,107-116,125,133-137,139-151
+android/app/src/main/java/ai/axiomaster/bonio/ui/screens/MemoryTab.kt
+  h_de08bd40967a17 41,53,99,115,121-127,143,326,330,333,345,357,383,389,406,414,422,441,446,455,466,472,486,494,521,528,535,563,568,579,585,595-596,605
+android/app/src/main/java/ai/axiomaster/bonio/ui/screens/PersonalizationTab.kt
+  h_de08bd40967a17 20,41,50,124,135-136,144,150,168,171,182,187,205-206,224,229,238-239,241-258,262-264,267,272-273,371-372,380,384,410,414,424-425,430,447-448,460,470,477,487,494,504,519,524,534,538-539,548,552,558,568,579-584,597,604-605,610-615
+android/app/src/main/java/ai/axiomaster/bonio/ui/screens/SettingsTab.kt
+  h_de08bd40967a17 40-41,50,53-55,122,127-158,164-165,173,183,189-190,201,207-208,226,232-233,250,260,270,284,295,301-302,323,335,341,352-383,390,403,409,418,423,435,445-446,451-456,465,467,473-474
+android/app/src/main/java/ai/axiomaster/bonio/ui/screens/chat/ChatComposer.kt
+  h_de08bd40967a17 44,69,79,103-104,116,123-125,211-212,225,234,258,285-286,300,302,309,322,329,340,347,364,379,415,423-424,432,436,448-449,451-458,464,468
+android/app/src/main/java/ai/axiomaster/bonio/ui/screens/chat/ChatMessageList.kt
+  h_de08bd40967a17 3,28,51,97,103,114,126,138-139,153,174,183-184,191,199,208-209,216-218,220,228,237-238,248
+android/app/src/main/java/ai/axiomaster/bonio/ui/theme/Theme.kt
+  h_de08bd40967a17 8-75,78-89,93,95-104,109,112-116,119-128
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "2d9801458cc6520d0c89d2535a4ae2540ecb8750",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  },
+  "sessions": {
+    "s_539b59f41bad53": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8f431abe-980e-474d-af47-4ff9172028a6",
+        "model": "glm-5.1"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 2
+    },
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 36
+    }
+  }
+}
