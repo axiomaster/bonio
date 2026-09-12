@@ -1,0 +1,50 @@
+android/app/src/main/java/ai/axiomaster/bonio/MainViewModel.kt
+  h_de08bd40967a17 4,50,226-244
+android/app/src/main/java/ai/axiomaster/bonio/NodeForegroundService.kt
+  h_de08bd40967a17 11,25-26,28,34,52-53,55,57,59,73-84,149-154,160-167,176-177,188-193
+android/app/src/main/java/ai/axiomaster/bonio/NodeRuntime.kt
+  h_de08bd40967a17 527,542
+android/app/src/main/java/ai/axiomaster/bonio/ScreenCaptureRequester.kt
+  h_de08bd40967a17 25-31,45,47-56
+android/app/src/main/java/ai/axiomaster/bonio/i18n/AppLanguage.kt
+  h_de08bd40967a17 83-94,164-175,245-256
+android/app/src/main/java/ai/axiomaster/bonio/remote/SecurePrefs.kt
+  h_de08bd40967a17 49-51,133-137
+android/app/src/main/java/ai/axiomaster/bonio/remote/node/ScreenCaptureManager.kt
+  h_de08bd40967a17 22,28-31,45,49
+android/app/src/main/java/ai/axiomaster/bonio/remote/node/ScreenRecordManager.kt
+  h_de08bd40967a17 22,32-35,58,62
+android/app/src/main/java/ai/axiomaster/bonio/ui/screens/SettingsTab.kt
+  h_de08bd40967a17 7,88-102,200-201,215-216,225-226,235-245,249-250,367
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "8ff57055ef390ddb16549453c5f6db0b138a738c",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  },
+  "sessions": {
+    "s_539b59f41bad53": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8f431abe-980e-474d-af47-4ff9172028a6",
+        "model": "glm-5.1"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 2
+    },
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 36
+    }
+  }
+}
