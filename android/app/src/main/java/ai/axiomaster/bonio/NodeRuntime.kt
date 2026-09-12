@@ -63,7 +63,7 @@ class NodeRuntime(context: Context) {
   private val contactsHandler = ContactsHandler(appContext)
   private val calendarHandler = CalendarHandler(appContext)
   private val motionHandler = MotionHandler()
-  private val smsHandler = SmsHandler()
+  private val smsHandler = SmsHandler(appContext)
   private val telephonyHandler = TelephonyHandler(appContext)
   private val inputHandler = InputHandler()
   private val debugHandler = DebugHandler()
@@ -98,7 +98,7 @@ class NodeRuntime(context: Context) {
     voiceWakeMode = { VoiceWakeMode.Off },
     motionActivityAvailable = { false },
     motionPedometerAvailable = { false },
-    smsAvailable = { false },
+    smsAvailable = { smsAvailable() },
     telephonyAvailable = { hasTelephony() },
     hasRecordAudioPermission = { hasRecordAudioPermission() },
     manualTls = { manualTls.value },
@@ -125,7 +125,7 @@ class NodeRuntime(context: Context) {
     isForeground = { _isForeground.value },
     cameraEnabled = { cameraEnabled.value },
     locationEnabled = { locationMode.value != LocationMode.Off },
-    smsAvailable = { false },
+    smsAvailable = { smsAvailable() },
     telephonyAvailable = { hasTelephony() },
     debugBuild = { true },
     refreshNodeCanvasCapability = { nodeSession.refreshNodeCanvasCapability() },
@@ -413,6 +413,14 @@ class NodeRuntime(context: Context) {
   private fun hasRecordAudioPermission(): Boolean = ContextCompat.checkSelfPermission(appContext, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 
   private fun hasTelephony(): Boolean = appContext.packageManager.hasSystemFeature(PackageManager.FEATURE_TELEPHONY)
+
+  /** SMS node commands are advertised only when the hardware and permissions allow them. */
+  private fun smsAvailable(): Boolean {
+    if (!hasTelephony()) return false
+    val sendOk = ContextCompat.checkSelfPermission(appContext, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED
+    val readOk = ContextCompat.checkSelfPermission(appContext, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
+    return sendOk || readOk
+  }
 
   val callStateMonitor: CallStateMonitor by lazy {
     CallStateMonitor(

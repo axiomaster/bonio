@@ -209,6 +209,14 @@ object InvokeCommandRegistry {
         availability = InvokeCommandAvailability.SmsAvailable,
       ),
       InvokeCommandSpec(
+        name = OpenClawSmsCommand.Search.rawValue,
+        availability = InvokeCommandAvailability.SmsAvailable,
+      ),
+      InvokeCommandSpec(
+        name = OpenClawSmsCommand.Bill.rawValue,
+        availability = InvokeCommandAvailability.SmsAvailable,
+      ),
+      InvokeCommandSpec(
         name = OpenClawTelephonyCommand.Answer.rawValue,
         availability = InvokeCommandAvailability.TelephonyAvailable,
       ),

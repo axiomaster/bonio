@@ -168,8 +168,10 @@ class InvokeDispatcher(
       OpenClawScreenCommand.Record.rawValue -> screenHandler.handleScreenRecord(paramsJson)
       OpenClawScreenCommand.Capture.rawValue -> screenHandler.handleScreenCapture(paramsJson)
 
-      // SMS command
+      // SMS commands
       OpenClawSmsCommand.Send.rawValue -> smsHandler.handleSmsSend(paramsJson)
+      OpenClawSmsCommand.Search.rawValue -> smsHandler.handleSmsSearch(paramsJson)
+      OpenClawSmsCommand.Bill.rawValue -> smsHandler.handleSmsBill(paramsJson)
 
       // Telephony commands
       OpenClawTelephonyCommand.Answer.rawValue -> telephonyHandler.handleAnswer(paramsJson)

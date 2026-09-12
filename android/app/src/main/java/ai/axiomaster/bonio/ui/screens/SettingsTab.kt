@@ -165,10 +165,13 @@ fun SettingsTab(
   var appUpdateInstallEnabled by remember { mutableStateOf(canInstallUnknownApps(context)) }
 
   var smsPermissionGranted by remember {
-    mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED)
+    mutableStateOf(
+      ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED &&
+      ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
+    )
   }
-  val smsPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-    smsPermissionGranted = granted
+  val smsPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { perms ->
+    smsPermissionGranted = perms[Manifest.permission.SEND_SMS] == true || perms[Manifest.permission.READ_SMS] == true
   }
 
   var overlayPermissionGranted by remember {
@@ -188,7 +191,8 @@ fun SettingsTab(
                                      ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CALENDAR) == PackageManager.PERMISSION_GRANTED
         motionPermissionGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED
         appUpdateInstallEnabled = canInstallUnknownApps(context)
-        smsPermissionGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED
+        smsPermissionGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED &&
+                               ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
         overlayPermissionGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Settings.canDrawOverlays(context) else true
       }
     }
@@ -371,10 +375,13 @@ fun SettingsTab(
       item {
         PermissionRow(
           title = "SMS Permission",
-          description = if (smsPermissionAvailable) "Allow the gateway to send SMS." else "SMS requires telephony hardware.",
+          description = if (smsPermissionAvailable) "Allow the gateway to send and read SMS." else "SMS requires telephony hardware.",
           buttonLabel = if (smsPermissionAvailable) (if (smsPermissionGranted) "Manage" else "Grant") else "Unavailable",
           enabled = smsPermissionAvailable,
-          onClick = { if (smsPermissionGranted) openAppSettings(context) else smsPermissionLauncher.launch(Manifest.permission.SEND_SMS) },
+          onClick = {
+            if (smsPermissionGranted) openAppSettings(context)
+            else smsPermissionLauncher.launch(arrayOf(Manifest.permission.SEND_SMS, Manifest.permission.READ_SMS))
+          },
           colors = listItemColors
         )
       }

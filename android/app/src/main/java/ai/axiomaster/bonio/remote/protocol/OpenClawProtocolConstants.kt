@@ -66,6 +66,8 @@ enum class OpenClawScreenCommand(val rawValue: String) {
 
 enum class OpenClawSmsCommand(val rawValue: String) {
   Send("sms.send"),
+  Search("sms.search"),
+  Bill("sms.bill"),
   ;
 
   companion object {
