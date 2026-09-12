@@ -1,0 +1,58 @@
+android/app/src/main/java/ai/axiomaster/bonio/BonioApp.kt
+  h_de08bd40967a17 13-14
+android/app/src/main/java/ai/axiomaster/bonio/FloatingWindowService.kt
+  h_de08bd40967a17 41,254-262,270-271,274,747,778-784,802-803,807,816-818,820,822-830,1345-1346,1349
+android/app/src/main/java/ai/axiomaster/bonio/NodeRuntime.kt
+  h_de08bd40967a17 227-228,319
+android/app/src/main/java/ai/axiomaster/bonio/remote/cue/MagicCueController.kt
+  h_de08bd40967a17 65-67,73,83-86,90,110,113,116-127,131,134,137-139,146-147,161,166,170,179,207-214,284-285,289-298
+android/app/src/main/java/ai/axiomaster/bonio/remote/gateway/GatewaySession.kt
+  h_de08bd40967a17 543,562
+android/app/src/main/java/ai/axiomaster/bonio/remote/memory/ChargingTriggeredSync.kt
+  h_de08bd40967a17 8,14,16-17,32-40,42-43,46-47,49,53-56,62,66-67,72-84,87-92,94,102
+android/app/src/main/java/ai/axiomaster/bonio/remote/memory/CompanionMemoryController.kt
+  h_de08bd40967a17 46-48,54,65,85,88,91-102,106,123-125
+android/app/src/main/java/ai/axiomaster/bonio/remote/node/BonioAccessibilityService.kt
+  h_de08bd40967a17 16-17,23-30,33,61,65-73,75-102,115-140,145-185,188-189,192-249,255-303,305,307,310,312-319,322-326,348-408,431,434,445-469
+android/app/src/main/java/ai/axiomaster/bonio/remote/node/ContactsCalendarHandlers.kt
+  h_de08bd40967a17 94,97,101-106,126-128,130-141,147,152,154-156
+android/app/src/main/java/ai/axiomaster/bonio/remote/node/ScreenHandler.kt
+  h_de08bd40967a17 55,80-84
+android/app/src/main/java/ai/axiomaster/bonio/remote/node/SmsHandlerImpl.kt
+  h_de08bd40967a17 134,168,181-186,189-190,226,238-239,241-244,253-257
+android/app/src/main/java/ai/axiomaster/bonio/util/AppLogger.kt
+  h_de08bd40967a17 1-49
+android/app/src/main/res/xml/accessibility_service_config.xml
+  h_de08bd40967a17 4-5,7-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "2c4e99432d62d7b185d03f2d88cae8963c699cae",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  },
+  "sessions": {
+    "s_539b59f41bad53": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8f431abe-980e-474d-af47-4ff9172028a6",
+        "model": "glm-5.1"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 2
+    },
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 36
+    }
+  }
+}
