@@ -205,6 +205,7 @@ class FloatingWindowService : Service() {
         textBubble = floatingView.findViewById(R.id.text_bubble)
         textBubbleScroll = floatingView.findViewById(R.id.text_bubble_scroll)
         bubbleContainer.setOnClickListener {
+            ai.axiomaster.bonio.util.AppLogger.i(TAG, "bubble clicked: pendingPrompt=$pendingAccessibilityPrompt cues=${actionableCues.size}")
             if (pendingAccessibilityPrompt) {
                 openAccessibilitySettings()
             } else if (actionableCues.isNotEmpty()) {
@@ -777,7 +778,7 @@ class FloatingWindowService : Service() {
                 kotlinx.coroutines.coroutineScope {
                     // Only run LLM magic cue analysis for WeChat; all other apps just screenshot+save
                     if (isWechat) {
-                        launch { cues = withContext(Dispatchers.Default) { runtime.magicCue.runCue(screen) } }
+                        launch { cues = withContext(Dispatchers.Default) { runtime.magicCue.runCue(screen, screenshotBase64) } }
                     }
                     launch {
                         remembered = withContext(Dispatchers.Default) {
@@ -853,6 +854,20 @@ class FloatingWindowService : Service() {
         avatarController.setActivity(AgentState.Working)
         avatarController.setBubble("正在发送…")
         serviceScope.launch {
+            try {
+                applyCueInner(cue)
+            } catch (e: Throwable) {
+                ai.axiomaster.bonio.util.AppLogger.e(TAG, "applyMagicCue failed", e)
+                avatarController.setActivity(AgentState.Confused)
+                avatarController.setBubble("已复制，长按输入框可粘贴")
+                delay(2500)
+                avatarController.clearBubble()
+                avatarController.setActivity(AgentState.Idle)
+            }
+        }
+    }
+
+    private suspend fun applyCueInner(cue: MagicCue) {
             if (cue.kind == "calendar") {
                 openCalendarApp()
                 avatarController.setActivity(AgentState.Happy)
@@ -860,27 +875,45 @@ class FloatingWindowService : Service() {
                 delay(1500)
             } else {
                 val accessibility = ai.axiomaster.bonio.remote.node.BonioAccessibilityService.instance
+                val treeBlocked = accessibility?.isExternalTreeBlocked() == true
+                ai.axiomaster.bonio.util.AppLogger.i(TAG, "applyCue: kind=${cue.kind} treeBlocked=$treeBlocked")
                 // Try sending directly (silent text injection + dynamic send button click)
-                val sent = accessibility?.sendTextToActiveChat(cue.content) == true
+                val sent = !treeBlocked && accessibility?.sendTextToActiveChat(cue.content) == true
                 if (sent) {
                     avatarController.setActivity(AgentState.Happy)
                     avatarController.setBubble("已发送 ✅")
+                } else if (treeBlocked) {
+                    // Apps like WeChat return stub node trees; do NOT blind-tap the
+                    // node-based path (it would raise the keyboard). Paste via
+                    // clipboard + long-press popup instead.
+                    val pasted = accessibility?.fillViaClipboardPaste(cue.content) == true
+                    if (pasted) {
+                        avatarController.setActivity(AgentState.Happy)
+                        avatarController.setBubble("已粘贴到输入框，请点发送")
+                    } else {
+                        avatarController.setActivity(AgentState.Confused)
+                        avatarController.setBubble("已复制，长按输入框可粘贴")
+                    }
                 } else {
-                    // Fallback to fill active reply field if send button wasn't found
                     val filled = accessibility?.fillActiveReplyField(cue.content) == true
                     if (filled) {
                         avatarController.setActivity(AgentState.Happy)
-                        avatarController.setBubble("已填入回复框")
+                        avatarController.setBubble("已填入回复框，点发送即可")
                     } else {
-                        avatarController.setActivity(AgentState.Confused)
-                        avatarController.setBubble("未找到回复框，点此重试")
+                        val pasted = accessibility?.fillViaClipboardPaste(cue.content) == true
+                        if (pasted) {
+                            avatarController.setActivity(AgentState.Happy)
+                            avatarController.setBubble("已粘贴到输入框，请点发送")
+                        } else {
+                            avatarController.setActivity(AgentState.Confused)
+                            avatarController.setBubble("已复制，长按输入框可粘贴")
+                        }
                     }
                 }
-                delay(1800)
+                delay(2500)
             }
             avatarController.clearBubble()
             avatarController.setActivity(AgentState.Idle)
-        }
     }
 
     private fun openCalendarApp() {

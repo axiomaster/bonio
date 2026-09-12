@@ -8,6 +8,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -77,17 +78,26 @@ class MagicCueController(
   /**
    * Run one cue cycle for the given screen context. Returns the parsed cues,
    * or null when the screen had nothing to act on / the run failed.
+   *
+   * When the accessibility tree is empty (e.g. WeChat returns stub nodes to
+   * third-party services on some ROMs) but a screenshot is available, the run
+   * falls back to vision analysis of the screenshot instead of bailing out.
    */
-  suspend fun runCue(screen: ScreenContext): List<MagicCue>? {
+  suspend fun runCue(screen: ScreenContext, screenshotBase64: String? = null): List<MagicCue>? {
     val screenText = screen.content
-    if (screenText.isBlank()) {
-      ai.axiomaster.bonio.util.AppLogger.w(TAG, "runCue: screenText is blank, pkg=${screen.packageName}")
+    val hasText = screenText.isNotBlank()
+    if (!hasText && screenshotBase64.isNullOrEmpty()) {
+      ai.axiomaster.bonio.util.AppLogger.w(TAG, "runCue: screenText is blank and no screenshot, pkg=${screen.packageName}")
       return emptyList()
     }
+    val vision = !hasText
 
-    val facts = collectFacts(screenText)
-    val prompt = buildPrompt(screen, facts)
-    ai.axiomaster.bonio.util.AppLogger.i(TAG, "runCue: screenText=${screenText.length}ch facts=${facts?.length ?: 0}ch")
+    val facts = if (hasText) collectFacts(screenText) else null
+    val prompt = buildPrompt(screen, facts, vision)
+    ai.axiomaster.bonio.util.AppLogger.i(
+      TAG,
+      "runCue: screenText=${screenText.length}ch facts=${facts?.length ?: 0}ch vision=$vision shot=${!screenshotBase64.isNullOrEmpty()}",
+    )
 
     // Keep the cue session ephemeral: one conversation per run.
     try {
@@ -106,6 +116,21 @@ class MagicCueController(
         put("thinking", JsonPrimitive("low"))
         put("timeoutMs", JsonPrimitive(RUN_TIMEOUT_MS))
         put("idempotencyKey", JsonPrimitive(runId))
+        if (vision && !screenshotBase64.isNullOrEmpty()) {
+          put(
+            "attachments",
+            JsonArray(
+              listOf(
+                buildJsonObject {
+                  put("type", JsonPrimitive("image"))
+                  put("mimeType", JsonPrimitive("image/jpeg"))
+                  put("fileName", JsonPrimitive("screen.jpg"))
+                  put("content", JsonPrimitive(screenshotBase64))
+                },
+              ),
+            ),
+          )
+        }
       }
       val res = try {
         session.request("chat.send", params.toString(), timeoutMs = 15_000)
@@ -220,15 +245,19 @@ class MagicCueController(
 
   // ── prompt ──
 
-  private fun buildPrompt(screen: ScreenContext, facts: String?): String {
+  private fun buildPrompt(screen: ScreenContext, facts: String?, vision: Boolean = false): String {
     val sb = StringBuilder()
     sb.append("你是 Bonio 的 Magic Cue 助手。基于用户当前屏幕内容，产出可直接执行的操作建议。\n")
     sb.append("（应用：").append(screen.packageName.ifEmpty { "未知" })
     if (screen.title.isNotEmpty()) sb.append("，会话对象/标题：【").append(screen.title).append("】")
     sb.append("）：\n")
-    sb.append("<屏幕文本>\n").append(screen.content).append("\n</屏幕文本>\n")
-    if (!facts.isNullOrEmpty()) {
-      sb.append("<端侧已知事实>\n").append(facts).append("\n</端侧已知事实>\n")
+    if (vision) {
+      sb.append("（无障碍树为空，请直接分析附件中的屏幕截图）\n")
+    } else {
+      sb.append("<屏幕文本>\n").append(screen.content).append("\n</屏幕文本>\n")
+      if (!facts.isNullOrEmpty()) {
+        sb.append("<端侧已知事实>\n").append(facts).append("\n</端侧已知事实>\n")
+      }
     }
     sb.append(
       """

@@ -15,6 +15,9 @@ import org.json.JSONObject
 import android.graphics.Bitmap
 import android.view.Display
 import android.util.Base64
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.CompletableDeferred
@@ -255,6 +258,19 @@ class BonioAccessibilityService : AccessibilityService() {
     return sent
   }
 
+  /**
+   * True when the active app returns stub node trees to accessibility
+   * (e.g. WeChat 8.0.77 on EMUI): root resolves but has no children, so
+   * node-based fill/send paths cannot work and gesture/clipboard paths must
+   * be used instead.
+   */
+  fun isExternalTreeBlocked(): Boolean {
+    val root = externalApplicationRoot() ?: return true
+    val blocked = root.childCount == 0
+    root.recycle()
+    return blocked
+  }
+
   /** Writes text to the active app's reply field without sending it. */
   suspend fun fillActiveReplyField(text: String): Boolean {
     val root = externalApplicationRoot()
@@ -329,6 +345,142 @@ class BonioAccessibilityService : AccessibilityService() {
     } catch (_: Throwable) {
       false
     }
+  }
+
+  private suspend fun longPressScreenPoint(x: Float, y: Float): Boolean {
+    val path = Path().apply { moveTo(x, y) }
+    val gestureOk = CompletableDeferred<Boolean>()
+    dispatchGesture(
+      GestureDescription.Builder()
+        .addStroke(GestureDescription.StrokeDescription(path, 0, 650))
+        .build(),
+      object : GestureResultCallback() {
+        override fun onCompleted(gestureDescription: GestureDescription?) {
+          gestureOk.complete(true)
+        }
+        override fun onCancelled(gestureDescription: GestureDescription?) {
+          gestureOk.complete(false)
+        }
+      },
+      null,
+    )
+    return try {
+      withTimeout(1200) { gestureOk.await() }
+    } catch (_: Throwable) {
+      false
+    }
+  }
+
+  /**
+   * Fallback fill for apps that return stub accessibility trees (e.g. WeChat
+   * 8.0.77 on EMUI): copy [text] to the clipboard, tap the composer, long-press
+   * it and tap the system paste popup, locating the popup by screenshot pixel
+   * analysis (the node tree is unavailable there). Best effort.
+   */
+  suspend fun fillViaClipboardPaste(text: String): Boolean {
+    val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+    if (clipboard == null) return false
+    clipboard.setPrimaryClip(ClipData.newPlainText("bonio", text))
+
+    val dm = resources.displayMetrics
+    val x = dm.widthPixels * 0.35f
+    val y = dm.heightPixels * 0.95f
+
+    // Long-press the composer directly at its resting position (keyboard
+    // closed). Tapping first would raise the keyboard and move the composer.
+    longPressScreenPoint(x, y)
+    delay(900)
+    // A first long-press may only focus an unfocused field; press again to
+    // make sure the paste popup is showing.
+    longPressScreenPoint(x, y)
+    delay(900)
+
+    val popup = findPastePopupPoint(y)
+    ai.axiomaster.bonio.util.AppLogger.i(TAG, "fillViaClipboardPaste: popup=${popup}")
+    if (popup == null) return false
+    return tapScreenPoint(popup.first, popup.second)
+  }
+
+  /**
+   * Locate a paste popup just above [composerY]: screenshot, downscale, and
+   * search for a blob of pixels that deviates from the row's background color
+   * (dark popup on light chat background, or the reverse in dark mode).
+   */
+  private suspend fun findPastePopupPoint(composerY: Float): Pair<Float, Float>? {
+    val full = takeScreenshotBitmap() ?: return null
+    val result = try {
+      val divisor = (minOf(full.width, full.height) / 400f).coerceIn(1f, 8f)
+      val scale = divisor
+      val small = Bitmap.createScaledBitmap(
+        full,
+        (full.width / scale).toInt().coerceAtLeast(1),
+        (full.height / scale).toInt().coerceAtLeast(1),
+        true,
+      )
+      try {
+        val px = IntArray(small.width * small.height)
+        small.getPixels(px, 0, small.width, 0, 0, small.width, small.height)
+        val sY = ((composerY / scale).toInt() - 25).coerceIn(10, small.height - 1)
+        val topY = ((composerY / scale).toInt() - 170).coerceIn(0, small.height - 1)
+        // The paste popup shows right above the long-press point (0.35w).
+        // Keep the search clear of the floating pet, which lives near 0.7w+.
+        val minX = (small.width * 0.06f).toInt()
+        val maxX = (small.width * 0.62f).toInt()
+
+        var bestRun = 0
+        var bestRow = -1
+        var bestStart = 0
+        // Bottom-up: the paste popup is the lowest qualifying blob above the
+        // composer, so prefer later rows over longer runs.
+        for (row in sY downTo topY) {
+          val base = row * small.width
+          val ref = px[base + (small.width * 0.01f).toInt()]
+          val refLum = luminance(ref)
+          var runStart = -1
+          var rowBest = 0
+          var rowBestStart = 0
+          for (col in minX..maxX) {
+            val deviates = kotlin.math.abs(luminance(px[base + col]) - refLum) > 40
+            if (deviates) {
+              if (runStart < 0) runStart = col
+              val len = col - runStart + 1
+              if (len > rowBest) {
+                rowBest = len
+                rowBestStart = runStart
+              }
+            } else {
+              runStart = -1
+            }
+          }
+          if (rowBest in 20..120) {
+            bestRun = rowBest
+            bestRow = row
+            bestStart = rowBestStart
+            break
+          }
+        }
+        if (bestRow >= 0 && bestRun >= 20) {
+          Pair(
+            (bestStart + bestRun / 2f) * scale,
+            (bestRow + 1) * scale,
+          )
+        } else {
+          null
+        }
+      } finally {
+        small.recycle()
+      }
+    } finally {
+      full.recycle()
+    }
+    return result
+  }
+
+  private fun luminance(pixel: Int): Int {
+    val r = (pixel shr 16) and 0xFF
+    val g = (pixel shr 8) and 0xFF
+    val b = pixel and 0xFF
+    return (r * 299 + g * 587 + b * 114) / 1000
   }
 
   private fun findFirstNode(
