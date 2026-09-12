@@ -142,6 +142,9 @@ object InvokeCommandRegistry {
         requiresForeground = true,
       ),
       InvokeCommandSpec(
+        name = OpenClawScreenCommand.Context.rawValue,
+      ),
+      InvokeCommandSpec(
         name = OpenClawSystemCommand.Notify.rawValue,
       ),
       InvokeCommandSpec(

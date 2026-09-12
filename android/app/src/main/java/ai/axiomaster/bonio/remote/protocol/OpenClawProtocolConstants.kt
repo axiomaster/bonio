@@ -57,6 +57,7 @@ enum class OpenClawCameraCommand(val rawValue: String) {
 enum class OpenClawScreenCommand(val rawValue: String) {
   Record("screen.record"),
   Capture("screen.capture"),
+  Context("screen.context"),
   ;
 
   companion object {

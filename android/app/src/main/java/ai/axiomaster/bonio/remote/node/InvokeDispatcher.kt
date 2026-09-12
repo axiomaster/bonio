@@ -164,9 +164,10 @@ class InvokeDispatcher(
       OpenClawMotionCommand.Activity.rawValue -> motionHandler.handleMotionActivity(paramsJson)
       OpenClawMotionCommand.Pedometer.rawValue -> motionHandler.handleMotionPedometer(paramsJson)
 
-      // Screen command
+      // Screen commands
       OpenClawScreenCommand.Record.rawValue -> screenHandler.handleScreenRecord(paramsJson)
       OpenClawScreenCommand.Capture.rawValue -> screenHandler.handleScreenCapture(paramsJson)
+      OpenClawScreenCommand.Context.rawValue -> screenHandler.handleScreenContext(paramsJson)
 
       // SMS commands
       OpenClawSmsCommand.Send.rawValue -> smsHandler.handleSmsSend(paramsJson)
