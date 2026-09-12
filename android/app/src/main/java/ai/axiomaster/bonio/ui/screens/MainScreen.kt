@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Settings
@@ -30,6 +31,7 @@ import androidx.navigation.compose.rememberNavController
 
 sealed class Screen(val route: String, val title: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     object Chat : Screen("chat", "Chat", Icons.Default.ChatBubble)
+    object Memory : Screen("memory", "Memory", Icons.Default.AutoStories)
     object Marketplace : Screen("marketplace", "Marketplace", Icons.Default.Store)
     object Server : Screen("server", "Server", Icons.Default.Dns)
     object Settings : Screen("settings", "Settings", Icons.Default.Settings)
@@ -37,6 +39,7 @@ sealed class Screen(val route: String, val title: String, val icon: androidx.com
 
 val items = listOf(
     Screen.Chat,
+    Screen.Memory,
     Screen.Server,
     Screen.Marketplace,
     Screen.Settings
@@ -88,6 +91,7 @@ fun MainScreen(
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(Screen.Chat.route) { ChatTab(viewModel = viewModel) }
+            composable(Screen.Memory.route) { MemoryTab(viewModel = viewModel) }
             composable(Screen.Marketplace.route) { MarketplaceTab(viewModel = viewModel) }
             composable(Screen.Server.route) { ServerTab(viewModel = viewModel) }
             composable(Screen.Settings.route) { SettingsTab(viewModel = viewModel) }

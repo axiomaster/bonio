@@ -725,12 +725,29 @@ class FloatingWindowService : Service() {
                     content = obj.optString("content"),
                     rawJson = ctxRes.payloadJson,
                 )
-                val cues = withContext(Dispatchers.Default) { runtime.magicCue.runCue(screen) }
+                var cues: List<ai.axiomaster.bonio.remote.cue.MagicCue>? = null
+                var remembered = false
+                kotlinx.coroutines.coroutineScope {
+                    launch { cues = withContext(Dispatchers.Default) { runtime.magicCue.runCue(screen) } }
+                    launch { remembered = withContext(Dispatchers.Default) { runtime.companionMemory.capture(screen, explicit = true) } }
+                }
                 magicCuePending = false
                 when {
-                    cues == null -> showCueFailure("屏幕分析失败，请稍后再试")
-                    cues.isEmpty() -> showCueFailure("当前页面没有什么可以帮你")
-                    else -> showCues(cues)
+                    !cues.isNullOrEmpty() -> showCues(cues!!)
+                    remembered -> {
+                        cueEpoch += 1
+                        val epoch = cueEpoch
+                        avatarController.setActivity(AgentState.Happy)
+                        avatarController.setBubble("已记住 ✅", SUGGESTION_BG_COLOR, android.graphics.Color.WHITE)
+                        mainHandler.postDelayed({
+                            if (cueEpoch == epoch) {
+                                avatarController.clearBubble()
+                                avatarController.setActivity(AgentState.Idle)
+                            }
+                        }, 2000)
+                    }
+                    cues != null -> showCueFailure("当前页面没有什么可以帮你")
+                    else -> showCueFailure("屏幕分析失败，请稍后再试")
                 }
             } catch (e: Throwable) {
                 magicCuePending = false

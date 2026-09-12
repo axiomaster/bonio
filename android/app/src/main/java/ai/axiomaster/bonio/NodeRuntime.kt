@@ -219,6 +219,7 @@ class NodeRuntime(context: Context) {
           floatingWindowIntentHandler?.invoke(payloadJson)
         }
         magicCue.handleGatewayEvent(event, payloadJson)
+        companionMemory.handleGatewayEvent(event, payloadJson)
         if (!callEventHandler.handleEvent(event, payloadJson)) {
           chat.handleGatewayEvent(event, payloadJson)
         }
@@ -270,6 +271,20 @@ class NodeRuntime(context: Context) {
   /** In-process screen context capture (accessibility tree text snapshot). */
   suspend fun captureScreenContext(maxTextLength: Int = 6000): GatewaySession.InvokeResult =
     invokeDispatcher.handleInvoke("screen.context", """{"maxTextLength":$maxTextLength}""")
+
+  /** 记一记 (memo) storage for the Memory tab. */
+  val memoryRepository: ai.axiomaster.bonio.remote.memory.MemoryRepository by lazy {
+    ai.axiomaster.bonio.remote.memory.MemoryRepository(operatorSession, scope)
+  }
+
+  private val memoryService: ai.axiomaster.bonio.remote.memory.MemoryService by lazy {
+    ai.axiomaster.bonio.remote.memory.MemoryService(operatorSession)
+  }
+
+  /** Companion memory: double-tap → decide & remember the page (hidden session). */
+  val companionMemory: ai.axiomaster.bonio.remote.memory.CompanionMemoryController by lazy {
+    ai.axiomaster.bonio.remote.memory.CompanionMemoryController(operatorSession, memoryService)
+  }
 
   val serverConfigRepository: ai.axiomaster.bonio.remote.config.ConfigRepository =
     ai.axiomaster.bonio.remote.config.ConfigRepository(operatorSession)
