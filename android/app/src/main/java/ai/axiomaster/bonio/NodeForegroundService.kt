@@ -8,6 +8,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.os.Build
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -21,13 +22,16 @@ class NodeForegroundService : Service() {
   private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
   private var notificationJob: Job? = null
   private var lastRequiresMic = false
+  private var lastRequiresMediaProjection = false
+  private var mediaProjectionActive = false
   private var didStartForeground = false
+  private var lastNotification: Notification? = null
 
   override fun onCreate() {
     super.onCreate()
     ensureChannel()
     val initial = buildNotification(title = "Bonio Remote", text = "Starting…")
-    startForegroundWithTypes(notification = initial, requiresMic = false)
+    startForegroundWithTypes(notification = initial, requiresMic = false, requiresMediaProjection = false)
 
     val runtime = (application as BonioApp).runtime
     if (runtime.prefs.localEnabled.value) {
@@ -45,11 +49,14 @@ class NodeForegroundService : Service() {
           val title = if (connected) "Bonio Remote · Connected" else "Bonio Remote"
           val text = server?.let { "$status · $it" } ?: status
 
+          val notif = buildNotification(title = title, text = text)
+          lastNotification = notif
           // Mic requirement check (simplified for now)
-          val requiresMic = false // runtime.micEnabled.value && hasRecordAudioPermission()
+          val requiresMic = false
           startForegroundWithTypes(
-            notification = buildNotification(title = title, text = text),
+            notification = notif,
             requiresMic = requiresMic,
+            requiresMediaProjection = mediaProjectionActive,
           )
         }
       }
@@ -62,6 +69,18 @@ class NodeForegroundService : Service() {
         (application as BonioApp).localEngine.stop()
         stopSelf()
         return START_NOT_STICKY
+      }
+      ACTION_ENABLE_MEDIA_PROJECTION -> {
+        mediaProjectionActive = true
+        val notif = lastNotification ?: buildNotification(title = "Bonio Remote", text = "Screen capture authorized")
+        startForegroundWithTypes(notif, requiresMic = false, requiresMediaProjection = true)
+        return START_STICKY
+      }
+      ACTION_DISABLE_MEDIA_PROJECTION -> {
+        mediaProjectionActive = false
+        val notif = lastNotification ?: buildNotification(title = "Bonio Remote", text = "Connected")
+        startForegroundWithTypes(notif, requiresMic = false, requiresMediaProjection = false)
+        return START_STICKY
       }
     }
     return START_STICKY
@@ -127,19 +146,25 @@ class NodeForegroundService : Service() {
     mgr.notify(NOTIFICATION_ID, notification)
   }
 
-  private fun startForegroundWithTypes(notification: Notification, requiresMic: Boolean) {
-    if (didStartForeground && requiresMic == lastRequiresMic) {
+  private fun startForegroundWithTypes(
+    notification: Notification,
+    requiresMic: Boolean,
+    requiresMediaProjection: Boolean
+  ) {
+    if (didStartForeground && requiresMic == lastRequiresMic && requiresMediaProjection == lastRequiresMediaProjection) {
       updateNotification(notification)
       return
     }
 
     lastRequiresMic = requiresMic
-    val types =
-      if (requiresMic) {
-        ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
-      } else {
-        ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-      }
+    lastRequiresMediaProjection = requiresMediaProjection
+    var types = ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+    if (requiresMic) {
+      types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+    }
+    if (requiresMediaProjection && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+      types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+    }
     startForeground(NOTIFICATION_ID, notification, types)
     didStartForeground = true
   }
@@ -148,6 +173,8 @@ class NodeForegroundService : Service() {
     private const val CHANNEL_ID = "connection"
     private const val NOTIFICATION_ID = 1
     private const val ACTION_STOP = "ai.axiomaster.Bonio.action.STOP"
+    private const val ACTION_ENABLE_MEDIA_PROJECTION = "ai.axiomaster.Bonio.action.ENABLE_MEDIA_PROJECTION"
+    private const val ACTION_DISABLE_MEDIA_PROJECTION = "ai.axiomaster.Bonio.action.DISABLE_MEDIA_PROJECTION"
 
     fun start(context: Context) {
       val intent = Intent(context, NodeForegroundService::class.java)
@@ -156,6 +183,12 @@ class NodeForegroundService : Service() {
 
     fun stop(context: Context) {
       val intent = Intent(context, NodeForegroundService::class.java).setAction(ACTION_STOP)
+      context.startService(intent)
+    }
+
+    fun updateMediaProjection(context: Context, enabled: Boolean) {
+      val action = if (enabled) ACTION_ENABLE_MEDIA_PROJECTION else ACTION_DISABLE_MEDIA_PROJECTION
+      val intent = Intent(context, NodeForegroundService::class.java).setAction(action)
       context.startService(intent)
     }
   }

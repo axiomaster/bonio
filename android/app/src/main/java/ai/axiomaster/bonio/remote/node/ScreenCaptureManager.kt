@@ -19,9 +19,14 @@ class ScreenCaptureManager(private val context: Context) {
   data class Payload(val payloadJson: String)
 
   @Volatile private var screenCaptureRequester: ScreenCaptureRequester? = null
+  @Volatile private var latestCaptureResult: ScreenCaptureRequester.CaptureResult? = null
 
   fun attachScreenCaptureRequester(requester: ScreenCaptureRequester) {
     screenCaptureRequester = requester
+  }
+
+  fun setLatestCaptureResult(result: ScreenCaptureRequester.CaptureResult?) {
+    latestCaptureResult = result
   }
 
   suspend fun capture(paramsJson: String?): Payload =
@@ -37,10 +42,11 @@ class ScreenCaptureManager(private val context: Context) {
       val maxWidth = parseJsonInt(params, "maxWidth")?.takeIf { it > 0 }
 
       val capture =
-        requester.requestCapture()
+        latestCaptureResult ?: requester.requestCapture(skipRationale = true)
           ?: throw IllegalStateException(
             "SCREEN_PERMISSION_REQUIRED: grant Screen Recording permission",
           )
+      latestCaptureResult = null
 
       val mgr =
         context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager

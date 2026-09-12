@@ -524,6 +524,7 @@ class NodeRuntime(context: Context) {
   // Delegate methods
   fun setDisplayName(v: String) = prefs.setDisplayName(v)
   fun setCameraEnabled(v: Boolean) = prefs.setCameraEnabled(v)
+  fun setScreenRecordEnabled(v: Boolean) = prefs.setScreenRecordEnabled(v)
   fun setLocationMode(m: LocationMode) = prefs.setLocationMode(m)
   fun setManualEnabled(v: Boolean) = prefs.setManualEnabled(v)
   fun setManualHost(v: String) = prefs.setManualHost(v)
@@ -538,6 +539,7 @@ class NodeRuntime(context: Context) {
   val instanceId: StateFlow<String> = prefs.instanceId
   val displayName: StateFlow<String> = prefs.displayName
   val cameraEnabled: StateFlow<Boolean> = prefs.cameraEnabled
+  val screenRecordEnabled: StateFlow<Boolean> = prefs.screenRecordEnabled
   val locationMode: StateFlow<LocationMode> = prefs.locationMode
   val manualEnabled: StateFlow<Boolean> = prefs.manualEnabled
   val manualHost: StateFlow<String> = prefs.manualHost

@@ -19,6 +19,7 @@ class ScreenRecordManager(private val context: Context) {
 
   @Volatile private var screenCaptureRequester: ScreenCaptureRequester? = null
   @Volatile private var permissionRequester: PermissionRequester? = null
+  @Volatile private var latestCaptureResult: ScreenCaptureRequester.CaptureResult? = null
 
   fun attachScreenCaptureRequester(requester: ScreenCaptureRequester) {
     screenCaptureRequester = requester
@@ -26,6 +27,10 @@ class ScreenRecordManager(private val context: Context) {
 
   fun attachPermissionRequester(requester: PermissionRequester) {
     permissionRequester = requester
+  }
+
+  fun setLatestCaptureResult(result: ScreenCaptureRequester.CaptureResult?) {
+    latestCaptureResult = result
   }
 
   suspend fun record(paramsJson: String?): Payload =
@@ -50,10 +55,11 @@ class ScreenRecordManager(private val context: Context) {
         throw IllegalArgumentException("INVALID_REQUEST: screenIndex must be 0 on Android")
       }
 
-      val capture = requester.requestCapture()
+      val capture = latestCaptureResult ?: requester.requestCapture(skipRationale = true)
         ?: throw IllegalStateException(
           "SCREEN_PERMISSION_REQUIRED: grant Screen Recording permission",
         )
+      latestCaptureResult = null
 
       val mgr =
         context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager

@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -84,7 +85,21 @@ fun SettingsTab(
         micPermissionGranted = granted
     }
 
-    val screenRecordActive by viewModel.screenRecordActive.collectAsState()
+    val screenRecordEnabled by viewModel.screenRecordEnabled.collectAsState()
+    val mediaProjectionManager = remember {
+        context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+    }
+    val screenCaptureLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK && result.data != null) {
+            viewModel.onScreenCaptureAuthorized(result.resultCode, result.data!!)
+            Toast.makeText(context, strings.screenRecordGrantedToast, Toast.LENGTH_SHORT).show()
+        } else {
+            viewModel.onScreenCaptureRevoked()
+            Toast.makeText(context, strings.screenRecordDeniedToast, Toast.LENGTH_SHORT).show()
+        }
+    }
     var screenAwarenessEnabled by remember { mutableStateOf(true) }
 
     val instanceId by viewModel.instanceId.collectAsState()
@@ -182,8 +197,8 @@ fun SettingsTab(
             ) {
                 Column {
                     ToggleRow(
-                        title = if (currentLanguage == AppLanguage.ZH) "地理位置权限" else "Location",
-                        subtitle = if (currentLanguage == AppLanguage.ZH) "定位信息分享" else "GPS location sharing",
+                        title = strings.permLocationTitle,
+                        subtitle = strings.permLocationDesc,
                         isOn = locationMode != LocationMode.Off,
                         onToggle = { enable ->
                             if (enable) {
@@ -197,8 +212,8 @@ fun SettingsTab(
                     )
                     HorizontalDivider(color = Color(0xFFF2F3F5), thickness = 0.5.dp)
                     ToggleRow(
-                        title = if (currentLanguage == AppLanguage.ZH) "麦克风与语音" else "Voice Wake & STT",
-                        subtitle = if (currentLanguage == AppLanguage.ZH) "语音唤醒与输入识别" else "Voice recognition and wake word",
+                        title = strings.permMicTitle,
+                        subtitle = strings.permMicDesc,
                         isOn = micPermissionGranted,
                         onToggle = { enable ->
                             if (enable) audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
@@ -207,8 +222,8 @@ fun SettingsTab(
                     )
                     HorizontalDivider(color = Color(0xFFF2F3F5), thickness = 0.5.dp)
                     ToggleRow(
-                        title = if (currentLanguage == AppLanguage.ZH) "相机权限" else "Camera Access",
-                        subtitle = if (currentLanguage == AppLanguage.ZH) "允许拍照与视频环境感知" else "Allow remote photo/video",
+                        title = strings.permCameraTitle,
+                        subtitle = strings.permCameraDesc,
                         isOn = cameraEnabled,
                         onToggle = { enable ->
                             if (enable) permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
@@ -217,15 +232,22 @@ fun SettingsTab(
                     )
                     HorizontalDivider(color = Color(0xFFF2F3F5), thickness = 0.5.dp)
                     ToggleRow(
-                        title = if (currentLanguage == AppLanguage.ZH) "屏幕录制感知" else "Screen Recording",
-                        subtitle = if (currentLanguage == AppLanguage.ZH) "允许实时屏幕交互流" else "Allow remote screen view",
-                        isOn = screenRecordActive,
-                        onToggle = { /* Managed dynamically by screen recording session */ }
+                        title = strings.permScreenRecordTitle,
+                        subtitle = strings.permScreenRecordDesc,
+                        isOn = screenRecordEnabled,
+                        onToggle = { enable ->
+                            if (enable) {
+                                val intent = mediaProjectionManager.createScreenCaptureIntent()
+                                screenCaptureLauncher.launch(intent)
+                            } else {
+                                viewModel.onScreenCaptureRevoked()
+                            }
+                        }
                     )
                     HorizontalDivider(color = Color(0xFFF2F3F5), thickness = 0.5.dp)
                     ToggleRow(
-                        title = if (currentLanguage == AppLanguage.ZH) "屏幕理解 (Screen Awareness)" else "Screen Awareness",
-                        subtitle = if (currentLanguage == AppLanguage.ZH) "按需分析读取当前屏幕内容" else "Allow on-demand reading of current page",
+                        title = strings.permScreenAwarenessTitle,
+                        subtitle = strings.permScreenAwarenessDesc,
                         isOn = screenAwarenessEnabled,
                         onToggle = { screenAwarenessEnabled = it }
                     )
@@ -342,6 +364,7 @@ private fun ToggleRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable { onToggle(!isOn) }
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween

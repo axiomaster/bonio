@@ -1,6 +1,7 @@
 package ai.axiomaster.bonio
 
 import android.app.Application
+import android.content.Intent
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import ai.axiomaster.bonio.ai.AgentManager
@@ -46,6 +47,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
   val cameraHud: StateFlow<CameraHudState?> = runtime.cameraHud
   val screenRecordActive: StateFlow<Boolean> = runtime.screenRecordActive
+  val screenRecordEnabled: StateFlow<Boolean> = runtime.screenRecordEnabled
 
   val instanceId: StateFlow<String> = runtime.instanceId
   val displayName: StateFlow<String> = runtime.displayName
@@ -219,6 +221,25 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
   fun setCameraEnabled(value: Boolean) {
     runtime.setCameraEnabled(value)
+  }
+
+  fun setScreenRecordEnabled(value: Boolean) {
+    runtime.setScreenRecordEnabled(value)
+  }
+
+  fun onScreenCaptureAuthorized(resultCode: Int, data: Intent) {
+    val captureResult = ScreenCaptureRequester.CaptureResult(resultCode, data)
+    runtime.screenCaptureManager.setLatestCaptureResult(captureResult)
+    runtime.screenRecorder.setLatestCaptureResult(captureResult)
+    runtime.setScreenRecordEnabled(true)
+    NodeForegroundService.updateMediaProjection(getApplication(), true)
+  }
+
+  fun onScreenCaptureRevoked() {
+    runtime.screenCaptureManager.setLatestCaptureResult(null)
+    runtime.screenRecorder.setLatestCaptureResult(null)
+    runtime.setScreenRecordEnabled(false)
+    NodeForegroundService.updateMediaProjection(getApplication(), false)
   }
 
   fun setLocationMode(mode: LocationMode) {

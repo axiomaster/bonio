@@ -22,6 +22,13 @@ class ScreenCaptureRequester(private val activity: ComponentActivity) {
 
   private val mutex = Mutex()
   private var pending: CompletableDeferred<CaptureResult?>? = null
+  @Volatile private var preAuthorizedResult: CaptureResult? = null
+
+  fun setPreAuthorizedResult(result: CaptureResult?) {
+    preAuthorizedResult = result
+  }
+
+  fun getPreAuthorizedResult(): CaptureResult? = preAuthorizedResult
 
   private val launcher: ActivityResultLauncher<Intent> =
     activity.registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -35,10 +42,18 @@ class ScreenCaptureRequester(private val activity: ComponentActivity) {
       }
     }
 
-  suspend fun requestCapture(timeoutMs: Long = 20_000): CaptureResult? =
+  suspend fun requestCapture(timeoutMs: Long = 20_000, skipRationale: Boolean = false): CaptureResult? =
     mutex.withLock {
-      val proceed = showRationaleDialog()
-      if (!proceed) return null
+      val pre = preAuthorizedResult
+      if (pre != null) {
+        preAuthorizedResult = null
+        return pre
+      }
+
+      if (!skipRationale) {
+        val proceed = showRationaleDialog()
+        if (!proceed) return null
+      }
 
       val mgr = activity.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
       val intent = mgr.createScreenCaptureIntent()
