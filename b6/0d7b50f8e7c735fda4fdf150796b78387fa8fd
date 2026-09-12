@@ -1,0 +1,29 @@
+android/app/src/main/java/ai/axiomaster/bonio/ui/screens/MemoryTab.kt
+  s_539b59f41bad53::t_ffbb50966f0746 236,238-239,242-243,253,255-256,259-260
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "b60d7b50f8e7c735fda4fdf150796b78387fa8fd",
+  "prompts": {},
+  "sessions": {
+    "s_539b59f41bad53": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8f431abe-980e-474d-af47-4ff9172028a6",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 0
+    },
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 36
+    }
+  }
+}
