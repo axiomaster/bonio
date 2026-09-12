@@ -1,0 +1,54 @@
+android/app/src/main/java/ai/axiomaster/bonio/MainViewModel.kt
+  h_de08bd40967a17 85-95
+android/app/src/main/java/ai/axiomaster/bonio/i18n/AppLanguage.kt
+  h_de08bd40967a17 1-235
+android/app/src/main/java/ai/axiomaster/bonio/remote/chat/ChatController.kt
+  h_de08bd40967a17 124-125,327-329
+android/app/src/main/java/ai/axiomaster/bonio/remote/memory/MemoryRepository.kt
+  h_de08bd40967a17 20,28-33,55-73,99,103-109,171-174
+android/app/src/main/java/ai/axiomaster/bonio/ui/screens/ChatTab.kt
+  h_de08bd40967a17 25,51,145,164-169,186
+android/app/src/main/java/ai/axiomaster/bonio/ui/screens/MainScreen.kt
+  h_de08bd40967a17 4-5,15,18-19,21-22,24,26,34-36,38-42,57-58,60-99,101-108,110-111,114-124
+android/app/src/main/java/ai/axiomaster/bonio/ui/screens/MemoryTab.kt
+  h_de08bd40967a17 3-5,8-9,12-13,15,17,23,25-28,30,35-36,38,45-46,48-53,55-58,60-62,64-81,83-136,138-145,147-164,167-190,193-250,254-292,294-296,301-370,372-396,398-403,405-466,468-474,476-484,486-587,593-605,608-622
+android/app/src/main/java/ai/axiomaster/bonio/ui/screens/PersonalizationTab.kt
+  h_de08bd40967a17 36,47,127,197,348,364,376,390,410,424
+android/app/src/main/java/ai/axiomaster/bonio/ui/screens/SettingsTab.kt
+  h_de08bd40967a17 10,15,19-21,27,29,36-37,46-50,55-56,103,106-107,115-119,122-126,131-150,159-160,174-175,185-186,200-201,210-211,220-221,227-228,236-237,245-286,293-323,343-345,362-366,373
+android/app/src/main/java/ai/axiomaster/bonio/ui/screens/chat/ChatComposer.kt
+  h_de08bd40967a17 41-42,67,111,123-126,146,228,303,439,444,462,464-467
+android/app/src/main/java/ai/axiomaster/bonio/ui/screens/chat/ChatMessageList.kt
+  h_de08bd40967a17 24,48-49,92,98,110
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "0dddbd44c635660b3dddd3a3595d7aa50ef10695",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  },
+  "sessions": {
+    "s_539b59f41bad53": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8f431abe-980e-474d-af47-4ff9172028a6",
+        "model": "glm-5.1"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 2
+    },
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 36
+    }
+  }
+}
