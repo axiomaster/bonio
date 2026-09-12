@@ -1,0 +1,44 @@
+android/app/src/main/java/ai/axiomaster/bonio/FloatingWindowService.kt
+  h_de08bd40967a17 24,85-104,208-214,603-618,718-733
+android/app/src/main/java/ai/axiomaster/bonio/i18n/AppLanguage.kt
+  h_de08bd40967a17 97-102,186-193,277-284
+android/app/src/main/java/ai/axiomaster/bonio/ui/components/BonioSwitch.kt
+  h_de08bd40967a17 1-85
+android/app/src/main/java/ai/axiomaster/bonio/ui/screens/PersonalizationTab.kt
+  h_de08bd40967a17 40,577,579,598,602,604
+android/app/src/main/java/ai/axiomaster/bonio/ui/screens/SettingsTab.kt
+  h_de08bd40967a17 4,12,37-39,45-46,50-69,136-152,331-345,388,391,406-470,565,569,571
+android/app/src/main/java/ai/axiomaster/bonio/ui/screens/SkillsSection.kt
+  h_de08bd40967a17 5,222,224
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "4b28454c8bb98e7e49ba97ca28ec7edc1a90941c",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  },
+  "sessions": {
+    "s_539b59f41bad53": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8f431abe-980e-474d-af47-4ff9172028a6",
+        "model": "glm-5.1"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 2
+    },
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 36
+    }
+  }
+}
