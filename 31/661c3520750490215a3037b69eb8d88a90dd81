@@ -1,0 +1,33 @@
+android/app/src/main/java/ai/axiomaster/bonio/NodeRuntime.kt
+  s_539b59f41bad53::t_328affaec8b21b 289-309
+  s_539b59f41bad53::t_21faa7cc5f3068 374
+  s_539b59f41bad53::t_832b725e3d28d2 398
+android/app/src/main/java/ai/axiomaster/bonio/remote/memory/ChargingTriggeredSync.kt
+  s_539b59f41bad53::t_6098ebe9a7c663 1-87
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "31661c3520750490215a3037b69eb8d88a90dd81",
+  "prompts": {},
+  "sessions": {
+    "s_539b59f41bad53": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8f431abe-980e-474d-af47-4ff9172028a6",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 0
+    },
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 36
+    }
+  }
+}
