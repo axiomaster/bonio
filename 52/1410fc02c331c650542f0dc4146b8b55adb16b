@@ -1,0 +1,38 @@
+server/src/providers/openai_compatible.cpp
+  s_539b59f41bad53::t_29a6c87b2ee63d 14-64
+  s_539b59f41bad53::t_867e55d2e36820 123
+  s_539b59f41bad53::t_eb085454335e28 87
+server/src/agent/agent.cpp
+  s_539b59f41bad53::t_138baa71aebc11 774
+  s_539b59f41bad53::t_cbe8039de0246c 535
+  s_539b59f41bad53::t_9daddd17b77dec 430
+server/include/hiclaw/providers/openai_compatible.hpp
+  s_539b59f41bad53::t_83e59eda0f9c5d 6,25-36
+  s_539b59f41bad53::t_84f4ae21afcb8b 37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "521410fc02c331c650542f0dc4146b8b55adb16b",
+  "prompts": {},
+  "sessions": {
+    "s_539b59f41bad53": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8f431abe-980e-474d-af47-4ff9172028a6",
+        "model": "glm-5.1"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 2
+    },
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 36
+    }
+  }
+}
