@@ -1,0 +1,46 @@
+android/app/src/main/java/ai/axiomaster/bonio/remote/node/InvokeDispatcher.kt
+  s_539b59f41bad53::t_c11a259ef5db58 171,173-174
+android/app/src/main/java/ai/axiomaster/bonio/remote/protocol/OpenClawProtocolConstants.kt
+  s_539b59f41bad53::t_79fad462d03c05 69-70
+android/app/src/main/AndroidManifest.xml
+  s_539b59f41bad53::t_454a0e2b4f9a49 19
+android/app/src/main/java/ai/axiomaster/bonio/ui/screens/SettingsTab.kt
+  s_539b59f41bad53::t_dc24d8139300a6 168-171,173-174
+  s_539b59f41bad53::t_bf3bc3c54bb6dd 378,381-384
+  s_539b59f41bad53::t_130dd638471c2d 194-195
+android/app/src/main/java/ai/axiomaster/bonio/remote/node/InvokeCommandRegistry.kt
+  s_539b59f41bad53::t_62f80aa6e5836b 211-218
+android/app/src/main/java/ai/axiomaster/bonio/NodeRuntime.kt
+  s_539b59f41bad53::t_19b18c3049e932 101
+  s_539b59f41bad53::t_d867b269392124 66
+  s_539b59f41bad53::t_d35ca40004225a 128
+  s_539b59f41bad53::t_72d3a302ca11c8 417-424
+android/app/src/main/java/ai/axiomaster/bonio/remote/node/SmsHandlerImpl.kt
+  s_539b59f41bad53::t_569815bff02edd 1-278
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "6436b7d661366db5d1f2159543936cea1d19ae26",
+  "prompts": {},
+  "sessions": {
+    "s_539b59f41bad53": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8f431abe-980e-474d-af47-4ff9172028a6",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 11
+    },
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 36
+    }
+  }
+}
