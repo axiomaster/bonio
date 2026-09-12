@@ -4,20 +4,24 @@
     android:id="@+id/floating_root"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
-    android:orientation="horizontal"
-    android:gravity="center_vertical">
+    android:orientation="vertical"
+    android:gravity="center_horizontal">
 
     <androidx.cardview.widget.CardView
         android:id="@+id/bubble_container"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginBottom="4dp"
         android:visibility="gone"
         android:clickable="true"
         android:focusable="true"
-        app:cardBackgroundColor="#E62D303E"
-        app:cardCornerRadius="14dp"
-        app:cardElevation="4dp"
-        app:contentPadding="12dp">
+        app:cardBackgroundColor="#FFFFFF"
+        app:cardCornerRadius="8dp"
+        app:cardElevation="2dp"
+        app:contentPaddingLeft="8dp"
+        app:contentPaddingRight="8dp"
+        app:contentPaddingTop="4dp"
+        app:contentPaddingBottom="4dp">
 
         <LinearLayout
             android:layout_width="wrap_content"
@@ -29,8 +33,8 @@
                 android:id="@+id/bubble_label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="#FFFFFF"
-                android:textSize="13sp"
+                android:textColor="#3D2D18"
+                android:textSize="12sp"
                 android:textStyle="bold"
                 android:visibility="gone" />
 
@@ -45,9 +49,9 @@
                     android:id="@+id/text_bubble"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:maxWidth="280dp"
-                    android:textColor="#FFFFFF"
-                    android:textSize="15sp" />
+                    android:maxWidth="160dp"
+                    android:textColor="#3D2D18"
+                    android:textSize="13sp" />
 
             </ScrollView>
 
@@ -55,10 +59,9 @@
 
     </androidx.cardview.widget.CardView>
 
-    <com.airbnb.lottie.LottieAnimationView
-        android:id="@+id/lottie_agent"
-        android:layout_width="126dp"
-        android:layout_height="126dp"
-        app:lottie_loop="true" />
+    <ai.axiomaster.bonio.avatar.PixelAvatarView
+        android:id="@+id/pixel_avatar"
+        android:layout_width="100dp"
+        android:layout_height="100dp" />
 
 </LinearLayout>

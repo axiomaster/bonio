@@ -5,27 +5,26 @@ import android.net.Uri
 import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.VolumeUp
-import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ai.axiomaster.bonio.MainViewModel
 import ai.axiomaster.bonio.remote.chat.ChatSessionEntry
 import ai.axiomaster.bonio.remote.chat.OutgoingAttachment
+import ai.axiomaster.bonio.remote.memory.CompanionMemoryController
 import ai.axiomaster.bonio.ui.screens.chat.*
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.Dispatchers
@@ -39,13 +38,15 @@ data class PendingImageAttachment(
     val base64: String,
 )
 
+private const val WECHAT_SESSION_PREFIX = "wechat:"
+
 @Composable
 fun ChatTab(
     viewModel: MainViewModel,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    
+
     val messages by viewModel.chatMessages.collectAsState()
     val errorText by viewModel.chatError.collectAsState()
     val pendingRunCount by viewModel.pendingRunCount.collectAsState()
@@ -67,6 +68,10 @@ fun ChatTab(
     val attachments = remember { mutableStateListOf<PendingImageAttachment>() }
     val isSpeakerEnabled by viewModel.isSpeakerEnabled.collectAsState()
     val partialSttText by viewModel.partialSttText.collectAsState()
+
+    val sessionLabel = remember(sessionKey) {
+        labelForSessionKey(sessionKey)
+    }
 
     val micPermissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -104,180 +109,184 @@ fun ChatTab(
             }
         }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color(0xFFFAFAFA))
+    ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 20.dp, vertical = 0.dp), // Reduce vertical padding to accommodate top tabs
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxSize()
         ) {
-        Spacer(modifier = Modifier.height(12.dp)) // Managed spacing
-        ChatThreadSelector(
-            sessionKey = sessionKey,
-            sessions = sessions,
-            mainSessionKey = mainSessionKey,
-            healthOk = healthOk,
-            isSpeakerEnabled = isSpeakerEnabled,
-            onToggleSpeaker = { viewModel.setSpeakerEnabled(!isSpeakerEnabled) },
-            onSelectSession = { key -> viewModel.switchChatSession(key) },
-        )
+            // ── Header Bar (Connection Status + Session Capsules + Speaker) ──
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Connection status pill
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFFE8ECF0),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "●",
+                            fontSize = 8.sp,
+                            color = if (healthOk) Color(0xFF2ECC71) else Color(0xFFF39C12)
+                        )
+                        Text(
+                            text = if (healthOk) "Connected" else "Offline",
+                            fontSize = 11.sp,
+                            color = Color(0xFF999999)
+                        )
+                    }
+                }
 
-        if (!errorText.isNullOrBlank()) {
-            ChatErrorRail(errorText = errorText!!)
-        }
+                Spacer(modifier = Modifier.width(6.dp))
 
-        ChatMessageList(
-            messages = messages,
-            pendingRunCount = pendingRunCount,
-            pendingToolCalls = pendingToolCalls,
-            streamingAssistantText = streamingAssistantText,
-            healthOk = healthOk,
-            modifier = Modifier.weight(1f, fill = true),
-        )
-
-        Row(modifier = Modifier.fillMaxWidth().imePadding()) {
-            ChatComposer(
-                healthOk = healthOk,
-                thinkingLevel = thinkingLevel,
-                pendingRunCount = pendingRunCount,
-                attachments = attachments,
-                isSpeakerEnabled = isSpeakerEnabled,
-                partialSttText = partialSttText,
-                onPickImages = { pickImages.launch("image/*") },
-                onRemoveAttachment = { id -> attachments.removeAll { it.id == id } },
-                onSetThinkingLevel = { level -> viewModel.setChatThinkingLevel(level) },
-                onRefresh = {
-                    viewModel.refreshChat()
-                    viewModel.refreshChatSessions(limit = 200)
-                },
-                onAbort = { viewModel.abortChat() },
-                onSend = { text ->
-                    val outgoing =
-                        attachments.map { att ->
-                            OutgoingAttachment(
-                                type = "image",
-                                mimeType = att.mimeType,
-                                fileName = att.fileName,
-                                base64 = att.base64,
+                // Session capsules (chat, memory, wechat)
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    listOf("chat", "memory", "wechat").forEach { label ->
+                        val active = sessionLabel == label
+                        Surface(
+                            onClick = {
+                                when (label) {
+                                    "memory" -> viewModel.switchChatSession(CompanionMemoryController.SESSION_KEY)
+                                    "wechat" -> {
+                                        viewModel.refreshChatSessions(limit = 200)
+                                        val key = latestWechatSessionKey(sessions) ?: "${WECHAT_SESSION_PREFIX}pending"
+                                        viewModel.switchChatSession(key)
+                                    }
+                                    else -> viewModel.switchChatSession(mainSessionKey.ifEmpty { "main" })
+                                }
+                            },
+                            shape = RoundedCornerShape(14.dp),
+                            color = if (active) Color(0xFF0A59F7) else Color(0xFFE8ECF0),
+                        ) {
+                            Text(
+                                text = label,
+                                fontSize = 13.sp,
+                                color = if (active) Color.White else Color(0xFF333333),
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
                             )
                         }
-                    viewModel.sendChat(message = text, thinking = thinkingLevel, attachments = outgoing)
-                    attachments.clear()
-                },
-                onStartVoice = { startVoiceWithPermission() },
-                onStopVoice = { viewModel.stopVoiceInput() },
-                onCancelVoice = { viewModel.cancelVoiceInput() },
-            )
-        }
-    }
-    
-}
-}
+                    }
+                }
 
-@Composable
-private fun ChatThreadSelector(
-    sessionKey: String,
-    sessions: List<ChatSessionEntry>,
-    mainSessionKey: String,
-    healthOk: Boolean,
-    isSpeakerEnabled: Boolean,
-    onToggleSpeaker: () -> Unit,
-    onSelectSession: (String) -> Unit,
-) {
-    val sessionOptions = resolveSessionChoices(sessionKey, sessions, mainSessionKey = mainSessionKey)
+                Spacer(modifier = Modifier.width(6.dp))
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        // Scrollable area for sessions and status
-        Row(
-            modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            for (entry in sessionOptions) {
-                val active = entry.key == sessionKey
+                // Speaker toggle button
                 Surface(
-                    onClick = { onSelectSession(entry.key) },
-                    shape = RoundedCornerShape(8.dp), // Rounded rectangle
-                    color = if (active) mobileAccent else Color.White,
-                    border = BorderStroke(1.dp, if (active) Color(0xFF154CAD) else mobileBorderStrong),
-                    tonalElevation = 0.dp,
-                    shadowElevation = 0.dp,
+                    onClick = { viewModel.setSpeakerEnabled(!isSpeakerEnabled) },
+                    shape = RoundedCornerShape(14.dp),
+                    color = if (isSpeakerEnabled) Color(0xFFE3F2FD) else Color(0xFFF0F0F0),
+                    modifier = Modifier.size(width = 36.dp, height = 28.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = if (isSpeakerEnabled) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+                            contentDescription = "Speaker Toggle",
+                            modifier = Modifier.size(16.dp),
+                            tint = if (isSpeakerEnabled) Color(0xFF0A59F7) else Color(0xFF888888)
+                        )
+                    }
+                }
+            }
+
+            if (!errorText.isNullOrBlank()) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFFFFEBEE)
                 ) {
                     Text(
-                        text = friendlySessionName(entry.displayName ?: entry.key),
-                        style = mobileCaption1.copy(fontWeight = if (active) FontWeight.Bold else FontWeight.SemiBold),
-                        color = if (active) Color.White else mobileText,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        text = errorText!!,
+                        fontSize = 12.sp,
+                        color = Color(0xFFE53935),
+                        modifier = Modifier.padding(8.dp)
                     )
                 }
+            }
 
-                if (active) {
-                    ChatConnectionPill(healthOk = healthOk)
+            // ── Messages Area ──
+            ChatMessageList(
+                sessionLabel = sessionLabel,
+                messages = messages,
+                pendingRunCount = pendingRunCount,
+                pendingToolCalls = pendingToolCalls,
+                streamingAssistantText = streamingAssistantText,
+                healthOk = healthOk,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp),
+            )
+
+            // ── Bottom Composer (Only shown in 'chat' session, matching HarmonyOS) ──
+            if (sessionLabel == "chat") {
+                Box(modifier = Modifier.fillMaxWidth().imePadding()) {
+                    ChatComposer(
+                        healthOk = healthOk,
+                        thinkingLevel = thinkingLevel,
+                        pendingRunCount = pendingRunCount,
+                        attachments = attachments,
+                        isSpeakerEnabled = isSpeakerEnabled,
+                        partialSttText = partialSttText,
+                        onPickImages = { pickImages.launch("image/*") },
+                        onRemoveAttachment = { id -> attachments.removeAll { it.id == id } },
+                        onSetThinkingLevel = { level -> viewModel.setChatThinkingLevel(level) },
+                        onRefresh = {
+                            viewModel.refreshChat()
+                            viewModel.refreshChatSessions(limit = 200)
+                        },
+                        onAbort = { viewModel.abortChat() },
+                        onSend = { text ->
+                            val outgoing =
+                                attachments.map { att ->
+                                    OutgoingAttachment(
+                                        type = "image",
+                                        mimeType = att.mimeType,
+                                        fileName = att.fileName,
+                                        base64 = att.base64,
+                                    )
+                                }
+                            viewModel.sendChat(message = text, thinking = thinkingLevel, attachments = outgoing)
+                            attachments.clear()
+                        },
+                        onStartVoice = { startVoiceWithPermission() },
+                        onStopVoice = { viewModel.stopVoiceInput() },
+                        onCancelVoice = { viewModel.cancelVoiceInput() },
+                    )
                 }
             }
         }
-
-        // Speaker Toggle Button
-        Surface(
-            onClick = onToggleSpeaker,
-            shape = RoundedCornerShape(8.dp),
-            color = if (isSpeakerEnabled) mobileAccentSoft else Color(0xFFF0F0F0),
-            border = BorderStroke(1.dp, if (isSpeakerEnabled) mobileAccent.copy(alpha = 0.2f) else mobileBorder),
-        ) {
-            Box(
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (isSpeakerEnabled) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
-                    contentDescription = "Speaker Toggle",
-                    modifier = Modifier.size(18.dp),
-                    tint = if (isSpeakerEnabled) mobileAccent else Color(0xFF99A0AE)
-                )
-            }
-        }
     }
 }
 
-@Composable
-private fun ChatConnectionPill(healthOk: Boolean) {
-    Surface(
-        shape = RoundedCornerShape(8.dp), // Rounded rectangle
-        color = if (healthOk) mobileSuccessSoft else mobileWarningSoft,
-        border = BorderStroke(1.dp, if (healthOk) mobileSuccess.copy(alpha = 0.35f) else mobileWarning.copy(alpha = 0.35f)),
-    ) {
-        Text(
-            text = if (healthOk) "Connected" else "Offline",
-            style = mobileCaption2.copy(fontWeight = FontWeight.Bold), // Smaller text for compactness
-            color = if (healthOk) mobileSuccess else mobileWarning,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-        )
-    }
+private fun labelForSessionKey(key: String): String {
+    if (key == CompanionMemoryController.SESSION_KEY) return "memory"
+    if (key.startsWith(WECHAT_SESSION_PREFIX)) return "wechat"
+    return "chat"
 }
 
-@Composable
-private fun ChatErrorRail(errorText: String) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = Color.White,
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, mobileDanger),
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-                text = "CHAT ERROR",
-                style = mobileCaption2.copy(letterSpacing = 0.6.sp),
-                color = mobileDanger,
-            )
-            Text(text = errorText, style = mobileCallout, color = mobileText)
-        }
-    }
+private fun latestWechatSessionKey(sessions: List<ChatSessionEntry>): String? {
+    return sessions
+        .filter { it.key.startsWith(WECHAT_SESSION_PREFIX) }
+        .maxByOrNull { it.updatedAtMs ?: 0L }
+        ?.key
 }
 
 private suspend fun loadImageAttachment(resolver: ContentResolver, uri: Uri): PendingImageAttachment {
@@ -300,4 +309,3 @@ private suspend fun loadImageAttachment(resolver: ContentResolver, uri: Uri): Pe
         base64 = base64,
     )
 }
-

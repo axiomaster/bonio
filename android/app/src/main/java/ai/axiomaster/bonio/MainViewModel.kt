@@ -100,6 +100,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     avatarPrefs.edit().putBoolean("show_overlay", enabled).apply()
   }
 
+  private val _avatarSkin = MutableStateFlow(avatarPrefs.getString("avatar_skin", "cat") ?: "cat")
+  val avatarSkin: StateFlow<String> = _avatarSkin
+
+  fun setAvatarSkin(skin: String) {
+    val normalized = skin.lowercase().trim().ifEmpty { "cat" }
+    _avatarSkin.value = normalized
+    avatarPrefs.edit().putString("avatar_skin", normalized).apply()
+  }
+
   val themeManager = ai.axiomaster.bonio.avatar.ThemeManager(app)
   val installedThemes: StateFlow<List<ai.axiomaster.bonio.remote.theme.ThemeInfo>> = themeManager.installedThemes
   val activeThemeId: StateFlow<String> = themeManager.activeThemeId
@@ -243,6 +252,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
   fun connect(endpoint: GatewayEndpoint) {
     runtime.connect(endpoint)
+  }
+
+  fun connectManual() {
+    val host = manualHost.value.trim()
+    val port = manualPort.value
+    val tls = manualTls.value
+    val token = gatewayToken.value.trim().ifEmpty { null }
+    if (host.isNotEmpty()) {
+      val endpoint = GatewayEndpoint(
+        stableId = "manual|${host.lowercase()}|$port",
+        name = "$host:$port",
+        host = host,
+        port = port,
+        tlsEnabled = tls
+      )
+      runtime.connect(endpoint, token)
+    }
   }
 
   fun setLocalEnabled(enabled: Boolean) {

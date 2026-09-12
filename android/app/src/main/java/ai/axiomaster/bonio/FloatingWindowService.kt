@@ -56,7 +56,7 @@ class FloatingWindowService : Service() {
     private lateinit var floatingView: View
     private lateinit var layoutParams: WindowManager.LayoutParams
 
-    private lateinit var lottieAnimationView: LottieAnimationView
+    private lateinit var pixelAvatarView: ai.axiomaster.bonio.avatar.PixelAvatarView
     private lateinit var bubbleContainer: CardView
     private lateinit var bubbleLabel: TextView
     private lateinit var textBubble: TextView
@@ -174,10 +174,10 @@ class FloatingWindowService : Service() {
         floatingView = LayoutInflater.from(this).inflate(R.layout.floating_agent_layout, null)
         floatingRoot = floatingView.findViewById(R.id.floating_root)
 
-        lottieAnimationView = floatingView.findViewById(R.id.lottie_agent)
-        lottieAnimationView.setFailureListener { e ->
-            Log.w(TAG, "Lottie composition failed, ignoring", e)
-        }
+        pixelAvatarView = floatingView.findViewById(R.id.pixel_avatar)
+        val avatarPrefs = getSharedPreferences("bonio_avatar", Context.MODE_PRIVATE)
+        val initSkin = avatarPrefs.getString("avatar_skin", "cat") ?: "cat"
+        pixelAvatarView.setSkin(initSkin)
         bubbleContainer = floatingView.findViewById(R.id.bubble_container)
         bubbleLabel = floatingView.findViewById(R.id.bubble_label)
         textBubble = floatingView.findViewById(R.id.text_bubble)
@@ -335,13 +335,15 @@ class FloatingWindowService : Service() {
             }
         }
 
+        // Observe skin changes from preferences
         serviceScope.launch {
-            stateManager.avatarColorFilter.collect { color ->
-                if (color != null) {
-                    lottieAnimationView.setColorFilter(color, PorterDuff.Mode.MULTIPLY)
-                } else {
-                    lottieAnimationView.clearColorFilter()
+            val avatarPrefs = applicationContext.getSharedPreferences("bonio_avatar", Context.MODE_PRIVATE)
+            while (true) {
+                val skin = avatarPrefs.getString("avatar_skin", "cat") ?: "cat"
+                if (pixelAvatarView.getSkin() != skin) {
+                    pixelAvatarView.setSkin(skin)
                 }
+                delay(500)
             }
         }
 
@@ -387,60 +389,24 @@ class FloatingWindowService : Service() {
     }
 
     private fun updateAnimation(state: AvatarState) {
-        if (isPlayingTransition) {
-            updateFlip(state)
-            return
+        val visual = when (state.activity) {
+            AgentState.Working -> "working"
+            AgentState.Thinking, AgentState.Confused -> "thinking"
+            AgentState.Listening -> "waiting"
+            AgentState.Speaking -> "wave"
+            AgentState.Happy -> "completed"
+            AgentState.Bored, AgentState.Sleeping, AgentState.Idle -> "idle"
+            else -> "idle"
         }
-
-        val assetPath = themeManager.resolveAssetPath(state)
-        if (assetPath == currentAssetPath) return
-        currentAssetPath = assetPath
-
-        try {
-            lottieAnimationView.repeatCount = com.airbnb.lottie.LottieDrawable.INFINITE
-            lottieAnimationView.setAnimation(assetPath)
-            lottieAnimationView.playAnimation()
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to set Lottie animation: $assetPath", e)
-        }
-
-        updateFlip(state)
-    }
-
-    private fun updateFlip(state: AvatarState) {
-        val target = state.targetPosition
-        if (target != null && (state.motion == MotionState.Walking || state.motion == MotionState.Running)) {
-            val movingRight = target.x > state.position.x
-            lottieAnimationView.scaleX = if (movingRight) -1f else 1f
-        } else {
-            lottieAnimationView.scaleX = 1f
-        }
+        pixelAvatarView.setVisualState(visual)
     }
 
     private fun playTransitionThenLoop(transition: ai.axiomaster.bonio.avatar.AvatarTransition) {
-        val transitionPath = themeManager.resolveTransitionPath(transition) ?: return
-        isPlayingTransition = true
-        currentAssetPath = null
-
-        try {
-            lottieAnimationView.repeatCount = 0
-            lottieAnimationView.setAnimation(transitionPath)
-            lottieAnimationView.removeAllAnimatorListeners()
-            lottieAnimationView.addAnimatorListener(object : android.animation.AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: android.animation.Animator) {
-                    lottieAnimationView.removeAllAnimatorListeners()
-                    isPlayingTransition = false
-                    avatarController.clearTransition()
-                    val stableState = avatarController.avatarState.value
-                    updateAnimation(stableState)
-                }
-            })
-            lottieAnimationView.playAnimation()
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to play transition animation: $transitionPath", e)
-            isPlayingTransition = false
+        pixelAvatarView.setVisualState("wave")
+        mainHandler.postDelayed({
             avatarController.clearTransition()
-        }
+            updateAnimation(avatarController.avatarState.value)
+        }, 1200)
     }
 
     private fun updatePosition(state: AvatarState) {
@@ -461,19 +427,15 @@ class FloatingWindowService : Service() {
 
     private fun bubbleLabelTextForActivity(state: AvatarState): String? {
         stateManager.bubbleCountdownLabel.value?.let { return it }
-        return when (state.activity) {
-            AgentState.Listening -> "Listening..."
-            AgentState.Thinking -> "Thinking..."
-            AgentState.Speaking -> "Speaking..."
-            AgentState.Working -> "Working..."
-            AgentState.Happy -> null
-            AgentState.Confused -> "Hmm?"
-            AgentState.Angry -> "Grr!"
-            AgentState.Watching -> null
-            AgentState.Bored -> null
-            AgentState.Sleeping -> "Zzz..."
-            AgentState.Idle -> null
-        }
+        val stateName = when (state.activity) {
+            AgentState.Working -> "working"
+            AgentState.Thinking, AgentState.Confused -> "thinking"
+            AgentState.Listening -> "waiting"
+            AgentState.Happy -> "completed"
+            AgentState.Sleeping, AgentState.Idle -> "idle"
+            else -> null
+        } ?: return null
+        return ai.axiomaster.bonio.avatar.CustomSkinManager.getAgentBubble(stateName, pixelAvatarView.getSkin())
     }
 
     private fun updateBubbleForActivity(state: AvatarState) {
@@ -514,24 +476,7 @@ class FloatingWindowService : Service() {
     }
 
     private fun positionBubbleBesideAvatar() {
-        if (!::floatingRoot.isInitialized || !::lottieAnimationView.isInitialized) return
-        val showOnLeft = avatarController.avatarState.value.position.x > resources.displayMetrics.widthPixels / 2f
-        val bubbleIndex = floatingRoot.indexOfChild(bubbleContainer)
-        val desiredBubbleIndex = if (showOnLeft) 0 else 1
-        if (bubbleIndex != desiredBubbleIndex) {
-            floatingRoot.removeView(bubbleContainer)
-            floatingRoot.addView(bubbleContainer, desiredBubbleIndex)
-        }
-        val spacing = (8 * resources.displayMetrics.density).toInt()
-        (bubbleContainer.layoutParams as? LinearLayout.LayoutParams)?.let { params ->
-            params.setMargins(
-                if (showOnLeft) 0 else spacing,
-                0,
-                if (showOnLeft) spacing else 0,
-                0,
-            )
-            bubbleContainer.layoutParams = params
-        }
+        // Bubble is positioned directly above pixel avatar in vertical root
     }
 
     private fun hideBubbleAnimated() {
@@ -557,7 +502,7 @@ class FloatingWindowService : Service() {
         val dragThresholdPx = (DRAG_THRESHOLD_DP * density).toInt()
         Log.d(TAG, "setupTouchListener: dragThresholdPx=$dragThresholdPx density=$density")
 
-        lottieAnimationView.setOnTouchListener(object : View.OnTouchListener {
+        pixelAvatarView.setOnTouchListener(object : View.OnTouchListener {
             private var initialX = 0
             private var initialY = 0
             private var initialTouchX = 0f
@@ -600,6 +545,11 @@ class FloatingWindowService : Service() {
                             }
                         }
                         if (isDragging) {
+                            if (dx < -10) {
+                                pixelAvatarView.setVisualState("dragLeft")
+                            } else if (dx > 10) {
+                                pixelAvatarView.setVisualState("dragRight")
+                            }
                             val newX = initialX + dx
                             val newY = initialY + dy
                             avatarController.dragTo(newX, newY)
@@ -613,6 +563,7 @@ class FloatingWindowService : Service() {
                         } else if (isDragging) {
                             avatarController.endDrag()
                             savePosition()
+                            updateAnimation(avatarController.avatarState.value)
                         } else {
                             v?.performClick()
                             val now = android.os.SystemClock.uptimeMillis()
@@ -621,6 +572,19 @@ class FloatingWindowService : Service() {
                                 runMagicCue()
                             } else {
                                 lastTapAt = now
+                                pixelAvatarView.setVisualState("wave")
+                                val skin = pixelAvatarView.getSkin()
+                                val greeting = when (skin) {
+                                    "kun" -> "你干嘛~哎哟"
+                                    "mario" -> "Here we go!"
+                                    "messi" -> "Vamos!"
+                                    else -> "喵~ 休息中~ 有事叫我"
+                                }
+                                avatarController.setBubble(greeting)
+                                mainHandler.postDelayed({
+                                    avatarController.clearBubble()
+                                    updateAnimation(avatarController.avatarState.value)
+                                }, 2400)
                             }
                         }
                         return true
@@ -631,6 +595,7 @@ class FloatingWindowService : Service() {
                             longPressTriggered = false
                         } else if (isDragging) {
                             avatarController.endDrag()
+                            updateAnimation(avatarController.avatarState.value)
                         }
                         return true
                     }
