@@ -76,6 +76,9 @@ class FloatingWindowService : Service() {
     private var voiceSessionId = 0
     private var screenSuggestionPending = false
     private var actionableSuggestion: String? = null
+    private var magicCuePending = false
+    private var actionableCues: List<ai.axiomaster.bonio.remote.cue.MagicCue> = emptyList()
+    private var cueEpoch = 0
 
     private var currentAssetPath: String? = null
     private var isPlayingTransition = false
@@ -178,7 +181,9 @@ class FloatingWindowService : Service() {
         bubbleLabel = floatingView.findViewById(R.id.bubble_label)
         textBubble = floatingView.findViewById(R.id.text_bubble)
         textBubbleScroll = floatingView.findViewById(R.id.text_bubble_scroll)
-        bubbleContainer.setOnClickListener { sendActionableSuggestion() }
+        bubbleContainer.setOnClickListener {
+            if (actionableCues.isNotEmpty()) applyMagicCue() else sendActionableSuggestion()
+        }
 
         val savedX = prefs.getInt(KEY_POS_X, 0)
         val savedY = prefs.getInt(KEY_POS_Y, 100)
@@ -601,7 +606,7 @@ class FloatingWindowService : Service() {
                             val now = android.os.SystemClock.uptimeMillis()
                             if (now - lastTapAt <= DOUBLE_TAP_THRESHOLD_MS) {
                                 lastTapAt = 0L
-                                bringAppToFront()
+                                runMagicCue()
                             } else {
                                 lastTapAt = now
                             }
@@ -687,6 +692,122 @@ class FloatingWindowService : Service() {
             delay(1800)
             avatarController.clearBubble()
             avatarController.setActivity(AgentState.Idle)
+        }
+    }
+
+    // ── Magic Cue (double-tap): screen text → LLM suggestions → capsule ──
+
+    private fun runMagicCue() {
+        if (magicCuePending) return
+        val runtime = (application as BonioApp).runtime
+        if (!runtime.isConnected.value) {
+            avatarController.setActivity(AgentState.Confused)
+            avatarController.setBubble("后端未连接")
+            mainHandler.postDelayed({ avatarController.clearBubble(); avatarController.setActivity(AgentState.Idle) }, 2000)
+            return
+        }
+        magicCuePending = true
+        actionableCues = emptyList()
+        cueEpoch += 1
+        avatarController.clearBubble()
+        avatarController.setActivity(AgentState.Thinking)
+        avatarController.setBubble("正在分析屏幕…")
+        serviceScope.launch {
+            try {
+                val ctxRes = withContext(Dispatchers.Default) { runtime.captureScreenContext(6000) }
+                if (!ctxRes.ok || ctxRes.payloadJson == null) {
+                    throw IllegalStateException(ctxRes.error?.message ?: "无法读取屏幕内容")
+                }
+                val obj = withContext(Dispatchers.Default) { org.json.JSONObject(ctxRes.payloadJson) }
+                val screen = ai.axiomaster.bonio.remote.cue.MagicCueController.ScreenContext(
+                    packageName = obj.optString("package"),
+                    title = obj.optString("title"),
+                    content = obj.optString("content"),
+                    rawJson = ctxRes.payloadJson,
+                )
+                val cues = withContext(Dispatchers.Default) { runtime.magicCue.runCue(screen) }
+                magicCuePending = false
+                when {
+                    cues == null -> showCueFailure("屏幕分析失败，请稍后再试")
+                    cues.isEmpty() -> showCueFailure("当前页面没有什么可以帮你")
+                    else -> showCues(cues)
+                }
+            } catch (e: Throwable) {
+                magicCuePending = false
+                Log.e(TAG, "Magic cue failed", e)
+                showCueFailure(e.message ?: "屏幕分析失败，请稍后再试")
+            }
+        }
+    }
+
+    private fun showCues(cues: List<ai.axiomaster.bonio.remote.cue.MagicCue>) {
+        actionableCues = cues
+        cueEpoch += 1
+        val epoch = cueEpoch
+        val first = cues.first()
+        val prompt = if (cues.size > 1) "有 ${cues.size} 条建议，点我采纳" else first.title
+        avatarController.setActivity(AgentState.Speaking)
+        avatarController.setBubble(prompt, SUGGESTION_BG_COLOR, android.graphics.Color.WHITE)
+        mainHandler.postDelayed({
+            if (cueEpoch == epoch) {
+                actionableCues = emptyList()
+                avatarController.clearBubble()
+                avatarController.setActivity(AgentState.Idle)
+            }
+        }, SUGGESTION_DISPLAY_MS)
+    }
+
+    private fun showCueFailure(message: String) {
+        avatarController.setActivity(AgentState.Confused)
+        avatarController.setBubble(message)
+        mainHandler.postDelayed({ avatarController.clearBubble(); avatarController.setActivity(AgentState.Idle) }, 2500)
+    }
+
+    private fun applyMagicCue() {
+        val cue = actionableCues.firstOrNull() ?: return
+        cueEpoch += 1
+        actionableCues = emptyList()
+        avatarController.setActivity(AgentState.Working)
+        avatarController.setBubble("正在应用…")
+        serviceScope.launch {
+            if (cue.kind == "calendar") {
+                openCalendarApp()
+                avatarController.setActivity(AgentState.Happy)
+                avatarController.setBubble("已打开日历")
+                delay(1500)
+            } else {
+                val accessibility = ai.axiomaster.bonio.remote.node.BonioAccessibilityService.instance
+                val filled = accessibility?.fillActiveReplyField(cue.content) == true
+                if (filled) {
+                    avatarController.setActivity(AgentState.Happy)
+                    avatarController.setBubble("已填入回复框")
+                } else {
+                    avatarController.setActivity(AgentState.Confused)
+                    avatarController.setBubble("未找到回复框，点此重试")
+                }
+                delay(1800)
+            }
+            avatarController.clearBubble()
+            avatarController.setActivity(AgentState.Idle)
+        }
+    }
+
+    private fun openCalendarApp() {
+        try {
+            val launch = packageManager.getLaunchIntentForPackage("com.google.android.calendar")
+                ?: packageManager.getLaunchIntentForPackage("com.samsung.android.calendar")
+                ?: packageManager.getLaunchIntentForPackage("com.android.calendar")
+            if (launch != null) {
+                launch.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(launch)
+                return
+            }
+            val view = android.content.Intent(android.content.Intent.ACTION_VIEW)
+                .setData(android.provider.CalendarContract.CONTENT_URI.buildUpon().appendPath("time").build())
+            view.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(view)
+        } catch (e: Throwable) {
+            Log.w(TAG, "open calendar failed", e)
         }
     }
 

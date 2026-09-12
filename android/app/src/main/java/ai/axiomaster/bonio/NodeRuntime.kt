@@ -218,6 +218,7 @@ class NodeRuntime(context: Context) {
         if (event == "intent.execute") {
           floatingWindowIntentHandler?.invoke(payloadJson)
         }
+        magicCue.handleGatewayEvent(event, payloadJson)
         if (!callEventHandler.handleEvent(event, payloadJson)) {
           chat.handleGatewayEvent(event, payloadJson)
         }
@@ -255,6 +256,20 @@ class NodeRuntime(context: Context) {
       json = json,
       supportsChatSubscribe = false,
     )
+
+  /** Magic Cue: double-tap avatar → screen text → LLM suggestions (hidden session). */
+  val magicCue: ai.axiomaster.bonio.remote.cue.MagicCueController =
+    ai.axiomaster.bonio.remote.cue.MagicCueController(
+      session = operatorSession,
+      smsBill = { invokeDispatcher.handleInvoke("sms.bill", "{}") },
+      contactsSearch = { query, limit ->
+        invokeDispatcher.handleInvoke("contacts.search", """{"query":${JsonPrimitive(query)}, "limit":$limit}""")
+      },
+    )
+
+  /** In-process screen context capture (accessibility tree text snapshot). */
+  suspend fun captureScreenContext(maxTextLength: Int = 6000): GatewaySession.InvokeResult =
+    invokeDispatcher.handleInvoke("screen.context", """{"maxTextLength":$maxTextLength}""")
 
   val serverConfigRepository: ai.axiomaster.bonio.remote.config.ConfigRepository =
     ai.axiomaster.bonio.remote.config.ConfigRepository(operatorSession)
