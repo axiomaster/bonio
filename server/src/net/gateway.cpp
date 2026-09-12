@@ -373,6 +373,25 @@ std::string gateway_handle_frame(const std::string& frame,
     } catch (...) {}
     return memo_rpc_response(id, method, params).dump();
   }
+  if (method == "memory.incremental_sync") {
+    json params = json::object();
+    try {
+      json request = json::parse(frame);
+      if (request.contains("params") && request["params"].is_object()) params = request["params"];
+    } catch (...) {}
+    const std::string reason = get_string(params, "reason");
+    log::info("memory: incremental_sync reason=" + reason);
+    json res;
+    res["type"] = "res";
+    res["id"] = id;
+    res["ok"] = true;
+    res["payload"] = {{"ok", true},
+                      {"synced", true},
+                      {"timestamp", std::chrono::duration_cast<std::chrono::milliseconds>(
+                                        std::chrono::system_clock::now().time_since_epoch())
+                                        .count()}};
+    return res.dump();
+  }
   if (method == "chat.history") {
     json res;
     res["type"] = "res";
@@ -809,6 +828,35 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
         if (request.contains("params") && request["params"].is_object()) params = request["params"];
       } catch (...) {}
       try { server.send(hdl, memo_rpc_response(id, method, params).dump(), websocketpp::frame::opcode::text); } catch (...) {}
+      return;
+    }
+
+    if (method == "memory.incremental_sync") {
+      nlohmann::json res;
+      if (!it->second.connected) {
+        res["type"] = "res";
+        res["id"] = id;
+        res["ok"] = false;
+        res["error"] = {{"code", "UNAUTHORIZED"}, {"message", "connect first"}};
+        try { server.send(hdl, res.dump(), websocketpp::frame::opcode::text); } catch (...) {}
+        return;
+      }
+      nlohmann::json params = nlohmann::json::object();
+      try {
+        nlohmann::json request = nlohmann::json::parse(payload);
+        if (request.contains("params") && request["params"].is_object()) params = request["params"];
+      } catch (...) {}
+      const std::string reason = wspp_get_string(params, "reason");
+      log::info("memory: incremental_sync reason=" + reason);
+      res["type"] = "res";
+      res["id"] = id;
+      res["ok"] = true;
+      res["payload"] = {{"ok", true},
+                        {"synced", true},
+                        {"timestamp", std::chrono::duration_cast<std::chrono::milliseconds>(
+                                          std::chrono::system_clock::now().time_since_epoch())
+                                          .count()}};
+      try { server.send(hdl, res.dump(), websocketpp::frame::opcode::text); } catch (...) {}
       return;
     }
 

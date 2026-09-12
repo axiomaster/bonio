@@ -143,6 +143,14 @@ static json remote_tools_array() {
 
   tools.push_back(json::parse(R"({"type":"function","function":{"name":"input.find","description":"Check if there is a focused editable input field on the screen and get its position.","parameters":{"type":"object","properties":{},"required":[]}}})"));
 
+  tools.push_back(json::parse(R"___({"type":"function","function":{"name":"sms.send","description":"Send an SMS text message to a phone number.","parameters":{"type":"object","properties":{"to":{"type":"string","description":"Recipient phone number"},"message":{"type":"string","description":"Message body to send"}},"required":["to","message"]}}})___"));
+
+  tools.push_back(json::parse(R"___({"type":"function","function":{"name":"sms.search","description":"Search the device's SMS inbox. Prefer this over sms.bill for general message lookups.","parameters":{"type":"object","properties":{"query":{"type":"string","description":"Keyword to match in the message body"},"sender":{"type":"string","description":"Sender number to filter by (e.g. 10086)"},"limit":{"type":"integer","description":"Max number of messages to return (default 20)"}}}}})___"));
+
+  tools.push_back(json::parse(R"___({"type":"function","function":{"name":"sms.bill","description":"Find the latest carrier billing SMS (phone bill). Returns parsed billing info: amount due, balance, billing cycle, past-due status.","parameters":{"type":"object","properties":{}}}})___"));
+
+  tools.push_back(json::parse(R"___({"type":"function","function":{"name":"screen.context","description":"Read the text content of the current screen via the accessibility tree. Use this to understand what the user is looking at (cheaper than screen.capture for text).","parameters":{"type":"object","properties":{"maxTextLength":{"type":"integer","description":"Max characters of screen text to return (default 6000)"}}}}})___"));
+
   return tools;
 }
 
