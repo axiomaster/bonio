@@ -46,8 +46,18 @@ class MagicCueController(
     val rawJson: String,
   )
 
+  sealed class CueResult {
+    data class Success(val cues: List<MagicCue>) : CueResult()
+    data class Error(val message: String) : CueResult()
+  }
+
+  private sealed class RunOutcome {
+    data class Success(val text: String) : RunOutcome()
+    data class Error(val message: String) : RunOutcome()
+  }
+
   private val json = Json { ignoreUnknownKeys = true }
-  private val pendingRuns: MutableMap<String, CompletableDeferred<String?>> =
+  private val pendingRuns: MutableMap<String, CompletableDeferred<RunOutcome>> =
     Collections.synchronizedMap(mutableMapOf())
 
   /** Consume operator-session `chat` events; completes the awaiting run. */
@@ -66,29 +76,27 @@ class MagicCueController(
     val deferred = synchronized(pendingRuns) {
       pendingRuns.remove(runId)
     } ?: return
-    val text = if (state == "final") {
-      payload["message"].asStringOrNull() ?: payload["text"].asStringOrNull()
+    if (state == "final") {
+      val text = payload["message"].asStringOrNull() ?: payload["text"].asStringOrNull() ?: ""
+      ai.axiomaster.bonio.util.AppLogger.i(TAG, "handleGatewayEvent matched runId=$runId (final) text=${text.take(60)}")
+      deferred.complete(RunOutcome.Success(text))
     } else {
-      payload["errorMessage"].asStringOrNull()
+      val errMsg = payload["errorMessage"].asStringOrNull() ?: "模型执行失败 ($state)"
+      ai.axiomaster.bonio.util.AppLogger.w(TAG, "handleGatewayEvent matched runId=$runId ($state) error=$errMsg")
+      deferred.complete(RunOutcome.Error(errMsg))
     }
-    ai.axiomaster.bonio.util.AppLogger.i(TAG, "handleGatewayEvent matched runId=$runId text=${text?.take(60)}")
-    deferred.complete(text)
   }
 
   /**
-   * Run one cue cycle for the given screen context. Returns the parsed cues,
-   * or null when the screen had nothing to act on / the run failed.
-   *
-   * When the accessibility tree is empty (e.g. WeChat returns stub nodes to
-   * third-party services on some ROMs) but a screenshot is available, the run
-   * falls back to vision analysis of the screenshot instead of bailing out.
+   * Run one cue cycle for the given screen context. Returns CueResult,
+   * indicating either parsed cues or an explicit failure reason.
    */
-  suspend fun runCue(screen: ScreenContext, screenshotBase64: String? = null): List<MagicCue>? {
+  suspend fun runCue(screen: ScreenContext, screenshotBase64: String? = null): CueResult {
     val screenText = screen.content
     val hasText = screenText.isNotBlank()
     if (!hasText && screenshotBase64.isNullOrEmpty()) {
       ai.axiomaster.bonio.util.AppLogger.w(TAG, "runCue: screenText is blank and no screenshot, pkg=${screen.packageName}")
-      return emptyList()
+      return CueResult.Success(emptyList())
     }
     val vision = !hasText
 
@@ -107,7 +115,7 @@ class MagicCueController(
     }
 
     val runId = UUID.randomUUID().toString()
-    val deferred = CompletableDeferred<String?>()
+    val deferred = CompletableDeferred<RunOutcome>()
     synchronized(pendingRuns) { pendingRuns[runId] = deferred }
     try {
       val params = buildJsonObject {
@@ -136,7 +144,7 @@ class MagicCueController(
         session.request("chat.send", params.toString(), timeoutMs = 15_000)
       } catch (e: Throwable) {
         ai.axiomaster.bonio.util.AppLogger.e(TAG, "chat.send failed: ${e.message}", e)
-        return null
+        return CueResult.Error(e.message ?: "网关请求失败")
       }
       val resObj = try { json.parseToJsonElement(res).asObjectOrNull() } catch (_: Throwable) { null }
       val payloadObj = resObj?.get("payload")?.asObjectOrNull()
@@ -150,14 +158,22 @@ class MagicCueController(
           }
         }
       }
-      val reply = try {
+      val outcome = try {
         withTimeout(RUN_TIMEOUT_MS) { deferred.await() }
       } catch (_: TimeoutCancellationException) {
         ai.axiomaster.bonio.util.AppLogger.w(TAG, "cue run timed out")
-        null
+        RunOutcome.Error("分析超时，请稍后再试")
       }
-      ai.axiomaster.bonio.util.AppLogger.i(TAG, "cue reply: ${reply?.take(100)}")
-      return reply?.let { parseCues(it) }
+      return when (outcome) {
+        is RunOutcome.Success -> {
+          ai.axiomaster.bonio.util.AppLogger.i(TAG, "cue reply: ${outcome.text.take(100)}")
+          CueResult.Success(parseCues(outcome.text))
+        }
+        is RunOutcome.Error -> {
+          ai.axiomaster.bonio.util.AppLogger.w(TAG, "cue error: ${outcome.message}")
+          CueResult.Error(outcome.message)
+        }
+      }
     } finally {
       synchronized(pendingRuns) {
         pendingRuns.remove(runId)
