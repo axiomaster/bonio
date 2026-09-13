@@ -51,15 +51,20 @@ object CustomSkinManager {
             "working" -> "努力工作中…"
             "thinking" -> if (s == "messi") "战术思考中…" else "思考中…"
             "waiting", "listening" -> "在等你回复哦~"
+            "speaking" -> "说话中…"
             "failed" -> if (s == "mario") "Mamma Mia! 出错了 (._.)" else "呜…出错了 (._.)"
             "idle" -> "休息中~ 有事叫我"
+            "bored" -> "好无聊呀~"
+            "sleeping" -> "呼噜噜…睡觉中"
+            "angry" -> "气呼呼 ˋ^ˊ"
+            "watching" -> "注视中…"
             "completed" -> when (s) {
                 "mario" -> "Here we go! 任务完成！"
                 "messi" -> "Vamos! 胜利完成！"
                 "kun" -> "完成啦！你干嘛~哎哟"
                 else -> "喵~ 任务完成啦！"
             }
-            else -> null
+            else -> "喵~"
         }
     }
 }
