@@ -34,7 +34,13 @@ object ImeProxyManager {
             } catch (se: SecurityException) {
                 ""
             }
-            val newEnabled = if (enabled.isEmpty()) BONIO_IME_ID else "$enabled:$BONIO_IME_ID"
+            val newEnabled = if (enabled.isEmpty()) {
+                BONIO_IME_ID
+            } else if (!enabled.contains(BONIO_IME_ID)) {
+                "$enabled:$BONIO_IME_ID"
+            } else {
+                enabled
+            }
             Settings.Secure.putString(resolver, Settings.Secure.ENABLED_INPUT_METHODS, newEnabled)
             Log.i(TAG, "ensureImeEnabled: added $BONIO_IME_ID to enabled input methods")
             return true

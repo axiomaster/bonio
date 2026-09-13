@@ -40,6 +40,7 @@ import com.airbnb.lottie.LottieAnimationView
 import com.airbnb.lottie.LottieDrawable
 import ai.axiomaster.bonio.remote.chat.OutgoingAttachment
 import ai.axiomaster.bonio.remote.cue.MagicCue
+import ai.axiomaster.bonio.input.ImeProxyManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -1023,52 +1024,59 @@ class FloatingWindowService : Service() {
     }
 
     private suspend fun applyCueInner(cue: MagicCue) {
-            if (cue.kind == "calendar") {
-                openCalendarApp()
-                avatarController.setActivity(AgentState.Happy)
-                setHeadStatus("已打开日历")
-                delay(1500)
-            } else {
-                val accessibility = ai.axiomaster.bonio.remote.node.BonioAccessibilityService.instance
-                val treeBlocked = accessibility?.isExternalTreeBlocked() == true
-                ai.axiomaster.bonio.util.AppLogger.i(TAG, "applyCue: kind=${cue.kind} treeBlocked=$treeBlocked")
-                // Try sending directly (silent text injection + dynamic send button click)
-                val sent = !treeBlocked && accessibility?.sendTextToActiveChat(cue.content) == true
-                if (sent) {
-                    avatarController.setActivity(AgentState.Happy)
-                    setHeadStatus("已发送 ✅")
-                } else if (treeBlocked) {
-                    // Apps like WeChat return stub node trees; do NOT blind-tap the
-                    // node-based path (it would raise the keyboard). Paste via
-                    // clipboard + long-press popup instead.
-                    val pasted = accessibility?.fillViaClipboardPaste(cue.content) == true
-                    if (pasted) {
-                        avatarController.setActivity(AgentState.Happy)
-                        setHeadStatus("已粘贴到输入框，请点发送", 5000)
-                    } else {
-                        avatarController.setActivity(AgentState.Confused)
-                        setHeadStatus("已复制，长按输入框可粘贴", 6000)
-                    }
-                } else {
-                    val filled = accessibility?.fillActiveReplyField(cue.content) == true
-                    if (filled) {
-                        avatarController.setActivity(AgentState.Happy)
-                        setHeadStatus("已填入回复框，点发送即可", 5000)
-                    } else {
-                        val pasted = accessibility?.fillViaClipboardPaste(cue.content) == true
-                        if (pasted) {
-                            avatarController.setActivity(AgentState.Happy)
-                            setHeadStatus("已粘贴到输入框，请点发送", 5000)
-                        } else {
-                            avatarController.setActivity(AgentState.Confused)
-                            setHeadStatus("已复制，长按输入框可粘贴", 6000)
-                        }
-                    }
+        if (cue.kind == "calendar") {
+            openCalendarApp()
+            avatarController.setActivity(AgentState.Happy)
+            setHeadStatus("已打开日历")
+            delay(1500)
+        } else {
+            val accessibility = ai.axiomaster.bonio.remote.node.BonioAccessibilityService.instance
+            ai.axiomaster.bonio.util.AppLogger.i(TAG, "applyCue: kind=${cue.kind} content=${cue.content.take(50)}")
+
+            var sent = false
+
+            // 1. Try IME Proxy (zero keyboard flicker, directly injected via InputConnection)
+            try {
+                if (ImeProxyManager.isSecureSettingsGranted(this@FloatingWindowService)) {
+                    ai.axiomaster.bonio.util.AppLogger.i(TAG, "applyCue: trying ImeProxyManager.injectAndSend")
+                    sent = ImeProxyManager.injectAndSend(
+                        context = this@FloatingWindowService,
+                        text = cue.content,
+                        doSend = true,
+                        focusTrigger = { accessibility?.focusChatInputArea() ?: false },
+                        clickSendTrigger = { accessibility?.clickSendButtonArea() ?: false }
+                    )
+                    ai.axiomaster.bonio.util.AppLogger.i(TAG, "applyCue: ImeProxyManager result=$sent")
                 }
-                delay(2500)
+            } catch (e: Throwable) {
+                ai.axiomaster.bonio.util.AppLogger.w(TAG, "applyCue: ImeProxyManager failed: ${e.message}")
             }
-            avatarController.clearBubble()
-            avatarController.setActivity(AgentState.Idle)
+
+            // 2. Fallback: Accessibility direct text injection and send click
+            if (!sent && accessibility != null) {
+                ai.axiomaster.bonio.util.AppLogger.i(TAG, "applyCue: falling back to accessibility.sendTextToActiveChat")
+                sent = accessibility.sendTextToActiveChat(cue.content)
+                ai.axiomaster.bonio.util.AppLogger.i(TAG, "applyCue: sendTextToActiveChat result=$sent")
+            }
+
+            // 3. Last resort fallback: paste via clipboard and tap send button
+            if (!sent && accessibility != null) {
+                ai.axiomaster.bonio.util.AppLogger.i(TAG, "applyCue: falling back to fillViaClipboardPasteAndSend")
+                sent = accessibility.fillViaClipboardPasteAndSend(cue.content)
+                ai.axiomaster.bonio.util.AppLogger.i(TAG, "applyCue: fillViaClipboardPasteAndSend result=$sent")
+            }
+
+            if (sent) {
+                avatarController.setActivity(AgentState.Happy)
+                setHeadStatus("已发送 ✅", 3000)
+            } else {
+                avatarController.setActivity(AgentState.Confused)
+                setHeadStatus("已复制，长按输入框可粘贴", 5000)
+            }
+            delay(2500)
+        }
+        avatarController.clearBubble()
+        avatarController.setActivity(AgentState.Idle)
     }
 
     private fun openCalendarApp() {

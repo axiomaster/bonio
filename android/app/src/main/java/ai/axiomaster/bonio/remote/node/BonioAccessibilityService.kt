@@ -150,6 +150,9 @@ class BonioAccessibilityService : AccessibilityService() {
 
   /** Inserts text into the active app editor and activates its send action. */
   suspend fun sendTextToActiveChat(text: String): Boolean {
+    val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+    clipboard?.setPrimaryClip(ClipData.newPlainText("bonio", text))
+
     val root = externalApplicationRoot()
     val editor = if (root != null) {
       val found = findBottommostEditor(root) ?: findFirstNode(root) { it.isEditable && it.isEnabled }
@@ -157,16 +160,14 @@ class BonioAccessibilityService : AccessibilityService() {
       found
     } else null
 
-    val editorRect = Rect()
     var textInjected = false
 
     if (editor != null) {
-      editor.getBoundsInScreen(editorRect)
-      textInjected = setTextOnNode(editor, text)
+      textInjected = setTextOnNode(editor, text) || editor.performAction(AccessibilityNodeInfo.ACTION_PASTE)
       if (!textInjected) {
         editor.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
         delay(100)
-        textInjected = setTextOnNode(editor, text)
+        textInjected = setTextOnNode(editor, text) || editor.performAction(AccessibilityNodeInfo.ACTION_PASTE)
       }
       editor.recycle()
     }
@@ -174,16 +175,19 @@ class BonioAccessibilityService : AccessibilityService() {
     // Fallback: tap bottom input area if editor not found or injection failed
     if (!textInjected) {
       val dm = resources.displayMetrics
-      val tapX = (dm.widthPixels * 0.35f)
+      val tapX = (dm.widthPixels * 0.45f)
       val tapY = (dm.heightPixels * 0.95f)
       ai.axiomaster.bonio.util.AppLogger.i(TAG, "sendTextToActiveChat: tapping input area fallback at ($tapX, $tapY)")
       val tapOk = tapScreenPoint(tapX, tapY)
       if (tapOk) {
         delay(350)
-        val focused = findFocusedInput()
+        var focused = findFocusedInput()
+        if (focused == null) {
+          delay(200)
+          focused = findFocusedInput()
+        }
         if (focused != null) {
-          textInjected = setTextOnNode(focused.node, text)
-          editorRect.set(focused.bounds)
+          textInjected = setTextOnNode(focused.node, text) || focused.node.performAction(AccessibilityNodeInfo.ACTION_PASTE)
           focused.node.recycle()
         }
       }
@@ -197,63 +201,7 @@ class BonioAccessibilityService : AccessibilityService() {
     // Allow UI a moment to update and render the send button (e.g. '+' switches to '发送')
     delay(250)
 
-    // Re-check focused editor bounds after keyboard may have shifted layout
-    val activeEditor = findFocusedInput()
-    if (activeEditor != null) {
-      if (activeEditor.bounds.centerY() > 0) {
-        editorRect.set(activeEditor.bounds)
-      }
-      activeEditor.node.recycle()
-    }
-
-    val refreshedRoot = externalApplicationRoot()
-    val sendNode = if (refreshedRoot != null) {
-      val found = findFirstNode(refreshedRoot) { node ->
-        val label = listOf(node.text, node.contentDescription, node.viewIdResourceName)
-          .joinToString(" ") { it?.toString().orEmpty() }.trim()
-        node.isEnabled && (
-          label == "发送" || label.equals("send", ignoreCase = true) ||
-          label.contains("发送") || label.contains("btn_send", ignoreCase = true) ||
-          label.contains("send_button", ignoreCase = true)
-        )
-      }
-      refreshedRoot.recycle()
-      found
-    } else null
-
-    var sent = false
-    if (sendNode != null) {
-      val sendRect = Rect()
-      sendNode.getBoundsInScreen(sendRect)
-
-      var clickable: AccessibilityNodeInfo? = sendNode
-      while (clickable != null && !clickable.isClickable) {
-        val parent = clickable.parent
-        clickable.recycle()
-        clickable = parent
-      }
-      sent = clickable?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
-      clickable?.recycle()
-
-      if (!sent && sendRect.width() > 0 && sendRect.height() > 0) {
-        ai.axiomaster.bonio.util.AppLogger.i(TAG, "sendTextToActiveChat: tapping sendNode bounds at (${sendRect.centerX()}, ${sendRect.centerY()})")
-        sent = tapScreenPoint(sendRect.centerX().toFloat(), sendRect.centerY().toFloat())
-      }
-    }
-
-    // Fallback: if send button node not found, tap right edge of editor row
-    if (!sent) {
-      val dm = resources.displayMetrics
-      val fallbackX = if (editorRect.right > 0 && editorRect.right < dm.widthPixels) {
-        (editorRect.right + dm.widthPixels) / 2f
-      } else {
-        dm.widthPixels * 0.92f
-      }
-      val fallbackY = if (editorRect.centerY() > 0) editorRect.centerY().toFloat() else (dm.heightPixels - (46 * dm.density))
-      ai.axiomaster.bonio.util.AppLogger.i(TAG, "sendTextToActiveChat: fallback tap send area at ($fallbackX, $fallbackY)")
-      sent = tapScreenPoint(fallbackX, fallbackY)
-    }
-
+    val sent = clickSendButtonArea()
     ai.axiomaster.bonio.util.AppLogger.i(TAG, "sendTextToActiveChat: result=$sent")
     return sent
   }
@@ -315,6 +263,10 @@ class BonioAccessibilityService : AccessibilityService() {
       }
     }
 
+    val focused = findFocusedInput()
+    val focusedY = if (focused != null && focused.bounds.centerY() > 0) focused.bounds.centerY().toFloat() else -1f
+    focused?.node?.recycle()
+
     val dm = resources.displayMetrics
     val root = externalApplicationRoot()
     val bounds = Rect()
@@ -326,8 +278,10 @@ class BonioAccessibilityService : AccessibilityService() {
       bounds.set(0, 0, dm.widthPixels, dm.heightPixels)
     }
     val bottom = if (bounds.bottom > 0) bounds.bottom else dm.heightPixels
-    val sendX = bounds.left + (bounds.width() * 0.91f)
-    val sendY = (bottom - (46 * dm.density)).coerceAtLeast(bottom * 0.90f)
+    // In WeChat and standard chat apps, the send button replaces the '+' icon on the right side of the bottom bar.
+    // For 1080px width, center is around 920 (0.85f).
+    val sendX = bounds.left + (bounds.width() * 0.85f)
+    val sendY = if (focusedY > 0) focusedY else (bottom - (42 * dm.density)).coerceAtLeast(bottom * 0.95f)
     ai.axiomaster.bonio.util.AppLogger.i(TAG, "clickSendButtonArea: tapping fallback at ($sendX, $sendY)")
     return tapScreenPoint(sendX, sendY)
   }
@@ -473,6 +427,32 @@ class BonioAccessibilityService : AccessibilityService() {
     ai.axiomaster.bonio.util.AppLogger.i(TAG, "fillViaClipboardPaste: popup=${popup}")
     if (popup == null) return false
     return tapScreenPoint(popup.first, popup.second)
+  }
+
+  suspend fun fillViaClipboardPasteAndSend(text: String): Boolean {
+    val pasted = fillViaClipboardPaste(text)
+    if (pasted) {
+      delay(250)
+      clickSendButtonArea()
+      return true
+    }
+    focusChatInputArea()
+    delay(350)
+    var focused = findFocusedInput()
+    if (focused == null) {
+      delay(200)
+      focused = findFocusedInput()
+    }
+    if (focused != null) {
+      val res = focused.node.performAction(AccessibilityNodeInfo.ACTION_PASTE)
+      focused.node.recycle()
+      if (res) {
+        delay(250)
+        clickSendButtonArea()
+        return true
+      }
+    }
+    return false
   }
 
   /**
