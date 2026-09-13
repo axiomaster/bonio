@@ -69,8 +69,6 @@ class FloatingWindowService : Service() {
     private lateinit var bubbleContainer: CardView
     private lateinit var cueTitle: TextView
     private lateinit var textBubble: TextView
-    private lateinit var textBubbleScroll: ScrollView
-    private lateinit var cueActionBtn: TextView
 
     // Fixed avatar window offsets (anchor avatar at x=30dp, y=36dp within 160x140dp window)
     private var avatarWindowWidth = 0
@@ -230,25 +228,20 @@ class FloatingWindowService : Service() {
         bubbleContainer = capsuleView.findViewById(R.id.capsule_root)
         cueTitle = capsuleView.findViewById(R.id.cue_title)
         textBubble = capsuleView.findViewById(R.id.text_bubble)
-        textBubbleScroll = capsuleView.findViewById(R.id.text_bubble_scroll)
-        cueActionBtn = capsuleView.findViewById(R.id.cue_action_btn)
-        cueActionBtn.setOnClickListener {
-            if (actionableCues.isNotEmpty()) {
-                applyMagicCue()
-            } else {
-                sendActionableSuggestion()
-            }
-        }
-        bubbleContainer.setOnClickListener {
-            ai.axiomaster.bonio.util.AppLogger.i(TAG, "bubble clicked: pendingPrompt=$pendingAccessibilityPrompt cues=${actionableCues.size}")
+
+        val onCapsuleClick = View.OnClickListener {
+            ai.axiomaster.bonio.util.AppLogger.i(TAG, "capsule clicked: pendingPrompt=$pendingAccessibilityPrompt cues=${actionableCues.size}")
             if (pendingAccessibilityPrompt) {
                 openAccessibilitySettings()
             } else if (actionableCues.isNotEmpty()) {
                 applyMagicCue()
-            } else {
+            } else if (!actionableSuggestion.isNullOrEmpty()) {
                 sendActionableSuggestion()
             }
         }
+        bubbleContainer.setOnClickListener(onCapsuleClick)
+        textBubble.setOnClickListener(onCapsuleClick)
+        cueTitle.setOnClickListener(onCapsuleClick)
         bubbleContainer.setOnTouchListener { v, e ->
             if (e.actionMasked == MotionEvent.ACTION_UP) {
                 val rect = android.graphics.Rect().also(v::getHitRect)
@@ -258,7 +251,7 @@ class FloatingWindowService : Service() {
                 )
                 v.performClick()
             }
-            true
+            false
         }
 
         val savedX = prefs.getInt(KEY_POS_X, 0)
@@ -437,34 +430,16 @@ class FloatingWindowService : Service() {
         }
 
         // Observe text bubble
-        val bubbleMaxHeightPx = (64 * resources.displayMetrics.density).toInt()
         serviceScope.launch {
             stateManager.currentTextBubble.collect { text: String? ->
                 if (text.isNullOrEmpty()) {
                     if (actionableCues.isEmpty()) {
                         hideBubbleAnimated()
                     }
-                    textBubbleScroll.visibility = View.GONE
-                    textBubbleScroll.layoutParams = textBubbleScroll.layoutParams.apply {
-                        height = ViewGroup.LayoutParams.WRAP_CONTENT
-                    }
                 } else {
                     cueTitle.visibility = View.GONE
-                    cueActionBtn.visibility = if (!actionableSuggestion.isNullOrEmpty()) View.VISIBLE else View.GONE
-                    if (!actionableSuggestion.isNullOrEmpty()) cueActionBtn.text = "发送"
                     textBubble.text = text
-                    textBubbleScroll.visibility = View.VISIBLE
                     showBubbleAnimated()
-                    textBubble.post {
-                        val lp = textBubbleScroll.layoutParams
-                        if (textBubble.height > bubbleMaxHeightPx) {
-                            lp.height = bubbleMaxHeightPx
-                        } else {
-                            lp.height = ViewGroup.LayoutParams.WRAP_CONTENT
-                        }
-                        textBubbleScroll.layoutParams = lp
-                        textBubbleScroll.fullScroll(View.FOCUS_DOWN)
-                    }
                 }
             }
         }
@@ -974,9 +949,6 @@ class FloatingWindowService : Service() {
             cueTitle.visibility = View.GONE
         }
         textBubble.text = first.content
-        textBubbleScroll.visibility = View.VISIBLE
-        cueActionBtn.text = if (first.kind == "calendar") "打开" else "发送"
-        cueActionBtn.visibility = View.VISIBLE
 
         avatarController.setActivity(AgentState.Speaking)
         val headPrompt = if (cues.size > 1) {
