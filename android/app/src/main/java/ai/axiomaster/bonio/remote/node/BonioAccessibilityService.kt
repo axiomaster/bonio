@@ -258,6 +258,78 @@ class BonioAccessibilityService : AccessibilityService() {
     return sent
   }
 
+  /** Taps the bottom chat bar to focus the input field without opening a keyboard (when Proxy IME is active). */
+  suspend fun focusChatInputArea(): Boolean {
+    val focused = findFocusedInput()
+    if (focused != null) {
+      focused.node.recycle()
+      return true
+    }
+    val dm = resources.displayMetrics
+    val root = externalApplicationRoot()
+    val bounds = Rect()
+    if (root != null) {
+      root.getBoundsInScreen(bounds)
+      root.recycle()
+    } else {
+      bounds.set(0, 0, dm.widthPixels, dm.heightPixels)
+    }
+    val bottom = if (bounds.bottom > 0) bounds.bottom else dm.heightPixels
+    val barY = (bottom - (30 * dm.density)).coerceAtLeast(bottom * 0.90f)
+    val inputX = bounds.left + (bounds.width() * 0.45f)
+    ai.axiomaster.bonio.util.AppLogger.i(TAG, "focusChatInputArea: tapping at ($inputX, $barY)")
+    return tapScreenPoint(inputX, barY)
+  }
+
+  /** Clicks the send button area on the right side of the chat input row. */
+  suspend fun clickSendButtonArea(): Boolean {
+    val refreshedRoot = externalApplicationRoot()
+    val sendNode = if (refreshedRoot != null) {
+      val found = findFirstNode(refreshedRoot) { node ->
+        val label = listOf(node.text, node.contentDescription, node.viewIdResourceName)
+          .joinToString(" ") { it?.toString().orEmpty() }.trim()
+        node.isEnabled && (
+          label == "发送" || label.equals("send", ignoreCase = true) ||
+          label.contains("发送") || label.contains("btn_send", ignoreCase = true) ||
+          label.contains("send_button", ignoreCase = true)
+        )
+      }
+      refreshedRoot.recycle()
+      found
+    } else null
+
+    if (sendNode != null) {
+      val sendRect = Rect().also(sendNode::getBoundsInScreen)
+      var clickable: AccessibilityNodeInfo? = sendNode
+      while (clickable != null && !clickable.isClickable) {
+        val parent = clickable.parent
+        clickable.recycle()
+        clickable = parent
+      }
+      val sent = clickable?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
+      clickable?.recycle()
+      if (sent) return true
+      if (sendRect.width() > 0 && sendRect.height() > 0) {
+        return tapScreenPoint(sendRect.centerX().toFloat(), sendRect.centerY().toFloat())
+      }
+    }
+
+    val dm = resources.displayMetrics
+    val root = externalApplicationRoot()
+    val bounds = Rect()
+    if (root != null) {
+      root.getBoundsInScreen(bounds)
+      root.recycle()
+    } else {
+      bounds.set(0, 0, dm.widthPixels, dm.heightPixels)
+    }
+    val bottom = if (bounds.bottom > 0) bounds.bottom else dm.heightPixels
+    val sendX = bounds.left + (bounds.width() * 0.92f)
+    val sendY = (bottom - (30 * dm.density)).coerceAtLeast(bottom * 0.90f)
+    ai.axiomaster.bonio.util.AppLogger.i(TAG, "clickSendButtonArea: tapping fallback at ($sendX, $sendY)")
+    return tapScreenPoint(sendX, sendY)
+  }
+
   /**
    * True when the active app returns stub node trees to accessibility
    * (e.g. WeChat 8.0.77 on EMUI): root resolves but has no children, so
