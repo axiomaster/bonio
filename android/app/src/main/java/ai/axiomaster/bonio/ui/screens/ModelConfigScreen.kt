@@ -149,7 +149,11 @@ fun ModelConfigScreen(
                             newModels.add(newConfig)
                         }
                         
-                        viewModel.updateServerConfig(models = newModels)
+                        if (defaultModel.isEmpty() || models.isEmpty()) {
+                            viewModel.updateServerConfig(defaultModel = modelId, models = newModels)
+                        } else {
+                            viewModel.updateServerConfig(models = newModels)
+                        }
                         // Reset form
                         modelId = ""
                         apiKey = ""
