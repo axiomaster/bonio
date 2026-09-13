@@ -1,0 +1,50 @@
+android/app/src/main/java/ai/axiomaster/bonio/FloatingWindowService.kt
+  s_539b59f41bad53::t_166292b80a8235 951,953
+  s_539b59f41bad53::t_2524ebb3aa3459 912,917-922
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.30.1",
+  "base_commit_sha": "57a2c38a2946fce38eb65b912ab8aa233cba2d1c",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  },
+  "sessions": {
+    "s_539b59f41bad53": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8f431abe-980e-474d-af47-4ff9172028a6",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_additions": 9,
+      "total_deletions": 7,
+      "overridden_lines": 0,
+      "turn_models": {
+        "t_166292b80a8235": "glm-5.3-flash",
+        "t_2524ebb3aa3459": "glm-5.3-flash",
+        "t_a7c528a8b68e57": "glm-5.3-flash"
+      },
+      "model_totals": {
+        "glm-5.3-flash": {
+          "additions": 9,
+          "deletions": 7
+        }
+      }
+    },
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_additions": 0,
+      "total_deletions": 36,
+      "overridden_lines": 0
+    }
+  }
+}
