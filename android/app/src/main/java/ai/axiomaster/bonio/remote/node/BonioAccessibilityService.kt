@@ -249,7 +249,7 @@ class BonioAccessibilityService : AccessibilityService() {
       } else {
         dm.widthPixels * 0.92f
       }
-      val fallbackY = if (editorRect.centerY() > 0) editorRect.centerY().toFloat() else (dm.heightPixels * 0.95f)
+      val fallbackY = if (editorRect.centerY() > 0) editorRect.centerY().toFloat() else (dm.heightPixels - (46 * dm.density))
       ai.axiomaster.bonio.util.AppLogger.i(TAG, "sendTextToActiveChat: fallback tap send area at ($fallbackX, $fallbackY)")
       sent = tapScreenPoint(fallbackX, fallbackY)
     }
@@ -271,11 +271,12 @@ class BonioAccessibilityService : AccessibilityService() {
     if (root != null) {
       root.getBoundsInScreen(bounds)
       root.recycle()
-    } else {
+    }
+    if (bounds.width() <= 0 || bounds.height() <= 0) {
       bounds.set(0, 0, dm.widthPixels, dm.heightPixels)
     }
     val bottom = if (bounds.bottom > 0) bounds.bottom else dm.heightPixels
-    val barY = (bottom - (30 * dm.density)).coerceAtLeast(bottom * 0.90f)
+    val barY = (bottom - (46 * dm.density)).coerceAtLeast(bottom * 0.90f)
     val inputX = bounds.left + (bounds.width() * 0.45f)
     ai.axiomaster.bonio.util.AppLogger.i(TAG, "focusChatInputArea: tapping at ($inputX, $barY)")
     return tapScreenPoint(inputX, barY)
@@ -320,12 +321,13 @@ class BonioAccessibilityService : AccessibilityService() {
     if (root != null) {
       root.getBoundsInScreen(bounds)
       root.recycle()
-    } else {
+    }
+    if (bounds.width() <= 0 || bounds.height() <= 0) {
       bounds.set(0, 0, dm.widthPixels, dm.heightPixels)
     }
     val bottom = if (bounds.bottom > 0) bounds.bottom else dm.heightPixels
-    val sendX = bounds.left + (bounds.width() * 0.92f)
-    val sendY = (bottom - (30 * dm.density)).coerceAtLeast(bottom * 0.90f)
+    val sendX = bounds.left + (bounds.width() * 0.91f)
+    val sendY = (bottom - (46 * dm.density)).coerceAtLeast(bottom * 0.90f)
     ai.axiomaster.bonio.util.AppLogger.i(TAG, "clickSendButtonArea: tapping fallback at ($sendX, $sendY)")
     return tapScreenPoint(sendX, sendY)
   }

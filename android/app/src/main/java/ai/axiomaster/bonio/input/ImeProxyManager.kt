@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.provider.Settings
 import android.util.Log
+import android.view.inputmethod.InputMethodManager
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
@@ -19,14 +20,23 @@ object ImeProxyManager {
 
     fun ensureImeEnabled(context: Context): Boolean {
         if (!isSecureSettingsGranted(context)) return false
+        val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        val isAlreadyEnabled = imm?.enabledInputMethodList?.any { it.id == BONIO_IME_ID } == true
+        if (isAlreadyEnabled) {
+            Log.i(TAG, "ensureImeEnabled: $BONIO_IME_ID is already enabled")
+            return true
+        }
+
+        val resolver = context.contentResolver
         try {
-            val resolver = context.contentResolver
-            val enabled = Settings.Secure.getString(resolver, Settings.Secure.ENABLED_INPUT_METHODS) ?: ""
-            if (!enabled.contains(BONIO_IME_ID)) {
-                val newEnabled = if (enabled.isEmpty()) BONIO_IME_ID else "$enabled:$BONIO_IME_ID"
-                Settings.Secure.putString(resolver, Settings.Secure.ENABLED_INPUT_METHODS, newEnabled)
-                Log.i(TAG, "ensureImeEnabled: added $BONIO_IME_ID to enabled input methods")
+            val enabled = try {
+                Settings.Secure.getString(resolver, Settings.Secure.ENABLED_INPUT_METHODS) ?: ""
+            } catch (se: SecurityException) {
+                ""
             }
+            val newEnabled = if (enabled.isEmpty()) BONIO_IME_ID else "$enabled:$BONIO_IME_ID"
+            Settings.Secure.putString(resolver, Settings.Secure.ENABLED_INPUT_METHODS, newEnabled)
+            Log.i(TAG, "ensureImeEnabled: added $BONIO_IME_ID to enabled input methods")
             return true
         } catch (e: Exception) {
             Log.e(TAG, "ensureImeEnabled failed", e)
@@ -67,7 +77,8 @@ object ImeProxyManager {
             val switched = Settings.Secure.putString(resolver, Settings.Secure.DEFAULT_INPUT_METHOD, BONIO_IME_ID)
             Log.i(TAG, "injectAndSend: switched default IME to $BONIO_IME_ID ok=$switched")
 
-            delay(60)
+            // Wait briefly for system to switch active IME service
+            delay(100)
 
             // 2. Trigger input field focus
             if (focusTrigger != null) {
@@ -75,29 +86,43 @@ object ImeProxyManager {
                 Log.i(TAG, "injectAndSend: focusTrigger result=$focused")
             }
 
-            // 3. Wait for InputConnection to bind (up to 2500ms)
+            // 3. Wait for InputConnection to bind to a real editor (up to 2000ms)
             var service = BonioProxyImeService.instance
-            var ic = service?.currentInputConnection
-            if (ic == null) {
-                ic = withTimeoutOrNull(2500) { connectionReady.await() }
-                service = BonioProxyImeService.instance
+            var ic = if (service?.isRealEditorConnected() == true) {
+                service.currentInputConnection
+            } else {
+                withTimeoutOrNull(2000) { connectionReady.await() } ?: service?.currentInputConnection
             }
+            service = BonioProxyImeService.instance
 
             if (ic == null || service == null) {
                 Log.w(TAG, "injectAndSend: failed to obtain InputConnection via Proxy IME")
                 return false
             }
 
+            // Short delay for connection stabilization
+            delay(60)
+
             // 4. Inject text and trigger send
-            val injected = service.injectTextAndSend(text, doSend)
+            val injected = service.injectTextAndSend(
+                text = text,
+                doSend = doSend,
+                useEnterKey = (clickSendTrigger == null)
+            )
             Log.i(TAG, "injectAndSend: injectTextAndSend result=$injected")
 
-            // 5. If clickSendTrigger provided, allow UI a moment then trigger send click
+            // 5. If clickSendTrigger provided, allow UI a moment to render send button then click it
             if (injected && doSend && clickSendTrigger != null) {
-                delay(120)
+                delay(180)
                 val sendClicked = clickSendTrigger()
                 Log.i(TAG, "injectAndSend: clickSendTrigger result=$sendClicked")
+                delay(200)
             }
+
+            // Keep keyboard hidden when switching back
+            try {
+                service.requestHideSelf(0)
+            } catch (_: Throwable) {}
 
             return injected
         } catch (e: Exception) {

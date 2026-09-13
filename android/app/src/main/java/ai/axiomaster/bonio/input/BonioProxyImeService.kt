@@ -25,6 +25,10 @@ class BonioProxyImeService : InputMethodService() {
             private set
 
         @Volatile
+        var currentAttribute: EditorInfo? = null
+            private set
+
+        @Volatile
         var onInputConnectionReady: CompletableDeferred<InputConnection>? = null
     }
 
@@ -37,6 +41,7 @@ class BonioProxyImeService : InputMethodService() {
     override fun onDestroy() {
         if (instance === this) {
             instance = null
+            currentAttribute = null
         }
         Log.i(TAG, "BonioProxyImeService destroyed")
         super.onDestroy()
@@ -47,27 +52,40 @@ class BonioProxyImeService : InputMethodService() {
     override fun onEvaluateFullscreenMode(): Boolean = false
     override fun onCreateInputView(): View? = null
 
+    fun isRealEditorConnected(): Boolean {
+        val attr = currentAttribute
+        val ic = currentInputConnection
+        return ic != null && attr != null && attr.inputType != EditorInfo.TYPE_NULL
+    }
+
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         super.onStartInput(attribute, restarting)
+        currentAttribute = attribute
         val ic = currentInputConnection
-        Log.i(TAG, "onStartInput: pkg=${attribute?.packageName} fieldId=${attribute?.fieldId} hasIc=${ic != null} restarting=$restarting")
-        if (ic != null) {
+        val isRealEditor = attribute != null && attribute.inputType != EditorInfo.TYPE_NULL
+        Log.i(TAG, "onStartInput: pkg=${attribute?.packageName} fieldId=${attribute?.fieldId} inputType=${attribute?.inputType} isRealEditor=$isRealEditor hasIc=${ic != null} restarting=$restarting")
+        if (ic != null && isRealEditor) {
             onInputConnectionReady?.complete(ic)
         }
     }
 
     override fun onFinishInput() {
         Log.i(TAG, "onFinishInput")
+        currentAttribute = null
         super.onFinishInput()
     }
 
-    suspend fun injectTextAndSend(text: String, doSend: Boolean = true): Boolean {
+    suspend fun injectTextAndSend(text: String, doSend: Boolean = true, useEnterKey: Boolean = false): Boolean {
         var ic = currentInputConnection
-        if (ic == null) {
-            Log.i(TAG, "injectTextAndSend: waiting for InputConnection...")
+        if (ic == null || !isRealEditorConnected()) {
+            Log.i(TAG, "injectTextAndSend: waiting for real editor InputConnection...")
             val deferred = CompletableDeferred<InputConnection>().also { onInputConnectionReady = it }
-            ic = withTimeoutOrNull(2500) { deferred.await() }
+            ic = withTimeoutOrNull(2000) { deferred.await() }
             onInputConnectionReady = null
+        }
+
+        if (ic == null) {
+            ic = currentInputConnection
         }
 
         if (ic == null) {
@@ -83,7 +101,7 @@ class BonioProxyImeService : InputMethodService() {
         }
 
         if (doSend) {
-            delay(150)
+            delay(100)
             // 1. Try standard IME action send
             val actionSent = ic.performEditorAction(EditorInfo.IME_ACTION_SEND)
             Log.i(TAG, "injectTextAndSend: performEditorAction(IME_ACTION_SEND) result=$actionSent")
@@ -93,8 +111,9 @@ class BonioProxyImeService : InputMethodService() {
                         ic.performEditorAction(EditorInfo.IME_ACTION_GO)
                 Log.i(TAG, "injectTextAndSend: performEditorAction(DONE/GO) result=$doneSent")
             }
-            // 3. Also send Enter keyevent (WeChat "回车键发送消息")
-            sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
+            if (useEnterKey) {
+                sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
+            }
         }
 
         return true

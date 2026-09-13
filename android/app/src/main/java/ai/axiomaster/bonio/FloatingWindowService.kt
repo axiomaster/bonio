@@ -402,11 +402,6 @@ class FloatingWindowService : Service() {
                 updateAnimation(state)
                 updatePosition(state)
                 updateBubbleForActivity(state)
-                if (state.activity == AgentState.Working) {
-                    showClone()
-                } else if (isCloneAttached && !suppressCloneHideForSmartReader) {
-                    hideClone()
-                }
             }
         }
 
