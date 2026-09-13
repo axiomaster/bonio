@@ -909,11 +909,17 @@ class FloatingWindowService : Service() {
 
                 val isWechat = screen.packageName == WECHAT_PACKAGE
                 var cues: List<ai.axiomaster.bonio.remote.cue.MagicCue>? = null
+                var cueError: String? = null
                 var remembered = false
                 kotlinx.coroutines.coroutineScope {
                     // Only run LLM magic cue analysis for WeChat; all other apps just screenshot+save
                     if (isWechat) {
-                        launch { cues = withContext(Dispatchers.Default) { runtime.magicCue.runCue(screen, screenshotBase64) } }
+                        launch {
+                            when (val r = withContext(Dispatchers.Default) { runtime.magicCue.runCue(screen, screenshotBase64) }) {
+                                is ai.axiomaster.bonio.remote.cue.MagicCueController.CueResult.Success -> cues = r.cues
+                                is ai.axiomaster.bonio.remote.cue.MagicCueController.CueResult.Error -> cueError = r.message
+                            }
+                        }
                     }
                     launch {
                         remembered = withContext(Dispatchers.Default) {
@@ -942,8 +948,9 @@ class FloatingWindowService : Service() {
                             }
                         }, 2000)
                     }
+                    cues != null && cueError != null -> showCueFailure(cueError!!)
                     cues != null -> showCueFailure("当前页面没有什么可以帮你")
-                    else -> showCueFailure("屏幕分析失败，请稍后再试")
+                    else -> showCueFailure(cueError ?: "屏幕分析失败，请稍后再试")
                 }
             } catch (e: Throwable) {
                 magicCuePending = false

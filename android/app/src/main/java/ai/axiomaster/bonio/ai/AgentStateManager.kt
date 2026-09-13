@@ -41,11 +41,6 @@ class AgentStateManager {
             AgentState.Idle -> clearBubble()
             AgentState.Bored -> clearBubble()
             AgentState.Sleeping -> clearBubble()
-<<<<<<< HEAD
-            AgentState.Listening -> clearBubble()
-            AgentState.Thinking -> clearBubble()
-=======
->>>>>>> 4b62f67 (fix(android): remove side bubble on thinking state transition and stabilize avatar position)
             AgentState.Happy -> clearBubble()
             AgentState.Confused -> clearBubble()
             else -> {}
