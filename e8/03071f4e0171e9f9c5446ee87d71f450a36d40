@@ -1,0 +1,38 @@
+android/app/src/main/java/ai/axiomaster/bonio/FloatingWindowService.kt
+  h_de08bd40967a17 483-484,486,488-493,498,511,597,871-878
+android/app/src/main/java/ai/axiomaster/bonio/avatar/CustomSkinManager.kt
+  h_de08bd40967a17 54,57-60,67
+android/app/src/main/res/layout/floating_agent_layout.xml
+  h_de08bd40967a17 13,16-17,33-35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "e803071f4e0171e9f9c5446ee87d71f450a36d40",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  },
+  "sessions": {
+    "s_539b59f41bad53": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8f431abe-980e-474d-af47-4ff9172028a6",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 75
+    },
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_deletions": 36
+    }
+  }
+}
