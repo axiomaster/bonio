@@ -75,7 +75,12 @@ class BonioProxyImeService : InputMethodService() {
         super.onFinishInput()
     }
 
-    suspend fun injectTextAndSend(text: String, doSend: Boolean = true, useEnterKey: Boolean = false): Boolean {
+    data class InjectionResult(
+        val committed: Boolean,
+        val sentViaAction: Boolean
+    )
+
+    suspend fun injectTextAndSend(text: String, doSend: Boolean = true, useEnterKey: Boolean = false): InjectionResult {
         var ic = currentInputConnection
         if (ic == null || !isRealEditorConnected()) {
             Log.i(TAG, "injectTextAndSend: waiting for real editor InputConnection...")
@@ -90,32 +95,34 @@ class BonioProxyImeService : InputMethodService() {
 
         if (ic == null) {
             Log.w(TAG, "injectTextAndSend: InputConnection unavailable after waiting")
-            return false
+            return InjectionResult(committed = false, sentViaAction = false)
         }
 
         // Commit text directly into remote editor
         val committed = ic.commitText(text, 1)
         Log.i(TAG, "injectTextAndSend: commitText result=$committed textLength=${text.length}")
         if (!committed) {
-            return false
+            return InjectionResult(committed = false, sentViaAction = false)
         }
 
+        var actionSent = false
         if (doSend) {
             delay(100)
             // 1. Try standard IME action send
-            val actionSent = ic.performEditorAction(EditorInfo.IME_ACTION_SEND)
+            actionSent = ic.performEditorAction(EditorInfo.IME_ACTION_SEND)
             Log.i(TAG, "injectTextAndSend: performEditorAction(IME_ACTION_SEND) result=$actionSent")
             if (!actionSent) {
                 // 2. Try IME action done or go
                 val doneSent = ic.performEditorAction(EditorInfo.IME_ACTION_DONE) ||
                         ic.performEditorAction(EditorInfo.IME_ACTION_GO)
                 Log.i(TAG, "injectTextAndSend: performEditorAction(DONE/GO) result=$doneSent")
+                if (doneSent) actionSent = true
             }
-            if (useEnterKey) {
+            if (!actionSent && useEnterKey) {
                 sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
             }
         }
 
-        return true
+        return InjectionResult(committed = true, sentViaAction = actionSent)
     }
 }

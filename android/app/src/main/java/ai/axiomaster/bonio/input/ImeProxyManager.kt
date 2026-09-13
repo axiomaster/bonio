@@ -63,6 +63,7 @@ object ImeProxyManager {
         doSend: Boolean = true,
         focusTrigger: (suspend () -> Boolean)? = null,
         clickSendTrigger: (suspend () -> Boolean)? = null,
+        onComplete: (suspend () -> Unit)? = null,
     ): Boolean {
         if (!isSecureSettingsGranted(context)) {
             Log.w(TAG, "injectAndSend: WRITE_SECURE_SETTINGS not granted, cannot use IME proxy")
@@ -110,19 +111,28 @@ object ImeProxyManager {
             delay(60)
 
             // 4. Inject text and trigger send
-            val injected = service.injectTextAndSend(
+            val result = service.injectTextAndSend(
                 text = text,
                 doSend = doSend,
                 useEnterKey = (clickSendTrigger == null)
             )
-            Log.i(TAG, "injectAndSend: injectTextAndSend result=$injected")
+            Log.i(TAG, "injectAndSend: injectTextAndSend result=$result")
 
-            // 5. If clickSendTrigger provided, allow UI a moment to render send button then click it
-            if (injected && doSend && clickSendTrigger != null) {
+            // 5. If clickSendTrigger provided and NOT sent via IME action, allow UI a moment to render send button then click it
+            if (result.committed && doSend && !result.sentViaAction && clickSendTrigger != null) {
                 delay(180)
                 val sendClicked = clickSendTrigger()
                 Log.i(TAG, "injectAndSend: clickSendTrigger result=$sendClicked")
                 delay(200)
+            }
+
+            // Execute post-send completion callback (e.g. clear focus from input box)
+            if (onComplete != null) {
+                try {
+                    onComplete()
+                } catch (e: Throwable) {
+                    Log.w(TAG, "injectAndSend: onComplete error: ${e.message}")
+                }
             }
 
             // Keep keyboard hidden when switching back
@@ -130,7 +140,7 @@ object ImeProxyManager {
                 service.requestHideSelf(0)
             } catch (_: Throwable) {}
 
-            return injected
+            return result.committed
         } catch (e: Exception) {
             Log.e(TAG, "injectAndSend failed with exception", e)
             return false

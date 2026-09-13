@@ -110,6 +110,20 @@ class BonioAccessibilityService : AccessibilityService() {
     return null
   }
 
+  /** Clears focus from the currently focused input field. */
+  fun clearFocusedInput(): Boolean {
+    val info = findFocusedInput() ?: return false
+    val res = info.node.performAction(AccessibilityNodeInfo.ACTION_CLEAR_FOCUS)
+    info.node.recycle()
+    return res
+  }
+
+  /** Dismisses soft keyboard using GLOBAL_ACTION_BACK or accessibility service capability. */
+  fun hideSoftKeyboard(): Boolean {
+    var cleared = clearFocusedInput()
+    return cleared
+  }
+
   /** Set text on a specific node using ACTION_SET_TEXT. */
   fun setTextOnNode(node: AccessibilityNodeInfo, text: String): Boolean {
     val args = Bundle()
@@ -202,6 +216,11 @@ class BonioAccessibilityService : AccessibilityService() {
     delay(250)
 
     val sent = clickSendButtonArea()
+    if (sent) {
+      delay(150)
+      clearFocusedInput()
+      hideSoftKeyboard()
+    }
     ai.axiomaster.bonio.util.AppLogger.i(TAG, "sendTextToActiveChat: result=$sent")
     return sent
   }
@@ -279,8 +298,8 @@ class BonioAccessibilityService : AccessibilityService() {
     }
     val bottom = if (bounds.bottom > 0) bounds.bottom else dm.heightPixels
     // In WeChat and standard chat apps, the send button replaces the '+' icon on the right side of the bottom bar.
-    // For 1080px width, center is around 920 (0.85f).
-    val sendX = bounds.left + (bounds.width() * 0.85f)
+    // For 1080px width, center is around 1015 (0.94f).
+    val sendX = bounds.left + (bounds.width() * 0.94f)
     val sendY = if (focusedY > 0) focusedY else (bottom - (42 * dm.density)).coerceAtLeast(bottom * 0.95f)
     ai.axiomaster.bonio.util.AppLogger.i(TAG, "clickSendButtonArea: tapping fallback at ($sendX, $sendY)")
     return tapScreenPoint(sendX, sendY)
@@ -434,6 +453,9 @@ class BonioAccessibilityService : AccessibilityService() {
     if (pasted) {
       delay(250)
       clickSendButtonArea()
+      delay(150)
+      clearFocusedInput()
+      hideSoftKeyboard()
       return true
     }
     focusChatInputArea()
@@ -449,6 +471,9 @@ class BonioAccessibilityService : AccessibilityService() {
       if (res) {
         delay(250)
         clickSendButtonArea()
+        delay(150)
+        clearFocusedInput()
+        hideSoftKeyboard()
         return true
       }
     }

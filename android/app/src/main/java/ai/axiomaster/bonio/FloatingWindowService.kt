@@ -1044,7 +1044,11 @@ class FloatingWindowService : Service() {
                         text = cue.content,
                         doSend = true,
                         focusTrigger = { accessibility?.focusChatInputArea() ?: false },
-                        clickSendTrigger = { accessibility?.clickSendButtonArea() ?: false }
+                        clickSendTrigger = { accessibility?.clickSendButtonArea() ?: false },
+                        onComplete = {
+                            accessibility?.clearFocusedInput()
+                            accessibility?.hideSoftKeyboard()
+                        }
                     )
                     ai.axiomaster.bonio.util.AppLogger.i(TAG, "applyCue: ImeProxyManager result=$sent")
                 }
