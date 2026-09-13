@@ -1,0 +1,38 @@
+android/app/src/main/java/ai/axiomaster/bonio/local/LocalEngineController.kt
+  h_de08bd40967a17 162-178
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.29.1408",
+  "base_commit_sha": "5d23e2a2dd428d226a1dc6d75c288efee9d0e20c",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  },
+  "sessions": {
+    "s_539b59f41bad53": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8f431abe-980e-474d-af47-4ff9172028a6",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_additions": 0,
+      "total_deletions": 75,
+      "overridden_lines": 0
+    },
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_additions": 0,
+      "total_deletions": 36,
+      "overridden_lines": 0
+    }
+  }
+}
