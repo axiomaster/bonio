@@ -160,6 +160,7 @@ static const char* fallbackBaseUrl(const std::string& provider) {
   if (provider == "qwen") return "https://dashscope.aliyuncs.com/compatible-mode/v1";
   if (provider == "kimi") return "https://api.moonshot.cn/v1";
   if (provider == "gemini") return "https://generativelanguage.googleapis.com/v1beta";
+  if (provider == "deepseek") return "https://api.deepseek.com";
   if (provider == "openai_compatible" || provider == "custom") return "";
   return "";
 }
@@ -172,6 +173,7 @@ static const char* fallbackApiKeyEnv(const std::string& provider) {
   if (provider == "qwen") return "DASHSCOPE_API_KEY";
   if (provider == "kimi") return "KIMI_API_KEY";
   if (provider == "gemini") return "GEMINI_API_KEY";
+  if (provider == "deepseek") return "DEEPSEEK_API_KEY";
   if (provider == "openai_compatible" || provider == "custom") return "OPENAI_API_KEY";
   return "";
 }

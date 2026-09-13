@@ -24,6 +24,7 @@ inline constexpr DefaultProviderEntry kDefaultProviders[] = {
     {"qwen", "Qwen", "https://dashscope.aliyuncs.com/compatible-mode/v1", "DASHSCOPE_API_KEY"},
     {"kimi", "Kimi", "https://api.moonshot.cn/v1", "KIMI_API_KEY"},
     {"gemini", "Gemini", "https://generativelanguage.googleapis.com/v1beta", "GEMINI_API_KEY"},
+    {"deepseek", "DeepSeek", "https://api.deepseek.com", "DEEPSEEK_API_KEY"},
     {"openai_compatible", "Custom", "", "OPENAI_API_KEY"},
 };
 

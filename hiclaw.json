@@ -1,5 +1,5 @@
 {
-  "default_model": "glm-4.7",
+  "default_model": "deepseek-chat",
   "gateway": {
     "enabled": true,
     "host": "0.0.0.0",
@@ -11,9 +11,10 @@
       "provider": "ollama"
     },
     {
-      "api_key": "41abc3aa823748fc81d18d95fa4a74f3.SJtsVTjEPFihsjEY",
-      "id": "glm-4.7",
-      "provider": "glm"
+      "api_key": "sk-83b125991f584f93a0fd2698b781ab67",
+      "base_url": "https://api.deepseek.com/v1",
+      "id": "deepseek-chat",
+      "provider": "openai_compatible"
     }
   ]
 }

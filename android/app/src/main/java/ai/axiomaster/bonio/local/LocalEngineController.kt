@@ -160,20 +160,42 @@ class LocalEngineController(context: Context, private val prefs: SecurePrefs) {
     }
     if (gateway.optString("pairing_code") != pairing) gateway.put("pairing_code", pairing)
 
-    // Pre-seed default model if no models configured
+    // Pre-seed default model if no models configured, or migrate from expired glm-4.7 default
     val modelsArr = json.optJSONArray("models")
-    if (modelsArr == null || modelsArr.length() == 0) {
-      if (!json.has("default_model") || json.optString("default_model").isEmpty()) {
-        json.put("default_model", "glm-4.7")
+    var hasValidDeepseek = false
+    if (modelsArr != null) {
+      for (i in 0 until modelsArr.length()) {
+        val m = modelsArr.optJSONObject(i) ?: continue
+        if (m.optString("id") == "deepseek-chat" && m.optString("api_key").isNotEmpty()) {
+          hasValidDeepseek = true
+          break
+        }
       }
-      val newModels = org.json.JSONArray().apply {
-        put(JSONObject().apply {
-          put("id", "glm-4.7")
-          put("provider", "glm")
-          put("api_key", "41abc3aa823748fc81d18d95fa4a74f3.SJtsVTjEPFihsjEY")
-        })
+    }
+
+    if (!hasValidDeepseek) {
+      val deepseekModel = JSONObject().apply {
+        put("id", "deepseek-chat")
+        put("provider", "openai_compatible")
+        put("base_url", "https://api.deepseek.com/v1")
+        put("api_key", "sk-83b125991f584f93a0fd2698b781ab67")
+      }
+      val newModels = org.json.JSONArray()
+      newModels.put(deepseekModel)
+      if (modelsArr != null) {
+        for (i in 0 until modelsArr.length()) {
+          val m = modelsArr.optJSONObject(i) ?: continue
+          // Keep existing models unless it's the broken default glm-4.7
+          if (m.optString("id") == "glm-4.7" && m.optString("api_key").startsWith("41abc3aa823748fc81d18d95fa4a74f3")) {
+            continue
+          }
+          newModels.put(m)
+        }
       }
       json.put("models", newModels)
+      if (!json.has("default_model") || json.optString("default_model").isEmpty() || json.optString("default_model") == "glm-4.7") {
+        json.put("default_model", "deepseek-chat")
+      }
     }
 
     configFile.writeText(json.toString(2))
