@@ -159,6 +159,23 @@ class LocalEngineController(context: Context, private val prefs: SecurePrefs) {
       prefs.saveLocalToken(pairing)
     }
     if (gateway.optString("pairing_code") != pairing) gateway.put("pairing_code", pairing)
+
+    // Pre-seed default model if no models configured
+    val modelsArr = json.optJSONArray("models")
+    if (modelsArr == null || modelsArr.length() == 0) {
+      if (!json.has("default_model") || json.optString("default_model").isEmpty()) {
+        json.put("default_model", "glm-4.7")
+      }
+      val newModels = org.json.JSONArray().apply {
+        put(JSONObject().apply {
+          put("id", "glm-4.7")
+          put("provider", "glm")
+          put("api_key", "41abc3aa823748fc81d18d95fa4a74f3.SJtsVTjEPFihsjEY")
+        })
+      }
+      json.put("models", newModels)
+    }
+
     configFile.writeText(json.toString(2))
   }
 
