@@ -1,0 +1,42 @@
+android/app/src/main/java/ai/axiomaster/bonio/input/BonioProxyImeService.kt
+  h_de08bd40967a17 27-30,44,55-60,63,65-67,74,78,80-81,83,87-90,104,114-116
+android/app/src/main/java/ai/axiomaster/bonio/input/ImeProxyManager.kt
+  h_de08bd40967a17 8,23-30,32-35,37-39,80-81,89,91-94,96,103-105,107-111,114,116,119,122-126
+android/app/src/main/java/ai/axiomaster/bonio/remote/node/BonioAccessibilityService.kt
+  h_de08bd40967a17 252,274-275,279,324-325,329-330
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.30.1",
+  "base_commit_sha": "5dc2be6b9ba190e549bdb080658ba52577d400a4",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  },
+  "sessions": {
+    "s_539b59f41bad53": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8f431abe-980e-474d-af47-4ff9172028a6",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_additions": 0,
+      "total_deletions": 75,
+      "overridden_lines": 0
+    },
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_additions": 0,
+      "total_deletions": 36,
+      "overridden_lines": 0
+    }
+  }
+}
