@@ -61,8 +61,10 @@ class FloatingWindowService : Service() {
     private lateinit var pixelAvatarView: ai.axiomaster.bonio.avatar.PixelAvatarView
     private lateinit var bubbleContainer: CardView
     private lateinit var bubbleLabel: TextView
+    private lateinit var cueTitle: TextView
     private lateinit var textBubble: TextView
     private lateinit var textBubbleScroll: ScrollView
+    private lateinit var cueActionBtn: TextView
     private lateinit var floatingRoot: LinearLayout
 
     private val avatarController: AvatarController get() = AgentManager.avatarController
@@ -203,8 +205,15 @@ class FloatingWindowService : Service() {
         pixelAvatarView.setSkin(initSkin)
         bubbleContainer = floatingView.findViewById(R.id.bubble_container)
         bubbleLabel = floatingView.findViewById(R.id.bubble_label)
+        cueTitle = floatingView.findViewById(R.id.cue_title)
         textBubble = floatingView.findViewById(R.id.text_bubble)
         textBubbleScroll = floatingView.findViewById(R.id.text_bubble_scroll)
+        cueActionBtn = floatingView.findViewById(R.id.cue_action_btn)
+        cueActionBtn.setOnClickListener {
+            if (actionableCues.isNotEmpty()) {
+                applyMagicCue()
+            }
+        }
         bubbleContainer.setOnClickListener {
             ai.axiomaster.bonio.util.AppLogger.i(TAG, "bubble clicked: pendingPrompt=$pendingAccessibilityPrompt cues=${actionableCues.size}")
             if (pendingAccessibilityPrompt) {
@@ -227,6 +236,10 @@ class FloatingWindowService : Service() {
                 v.performClick()
             }
             true
+        }
+
+        floatingView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            updatePosition(avatarController.avatarState.value)
         }
 
         val savedX = prefs.getInt(KEY_POS_X, 0)
@@ -295,6 +308,12 @@ class FloatingWindowService : Service() {
                     }
                     CloneManager.ACTION_HIDE_CLONE -> hideClone()
                     ACTION_TRIGGER_CUE -> runMagicCue()
+                    ACTION_SHOW_CUE -> {
+                        val title = intent.getStringExtra("title") ?: ""
+                        val content = intent.getStringExtra("content") ?: "王宁兵的号码是 13912345678"
+                        val kind = intent.getStringExtra("kind") ?: "reply"
+                        showCues(listOf(MagicCue(title = title, content = content, kind = kind)))
+                    }
                     ACTION_APPLY_CUE -> {
                         val extraText = intent.getStringExtra("text") ?: intent.getStringExtra("content")
                         if (!extraText.isNullOrEmpty()) {
@@ -311,6 +330,7 @@ class FloatingWindowService : Service() {
             addAction(CloneManager.ACTION_SHOW_CLONE)
             addAction(CloneManager.ACTION_HIDE_CLONE)
             addAction(ACTION_TRIGGER_CUE)
+            addAction(ACTION_SHOW_CUE)
             addAction(ACTION_APPLY_CUE)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -321,9 +341,10 @@ class FloatingWindowService : Service() {
     }
 
     private fun savePosition() {
+        val pos = avatarController.avatarState.value.position
         prefs.edit()
-            .putInt(KEY_POS_X, layoutParams.x)
-            .putInt(KEY_POS_Y, layoutParams.y)
+            .putInt(KEY_POS_X, pos.x.toInt())
+            .putInt(KEY_POS_Y, pos.y.toInt())
             .apply()
     }
 
@@ -391,16 +412,21 @@ class FloatingWindowService : Service() {
         }
 
         // Observe text bubble
-        val bubbleMaxHeightPx = (52 * resources.displayMetrics.density).toInt()
+        val bubbleMaxHeightPx = (64 * resources.displayMetrics.density).toInt()
         serviceScope.launch {
             stateManager.currentTextBubble.collect { text: String? ->
                 if (text.isNullOrEmpty()) {
-                    hideBubbleAnimated()
+                    if (actionableCues.isEmpty()) {
+                        hideBubbleAnimated()
+                    }
                     textBubbleScroll.visibility = View.GONE
                     textBubbleScroll.layoutParams = textBubbleScroll.layoutParams.apply {
                         height = ViewGroup.LayoutParams.WRAP_CONTENT
                     }
                 } else {
+                    cueTitle.visibility = View.GONE
+                    cueActionBtn.visibility = if (!actionableSuggestion.isNullOrEmpty()) View.VISIBLE else View.GONE
+                    if (!actionableSuggestion.isNullOrEmpty()) cueActionBtn.text = "发送"
                     textBubble.text = text
                     textBubbleScroll.visibility = View.VISIBLE
                     showBubbleAnimated()
@@ -450,29 +476,43 @@ class FloatingWindowService : Service() {
         }, 1200)
     }
 
-    private fun updatePosition(state: AvatarState) {
-        var newX = state.position.x.toInt()
-        val newY = state.position.y.toInt()
-        // With the horizontal layout the window grows sideways: when the capsule
-        // sits to the pet's left, shift the window left by the bubble width so
-        // the PET stays visually anchored at its position.
-        if (bubbleContainer.visibility == View.VISIBLE &&
-            ::floatingRoot.isInitialized &&
-            floatingRoot.indexOfChild(bubbleContainer) == 0
-        ) {
-            val endMargin = (bubbleContainer.layoutParams as? LinearLayout.LayoutParams)?.marginEnd ?: 0
-            newX -= (bubbleContainer.width + endMargin)
+    private var isUpdatingPosition = false
+
+    private fun getAvatarOffsetInWindow(): Pair<Int, Int> {
+        if (!::pixelAvatarView.isInitialized || !::floatingRoot.isInitialized) {
+            return Pair(0, 0)
         }
-        if (layoutParams.x != newX || layoutParams.y != newY) {
-            layoutParams.x = newX
-            layoutParams.y = newY
-            if (isViewAttached) {
-                try {
-                    windowManager.updateViewLayout(floatingView, layoutParams)
-                } catch (e: Exception) {
-                    Log.w(TAG, "updateViewLayout failed", e)
+        var offsetX = 0
+        var offsetY = 0
+        var current: View? = pixelAvatarView
+        while (current != null && current != floatingView) {
+            offsetX += current.left
+            offsetY += current.top
+            current = current.parent as? View
+        }
+        return Pair(offsetX, offsetY)
+    }
+
+    private fun updatePosition(state: AvatarState) {
+        if (isUpdatingPosition) return
+        isUpdatingPosition = true
+        try {
+            val (offsetX, offsetY) = getAvatarOffsetInWindow()
+            val newX = state.position.x.toInt() - offsetX
+            val newY = state.position.y.toInt() - offsetY
+            if (layoutParams.x != newX || layoutParams.y != newY) {
+                layoutParams.x = newX
+                layoutParams.y = newY
+                if (isViewAttached) {
+                    try {
+                        windowManager.updateViewLayout(floatingView, layoutParams)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "updateViewLayout failed", e)
+                    }
                 }
             }
+        } finally {
+            isUpdatingPosition = false
         }
     }
 
@@ -500,6 +540,7 @@ class FloatingWindowService : Service() {
         } else {
             bubbleLabel.visibility = View.GONE
         }
+        updatePosition(state)
     }
 
     /**
@@ -511,6 +552,7 @@ class FloatingWindowService : Service() {
         headStatusUntil = android.os.SystemClock.uptimeMillis() + durationMs
         bubbleLabel.text = text
         bubbleLabel.visibility = View.VISIBLE
+        updatePosition(avatarController.avatarState.value)
         mainHandler.postDelayed({
             if (android.os.SystemClock.uptimeMillis() >= headStatusUntil) {
                 headStatusUntil = 0L
@@ -529,24 +571,41 @@ class FloatingWindowService : Service() {
         ) {
             return
         }
+        val showOnLeft = avatarController.avatarState.value.position.x >
+            resources.displayMetrics.widthPixels / 2f
+
         bubbleContainer.visibility = View.VISIBLE
         bubbleContainer.alpha = 0f
         bubbleContainer.scaleX = 0.6f
         bubbleContainer.scaleY = 0.6f
+
+        val widthSpec = View.MeasureSpec.makeMeasureSpec(
+            (resources.displayMetrics.widthPixels * 0.65f).toInt(),
+            View.MeasureSpec.AT_MOST
+        )
+        val heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        bubbleContainer.measure(widthSpec, heightSpec)
+
+        bubbleContainer.pivotX = if (showOnLeft) bubbleContainer.measuredWidth.toFloat() else 0f
+        bubbleContainer.pivotY = bubbleContainer.measuredHeight / 2f
+
+        updatePosition(avatarController.avatarState.value)
+
         bubbleContainer.animate()
             .alpha(1f)
             .scaleX(1f)
             .scaleY(1f)
             .setDuration(250)
-            .setInterpolator(OvershootInterpolator(1.5f))
+            .setInterpolator(OvershootInterpolator(1.3f))
             .start()
+
         // Re-run the anchor compensation once the bubble has been measured.
         bubbleContainer.post {
             updatePosition(avatarController.avatarState.value)
             val rect = android.graphics.Rect().also(bubbleContainer::getGlobalVisibleRect)
             ai.axiomaster.bonio.util.AppLogger.i(
                 TAG,
-                "capsule shown: window=(${layoutParams.x},${layoutParams.y}) capsuleRect=$rect",
+                "capsule shown: window=(${layoutParams.x},${layoutParams.y}) capsuleRect=$rect showOnLeft=$showOnLeft",
             )
         }
     }
@@ -578,17 +637,23 @@ class FloatingWindowService : Service() {
     private fun hideBubbleAnimated() {
         bubbleContainer.animate().cancel()
         if (bubbleContainer.visibility != View.VISIBLE) return
+        val showOnLeft = if (::floatingRoot.isInitialized) {
+            floatingRoot.indexOfChild(bubbleContainer) == 0
+        } else false
+        bubbleContainer.pivotX = if (showOnLeft) bubbleContainer.width.toFloat() else 0f
+        bubbleContainer.pivotY = bubbleContainer.height / 2f
         bubbleContainer.animate()
             .alpha(0f)
             .scaleX(0.6f)
             .scaleY(0.6f)
-            .setDuration(200)
+            .setDuration(180)
             .setInterpolator(AccelerateInterpolator())
             .withEndAction {
                 bubbleContainer.visibility = View.GONE
                 bubbleContainer.alpha = 1f
                 bubbleContainer.scaleX = 1f
                 bubbleContainer.scaleY = 1f
+                updatePosition(avatarController.avatarState.value)
             }
             .start()
     }
@@ -620,8 +685,8 @@ class FloatingWindowService : Service() {
 
                 when (event.action) {
                     MotionEvent.ACTION_DOWN -> {
-                        initialX = layoutParams.x
-                        initialY = layoutParams.y
+                        initialX = avatarController.avatarState.value.position.x.toInt()
+                        initialY = avatarController.avatarState.value.position.y.toInt()
                         initialTouchX = event.rawX
                         initialTouchY = event.rawY
                         isDragging = false
@@ -635,6 +700,9 @@ class FloatingWindowService : Service() {
                         if (!isDragging && (Math.abs(dx) > dragThresholdPx || Math.abs(dy) > dragThresholdPx)) {
                             isDragging = true
                             mainHandler.removeCallbacks(longPressRunnable)
+                            if (bubbleContainer.visibility == View.VISIBLE) {
+                                hideBubbleAnimated()
+                            }
                             if (longPressTriggered) {
                                 cancelVoiceInputFromFloating()
                                 longPressTriggered = false
@@ -679,9 +747,8 @@ class FloatingWindowService : Service() {
                                         "messi" -> "Vamos!"
                                         else -> "喵~ 休息中~ 有事叫我"
                                     }
-                                    avatarController.setBubble(greeting)
+                                    setHeadStatus(greeting, 2400)
                                     mainHandler.postDelayed({
-                                        avatarController.clearBubble()
                                         updateAnimation(avatarController.avatarState.value)
                                     }, 2400)
                                 }
@@ -742,7 +809,7 @@ class FloatingWindowService : Service() {
             } catch (e: Exception) {
                 Log.e(TAG, "Screen context analysis failed", e)
                 avatarController.setActivity(AgentState.Confused)
-                avatarController.setBubble(e.message ?: "屏幕分析失败")
+                setHeadStatus(e.message ?: "屏幕分析失败", 2500)
                 delay(2500)
                 avatarController.clearBubble()
                 avatarController.setActivity(AgentState.Idle)
@@ -890,19 +957,31 @@ class FloatingWindowService : Service() {
         cueEpoch += 1
         val epoch = cueEpoch
         val first = cues.first()
-        val prompt = if (cues.size > 1) {
-            "有 ${cues.size} 条建议，点我发送"
-        } else if (first.title.isNotEmpty() && first.title != first.content) {
-            "${first.title}\n${first.content}"
+
+        if (first.title.isNotEmpty() && first.title != first.content) {
+            cueTitle.text = first.title
+            cueTitle.visibility = View.VISIBLE
         } else {
-            first.content
+            cueTitle.visibility = View.GONE
         }
+        textBubble.text = first.content
+        textBubbleScroll.visibility = View.VISIBLE
+        cueActionBtn.text = if (first.kind == "calendar") "打开" else "发送"
+        cueActionBtn.visibility = View.VISIBLE
+
         avatarController.setActivity(AgentState.Speaking)
-        avatarController.setBubble(prompt, SUGGESTION_BG_COLOR, android.graphics.Color.WHITE)
+        val headPrompt = if (cues.size > 1) {
+            "有 ${cues.size} 条建议，点我发送"
+        } else {
+            "要不要我帮你回？点一下就行~"
+        }
+        setHeadStatus(headPrompt, SUGGESTION_DISPLAY_MS)
+        showBubbleAnimated()
+
         mainHandler.postDelayed({
             if (cueEpoch == epoch) {
                 actionableCues = emptyList()
-                avatarController.clearBubble()
+                hideBubbleAnimated()
                 avatarController.setActivity(AgentState.Idle)
             }
         }, SUGGESTION_DISPLAY_MS)
@@ -918,6 +997,7 @@ class FloatingWindowService : Service() {
         val cue = customCue ?: actionableCues.firstOrNull() ?: return
         cueEpoch += 1
         actionableCues = emptyList()
+        hideBubbleAnimated()
         avatarController.setActivity(AgentState.Working)
         setHeadStatus("正在发送…", 15_000)
         serviceScope.launch {
@@ -1313,7 +1393,9 @@ class FloatingWindowService : Service() {
 
     private suspend fun handleScreenCaptureCommand(userText: String, runtime: NodeRuntime) {
         try {
-            avatarController.setBubble("Taking screenshot...")
+            withContext(Dispatchers.Main) {
+                setHeadStatus("Taking screenshot...", 3000)
+            }
 
             val base64 = runtime.captureScreenshot(maxEdge = 1080, quality = 80)
                 ?: run {
@@ -1324,7 +1406,9 @@ class FloatingWindowService : Service() {
                 }
             if (base64.isBlank()) throw IllegalStateException("Screenshot unavailable")
 
-            avatarController.setBubble("Analyzing screen...")
+            withContext(Dispatchers.Main) {
+                setHeadStatus("Analyzing screen...", 6000)
+            }
 
             val attachment = OutgoingAttachment(
                 type = "image",
@@ -1339,12 +1423,16 @@ class FloatingWindowService : Service() {
             )
         } catch (e: Exception) {
             Log.e(TAG, "Screen capture failed: ${e.message}", e)
-            avatarController.clearBubble()
-            avatarController.setActivity(AgentState.Confused)
-            avatarController.setBubble("Screenshot failed")
+            withContext(Dispatchers.Main) {
+                avatarController.clearBubble()
+                avatarController.setActivity(AgentState.Confused)
+                setHeadStatus("Screenshot failed", 2000)
+            }
             delay(2000)
-            avatarController.setActivity(AgentState.Idle)
-            avatarController.clearBubble()
+            withContext(Dispatchers.Main) {
+                avatarController.setActivity(AgentState.Idle)
+                avatarController.clearBubble()
+            }
         }
     }
 
@@ -1496,6 +1584,7 @@ class FloatingWindowService : Service() {
 
     companion object {
         const val ACTION_TRIGGER_CUE = "ai.axiomaster.bonio.ACTION_MAGIC_CUE"
+        const val ACTION_SHOW_CUE = "ai.axiomaster.bonio.ACTION_SHOW_CUE"
         const val ACTION_APPLY_CUE = "ai.axiomaster.bonio.ACTION_APPLY_CUE"
         private const val TAG = "BonioApp"
         private const val LONG_PRESS_THRESHOLD_MS = 600L
