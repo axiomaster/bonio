@@ -1,123 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/floating_root"
-    android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
-    android:orientation="horizontal"
-    android:gravity="center_vertical">
+    android:layout_width="160dp"
+    android:layout_height="140dp"
+    android:clipChildren="false"
+    android:clipToPadding="false">
 
-    <!-- Pet column: state pill fixed above the head, pet below -->
-    <LinearLayout
-        android:id="@+id/pet_column"
+    <!-- Head status pill: centered horizontally above the avatar -->
+    <TextView
+        android:id="@+id/bubble_label"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:gravity="center_horizontal">
+        android:layout_alignParentTop="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="4dp"
+        android:background="@drawable/state_pill_bg"
+        android:paddingLeft="10dp"
+        android:paddingRight="10dp"
+        android:paddingTop="3dp"
+        android:paddingBottom="3dp"
+        android:textColor="#3D2D18"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:maxWidth="150dp"
+        android:singleLine="true"
+        android:ellipsize="end"
+        android:elevation="3dp"
+        android:visibility="gone" />
 
-        <TextView
-            android:id="@+id/bubble_label"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="4dp"
-            android:background="@drawable/state_pill_bg"
-            android:paddingLeft="10dp"
-            android:paddingRight="10dp"
-            android:paddingTop="3dp"
-            android:paddingBottom="3dp"
-            android:textColor="#3D2D18"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:maxWidth="220dp"
-            android:singleLine="true"
-            android:ellipsize="end"
-            android:elevation="3dp"
-            android:visibility="gone" />
+    <!-- Avatar: fixed size 100dp x 100dp, centered horizontally, below top space -->
+    <ai.axiomaster.bonio.avatar.PixelAvatarView
+        android:id="@+id/pixel_avatar"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="36dp" />
 
-        <ai.axiomaster.bonio.avatar.PixelAvatarView
-            android:id="@+id/pixel_avatar"
-            android:layout_width="100dp"
-            android:layout_height="100dp" />
-
-    </LinearLayout>
-
-    <!-- Magic cue capsule: shown at the avatar's side, tap to apply -->
-    <androidx.cardview.widget.CardView
-        android:id="@+id/bubble_container"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
-        android:layout_marginEnd="8dp"
-        android:visibility="gone"
-        android:clickable="true"
-        android:focusable="true"
-        app:cardBackgroundColor="#FFFFFF"
-        app:cardCornerRadius="20dp"
-        app:cardElevation="4dp"
-        app:contentPaddingLeft="12dp"
-        app:contentPaddingRight="12dp"
-        app:contentPaddingTop="8dp"
-        app:contentPaddingBottom="8dp">
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/cue_title"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:maxWidth="160dp"
-                    android:textColor="#888888"
-                    android:textSize="11sp"
-                    android:singleLine="true"
-                    android:ellipsize="end"
-                    android:visibility="gone" />
-
-                <ScrollView
-                    android:id="@+id/text_bubble_scroll"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:scrollbars="none"
-                    android:fillViewport="true">
-
-                    <TextView
-                        android:id="@+id/text_bubble"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:maxWidth="160dp"
-                        android:textColor="#1A1A1A"
-                        android:textSize="13sp"
-                        android:textStyle="bold" />
-
-                </ScrollView>
-
-            </LinearLayout>
-
-            <TextView
-                android:id="@+id/cue_action_btn"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:background="@drawable/magic_cue_send_btn_bg"
-                android:paddingLeft="8dp"
-                android:paddingRight="8dp"
-                android:paddingTop="4dp"
-                android:paddingBottom="4dp"
-                android:text="发送"
-                android:textColor="#0A59F7"
-                android:textSize="12sp"
-                android:textStyle="bold" />
-
-        </LinearLayout>
-
-    </androidx.cardview.widget.CardView>
-
-</LinearLayout>
+</RelativeLayout>

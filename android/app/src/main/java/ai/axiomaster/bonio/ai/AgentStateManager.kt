@@ -41,8 +41,8 @@ class AgentStateManager {
             AgentState.Idle -> clearBubble()
             AgentState.Bored -> clearBubble()
             AgentState.Sleeping -> clearBubble()
-            AgentState.Listening -> setBubble("...")
-            AgentState.Thinking -> setBubble("Hmm...")
+            AgentState.Listening -> clearBubble()
+            AgentState.Thinking -> clearBubble()
             AgentState.Happy -> clearBubble()
             AgentState.Confused -> clearBubble()
             else -> {}

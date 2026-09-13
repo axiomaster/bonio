@@ -59,13 +59,23 @@ class FloatingWindowService : Service() {
     private lateinit var layoutParams: WindowManager.LayoutParams
 
     private lateinit var pixelAvatarView: ai.axiomaster.bonio.avatar.PixelAvatarView
-    private lateinit var bubbleContainer: CardView
     private lateinit var bubbleLabel: TextView
+
+    // Dedicated Magic Cue capsule overlay window
+    private lateinit var capsuleView: View
+    private lateinit var capsuleLayoutParams: WindowManager.LayoutParams
+    private var isCapsuleAttached = false
+    private lateinit var bubbleContainer: CardView
     private lateinit var cueTitle: TextView
     private lateinit var textBubble: TextView
     private lateinit var textBubbleScroll: ScrollView
     private lateinit var cueActionBtn: TextView
-    private lateinit var floatingRoot: LinearLayout
+
+    // Fixed avatar window offsets (anchor avatar at x=30dp, y=36dp within 160x140dp window)
+    private var avatarWindowWidth = 0
+    private var avatarWindowHeight = 0
+    private var avatarOffsetX = 0
+    private var avatarOffsetY = 0
 
     private val avatarController: AvatarController get() = AgentManager.avatarController
     private val stateManager get() = AgentManager.stateManager
@@ -195,23 +205,37 @@ class FloatingWindowService : Service() {
 
         avatarController.updateScreenMetrics(resources.displayMetrics)
 
+        val density = resources.displayMetrics.density
+        avatarWindowWidth = (AVATAR_WINDOW_WIDTH_DP * density).toInt()
+        avatarWindowHeight = (AVATAR_WINDOW_HEIGHT_DP * density).toInt()
+        avatarOffsetX = (AVATAR_OFFSET_X_DP * density).toInt()
+        avatarOffsetY = (AVATAR_OFFSET_Y_DP * density).toInt()
+
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         floatingView = LayoutInflater.from(this).inflate(R.layout.floating_agent_layout, null)
-        floatingRoot = floatingView.findViewById(R.id.floating_root)
-
+        bubbleLabel = floatingView.findViewById(R.id.bubble_label)
+        bubbleLabel.setOnClickListener {
+            if (pendingAccessibilityPrompt) {
+                openAccessibilitySettings()
+            }
+        }
         pixelAvatarView = floatingView.findViewById(R.id.pixel_avatar)
         val avatarPrefs = getSharedPreferences("bonio_avatar", Context.MODE_PRIVATE)
         val initSkin = avatarPrefs.getString("avatar_skin", "cat") ?: "cat"
         pixelAvatarView.setSkin(initSkin)
-        bubbleContainer = floatingView.findViewById(R.id.bubble_container)
-        bubbleLabel = floatingView.findViewById(R.id.bubble_label)
-        cueTitle = floatingView.findViewById(R.id.cue_title)
-        textBubble = floatingView.findViewById(R.id.text_bubble)
-        textBubbleScroll = floatingView.findViewById(R.id.text_bubble_scroll)
-        cueActionBtn = floatingView.findViewById(R.id.cue_action_btn)
+
+        // Initialize dedicated capsule overlay window
+        capsuleView = LayoutInflater.from(this).inflate(R.layout.magic_cue_capsule_layout, null)
+        bubbleContainer = capsuleView.findViewById(R.id.capsule_root)
+        cueTitle = capsuleView.findViewById(R.id.cue_title)
+        textBubble = capsuleView.findViewById(R.id.text_bubble)
+        textBubbleScroll = capsuleView.findViewById(R.id.text_bubble_scroll)
+        cueActionBtn = capsuleView.findViewById(R.id.cue_action_btn)
         cueActionBtn.setOnClickListener {
             if (actionableCues.isNotEmpty()) {
                 applyMagicCue()
+            } else {
+                sendActionableSuggestion()
             }
         }
         bubbleContainer.setOnClickListener {
@@ -224,8 +248,6 @@ class FloatingWindowService : Service() {
                 sendActionableSuggestion()
             }
         }
-        // Zero-duration taps (and some overlay relayout races) can drop the
-        // click; handle ACTION_UP explicitly so a real finger always triggers.
         bubbleContainer.setOnTouchListener { v, e ->
             if (e.actionMasked == MotionEvent.ACTION_UP) {
                 val rect = android.graphics.Rect().also(v::getHitRect)
@@ -236,10 +258,6 @@ class FloatingWindowService : Service() {
                 v.performClick()
             }
             true
-        }
-
-        floatingView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-            updatePosition(avatarController.avatarState.value)
         }
 
         val savedX = prefs.getInt(KEY_POS_X, 0)
@@ -254,6 +272,19 @@ class FloatingWindowService : Service() {
         }
 
         layoutParams = WindowManager.LayoutParams(
+            avatarWindowWidth,
+            avatarWindowHeight,
+            layoutFlag,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = savedX - avatarOffsetX
+            y = savedY - avatarOffsetY
+        }
+
+        capsuleLayoutParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             layoutFlag,
@@ -262,8 +293,6 @@ class FloatingWindowService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = savedX
-            y = savedY
         }
 
         setupTouchListener()
@@ -476,43 +505,19 @@ class FloatingWindowService : Service() {
         }, 1200)
     }
 
-    private var isUpdatingPosition = false
-
-    private fun getAvatarOffsetInWindow(): Pair<Int, Int> {
-        if (!::pixelAvatarView.isInitialized || !::floatingRoot.isInitialized) {
-            return Pair(0, 0)
-        }
-        var offsetX = 0
-        var offsetY = 0
-        var current: View? = pixelAvatarView
-        while (current != null && current != floatingView) {
-            offsetX += current.left
-            offsetY += current.top
-            current = current.parent as? View
-        }
-        return Pair(offsetX, offsetY)
-    }
-
     private fun updatePosition(state: AvatarState) {
-        if (isUpdatingPosition) return
-        isUpdatingPosition = true
-        try {
-            val (offsetX, offsetY) = getAvatarOffsetInWindow()
-            val newX = state.position.x.toInt() - offsetX
-            val newY = state.position.y.toInt() - offsetY
-            if (layoutParams.x != newX || layoutParams.y != newY) {
-                layoutParams.x = newX
-                layoutParams.y = newY
-                if (isViewAttached) {
-                    try {
-                        windowManager.updateViewLayout(floatingView, layoutParams)
-                    } catch (e: Exception) {
-                        Log.w(TAG, "updateViewLayout failed", e)
-                    }
+        val newX = state.position.x.toInt() - avatarOffsetX
+        val newY = state.position.y.toInt() - avatarOffsetY
+        if (layoutParams.x != newX || layoutParams.y != newY) {
+            layoutParams.x = newX
+            layoutParams.y = newY
+            if (isViewAttached) {
+                try {
+                    windowManager.updateViewLayout(floatingView, layoutParams)
+                } catch (e: Exception) {
+                    Log.w(TAG, "updateViewLayout failed", e)
                 }
             }
-        } finally {
-            isUpdatingPosition = false
         }
     }
 
@@ -540,7 +545,6 @@ class FloatingWindowService : Service() {
         } else {
             bubbleLabel.visibility = View.GONE
         }
-        updatePosition(state)
     }
 
     /**
@@ -552,7 +556,6 @@ class FloatingWindowService : Service() {
         headStatusUntil = android.os.SystemClock.uptimeMillis() + durationMs
         bubbleLabel.text = text
         bubbleLabel.visibility = View.VISIBLE
-        updatePosition(avatarController.avatarState.value)
         mainHandler.postDelayed({
             if (android.os.SystemClock.uptimeMillis() >= headStatusUntil) {
                 headStatusUntil = 0L
@@ -562,101 +565,100 @@ class FloatingWindowService : Service() {
     }
 
     private fun showBubbleAnimated() {
-        positionBubbleBesideAvatar()
-        bubbleContainer.animate().cancel()
-        if (bubbleContainer.visibility == View.VISIBLE &&
-            bubbleContainer.alpha == 1f &&
-            bubbleContainer.scaleX == 1f &&
-            bubbleContainer.scaleY == 1f
-        ) {
-            return
-        }
-        val showOnLeft = avatarController.avatarState.value.position.x >
-            resources.displayMetrics.widthPixels / 2f
-
-        bubbleContainer.visibility = View.VISIBLE
-        bubbleContainer.alpha = 0f
-        bubbleContainer.scaleX = 0.6f
-        bubbleContainer.scaleY = 0.6f
+        capsuleView.animate().cancel()
+        val density = resources.displayMetrics.density
+        val screenWidth = resources.displayMetrics.widthPixels
+        val screenHeight = resources.displayMetrics.heightPixels
+        val avatarPos = avatarController.avatarState.value.position
+        val avatarSizePx = (100 * density).toInt()
+        val marginPx = (8 * density).toInt()
 
         val widthSpec = View.MeasureSpec.makeMeasureSpec(
-            (resources.displayMetrics.widthPixels * 0.65f).toInt(),
+            (screenWidth * 0.65f).toInt(),
             View.MeasureSpec.AT_MOST
         )
         val heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
-        bubbleContainer.measure(widthSpec, heightSpec)
+        capsuleView.measure(widthSpec, heightSpec)
+        val capWidth = capsuleView.measuredWidth
+        val capHeight = capsuleView.measuredHeight
 
-        bubbleContainer.pivotX = if (showOnLeft) bubbleContainer.measuredWidth.toFloat() else 0f
-        bubbleContainer.pivotY = bubbleContainer.measuredHeight / 2f
+        val showOnLeft = avatarPos.x > screenWidth / 2f
+        val targetX = if (showOnLeft) {
+            (avatarPos.x - capWidth - marginPx).toInt().coerceAtLeast(marginPx)
+        } else {
+            (avatarPos.x + avatarSizePx + marginPx).toInt().coerceAtMost(screenWidth - capWidth - marginPx)
+        }
+        val targetY = (avatarPos.y + (avatarSizePx - capHeight) / 2).toInt().coerceIn(
+            marginPx,
+            screenHeight - capHeight - marginPx
+        )
 
-        updatePosition(avatarController.avatarState.value)
+        capsuleLayoutParams.x = targetX
+        capsuleLayoutParams.y = targetY
 
-        bubbleContainer.animate()
+        if (!isCapsuleAttached) {
+            try {
+                windowManager.addView(capsuleView, capsuleLayoutParams)
+                isCapsuleAttached = true
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to add capsuleView", e)
+                return
+            }
+        } else {
+            try {
+                windowManager.updateViewLayout(capsuleView, capsuleLayoutParams)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to update capsuleView layout", e)
+            }
+        }
+
+        capsuleView.visibility = View.VISIBLE
+        capsuleView.alpha = 0f
+        capsuleView.scaleX = 0.6f
+        capsuleView.scaleY = 0.6f
+        capsuleView.pivotX = if (showOnLeft) capWidth.toFloat() else 0f
+        capsuleView.pivotY = capHeight / 2f
+
+        capsuleView.animate()
             .alpha(1f)
             .scaleX(1f)
             .scaleY(1f)
             .setDuration(250)
             .setInterpolator(OvershootInterpolator(1.3f))
             .start()
-
-        // Re-run the anchor compensation once the bubble has been measured.
-        bubbleContainer.post {
-            updatePosition(avatarController.avatarState.value)
-            val rect = android.graphics.Rect().also(bubbleContainer::getGlobalVisibleRect)
-            ai.axiomaster.bonio.util.AppLogger.i(
-                TAG,
-                "capsule shown: window=(${layoutParams.x},${layoutParams.y}) capsuleRect=$rect showOnLeft=$showOnLeft",
-            )
-        }
-    }
-
-    private fun positionBubbleBesideAvatar() {
-        // Horizontal root: keep the capsule at the avatar's SIDE (HarmonyOS
-        // design) — left of the pet when the pet is on the right half of the
-        // screen, right of it otherwise — and swap the spacing margin.
-        if (!::floatingRoot.isInitialized || !::pixelAvatarView.isInitialized) return
-        val showOnLeft = avatarController.avatarState.value.position.x >
-            resources.displayMetrics.widthPixels / 2f
-        val desiredIndex = if (showOnLeft) 0 else 1
-        if (floatingRoot.indexOfChild(bubbleContainer) != desiredIndex) {
-            floatingRoot.removeView(bubbleContainer)
-            floatingRoot.addView(bubbleContainer, desiredIndex)
-        }
-        val spacing = (6 * resources.displayMetrics.density).toInt()
-        (bubbleContainer.layoutParams as? LinearLayout.LayoutParams)?.let { params ->
-            params.setMargins(
-                if (showOnLeft) 0 else spacing,
-                0,
-                if (showOnLeft) spacing else 0,
-                0,
-            )
-            bubbleContainer.layoutParams = params
-        }
     }
 
     private fun hideBubbleAnimated() {
-        bubbleContainer.animate().cancel()
-        if (bubbleContainer.visibility != View.VISIBLE) return
-        val showOnLeft = if (::floatingRoot.isInitialized) {
-            floatingRoot.indexOfChild(bubbleContainer) == 0
-        } else false
-        bubbleContainer.pivotX = if (showOnLeft) bubbleContainer.width.toFloat() else 0f
-        bubbleContainer.pivotY = bubbleContainer.height / 2f
-        bubbleContainer.animate()
+        capsuleView.animate().cancel()
+        if (!isCapsuleAttached || capsuleView.visibility != View.VISIBLE) return
+        val avatarPos = avatarController.avatarState.value.position
+        val showOnLeft = capsuleLayoutParams.x < avatarPos.x
+        capsuleView.pivotX = if (showOnLeft) capsuleView.width.toFloat() else 0f
+        capsuleView.pivotY = capsuleView.height / 2f
+        capsuleView.animate()
             .alpha(0f)
             .scaleX(0.6f)
             .scaleY(0.6f)
             .setDuration(180)
             .setInterpolator(AccelerateInterpolator())
             .withEndAction {
-                bubbleContainer.visibility = View.GONE
-                bubbleContainer.alpha = 1f
-                bubbleContainer.scaleX = 1f
-                bubbleContainer.scaleY = 1f
-                updatePosition(avatarController.avatarState.value)
+                capsuleView.visibility = View.GONE
+                capsuleView.alpha = 1f
+                capsuleView.scaleX = 1f
+                capsuleView.scaleY = 1f
+                if (isCapsuleAttached) {
+                    try {
+                        windowManager.removeView(capsuleView)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "removeView capsuleView failed", e)
+                    }
+                    isCapsuleAttached = false
+                }
             }
             .start()
     }
+
+    private var pendingSingleTapRunnable: Runnable? = null
 
     private fun setupTouchListener() {
         val density = resources.displayMetrics.density
@@ -700,7 +702,9 @@ class FloatingWindowService : Service() {
                         if (!isDragging && (Math.abs(dx) > dragThresholdPx || Math.abs(dy) > dragThresholdPx)) {
                             isDragging = true
                             mainHandler.removeCallbacks(longPressRunnable)
-                            if (bubbleContainer.visibility == View.VISIBLE) {
+                            pendingSingleTapRunnable?.let { mainHandler.removeCallbacks(it) }
+                            pendingSingleTapRunnable = null
+                            if (isCapsuleAttached) {
                                 hideBubbleAnimated()
                             }
                             if (longPressTriggered) {
@@ -716,7 +720,7 @@ class FloatingWindowService : Service() {
                             }
                             val newX = initialX + dx
                             val newY = initialY + dy
-                            avatarController.dragTo(newX, newY)
+                            avatarController.dragTo(newX.toFloat(), newY.toFloat())
                         }
                         return true
                     }
@@ -733,31 +737,41 @@ class FloatingWindowService : Service() {
                             val now = android.os.SystemClock.uptimeMillis()
                             if (now - lastTapAt <= DOUBLE_TAP_THRESHOLD_MS) {
                                 lastTapAt = 0L
+                                pendingSingleTapRunnable?.let { mainHandler.removeCallbacks(it) }
+                                pendingSingleTapRunnable = null
                                 runMagicCue()
                             } else {
                                 lastTapAt = now
-                                if (pendingAccessibilityPrompt) {
-                                    openAccessibilitySettings()
-                                } else {
-                                    pixelAvatarView.setVisualState("wave")
-                                    val skin = pixelAvatarView.getSkin()
-                                    val greeting = when (skin) {
-                                        "kun" -> "你干嘛~哎哟"
-                                        "mario" -> "Here we go!"
-                                        "messi" -> "Vamos!"
-                                        else -> "喵~ 休息中~ 有事叫我"
+                                pendingSingleTapRunnable?.let { mainHandler.removeCallbacks(it) }
+                                val runnable = Runnable {
+                                    pendingSingleTapRunnable = null
+                                    if (pendingAccessibilityPrompt) {
+                                        openAccessibilitySettings()
+                                    } else {
+                                        pixelAvatarView.setVisualState("wave")
+                                        val skin = pixelAvatarView.getSkin()
+                                        val greeting = when (skin) {
+                                            "kun" -> "你干嘛~哎哟"
+                                            "mario" -> "Here we go!"
+                                            "messi" -> "Vamos!"
+                                            else -> "喵~ 休息中~ 有事叫我"
+                                        }
+                                        setHeadStatus(greeting, 2400)
+                                        mainHandler.postDelayed({
+                                            updateAnimation(avatarController.avatarState.value)
+                                        }, 2400)
                                     }
-                                    setHeadStatus(greeting, 2400)
-                                    mainHandler.postDelayed({
-                                        updateAnimation(avatarController.avatarState.value)
-                                    }, 2400)
                                 }
+                                pendingSingleTapRunnable = runnable
+                                mainHandler.postDelayed(runnable, DOUBLE_TAP_THRESHOLD_MS)
                             }
                         }
                         return true
                     }
                     MotionEvent.ACTION_CANCEL -> {
                         mainHandler.removeCallbacks(longPressRunnable)
+                        pendingSingleTapRunnable?.let { mainHandler.removeCallbacks(it) }
+                        pendingSingleTapRunnable = null
                         if (longPressTriggered) {
                             longPressTriggered = false
                         } else if (isDragging) {
@@ -870,29 +884,21 @@ class FloatingWindowService : Service() {
         actionableCues = emptyList()
         cueEpoch += 1
         avatarController.clearBubble()
+        avatarController.setActivity(AgentState.Thinking)
+        setHeadStatus("正在分析屏幕…", 60_000)
 
         serviceScope.launch {
             try {
-                // Briefly hide the floating avatar so the captured screenshot does not have the overlay blocking content
                 var screenshotBase64: String? = null
-                val ctxRes = try {
-                    val prevVis = floatingView.visibility
-                    floatingView.visibility = View.INVISIBLE
-                    delay(50)
-                    kotlinx.coroutines.coroutineScope {
-                        val screenshotDef = async(Dispatchers.Default) {
-                            runtime.captureScreenshot(maxEdge = 1080, quality = 80)
-                        }
-                        val textDef = async(Dispatchers.Default) {
-                            runtime.captureScreenContext(6000)
-                        }
-                        screenshotBase64 = screenshotDef.await()
-                        textDef.await()
+                val ctxRes = kotlinx.coroutines.coroutineScope {
+                    val screenshotDef = async(Dispatchers.Default) {
+                        runtime.captureScreenshot(maxEdge = 1080, quality = 80)
                     }
-                } finally {
-                    floatingView.visibility = View.VISIBLE
-                    avatarController.setActivity(AgentState.Thinking)
-                    setHeadStatus("正在分析屏幕…", 60_000)
+                    val textDef = async(Dispatchers.Default) {
+                        runtime.captureScreenContext(6000)
+                    }
+                    screenshotBase64 = screenshotDef.await()
+                    textDef.await()
                 }
 
                 if (!ctxRes.ok || ctxRes.payloadJson == null) {
@@ -1572,6 +1578,14 @@ class FloatingWindowService : Service() {
         runtime.floatingWindowIntentHandler = null
         runtime.chat.onAssistantReply = null
         serviceScope.cancel()
+        if (::capsuleView.isInitialized && isCapsuleAttached) {
+            try {
+                windowManager.removeView(capsuleView)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to remove capsuleView", e)
+            }
+            isCapsuleAttached = false
+        }
         if (::floatingView.isInitialized && isViewAttached) {
             try {
                 windowManager.removeView(floatingView)
@@ -1588,7 +1602,7 @@ class FloatingWindowService : Service() {
         const val ACTION_APPLY_CUE = "ai.axiomaster.bonio.ACTION_APPLY_CUE"
         private const val TAG = "BonioApp"
         private const val LONG_PRESS_THRESHOLD_MS = 600L
-        private const val DOUBLE_TAP_THRESHOLD_MS = 500L
+        private const val DOUBLE_TAP_THRESHOLD_MS = 300L
         private const val SUGGESTION_DISPLAY_MS = 15_000L
         private const val SUGGESTION_BG_COLOR = 0xE62D303E.toInt()
         private const val DRAG_THRESHOLD_DP = 10f
@@ -1596,5 +1610,9 @@ class FloatingWindowService : Service() {
         private const val PREFS_NAME = "bonio_floating_window"
         private const val KEY_POS_X = "pos_x"
         private const val KEY_POS_Y = "pos_y"
+        private const val AVATAR_WINDOW_WIDTH_DP = 160
+        private const val AVATAR_WINDOW_HEIGHT_DP = 140
+        private const val AVATAR_OFFSET_X_DP = 30
+        private const val AVATAR_OFFSET_Y_DP = 36
     }
 }
