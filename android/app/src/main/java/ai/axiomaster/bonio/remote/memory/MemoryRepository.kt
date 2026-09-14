@@ -188,6 +188,15 @@ class MemoryRepository(
     }
   }
 
+  /** Suspend save used by batch import; triggers a single refresh afterwards. */
+  suspend fun saveBlocking(params: MemoryService.SaveParams): Boolean =
+    service.save(params)
+      .onFailure {
+        Log.w("MemoryRepository", "memo.save failed", it)
+        _error.value = it.message
+      }
+      .isSuccess
+
   fun delete(id: String) {
     scope.launch {
       service.delete(id)

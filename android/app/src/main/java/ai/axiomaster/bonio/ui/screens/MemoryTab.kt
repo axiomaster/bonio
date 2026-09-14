@@ -64,6 +64,65 @@ fun MemoryTab(
     var selectedMemory by remember { mutableStateOf<BonioMemo?>(null) }
     var pendingDelete by remember { mutableStateOf<BonioMemo?>(null) }
 
+    val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val snapshot = memos
+                val ok = runCatching {
+                    val json = buildMemoryExportJson(snapshot)
+                    context.contentResolver.openOutputStream(uri)?.use { out ->
+                        out.write(json.toByteArray(Charsets.UTF_8))
+                    } ?: error("cannot open output stream")
+                }.isSuccess
+                android.widget.Toast.makeText(
+                    context,
+                    if (ok) "已导出 ${snapshot.size} 条记忆" else "导出失败",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
+    val importLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val items = runCatching {
+                    val text = context.contentResolver.openInputStream(uri)?.use { input ->
+                        input.readBytes().toString(Charsets.UTF_8)
+                    } ?: error("cannot open input stream")
+                    parseMemoryImportJson(text)
+                }.getOrNull().orEmpty()
+                if (items.isEmpty()) {
+                    android.widget.Toast.makeText(context, "导入失败：文件格式不正确", android.widget.Toast.LENGTH_SHORT).show()
+                } else {
+                    var ok = 0
+                    items.forEach { m ->
+                        val saved = viewModel.memoryRepository.saveBlocking(
+                            ai.axiomaster.bonio.remote.memory.MemoryService.SaveParams(
+                                title = m.title,
+                                content = m.content,
+                                source = m.source.ifBlank { "import" },
+                                tags = m.tags,
+                                sourceApp = m.sourceApp,
+                                pageTitle = m.pageTitle,
+                                pageLink = m.pageLink,
+                                coverImage = m.coverImage,
+                                originalImage = m.originalImage,
+                                originalImageMimeType = m.originalImageMimeType,
+                            )
+                        )
+                        if (saved) ok += 1
+                    }
+                    viewModel.memoryRepository.refresh()
+                    android.widget.Toast.makeText(context, "已导入 $ok/${items.size} 条记忆", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -176,6 +235,28 @@ fun MemoryTab(
                         contentDescription = "Refresh",
                         tint = colors.accent
                     )
+                }
+
+                // ── Export / Import: memories are user assets; SAF keeps them
+                // in a user-chosen public location that survives uninstall. ──
+                TextButton(
+                    onClick = {
+                        if (memos.isNotEmpty()) {
+                            exportLauncher.launch(
+                                "bonio-memory-" + SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date()) + ".json"
+                            )
+                        }
+                    },
+                    enabled = memos.isNotEmpty()
+                ) {
+                    Text("导出", fontSize = 13.sp, color = colors.accent)
+                }
+                TextButton(
+                    onClick = {
+                        importLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
+                    }
+                ) {
+                    Text("导入", fontSize = 13.sp, color = colors.accent)
                 }
             }
 
@@ -676,5 +757,57 @@ private fun formatMemoryDate(timestamp: Long?, strings: AppStrings): String {
             val sdf = SimpleDateFormat("MM-dd", Locale.getDefault())
             sdf.format(date)
         }
+    }
+}
+
+/** Serialize memos into a portable JSON bundle (user-asset export). */
+internal fun buildMemoryExportJson(memos: List<BonioMemo>): String {
+    val arr = org.json.JSONArray()
+    memos.forEach { m ->
+        arr.put(org.json.JSONObject().apply {
+            put("title", m.title)
+            put("content", m.content)
+            put("source", m.source)
+            m.createdAt?.let { put("createdAt", it) }
+            if (m.tags.isNotEmpty()) put("tags", org.json.JSONArray(m.tags))
+            m.sourceApp?.let { put("sourceApp", it) }
+            m.pageTitle?.let { put("pageTitle", it) }
+            m.pageLink?.let { put("pageLink", it) }
+            m.coverImage?.let { put("coverImage", it) }
+            m.originalImage?.let { put("originalImage", it) }
+        })
+    }
+    return org.json.JSONObject()
+        .put("type", "bonio-memory")
+        .put("version", 1)
+        .put("exportedAt", System.currentTimeMillis())
+        .put("memos", arr)
+        .toString()
+}
+
+/** Parse an exported bundle back into memos (user-asset import). */
+internal fun parseMemoryImportJson(text: String): List<BonioMemo> {
+    val root = runCatching { org.json.JSONObject(text) }.getOrNull() ?: return emptyList()
+    if (root.optString("type", "bonio-memory") != "bonio-memory") return emptyList()
+    val arr = root.optJSONArray("memos") ?: return emptyList()
+    return (0 until arr.length()).mapNotNull { i ->
+        val o = arr.optJSONObject(i) ?: return@mapNotNull null
+        val title = o.optString("title")
+        val content = o.optString("content")
+        if (title.isBlank() && content.isBlank()) return@mapNotNull null
+        val tagsArr = o.optJSONArray("tags")
+        BonioMemo(
+            id = "",
+            title = title,
+            content = content,
+            source = o.optString("source", "import"),
+            createdAt = if (o.has("createdAt")) o.optLong("createdAt") else null,
+            tags = tagsArr?.let { t -> (0 until t.length()).mapNotNull { t.optString(it) } } ?: emptyList(),
+            sourceApp = o.optString("sourceApp").ifEmpty { null },
+            pageTitle = o.optString("pageTitle").ifEmpty { null },
+            pageLink = o.optString("pageLink").ifEmpty { null },
+            coverImage = o.optString("coverImage").ifEmpty { null },
+            originalImage = o.optString("originalImage").ifEmpty { null },
+        )
     }
 }
