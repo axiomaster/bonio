@@ -132,6 +132,22 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     avatarPrefs.edit().putString("avatar_skin", normalized).apply()
   }
 
+  private val _avatarScale = MutableStateFlow(avatarPrefs.getFloat("avatar_scale", 1.0f))
+  val avatarScale: StateFlow<Float> = _avatarScale
+
+  fun setAvatarScale(scale: Float) {
+    _avatarScale.value = scale
+    avatarPrefs.edit().putFloat("avatar_scale", scale).apply()
+  }
+
+  private val _autoDockEdge = MutableStateFlow(avatarPrefs.getBoolean("auto_dock_edge", true))
+  val autoDockEdge: StateFlow<Boolean> = _autoDockEdge
+
+  fun setAutoDockEdge(enabled: Boolean) {
+    _autoDockEdge.value = enabled
+    avatarPrefs.edit().putBoolean("auto_dock_edge", enabled).apply()
+  }
+
   val themeManager = ai.axiomaster.bonio.avatar.ThemeManager(app)
   val installedThemes: StateFlow<List<ai.axiomaster.bonio.remote.theme.ThemeInfo>> = themeManager.installedThemes
   val activeThemeId: StateFlow<String> = themeManager.activeThemeId

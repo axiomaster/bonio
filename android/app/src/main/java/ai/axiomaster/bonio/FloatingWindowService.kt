@@ -9,6 +9,9 @@ import ai.axiomaster.bonio.avatar.MotionState
 import ai.axiomaster.bonio.avatar.ThemeManager
 import ai.axiomaster.bonio.avatar.ActionEventWatcher
 import ai.axiomaster.bonio.remote.chat.SpeechToTextManager
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
 import android.app.Service
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -21,6 +24,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.SystemClock
 import android.provider.Settings
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -28,12 +32,14 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.view.animation.AccelerateInterpolator
+import android.view.animation.DecelerateInterpolator
 import android.view.animation.OvershootInterpolator
 import android.util.Log
 import android.view.ViewGroup
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.LinearLayout
+import android.widget.RelativeLayout
 import androidx.cardview.widget.CardView
 import androidx.core.content.ContextCompat
 import com.airbnb.lottie.LottieAnimationView
@@ -75,6 +81,15 @@ class FloatingWindowService : Service() {
     private var avatarWindowHeight = 0
     private var avatarOffsetX = 0
     private var avatarOffsetY = 0
+
+    // Dynamic scaling & docking
+    private var currentAvatarScale = 1.0f
+    private var isDockedToEdge = false
+    private var dockSide = DOCK_NONE
+    private var undockedPositionX = 0f
+    private var dockAnimator: ValueAnimator? = null
+    private var lastInteractionTime = 0L
+    private var isDraggingAvatar = false
 
     private val avatarController: AvatarController get() = AgentManager.avatarController
     private val stateManager get() = AgentManager.stateManager
@@ -202,13 +217,17 @@ class FloatingWindowService : Service() {
             }
         }
 
+        val avatarPrefs = getSharedPreferences("bonio_avatar", Context.MODE_PRIVATE)
+        currentAvatarScale = avatarPrefs.getFloat("avatar_scale", 1.0f)
+        lastInteractionTime = SystemClock.uptimeMillis()
+
         avatarController.updateScreenMetrics(resources.displayMetrics)
 
         val density = resources.displayMetrics.density
-        avatarWindowWidth = (AVATAR_WINDOW_WIDTH_DP * density).toInt()
-        avatarWindowHeight = (AVATAR_WINDOW_HEIGHT_DP * density).toInt()
-        avatarOffsetX = (AVATAR_OFFSET_X_DP * density).toInt()
-        avatarOffsetY = (AVATAR_OFFSET_Y_DP * density).toInt()
+        avatarWindowWidth = (AVATAR_WINDOW_WIDTH_DP * density * currentAvatarScale).toInt()
+        avatarWindowHeight = (AVATAR_WINDOW_HEIGHT_DP * density * currentAvatarScale).toInt()
+        avatarOffsetX = (AVATAR_OFFSET_X_DP * density * currentAvatarScale).toInt()
+        avatarOffsetY = (AVATAR_OFFSET_Y_DP * density * currentAvatarScale).toInt()
 
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         floatingView = LayoutInflater.from(this).inflate(R.layout.floating_agent_layout, null)
@@ -219,7 +238,7 @@ class FloatingWindowService : Service() {
             }
         }
         pixelAvatarView = floatingView.findViewById(R.id.pixel_avatar)
-        val avatarPrefs = getSharedPreferences("bonio_avatar", Context.MODE_PRIVATE)
+        applyViewScaling(currentAvatarScale)
         val initSkin = avatarPrefs.getString("avatar_skin", "cat") ?: "cat"
         pixelAvatarView.setSkin(initSkin)
 
@@ -270,7 +289,8 @@ class FloatingWindowService : Service() {
             avatarWindowHeight,
             layoutFlag,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
@@ -393,6 +413,15 @@ class FloatingWindowService : Service() {
         // Observe composite avatar state for animation + position
         serviceScope.launch {
             avatarController.avatarState.collect { state: AvatarState ->
+                if (state.activity != AgentState.Idle &&
+                    state.activity != AgentState.Sleeping &&
+                    state.activity != AgentState.Bored
+                ) {
+                    lastInteractionTime = SystemClock.uptimeMillis()
+                    if (isDockedToEdge) {
+                        undockFromEdge(animated = true)
+                    }
+                }
                 updateAnimation(state)
                 updatePosition(state)
                 updateBubbleForActivity(state)
@@ -417,7 +446,7 @@ class FloatingWindowService : Service() {
             }
         }
 
-        // Observe skin changes from preferences
+        // Observe skin, scale, auto-dock, and check idle timeout
         serviceScope.launch {
             val avatarPrefs = applicationContext.getSharedPreferences("bonio_avatar", Context.MODE_PRIVATE)
             while (true) {
@@ -425,6 +454,34 @@ class FloatingWindowService : Service() {
                 if (pixelAvatarView.getSkin() != skin) {
                     pixelAvatarView.setSkin(skin)
                 }
+
+                val scale = avatarPrefs.getFloat("avatar_scale", 1.0f)
+                if (Math.abs(currentAvatarScale - scale) > 0.001f) {
+                    applyAvatarScale(scale)
+                }
+
+                val autoDockEnabled = avatarPrefs.getBoolean("auto_dock_edge", true)
+                if (!autoDockEnabled && isDockedToEdge) {
+                    undockFromEdge(animated = true)
+                }
+
+                val now = SystemClock.uptimeMillis()
+                if (autoDockEnabled && !isDockedToEdge && !isDraggingAvatar && (dockAnimator?.isRunning != true)) {
+                    val state = avatarController.avatarState.value
+                    val isIdleActivity = state.activity == AgentState.Idle ||
+                                         state.activity == AgentState.Sleeping ||
+                                         state.activity == AgentState.Bored
+                    val isStationary = state.motion == MotionState.Stationary
+                    val notBusy = !screenSuggestionPending && !magicCuePending && !isVoiceActive && !isCapsuleAttached && (now >= headStatusUntil)
+                    if (isIdleActivity && isStationary && notBusy) {
+                        if (now - lastInteractionTime >= AUTO_DOCK_IDLE_TIMEOUT_MS) {
+                            dockToNearestEdge(animated = true)
+                        }
+                    } else {
+                        lastInteractionTime = now
+                    }
+                }
+
                 delay(500)
             }
         }
@@ -476,6 +533,19 @@ class FloatingWindowService : Service() {
         }, 1200)
     }
 
+    private fun updateGestureExclusion() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && ::floatingView.isInitialized) {
+            floatingView.post {
+                try {
+                    val rect = android.graphics.Rect(0, 0, floatingView.width, floatingView.height)
+                    floatingView.systemGestureExclusionRects = listOf(rect)
+                } catch (e: Exception) {
+                    Log.w(TAG, "setSystemGestureExclusionRects failed", e)
+                }
+            }
+        }
+    }
+
     private fun updatePosition(state: AvatarState) {
         val newX = state.position.x.toInt() - avatarOffsetX
         val newY = state.position.y.toInt() - avatarOffsetY
@@ -485,6 +555,7 @@ class FloatingWindowService : Service() {
             if (isViewAttached) {
                 try {
                     windowManager.updateViewLayout(floatingView, layoutParams)
+                    updateGestureExclusion()
                 } catch (e: Exception) {
                     Log.w(TAG, "updateViewLayout failed", e)
                 }
@@ -506,8 +577,10 @@ class FloatingWindowService : Service() {
     }
 
     private fun updateBubbleForActivity(state: AvatarState) {
-        // State pill ("休息中…", "Thinking…" etc.) lives above the head and is
-        // independent of the magic-cue capsule container.
+        if (isDockedToEdge) {
+            bubbleLabel.visibility = View.GONE
+            return
+        }
         if (android.os.SystemClock.uptimeMillis() < headStatusUntil) return
         val labelText = bubbleLabelTextForActivity(state)
         if (labelText != null) {
@@ -537,11 +610,15 @@ class FloatingWindowService : Service() {
 
     private fun showBubbleAnimated() {
         capsuleView.animate().cancel()
+        lastInteractionTime = SystemClock.uptimeMillis()
+        if (isDockedToEdge) {
+            undockFromEdge(animated = false)
+        }
         val density = resources.displayMetrics.density
         val screenWidth = resources.displayMetrics.widthPixels
         val screenHeight = resources.displayMetrics.heightPixels
         val avatarPos = avatarController.avatarState.value.position
-        val avatarSizePx = (100 * density).toInt()
+        val avatarSizePx = (100 * density * currentAvatarScale).toInt()
         val marginPx = (8 * density).toInt()
 
         val widthSpec = View.MeasureSpec.makeMeasureSpec(
@@ -629,6 +706,164 @@ class FloatingWindowService : Service() {
             .start()
     }
 
+    private fun applyViewScaling(scale: Float) {
+        val density = resources.displayMetrics.density
+        val avatarLp = pixelAvatarView.layoutParams as? RelativeLayout.LayoutParams
+        if (avatarLp != null) {
+            avatarLp.width = (100 * density * scale).toInt()
+            avatarLp.height = (100 * density * scale).toInt()
+            avatarLp.topMargin = (36 * density * scale).toInt()
+            pixelAvatarView.layoutParams = avatarLp
+        }
+        bubbleLabel.textSize = (12f * scale).coerceIn(9f, 16f)
+        val bubbleLp = bubbleLabel.layoutParams as? RelativeLayout.LayoutParams
+        if (bubbleLp != null) {
+            bubbleLp.topMargin = (4 * density * scale).toInt()
+            bubbleLabel.layoutParams = bubbleLp
+        }
+    }
+
+    private fun applyAvatarScale(scale: Float) {
+        currentAvatarScale = scale
+        val density = resources.displayMetrics.density
+        avatarWindowWidth = (AVATAR_WINDOW_WIDTH_DP * density * scale).toInt()
+        avatarWindowHeight = (AVATAR_WINDOW_HEIGHT_DP * density * scale).toInt()
+        avatarOffsetX = (AVATAR_OFFSET_X_DP * density * scale).toInt()
+        avatarOffsetY = (AVATAR_OFFSET_Y_DP * density * scale).toInt()
+
+        layoutParams.width = avatarWindowWidth
+        layoutParams.height = avatarWindowHeight
+        applyViewScaling(scale)
+
+        if (isDockedToEdge) {
+            dockToNearestEdge(animated = false)
+        } else {
+            val currentPos = avatarController.avatarState.value.position
+            layoutParams.x = currentPos.x.toInt() - avatarOffsetX
+            layoutParams.y = currentPos.y.toInt() - avatarOffsetY
+            if (isViewAttached) {
+                try {
+                    windowManager.updateViewLayout(floatingView, layoutParams)
+                    updateGestureExclusion()
+                } catch (e: Exception) {
+                    Log.w(TAG, "applyAvatarScale updateViewLayout failed", e)
+                }
+            }
+        }
+    }
+
+    private fun dockToNearestEdge(animated: Boolean = true) {
+        if (isDraggingAvatar || (dockAnimator?.isRunning == true && !isDockedToEdge)) return
+        dockAnimator?.cancel()
+        bubbleLabel.visibility = View.GONE
+
+        val screenWidth = resources.displayMetrics.widthPixels
+        val density = resources.displayMetrics.density
+        val avatarWidth = 100 * density * currentAvatarScale
+        val peekPx = (DOCK_PEEK_WIDTH_DP * density * currentAvatarScale).coerceAtLeast(24 * density)
+
+        val currentPos = avatarController.avatarState.value.position
+        undockedPositionX = currentPos.x
+
+        val avatarCenterX = currentPos.x + avatarWidth / 2f
+        val targetX: Float
+        if (avatarCenterX < screenWidth / 2f) {
+            dockSide = DOCK_LEFT
+            targetX = peekPx - avatarWidth
+        } else {
+            dockSide = DOCK_RIGHT
+            targetX = screenWidth.toFloat() - peekPx
+        }
+
+        val currentY = currentPos.y
+
+        if (animated) {
+            val startX = currentPos.x
+            dockAnimator = ValueAnimator.ofFloat(startX, targetX).apply {
+                duration = 350L
+                interpolator = DecelerateInterpolator()
+                addUpdateListener { anim ->
+                    val x = anim.animatedValue as Float
+                    avatarController.setPosition(x, currentY)
+                }
+                addListener(object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) {
+                        isDockedToEdge = true
+                        bubbleLabel.visibility = View.GONE
+                        floatingView.alpha = 0.8f
+                        updateGestureExclusion()
+                    }
+                    override fun onAnimationCancel(animation: Animator) {
+                        floatingView.alpha = 1.0f
+                    }
+                })
+                start()
+            }
+        } else {
+            avatarController.setPosition(targetX, currentY)
+            isDockedToEdge = true
+            bubbleLabel.visibility = View.GONE
+            floatingView.alpha = 0.8f
+            updateGestureExclusion()
+        }
+    }
+
+    private fun undockFromEdge(animated: Boolean = true, onComplete: (() -> Unit)? = null) {
+        if (!isDockedToEdge && dockAnimator?.isRunning != true) {
+            onComplete?.invoke()
+            return
+        }
+        dockAnimator?.cancel()
+        isDockedToEdge = false
+        floatingView.alpha = 1.0f
+        lastInteractionTime = SystemClock.uptimeMillis()
+
+        val screenWidth = resources.displayMetrics.widthPixels
+        val density = resources.displayMetrics.density
+        val avatarWidth = 100 * density * currentAvatarScale
+        val margin = 12 * density
+
+        val targetX = if (dockSide == DOCK_LEFT) {
+            margin
+        } else if (dockSide == DOCK_RIGHT) {
+            (screenWidth - avatarWidth - margin).coerceAtLeast(margin)
+        } else {
+            undockedPositionX.coerceIn(margin, (screenWidth - avatarWidth - margin).coerceAtLeast(margin))
+        }
+        dockSide = DOCK_NONE
+        val currentY = avatarController.avatarState.value.position.y
+
+        if (animated) {
+            val startX = avatarController.avatarState.value.position.x
+            dockAnimator = ValueAnimator.ofFloat(startX, targetX).apply {
+                duration = 250L
+                interpolator = DecelerateInterpolator()
+                addUpdateListener { anim ->
+                    val x = anim.animatedValue as Float
+                    avatarController.setPosition(x, currentY)
+                }
+                addListener(object : AnimatorListenerAdapter() {
+                    override fun onAnimationEnd(animation: Animator) {
+                        savePosition()
+                        updateBubbleForActivity(avatarController.avatarState.value)
+                        updateGestureExclusion()
+                        onComplete?.invoke()
+                    }
+                    override fun onAnimationCancel(animation: Animator) {
+                        savePosition()
+                    }
+                })
+                start()
+            }
+        } else {
+            avatarController.setPosition(targetX, currentY)
+            savePosition()
+            updateBubbleForActivity(avatarController.avatarState.value)
+            updateGestureExclusion()
+            onComplete?.invoke()
+        }
+    }
+
     private var pendingSingleTapRunnable: Runnable? = null
 
     private fun setupTouchListener() {
@@ -636,7 +871,7 @@ class FloatingWindowService : Service() {
         val dragThresholdPx = (DRAG_THRESHOLD_DP * density).toInt()
         Log.d(TAG, "setupTouchListener: dragThresholdPx=$dragThresholdPx density=$density")
 
-        pixelAvatarView.setOnTouchListener(object : View.OnTouchListener {
+        val touchListener = object : View.OnTouchListener {
             private var initialX = 0
             private var initialY = 0
             private var initialTouchX = 0f
@@ -658,11 +893,17 @@ class FloatingWindowService : Service() {
 
                 when (event.action) {
                     MotionEvent.ACTION_DOWN -> {
+                        lastInteractionTime = SystemClock.uptimeMillis()
+                        if (dockAnimator?.isRunning == true) {
+                            dockAnimator?.cancel()
+                            floatingView.alpha = 1.0f
+                        }
                         initialX = avatarController.avatarState.value.position.x.toInt()
                         initialY = avatarController.avatarState.value.position.y.toInt()
                         initialTouchX = event.rawX
                         initialTouchY = event.rawY
                         isDragging = false
+                        isDraggingAvatar = false
                         longPressTriggered = false
                         mainHandler.postDelayed(longPressRunnable, LONG_PRESS_THRESHOLD_MS)
                         return true
@@ -672,6 +913,11 @@ class FloatingWindowService : Service() {
                         val dy = event.rawY - initialTouchY
                         if (!isDragging && (Math.abs(dx) > dragThresholdPx || Math.abs(dy) > dragThresholdPx)) {
                             isDragging = true
+                            isDraggingAvatar = true
+                            isDockedToEdge = false
+                            dockSide = DOCK_NONE
+                            floatingView.alpha = 1.0f
+                            lastInteractionTime = SystemClock.uptimeMillis()
                             mainHandler.removeCallbacks(longPressRunnable)
                             pendingSingleTapRunnable?.let { mainHandler.removeCallbacks(it) }
                             pendingSingleTapRunnable = null
@@ -684,6 +930,7 @@ class FloatingWindowService : Service() {
                             }
                         }
                         if (isDragging) {
+                            lastInteractionTime = SystemClock.uptimeMillis()
                             if (dx < -10) {
                                 pixelAvatarView.setVisualState("dragLeft")
                             } else if (dx > 10) {
@@ -697,13 +944,24 @@ class FloatingWindowService : Service() {
                     }
                     MotionEvent.ACTION_UP -> {
                         mainHandler.removeCallbacks(longPressRunnable)
+                        lastInteractionTime = SystemClock.uptimeMillis()
                         if (longPressTriggered) {
                             longPressTriggered = false
                         } else if (isDragging) {
+                            isDragging = false
+                            isDraggingAvatar = false
                             avatarController.endDrag()
                             savePosition()
                             updateAnimation(avatarController.avatarState.value)
                         } else {
+                            if (isDockedToEdge) {
+                                undockFromEdge(animated = true)
+                                pixelAvatarView.setVisualState("wave")
+                                mainHandler.postDelayed({
+                                    updateAnimation(avatarController.avatarState.value)
+                                }, 1500)
+                                return true
+                            }
                             v?.performClick()
                             val now = android.os.SystemClock.uptimeMillis()
                             if (now - lastTapAt <= DOUBLE_TAP_THRESHOLD_MS) {
@@ -743,9 +1001,12 @@ class FloatingWindowService : Service() {
                         mainHandler.removeCallbacks(longPressRunnable)
                         pendingSingleTapRunnable?.let { mainHandler.removeCallbacks(it) }
                         pendingSingleTapRunnable = null
+                        lastInteractionTime = SystemClock.uptimeMillis()
+                        isDraggingAvatar = false
                         if (longPressTriggered) {
                             longPressTriggered = false
                         } else if (isDragging) {
+                            isDragging = false
                             avatarController.endDrag()
                             updateAnimation(avatarController.avatarState.value)
                         }
@@ -754,7 +1015,9 @@ class FloatingWindowService : Service() {
                 }
                 return false
             }
-        })
+        }
+        floatingView.setOnTouchListener(touchListener)
+        pixelAvatarView.setOnTouchListener(touchListener)
     }
 
     private fun analyzeCurrentScreen() {
@@ -1563,6 +1826,8 @@ class FloatingWindowService : Service() {
         runtime.avatarCommandExecutor.ttsManager = null
         runtime.floatingWindowIntentHandler = null
         runtime.chat.onAssistantReply = null
+        dockAnimator?.cancel()
+        dockAnimator = null
         serviceScope.cancel()
         if (::capsuleView.isInitialized && isCapsuleAttached) {
             try {
@@ -1600,5 +1865,10 @@ class FloatingWindowService : Service() {
         private const val AVATAR_WINDOW_HEIGHT_DP = 140
         private const val AVATAR_OFFSET_X_DP = 30
         private const val AVATAR_OFFSET_Y_DP = 36
+        private const val DOCK_NONE = 0
+        private const val DOCK_LEFT = 1
+        private const val DOCK_RIGHT = 2
+        private const val AUTO_DOCK_IDLE_TIMEOUT_MS = 10_000L
+        private const val DOCK_PEEK_WIDTH_DP = 28f
     }
 }

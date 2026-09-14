@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bonio Avatar 像素皮肤全状态交互预览 (Mario & Messi & Kun)</title>
+  <style>
+    :root {
+      --primary: #0a59f7;
+      --bg: #f5f6f9;
+      --card-bg: #ffffff;
+      --text: #1d2129;
+      --subtext: #86909c;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h1 {
+      margin-bottom: 8px;
+      font-size: 24px;
+      font-weight: 700;
+    }
+    .subtitle {
+      color: var(--subtext);
+      font-size: 14px;
+      margin-bottom: 24px;
+    }
+    .container {
+      display: flex;
+      gap: 32px;
+      max-width: 1200px;
+      width: 100%;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .card {
+      background: var(--card-bg);
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 340px;
+    }
+    .card-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .avatar-viewport {
+      width: 192px;
+      height: 208px;
+      border: 2px dashed #e5e6eb;
+      border-radius: 12px;
+      position: relative;
+      background: radial-gradient(circle at center, #ffffff 0%, #f2f3f5 100%);
+      overflow: hidden;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .sprite {
+      width: 192px;
+      height: 208px;
+      image-rendering: pixelated;
+      background-repeat: no-repeat;
+    }
+    .bubble {
+      position: absolute;
+      top: 8px;
+      background: rgba(0, 0, 0, 0.75);
+      color: #fff;
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      pointer-events: none;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .controls {
+      width: 100%;
+    }
+    .state-btn-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    button {
+      background: #f2f3f5;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      padding: 8px 4px;
+      font-size: 12px;
+      color: var(--text);
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+    button:hover {
+      background: #e5e6eb;
+    }
+    button.active {
+      background: var(--primary);
+      color: #ffffff;
+      border-color: var(--primary);
+    }
+    .state-info {
+      font-size: 12px;
+      color: var(--subtext);
+      text-align: center;
+      background: #f7f8fa;
+      padding: 8px;
+      border-radius: 8px;
+      margin-top: 8px;
+    }
+    .specs-panel {
+      max-width: 1080px;
+      width: 100%;
+      background: #fff;
+      border-radius: 16px;
+      padding: 24px;
+      margin-top: 32px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-top: 12px;
+    }
+    th, td {
+      border: 1px solid #e5e6eb;
+      padding: 8px 12px;
+      text-align: left;
+    }
+    th {
+      background: #f7f8fa;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🎮 Bonio Avatar 像素皮肤全状态实测预览</h1>
+  <div class="subtitle">严格对齐 Bonio 10 状态机与 8列 × 9行 规格契约 (1536 × 1872 WebP)</div>
+
+  <div class="container">
+    <!-- MARIO CARD -->
+    <div class="card" id="card-mario">
+      <div class="card-title">🍄 马里奥 (Super Mario)</div>
+      <div class="avatar-viewport">
+        <div class="bubble" id="bubble-mario">休息中~ 有事叫我</div>
+        <div class="sprite" id="sprite-mario"></div>
+      </div>
+      <div class="controls">
+        <div class="state-btn-grid" id="btns-mario"></div>
+        <div class="state-info" id="info-mario">当前动作: idle (待机呼吸)</div>
+      </div>
+    </div>
+
+    <!-- MESSI CARD -->
+    <div class="card" id="card-messi">
+      <div class="card-title">⚽ 里奥·梅西 (Leo Messi #10)</div>
+      <div class="avatar-viewport">
+        <div class="bubble" id="bubble-messi">休息中~ 有事叫我</div>
+        <div class="sprite" id="sprite-messi"></div>
+      </div>
+      <div class="controls">
+        <div class="state-btn-grid" id="btns-messi"></div>
+        <div class="state-info" id="info-messi">当前动作: idle (足尖颠球)</div>
+      </div>
+    </div>
+
+    <!-- KUN REFERENCE CARD -->
+    <div class="card" id="card-kun">
+      <div class="card-title">🐤 原版 Kun (Baseline)</div>
+      <div class="avatar-viewport">
+        <div class="bubble" id="bubble-kun">休息中~ 有事叫我</div>
+        <div class="sprite" id="sprite-kun"></div>
+      </div>
+      <div class="controls">
+        <div class="state-btn-grid" id="btns-kun"></div>
+        <div class="state-info" id="info-kun">当前动作: idle (抱球待机)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SPECS TABLE -->
+  <div class="specs-panel">
+    <h3>📋 8列 × 9行 动画状态对照表（全生命周期规范）</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>行号 (Row)</th>
+          <th>动作标识 (Anim)</th>
+          <th>Avatar 业务状态</th>
+          <th>帧数</th>
+          <th>各角色动作实现要点</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Row 0</td><td><code>idle</code></td><td>待机/休眠</td><td>6 帧</td><td>马里奥呼吸起伏 / 梅西足尖轻快颠球 / Kun 抱球呼吸</td></tr>
+        <tr><td>Row 1</td><td><code>runRight</code></td><td>向右拖动/奔跑</td><td>8 帧</td><td>经典三段步态 + 刹车 / 带球向右突破 / 跑步跨步</td></tr>
+        <tr><td>Row 2</td><td><code>runLeft</code></td><td>向左拖动/奔跑</td><td>8 帧</td><td>向左翻转跑动 / 向左逆足盘带 / 向左跑步</td></tr>
+        <tr><td>Row 3</td><td><code>wave</code></td><td>点击互动/打招呼</td><td>4 帧</td><td>胜利脱帽致意 / 队长袖标挥手致谢 / 摇晃挥手</td></tr>
+        <tr><td>Row 4</td><td><code>jump</code></td><td>任务完成庆祝</td><td>5 帧</td><td>经典顶砖起跳 / 双手指天经典庆祝 (Two fingers to sky) / 欢呼大跳</td></tr>
+        <tr><td>Row 5</td><td><code>failed</code></td><td>任务失败/报错</td><td>8 帧</td><td>马里奥中弹升天掉落 / 梅西抱头叹息 / 沮丧跌倒</td></tr>
+        <tr><td>Row 6</td><td><code>waiting</code></td><td>等待输入/录音中</td><td>6 帧</td><td>原地踏步踱步 / 球鞋踩球蓄势 / 歪头等待</td></tr>
+        <tr><td>Row 7</td><td><code>working</code></td><td>AI正在调用工具/搬砖</td><td>6 帧</td><td>奔跑冲刺采蘑菇 / 极速踩单车突破 / 疯狂敲键盘打字</td></tr>
+        <tr><td>Row 8</td><td><code>thinking</code></td><td>AI深入推理/思考</td><td>6 帧</td><td>疑惑偏头挠帽子 / 托腮战术深思 / 挠头思索</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    const CW = 192;
+    const CH = 208;
+    const SHEET_W = CW * 8;
+    const SHEET_H = CH * 9;
+
+    const ROWS = {
+      idle: { row: 0, count: 6, frames: [280, 110, 110, 140, 140, 320], name: '待机 (Idle)', bubble: '休息中~ 有事叫我' },
+      runRight: { row: 1, count: 8, frames: [120, 120, 120, 120, 120, 120, 120, 220], name: '向右跑 (Run R)', bubble: '向右奔跑~' },
+      runLeft: { row: 2, count: 8, frames: [120, 120, 120, 120, 120, 120, 120, 220], name: '向左跑 (Run L)', bubble: '向左滑行~' },
+      wave: { row: 3, count: 4, frames: [140, 140, 140, 280], name: '互动 (Wave)', bubble: '嗨！找我什么事？' },
+      jump: { row: 4, count: 5, frames: [140, 140, 140, 140, 280], name: '庆祝 (Jump)', bubble: '太棒啦！任务完成！' },
+      failed: { row: 5, count: 8, frames: [140, 140, 140, 140, 140, 140, 140, 240], name: '出错 (Failed)', bubble: '呜…出错了 (._.)' },
+      waiting: { row: 6, count: 6, frames: [150, 150, 150, 150, 150, 260], name: '等待 (Waiting)', bubble: '在等你的指令呢…' },
+      working: { row: 7, count: 6, frames: [120, 120, 120, 120, 120, 220], name: '工作中 (Working)', bubble: '努力搬砖中…' },
+      thinking: { row: 8, count: 6, frames: [150, 150, 150, 150, 150, 280], name: '思考中 (Thinking)', bubble: '正在烧 CPU 思考中…' },
+    };
+
+    function setupPlayer(id, spriteUrl) {
+      const spriteEl = document.getElementById(`sprite-${id}`);
+      const bubbleEl = document.getElementById(`bubble-${id}`);
+      const btnsContainer = document.getElementById(`btns-${id}`);
+      const infoEl = document.getElementById(`info-${id}`);
+
+      spriteEl.style.backgroundImage = `url('${spriteUrl}')`;
+      spriteEl.style.backgroundSize = `${SHEET_W}px ${SHEET_H}px`;
+
+      let currentAnim = 'idle';
+      let currentFrame = 0;
+      let timer = null;
+
+      function renderFrame() {
+        const spec = ROWS[currentAnim];
+        const bgX = -(currentFrame * CW);
+        const bgY = -(spec.row * CH);
+        spriteEl.style.backgroundPosition = `${bgX}px ${bgY}px`;
+        const delay = spec.frames[currentFrame] || 150;
+        timer = setTimeout(() => {
+          currentFrame = (currentFrame + 1) % spec.count;
+          renderFrame();
+        }, delay);
+      }
+
+      function switchAnim(animKey) {
+        if (timer) clearTimeout(timer);
+        currentAnim = animKey;
+        currentFrame = 0;
+        bubbleEl.innerText = ROWS[animKey].bubble;
+        infoEl.innerText = `当前动作: ${ROWS[animKey].name} (Row ${ROWS[animKey].row})`;
+
+        btnsContainer.querySelectorAll('button').forEach(btn => {
+          btn.classList.toggle('active', btn.dataset.key === animKey);
+        });
+        renderFrame();
+      }
+
+      Object.keys(ROWS).forEach(key => {
+        const btn = document.createElement('button');
+        btn.innerText = ROWS[key].name.split(' ')[0];
+        btn.dataset.key = key;
+        if (key === 'idle') btn.classList.add('active');
+        btn.onclick = () => switchAnim(key);
+        btnsContainer.appendChild(btn);
+      });
+
+      renderFrame();
+    }
+
+    setupPlayer('mario', 'assets/mario/spritesheet.webp?t=1788710206');
+    setupPlayer('messi', 'assets/messi/spritesheet.webp?t=' + Date.now());
+    setupPlayer('kun', '../harmonyos/entry/src/main/resources/rawfile/kun-spritesheet.webp');
+  </script>
+</body>
+</html>

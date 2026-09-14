@@ -51,6 +51,8 @@ fun PersonalizationTab(
     val colors = LocalAppColors.current
     val isConnected by viewModel.isConnected.collectAsState()
     val currentSkin by viewModel.avatarSkin.collectAsState()
+    val avatarScale by viewModel.avatarScale.collectAsState()
+    val autoDockEdge by viewModel.autoDockEdge.collectAsState()
     val serverConfig by viewModel.serverConfig.collectAsState()
     val skills by viewModel.skills.collectAsState()
     val skillsLoading by viewModel.skillsLoading.collectAsState()
@@ -192,6 +194,95 @@ fun PersonalizationTab(
                                 }
                             }
                         }
+                    }
+
+                    HorizontalDivider(color = colors.border.copy(alpha = 0.6f))
+
+                    // 显示大小
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column {
+                                Text(
+                                    text = "显示大小",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = colors.textPrimary
+                                )
+                                Text(
+                                    text = "调整屏幕上悬浮形象的缩放比例",
+                                    fontSize = 12.sp,
+                                    color = colors.textSecondary,
+                                    modifier = Modifier.padding(top = 2.dp)
+                                )
+                            }
+                            Text(
+                                text = "${(avatarScale * 100).toInt()}%",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = colors.accent
+                            )
+                        }
+
+                        val scaleOptions = listOf(0.50f to "50%", 0.75f to "75%", 1.00f to "100%", 1.25f to "125%", 1.50f to "150%")
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            scaleOptions.forEach { (scale, label) ->
+                                val isSelected = Math.abs(avatarScale - scale) < 0.01f
+                                Surface(
+                                    onClick = { viewModel.setAvatarScale(scale) },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isSelected) (if (colors.isDark) Color(0xFF1E2D4A) else Color(0xFFE8F0FE)) else colors.surfaceVariant,
+                                    border = BorderStroke(1.dp, if (isSelected) colors.accent else colors.border)
+                                ) {
+                                    Box(
+                                        modifier = Modifier.padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isSelected) colors.accent else colors.textPrimary
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(color = colors.border.copy(alpha = 0.6f))
+
+                    // 自动贴边隐藏
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+                            Text(
+                                text = "自动贴边隐藏",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = colors.textPrimary
+                            )
+                            Text(
+                                text = "长时间不使用时自动移动到最近边缘收起",
+                                fontSize = 12.sp,
+                                color = colors.textSecondary,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
+                        BonioSwitch(
+                            checked = autoDockEdge,
+                            onCheckedChange = { viewModel.setAutoDockEdge(it) }
+                        )
                     }
                 }
             }
