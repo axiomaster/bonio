@@ -12,6 +12,12 @@ import android.speech.SpeechRecognizer
 import android.util.Log
 import java.util.Locale
 
+/**
+ * Speech-to-text using the platform SpeechRecognizer only. The offline
+ * Sherpa-ONNX fallback (≈255MB models + runtime) is cut from v1 to slim the
+ * APK; on devices without a system recognizer voice input degrades to an
+ * error callback and the caller resets to idle.
+ */
 class SpeechToTextManager(private val context: Context) {
 
     interface Listener {
@@ -28,48 +34,11 @@ class SpeechToTextManager(private val context: Context) {
     @Volatile
     private var listening = false
 
-    private val sherpaManager = SherpaOnnxSpeechManager(context)
-    @Volatile
-    private var usingSherpa = false
-
     fun startListening(listener: Listener) {
-        mainHandler.post {
-            if (systemSttAvailable == false) {
-                Log.d(TAG, "System STT known unavailable, using Sherpa-ONNX directly")
-                startSherpaListening(listener)
-            } else {
-                startListeningOnMain(listener)
-            }
-        }
+        mainHandler.post { startListeningOnMain(listener) }
     }
 
     private var startTimeoutRunnable: Runnable? = null
-
-    private fun startSherpaListening(listener: Listener) {
-        currentListener = listener
-        usingSherpa = true
-        listening = true
-        val wrappedListener = object : Listener {
-            override fun onPartialResult(text: String) { listener.onPartialResult(text) }
-            override fun onFinalResult(text: String) {
-                listening = false
-                usingSherpa = false
-                listener.onFinalResult(text)
-            }
-            override fun onError(errorCode: Int) {
-                listening = false
-                usingSherpa = false
-                listener.onError(errorCode)
-            }
-            override fun onReadyForSpeech() { listener.onReadyForSpeech() }
-            override fun onEndOfSpeech() {
-                listening = false
-                usingSherpa = false
-                listener.onEndOfSpeech()
-            }
-        }
-        sherpaManager.startListening(wrappedListener)
-    }
 
     private fun startListeningOnMain(listener: Listener) {
         if (listening) {
@@ -77,13 +46,11 @@ class SpeechToTextManager(private val context: Context) {
         }
         destroyRecognizer()
         currentListener = listener
-        usingSherpa = false
 
         recognizer = createRecognizer()
         if (recognizer == null) {
-            Log.e(TAG, "SpeechRecognizer unavailable on this device, switching to Sherpa-ONNX")
-            systemSttAvailable = false
-            startSherpaListening(listener)
+            Log.e(TAG, "SpeechRecognizer unavailable on this device")
+            listener.onError(SpeechRecognizer.ERROR_CLIENT)
             return
         }
 
@@ -94,7 +61,6 @@ class SpeechToTextManager(private val context: Context) {
                 Log.d(TAG, "onReadyForSpeech")
                 gotCallback = true
                 cancelStartTimeout()
-                systemSttAvailable = true
                 listening = true
                 currentListener?.onReadyForSpeech()
             }
@@ -120,15 +86,7 @@ class SpeechToTextManager(private val context: Context) {
                 cancelStartTimeout()
                 listening = false
                 destroyRecognizer()
-
-                // System STT failed — fall back to Sherpa-ONNX for this and all future calls
-                if (systemSttAvailable != true) {
-                    Log.w(TAG, "System STT probe failed (error=$error), switching to Sherpa-ONNX fallback")
-                    systemSttAvailable = false
-                    startSherpaListening(listener)
-                } else {
-                    currentListener?.onError(error)
-                }
+                currentListener?.onError(error)
             }
 
             override fun onResults(results: Bundle?) {
@@ -167,14 +125,13 @@ class SpeechToTextManager(private val context: Context) {
 
         startTimeoutRunnable = Runnable {
             if (!gotCallback) {
-                Log.w(TAG, "SpeechRecognizer start timeout — no callback received, falling back to Sherpa-ONNX")
+                Log.w(TAG, "SpeechRecognizer start timeout — no callback received")
                 listening = false
                 destroyRecognizer()
-                systemSttAvailable = false
-                startSherpaListening(listener)
+                listener.onError(SpeechRecognizer.ERROR_CLIENT)
             }
         }
-        mainHandler.postDelayed(startTimeoutRunnable!!, 1000L)
+        mainHandler.postDelayed(startTimeoutRunnable!!, 1500L)
     }
 
     private fun cancelStartTimeout() {
@@ -188,17 +145,13 @@ class SpeechToTextManager(private val context: Context) {
 
     private fun stopListeningOnMain() {
         cancelStartTimeout()
-        if (usingSherpa) {
-            sherpaManager.stopListening()
-        } else {
-            listening = false
-            try {
-                recognizer?.stopListening()
-            } catch (e: Exception) {
-                Log.w(TAG, "stopListening error", e)
-            }
-            destroyRecognizer()
+        listening = false
+        try {
+            recognizer?.stopListening()
+        } catch (e: Exception) {
+            Log.w(TAG, "stopListening error", e)
         }
+        destroyRecognizer()
     }
 
     fun cancelListening() {
@@ -208,38 +161,26 @@ class SpeechToTextManager(private val context: Context) {
     private fun cancelListeningOnMain() {
         cancelStartTimeout()
         listening = false
-        if (usingSherpa) {
-            sherpaManager.cancelListening()
-        } else {
-            try {
-                recognizer?.cancel()
-            } catch (e: Exception) {
-                Log.w(TAG, "cancelListening error", e)
-            }
-            destroyRecognizer()
+        try {
+            recognizer?.cancel()
+        } catch (e: Exception) {
+            Log.w(TAG, "cancelListening error", e)
         }
-        usingSherpa = false
+        destroyRecognizer()
         currentListener = null
     }
 
     fun isListening(): Boolean = listening
 
     fun destroy() {
-        mainHandler.post {
-            cancelListeningOnMain()
-            sherpaManager.destroy()
-        }
+        mainHandler.post { cancelListeningOnMain() }
     }
 
     /**
-     * Pre-initialize the Sherpa-ONNX model in background so first voice input is fast.
+     * No-op: the offline model warm-up was removed with the Sherpa-ONNX cut.
+     * Kept for source compatibility with existing call sites.
      */
-    fun warmUp() {
-        sherpaManager.prepareModelAsync(
-            onReady = { Log.d(TAG, "Sherpa-ONNX model warmed up successfully") },
-            onError = { Log.w(TAG, "Sherpa-ONNX model warm-up failed", it) }
-        )
-    }
+    fun warmUp() {}
 
     private fun destroyRecognizer() {
         try {
@@ -267,7 +208,5 @@ class SpeechToTextManager(private val context: Context) {
 
     companion object {
         private const val TAG = "SpeechToTextManager"
-        @Volatile
-        private var systemSttAvailable: Boolean? = null  // null = not yet probed; shared across instances
     }
 }
