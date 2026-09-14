@@ -145,9 +145,7 @@ void CallHandler::run_call_flow(const std::string& number, const std::string& co
       }, 0));
     }
     steps.push_back(avatar_cmd::step("setState", {{"state", "watching"}}, 0));
-    // Portal animation: move to notification banner area
-    steps.push_back(avatar_cmd::step("moveTo", {{"x", 450}, {"y", 330}, {"mode", "portal"}}, 2500));
-    steps.push_back(avatar_cmd::step("setState", {{"state", "listening"}}, 0));
+    // v1: text reminder only — the avatar no longer moves around during calls.
     avatar_cmd::send(event_callback_, avatar_cmd::sequence(steps));
 
     // Also send a chat message via event
