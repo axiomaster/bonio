@@ -56,6 +56,15 @@ class PixelAvatarView @JvmOverloads constructor(
     private var currentFrame: Int = 0
     private var celebrateWithJump: Boolean = false
 
+    /**
+     * Per-row opaque-pixel bounds (union over all frames of the row), in
+     * spritesheet pixel coordinates. Sprites carry large transparent margins
+     * (the cat has huge headroom); drawing the tight box keeps the head pill
+     * close to the visible cat and guarantees edge-docked peeks show real
+     * pixels on both sides.
+     */
+    private val rowBounds = arrayOfNulls<Rect>(SPRITE_ROWS)
+
     private val handler = Handler(Looper.getMainLooper())
     private var isRunning = false
 
@@ -147,11 +156,38 @@ class PixelAvatarView @JvmOverloads constructor(
                 if (bmp != null) {
                     bitmapCache[fileName] = bmp
                     currentBitmap = bmp
+                    java.util.Arrays.fill(rowBounds, null)
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load spritesheet for skin: $skinId from $fileName", e)
         }
+    }
+
+    /** Union of opaque pixels across all frames of [row]; computed once, cached. */
+    private fun rowContentBounds(bmp: Bitmap, row: Int): Rect? {
+        val cached = rowBounds.getOrNull(row)
+        if (cached != null) return cached
+        val top = row * FRAME_HEIGHT
+        val bounds = Rect(-1, -1, -1, -1)
+        val pixels = IntArray(FRAME_WIDTH * FRAME_HEIGHT)
+        for (col in 0 until SPRITE_COLS) {
+            bmp.getPixels(pixels, 0, FRAME_WIDTH, col * FRAME_WIDTH, top, FRAME_WIDTH, FRAME_HEIGHT)
+            for (py in 0 until FRAME_HEIGHT) {
+                val base = py * FRAME_WIDTH
+                for (px in 0 until FRAME_WIDTH) {
+                    if ((pixels[base + px] ushr 24) != 0) {
+                        if (bounds.left < 0 || px < bounds.left) bounds.left = px
+                        if (bounds.right < 0 || px > bounds.right) bounds.right = px
+                        if (bounds.top < 0 || py < bounds.top) bounds.top = py
+                        if (bounds.bottom < 0 || py > bounds.bottom) bounds.bottom = py
+                    }
+                }
+            }
+        }
+        val result = if (bounds.left < 0) null else bounds
+        rowBounds[row] = result
+        return result
     }
 
     private fun scheduleNextFrame() {
@@ -182,22 +218,31 @@ class PixelAvatarView @JvmOverloads constructor(
         val row = spec.row.coerceIn(0, SPRITE_ROWS - 1)
         val col = currentFrame.coerceIn(0, SPRITE_COLS - 1)
 
-        val srcLeft = col * FRAME_WIDTH
-        val srcTop = row * FRAME_HEIGHT
-        val srcRight = srcLeft + FRAME_WIDTH
-        val srcBottom = srcTop + FRAME_HEIGHT
-        val srcRect = Rect(srcLeft, srcTop, srcRight, srcBottom)
-
-        // Fit sprite into view while maintaining 192:208 aspect ratio
         val viewW = width
         val viewH = height
         if (viewW <= 0 || viewH <= 0) return
 
-        val scale = min(viewW.toFloat() / FRAME_WIDTH, viewH.toFloat() / FRAME_HEIGHT)
-        val drawW = (FRAME_WIDTH * scale).toInt()
-        val drawH = (FRAME_HEIGHT * scale).toInt()
+        // Draw only the row's opaque content (tight crop): transparent sprite
+        // margins are skipped so the character fills the view and the head
+        // status pill sits right above the visible head.
+        val content = rowContentBounds(bmp, row)
+        val srcTop = row * FRAME_HEIGHT
+        val srcRect = if (content != null) {
+            Rect(col * FRAME_WIDTH + content.left, srcTop + content.top,
+                 col * FRAME_WIDTH + content.right + 1, srcTop + content.bottom + 1)
+        } else {
+            Rect(col * FRAME_WIDTH, srcTop, col * FRAME_WIDTH + FRAME_WIDTH, srcTop + FRAME_HEIGHT)
+        }
+
+        val srcW = srcRect.width()
+        val srcH = srcRect.height()
+        val scale = min(viewW.toFloat() / srcW, viewH.toFloat() / srcH)
+        val drawW = (srcW * scale).toInt().coerceAtLeast(1)
+        val drawH = (srcH * scale).toInt().coerceAtLeast(1)
+        // Anchor top-center: for wide characters (the lying cat) the head stays
+        // close to the pill above; tall characters fill the height anyway.
         val dstLeft = (viewW - drawW) / 2
-        val dstTop = (viewH - drawH) / 2
+        val dstTop = 0
         val dstRect = Rect(dstLeft, dstTop, dstLeft + drawW, dstTop + drawH)
 
         canvas.drawBitmap(bmp, srcRect, dstRect, pixelPaint)
