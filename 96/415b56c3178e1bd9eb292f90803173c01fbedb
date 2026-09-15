@@ -1,0 +1,62 @@
+server/CMakeLists.txt
+  s_539b59f41bad53::t_37bdaccce2378a 252-256
+android/app/src/main/jniLibs/arm64-v8a/libhiclaw.so
+  s_539b59f41bad53::t_68369f41869e4d 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.30.1",
+  "base_commit_sha": "96415b56c3178e1bd9eb292f90803173c01fbedb",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  },
+  "sessions": {
+    "s_539b59f41bad53": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8f431abe-980e-474d-af47-4ff9172028a6",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_additions": 5,
+      "total_deletions": 0,
+      "overridden_lines": 0,
+      "turn_models": {
+        "t_0a6b7eefed6271": "glm-5.3-flash",
+        "t_0baab366f3e09c": "glm-5.3-flash",
+        "t_166292b80a8235": "glm-5.3-flash",
+        "t_2524ebb3aa3459": "glm-5.3-flash",
+        "t_34dbd631c7ea7a": "glm-5.3-flash",
+        "t_37bdaccce2378a": "glm-5.3-flash",
+        "t_548822a0818734": "glm-5.3-flash",
+        "t_89181e98c4e803": "glm-5.3-flash",
+        "t_a5eadd87afcb60": "glm-5.3-flash",
+        "t_a7c528a8b68e57": "glm-5.3-flash",
+        "t_cd55c24cdd07eb": "glm-5.3-flash",
+        "t_d6f18353dd4c4a": "glm-5.3-flash",
+        "t_dc0d9dc7a37a88": "glm-5.3-flash",
+        "t_eec48db645445f": "glm-5.3-flash"
+      },
+      "model_totals": {
+        "glm-5.3-flash": {
+          "additions": 242,
+          "deletions": 111
+        }
+      }
+    },
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_additions": 0,
+      "total_deletions": 36,
+      "overridden_lines": 0
+    }
+  }
+}
