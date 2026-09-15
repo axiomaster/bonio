@@ -249,4 +249,9 @@ if(ANDROID)
   target_compile_options(hiclaw PRIVATE
     -Wno-unused-command-line-argument
   )
+  # 16 KB page-size compliance (required by Android 15+ devices/installers).
+  target_link_options(hiclaw PRIVATE
+    -Wl,-z,max-page-size=16384
+    -Wl,-z,common-page-size=16384
+  )
 endif()
