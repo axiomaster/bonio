@@ -318,7 +318,7 @@ types::ToolResult memo_save(const std::string& args_json) {
   return types::ToolResult{true, result.dump(), ""};
 }
 
-types::ToolResult memo_list(const std::string& args_json) {
+types::ToolResult memo_list(const std::string& args_json, bool include_images) {
   json params;
   try {
     params = args_json.empty() ? json::object() : json::parse(args_json);
@@ -346,13 +346,17 @@ types::ToolResult memo_list(const std::string& args_json) {
 
   json memos = json::array();
   for (size_t i = 0; i < stored_memos.size() && i < static_cast<size_t>(limit); ++i) {
+    if (!include_images) {
+      stored_memos[i].erase("coverImage");
+      stored_memos[i].erase("originalImage");
+    }
     memos.push_back(std::move(stored_memos[i]));
   }
   json result = {{"memos", memos}, {"count", memos.size()}};
   return types::ToolResult{true, result.dump(), ""};
 }
 
-types::ToolResult memo_get(const std::string& args_json) {
+types::ToolResult memo_get(const std::string& args_json, bool include_images) {
   json params;
   try {
     params = args_json.empty() ? json::object() : json::parse(args_json);
@@ -366,6 +370,10 @@ types::ToolResult memo_get(const std::string& args_json) {
   migrate_legacy_memos();
   std::optional<json> memo = read_memo(id);
   if (!memo) return types::ToolResult{false, "", "memo not found"};
+  if (!include_images) {
+    memo->erase("coverImage");
+    memo->erase("originalImage");
+  }
   json result = {{"memo", *memo}};
   return types::ToolResult{true, result.dump(), ""};
 }

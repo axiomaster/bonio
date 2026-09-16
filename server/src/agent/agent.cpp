@@ -211,6 +211,18 @@ std::string tool_message_json(const std::string& tool_call_id, const std::string
   return j.dump();
 }
 
+// Guard against oversized tool results overflowing the model's context window
+// (e.g. a tool echoing base64 payloads or dumping a huge file/page).
+constexpr size_t kMaxToolOutputChars = 64 * 1024;
+std::string cap_tool_output(const std::string& out) {
+  if (out.size() <= kMaxToolOutputChars) return out;
+  size_t cut = kMaxToolOutputChars;
+  while (cut > 0 && (static_cast<unsigned char>(out[cut]) & 0xC0) == 0x80) --cut;
+  std::string s = out.substr(0, cut);
+  s += "\n...[output truncated]";
+  return s;
+}
+
 }  // namespace
 
 RunResult run(const config::Config& config,
@@ -320,7 +332,7 @@ RunResult run(const config::Config& config,
     messages_json.push_back(assistant_message_json(resp.content, resp.tool_calls));
     for (const types::ToolCall& tc : resp.tool_calls) {
       types::ToolResult tr = tools::run_tool(tc.name, tc.arguments);
-      std::string out = tr.success ? tr.output : ("error: " + tr.error);
+      std::string out = cap_tool_output(tr.success ? tr.output : ("error: " + tr.error));
       messages_json.push_back(tool_message_json(tc.id, out));
     }
   }
@@ -872,7 +884,7 @@ RunResult run_streaming_with_history(
       } else {
         tr = tools::run_tool(tc.name, tc.arguments);
       }
-      std::string out = tr.success ? tr.output : ("error: " + tr.error);
+      std::string out = cap_tool_output(tr.success ? tr.output : ("error: " + tr.error));
       messages_json.push_back(tool_message_json(tc.id, out));
     }
 

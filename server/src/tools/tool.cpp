@@ -455,7 +455,9 @@ void register_builtin_tools() {
   register_tool("image", image_impl);
   register_tool("skill.read", skill_read_impl);
   register_tool("memo.save", [](const std::string& args_json) -> ToolResult { return memo_save(args_json); });
-  register_tool("memo.list", [](const std::string& args_json) -> ToolResult { return memo_list(args_json); });
+  // LLM-facing memo tools must not return base64 images — they accumulate in
+  // the conversation and overflow the model's context window.
+  register_tool("memo.list", [](const std::string& args_json) -> ToolResult { return memo_list(args_json, /*include_images=*/false); });
   cron::register_cron_tools();
 }
 
