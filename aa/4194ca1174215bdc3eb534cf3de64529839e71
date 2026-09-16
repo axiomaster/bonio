@@ -1,0 +1,51 @@
+android/app/build.gradle.kts
+  h_de08bd40967a17 94
+android/app/src/main/java/ai/axiomaster/bonio/MainViewModel.kt
+  h_de08bd40967a17 37
+android/app/src/main/java/ai/axiomaster/bonio/NodeRuntime.kt
+  h_de08bd40967a17 363-370,372-374
+android/app/src/main/java/ai/axiomaster/bonio/remote/node/DeviceNotificationListenerService.kt
+  h_de08bd40967a17 166,242,252-255
+android/app/src/main/java/ai/axiomaster/bonio/remote/todo/NotificationTodoExtractor.kt
+  h_de08bd40967a17 1-323
+android/app/src/main/java/ai/axiomaster/bonio/remote/todo/NotificationTodoManager.kt
+  h_de08bd40967a17 1-53
+android/app/src/main/java/ai/axiomaster/bonio/remote/todo/TodoItem.kt
+  h_de08bd40967a17 1-52
+android/app/src/main/java/ai/axiomaster/bonio/remote/todo/TodoRepository.kt
+  h_de08bd40967a17 1-140
+android/app/src/main/java/ai/axiomaster/bonio/ui/components/PinnedTodoCard.kt
+  h_de08bd40967a17 1-201
+android/app/src/main/java/ai/axiomaster/bonio/ui/screens/AllTodosView.kt
+  h_de08bd40967a17 1-456
+android/app/src/main/java/ai/axiomaster/bonio/ui/screens/MemoryTab.kt
+  h_de08bd40967a17 42,67,145-150,270-277
+android/app/src/test/java/ai/axiomaster/bonio/NotificationTodoExtractorTest.kt
+  h_de08bd40967a17 1-163
+docs/design/prd/20260916-notification-memo-todo-prd.md
+  h_de08bd40967a17 1-128
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.30.1",
+  "base_commit_sha": "aa4194ca1174215bdc3eb534cf3de64529839e71",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  },
+  "sessions": {
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_additions": 0,
+      "total_deletions": 36,
+      "overridden_lines": 0
+    }
+  }
+}
