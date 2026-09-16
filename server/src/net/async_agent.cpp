@@ -101,12 +101,14 @@ AsyncAgentManager::~AsyncAgentManager() {
 }
 
 std::string AsyncAgentManager::start_task(const std::string& session_key, const std::string& message,
-                                          const std::string& user_message_json_override) {
+                                          const std::string& user_message_json_override,
+                                          const std::string& user_profile) {
   auto task = std::make_shared<AsyncTask>();
   task->run_id = generate_run_id();
   task->session_key = session_key;
   task->message = message;
   task->user_message_json_override = user_message_json_override;
+  task->user_profile = user_profile;
 
   std::string run_id = task->run_id;
 
@@ -281,9 +283,11 @@ void AsyncAgentManager::run_task(std::shared_ptr<AsyncTask> task) {
       cron::set_session_key(session_key_copy);
       const std::string* user_override =
           task->user_message_json_override.empty() ? nullptr : &task->user_message_json_override;
+      const std::string* user_profile_ptr =
+          task->user_profile.empty() ? nullptr : &task->user_profile;
       result = agent::run_streaming_with_history(
           config_, history, task->message, 0.3,
-          stream_callback, tool_callback, &task->aborted, 5, remote_executor, user_override);
+          stream_callback, tool_callback, &task->aborted, 5, remote_executor, user_override, user_profile_ptr);
     }
 
     // Save assistant response to session store

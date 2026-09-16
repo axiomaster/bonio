@@ -40,6 +40,7 @@ import ai.axiomaster.bonio.i18n.AppStrings
 import ai.axiomaster.bonio.i18n.LocalAppStrings
 import ai.axiomaster.bonio.remote.memory.BonioMemo
 import ai.axiomaster.bonio.ui.theme.LocalAppColors
+import ai.axiomaster.bonio.ui.components.UserProfileDialog
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -63,6 +64,9 @@ fun MemoryTab(
     var selectedTag by remember { mutableStateOf("") }
     var selectedMemory by remember { mutableStateOf<BonioMemo?>(null) }
     var pendingDelete by remember { mutableStateOf<BonioMemo?>(null) }
+    var showProfileDialog by remember { mutableStateOf(false) }
+    var isExtractingProfile by remember { mutableStateOf(false) }
+    val userProfile by viewModel.userProfileRepository.profile.collectAsState()
 
     val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
@@ -237,19 +241,13 @@ fun MemoryTab(
                     )
                 }
 
-                // ── Export / Import: memories are user assets; SAF keeps them
-                // in a user-chosen public location that survives uninstall. ──
+                // ── User Profile (L0/L1) & Import: Export is hidden as requested ──
                 TextButton(
                     onClick = {
-                        if (memos.isNotEmpty()) {
-                            exportLauncher.launch(
-                                "bonio-memory-" + SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date()) + ".json"
-                            )
-                        }
-                    },
-                    enabled = memos.isNotEmpty()
+                        showProfileDialog = true
+                    }
                 ) {
-                    Text("导出", fontSize = 13.sp, color = colors.accent)
+                    Text("查看", fontSize = 13.sp, color = colors.accent)
                 }
                 TextButton(
                     onClick = {
@@ -428,6 +426,27 @@ fun MemoryTab(
             },
             containerColor = Color.White,
             shape = RoundedCornerShape(16.dp)
+        )
+    }
+
+    if (showProfileDialog) {
+        UserProfileDialog(
+            profile = userProfile,
+            onDismiss = { showProfileDialog = false },
+            onSave = { updated ->
+                viewModel.userProfileRepository.saveProfile(updated)
+                android.widget.Toast.makeText(context, "用户基础档案已保存", android.widget.Toast.LENGTH_SHORT).show()
+            },
+            onExtractFromMemos = {
+                scope.launch {
+                    isExtractingProfile = true
+                    val updated = viewModel.userProfileRepository.extractFromMemos(memos, forceAll = true)
+                    isExtractingProfile = false
+                    val msg = if (updated.isEmpty()) "未从当前记忆中萃取到新的档案信息" else "已从记忆中更新用户基础档案"
+                    android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+                }
+            },
+            isExtracting = isExtractingProfile,
         )
     }
 }

@@ -692,7 +692,8 @@ RunResult run_streaming_with_history(
     const std::atomic<bool>* aborted,
     int max_tool_rounds,
     RemoteToolExecutor remote_executor,
-    const std::string* user_message_json_override) {
+    const std::string* user_message_json_override,
+    const std::string* user_profile) {
   tools::register_builtin_tools();
   memory::set_base_path(config.config_dir);
   log::info("agent run_streaming_with_history: " + user_prompt.substr(0, 60) +
@@ -762,6 +763,9 @@ RunResult run_streaming_with_history(
         "Do NOT guess commands — load the skill first.\n";
   }
   sys_prompt += get_skill_index();
+  if (user_profile && !user_profile->empty()) {
+    sys_prompt += "\n\n## User Background Knowledge (L0/L1 Profile)\n" + *user_profile + "\n";
+  }
   {
     json sj;
     sj["role"] = "system";

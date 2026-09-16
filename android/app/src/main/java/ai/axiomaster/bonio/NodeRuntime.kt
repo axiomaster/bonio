@@ -345,6 +345,8 @@ class NodeRuntime(context: Context) {
             """{"reason":"$reason","soc":$soc,"timestamp":$timestamp}""",
             timeoutMs = 15_000,
           )
+          // 充电时从记忆中萃取用户信息 (L0/L1)
+          userProfileRepository.extractFromMemos(memoryRepository.memos.value)
           true
         } catch (e: Throwable) {
           Log.w("Bonio", "memory.incremental_sync failed: ${e.message}")
@@ -352,6 +354,10 @@ class NodeRuntime(context: Context) {
         }
       },
     )
+  }
+
+  val userProfileRepository: ai.axiomaster.bonio.remote.memory.UserProfileRepository by lazy {
+    ai.axiomaster.bonio.remote.memory.UserProfileRepository(appContext, scope)
   }
 
   val serverConfigRepository: ai.axiomaster.bonio.remote.config.ConfigRepository =
@@ -369,6 +375,9 @@ class NodeRuntime(context: Context) {
   }
 
   init {
+    chat.userProfileProvider = {
+      userProfileRepository.profile.value.toPromptContext()
+    }
     DeviceNotificationListenerService.setNotificationListener { entry ->
       notificationTodoManager.onNotificationPosted(entry)
     }

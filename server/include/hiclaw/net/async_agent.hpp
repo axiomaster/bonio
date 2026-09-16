@@ -25,6 +25,7 @@ struct AsyncTask {
   std::string message;
   /// If non-empty, passed to agent as OpenAI-format user message JSON (e.g. multimodal); else text-only from `message`.
   std::string user_message_json_override;
+  std::string user_profile;
   std::atomic<bool> aborted{false};
   std::thread worker;
 
@@ -50,7 +51,8 @@ public:
 
   // Start new async task, returns run_id
   std::string start_task(const std::string& session_key, const std::string& message,
-                         const std::string& user_message_json_override = "");
+                         const std::string& user_message_json_override = "",
+                         const std::string& user_profile = "");
 
   // Abort task
   bool abort_task(const std::string& run_id);

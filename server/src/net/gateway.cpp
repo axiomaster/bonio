@@ -890,6 +890,7 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
         // 解析参数
         std::string message;
         std::string session_key = "main";
+        std::string user_profile;
         wspp_json attachments = wspp_json::array();
         try {
           nlohmann::json j = nlohmann::json::parse(payload);
@@ -898,6 +899,8 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
             if (message.empty()) message = wspp_get_string(j["params"], "content");
             session_key = wspp_get_string(j["params"], "sessionKey");
             if (session_key.empty()) session_key = "main";
+            user_profile = wspp_get_string(j["params"], "userProfile");
+            if (user_profile.empty()) user_profile = wspp_get_string(j["params"], "user_profile");
             if (j["params"].contains("attachments") && j["params"]["attachments"].is_array()) {
               attachments = j["params"]["attachments"];
             }
@@ -966,7 +969,7 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
             return;
           }
 
-          std::string run_id = it->second.agent_manager->start_task(session_key, message, user_msg_json_override);
+          std::string run_id = it->second.agent_manager->start_task(session_key, message, user_msg_json_override, user_profile);
 
           nlohmann::json res;
           res["type"] = "res";
@@ -982,7 +985,7 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
         // Save user message to session store
         save_user_message();
 
-        std::string run_id = it->second.agent_manager->start_task(session_key, message, user_msg_json_override);
+        std::string run_id = it->second.agent_manager->start_task(session_key, message, user_msg_json_override, user_profile);
         nlohmann::json res;
         res["type"] = "res";
         res["id"] = id;

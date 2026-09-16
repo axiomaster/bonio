@@ -52,6 +52,7 @@ class ChatController(
   var onAssistantReply: ((String) -> Unit)? = null
   var onAssistantSpoke: ((String) -> Unit)? = null
   var onMemoChanged: (() -> Unit)? = null
+  var userProfileProvider: (() -> String)? = null
 
   private val pendingToolCallsById = ConcurrentHashMap<String, ChatPendingToolCall>()
   private val _pendingToolCalls = MutableStateFlow<List<ChatPendingToolCall>>(emptyList())
@@ -185,6 +186,7 @@ class ChatController(
 
     scope.launch {
       try {
+        val userProfileContext = userProfileProvider?.invoke()?.trim().orEmpty()
         val params =
           buildJsonObject {
             put("sessionKey", JsonPrimitive(sessionKey))
@@ -192,6 +194,9 @@ class ChatController(
             put("thinking", JsonPrimitive(thinking))
             put("timeoutMs", JsonPrimitive(30_000))
             put("idempotencyKey", JsonPrimitive(runId))
+            if (userProfileContext.isNotBlank()) {
+              put("userProfile", JsonPrimitive(userProfileContext))
+            }
             if (attachments.isNotEmpty()) {
               put(
                 "attachments",
