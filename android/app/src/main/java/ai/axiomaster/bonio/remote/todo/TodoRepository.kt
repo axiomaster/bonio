@@ -26,6 +26,7 @@ data class CalendarSyncResult(
     val added: Int,
     val totalEvents: Int,
     val permissionDenied: Boolean = false,
+    val error: String? = null,
 )
 
 /**
@@ -177,11 +178,18 @@ class TodoRepository(
                 CalendarContract.Instances.ALL_DAY,
                 CalendarContract.Instances.EVENT_LOCATION,
             )
+            // 时间范围必须编码进 URI（instances/when/<begin>/<end>）——部分厂商
+            // 提供者（如华为）对不带范围的 Instances URI 会返回空结果。
+            val uri = CalendarContract.Instances.CONTENT_URI
+                .buildUpon()
+                .appendPath(windowFrom.toString())
+                .appendPath(windowTo.toString())
+                .build()
             context.contentResolver.query(
-                CalendarContract.Instances.CONTENT_URI,
+                uri,
                 projection,
-                "${CalendarContract.Instances.BEGIN} >= ? AND ${CalendarContract.Instances.BEGIN} <= ?",
-                arrayOf(windowFrom.toString(), windowTo.toString()),
+                null,
+                null,
                 "${CalendarContract.Instances.BEGIN} ASC",
             )?.use { c ->
                 val iEventId = c.getColumnIndexOrThrow(CalendarContract.Instances.EVENT_ID)
@@ -210,7 +218,7 @@ class TodoRepository(
             return@withContext CalendarSyncResult(added = 0, totalEvents = 0, permissionDenied = true)
         } catch (e: Throwable) {
             Log.e(TAG, "calendar sync query failed", e)
-            return@withContext CalendarSyncResult(added = 0, totalEvents = 0)
+            return@withContext CalendarSyncResult(added = 0, totalEvents = 0, error = e.message ?: "日历查询失败")
         }
 
         mutex.withLock {

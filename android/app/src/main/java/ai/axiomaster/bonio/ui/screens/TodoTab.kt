@@ -68,6 +68,7 @@ fun TodoTab(
         syncing = false
         val message = when {
             result.permissionDenied -> "未授予日历权限，无法同步"
+            result.error != null -> "日历同步失败：${result.error}"
             result.totalEvents == 0 -> "日历暂无未来 7 天的日程"
             result.added == 0 -> "日历日程已是最新（共 ${result.totalEvents} 项）"
             else -> "已从日历同步 ${result.added} 项待办"

@@ -313,10 +313,15 @@ class CalendarHandler(private val context: Context) {
         CalendarContract.Instances.EVENT_LOCATION,
       )
       val cursor = if (query.isEmpty()) {
+        // 时间范围必须编码进 URI（instances/when/<begin>/<end>）——部分厂商
+        // 提供者（如华为）对不带范围的 Instances URI + WHERE 过滤会返回空结果。
+        val uri = CalendarContract.Instances.CONTENT_URI
+          .buildUpon()
+          .appendPath(windowFrom.toString())
+          .appendPath(windowTo.toString())
+          .build()
         context.contentResolver.query(
-          CalendarContract.Instances.CONTENT_URI, projection,
-          "${CalendarContract.Instances.BEGIN} >= ? AND ${CalendarContract.Instances.BEGIN} <= ?",
-          arrayOf(windowFrom.toString(), windowTo.toString()),
+          uri, projection, null, null,
           "${CalendarContract.Instances.BEGIN} ASC",
         )
       } else {
