@@ -1,0 +1,27 @@
+AGENTS.md
+  h_de08bd40967a17 3,12,14-19,26-31,34,36,39-41,43-44,47,49,57,59,62-65,68,70-75,78,81,83,86-87,90-91,93,98,100,105,107-108,112,122,124,126-131,133,135,137-139,141,143-149
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.30.1",
+  "base_commit_sha": "59e24fd680a86e092ad679e5e1fad39c7844b38e",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  },
+  "sessions": {
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_additions": 0,
+      "total_deletions": 36,
+      "overridden_lines": 0
+    }
+  }
+}
