@@ -360,7 +360,18 @@ class NodeRuntime(context: Context) {
   val skillRepository: ai.axiomaster.bonio.remote.skills.SkillRepository =
     ai.axiomaster.bonio.remote.skills.SkillRepository(operatorSession)
 
+  val todoRepository: ai.axiomaster.bonio.remote.todo.TodoRepository by lazy {
+    ai.axiomaster.bonio.remote.todo.TodoRepository(appContext, scope)
+  }
+
+  val notificationTodoManager: ai.axiomaster.bonio.remote.todo.NotificationTodoManager by lazy {
+    ai.axiomaster.bonio.remote.todo.NotificationTodoManager(todoRepository)
+  }
+
   init {
+    DeviceNotificationListenerService.setNotificationListener { entry ->
+      notificationTodoManager.onNotificationPosted(entry)
+    }
     chat.onMemoChanged = {
       memoryRepository.refresh()
     }

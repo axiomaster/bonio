@@ -163,6 +163,7 @@ class DeviceNotificationListenerService : NotificationListenerService() {
       Log.d(TAG, "  -> skipped (self notification)")
       return
     }
+    notificationListener?.invoke(entry)
     emitNotificationsChanged(
       buildJsonObject {
         put("change", JsonPrimitive("posted"))
@@ -238,6 +239,7 @@ class DeviceNotificationListenerService : NotificationListenerService() {
   companion object {
     @Volatile private var activeService: DeviceNotificationListenerService? = null
     @Volatile private var nodeEventSink: ((event: String, payloadJson: String?) -> Unit)? = null
+    @Volatile private var notificationListener: ((DeviceNotificationEntry) -> Unit)? = null
 
     private fun serviceComponent(context: Context): ComponentName {
       return ComponentName(context, DeviceNotificationListenerService::class.java)
@@ -245,6 +247,10 @@ class DeviceNotificationListenerService : NotificationListenerService() {
 
     fun setNodeEventSink(sink: ((event: String, payloadJson: String?) -> Unit)?) {
       nodeEventSink = sink
+    }
+
+    fun setNotificationListener(listener: ((DeviceNotificationEntry) -> Unit)?) {
+      notificationListener = listener
     }
 
     fun isAccessEnabled(context: Context): Boolean {

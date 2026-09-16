@@ -34,6 +34,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
   val discoveryStatusText: StateFlow<String> = runtime.discoveryStatusText
 
   val memoryRepository: ai.axiomaster.bonio.remote.memory.MemoryRepository = runtime.memoryRepository
+  val todoRepository: ai.axiomaster.bonio.remote.todo.TodoRepository = runtime.todoRepository
 
   val isConnected: StateFlow<Boolean> = runtime.isConnected
   val isNodeConnected: StateFlow<Boolean> = runtime.nodeConnected
