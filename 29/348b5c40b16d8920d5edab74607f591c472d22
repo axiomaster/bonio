@@ -1,0 +1,14 @@
+docs/design/prd/20260916-hierarchical-memory-l0-l3-prd.md
+  h_de08bd40967a17 1,3-5,9-11,13-25,29,31,33-81,88-106,110-112,115-130,133-193,196-206
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.30.1",
+  "base_commit_sha": "29348b5c40b16d8920d5edab74607f591c472d22",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  }
+}
