@@ -1,0 +1,16 @@
+android/app/src/main/java/ai/axiomaster/bonio/remote/todo/TodoItem.kt
+  h_de08bd40967a17 17,31,48
+android/app/src/main/java/ai/axiomaster/bonio/remote/todo/TodoRepository.kt
+  h_de08bd40967a17 62,83-89,94-95,103,125,211,224-242,244-245,248-252
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.30.1",
+  "base_commit_sha": "bed86e0e0afae59ee75a57507898403c489c55f5",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  }
+}
