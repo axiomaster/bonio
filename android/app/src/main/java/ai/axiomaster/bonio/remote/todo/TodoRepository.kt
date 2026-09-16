@@ -59,10 +59,7 @@ class TodoRepository(
                         val obj = jsonArray.getJSONObject(i)
                         items.add(TodoItem.fromJsonObject(obj))
                     }
-                    _todos.value = items.sortedWith(
-                        compareBy<TodoItem> { it.isCompleted }
-                            .thenByDescending { it.createdAt }
-                    )
+                    _todos.value = sortTodos(items)
                     Log.i(TAG, "Loaded ${_todos.value.size} todos from disk")
                     return
                 }
@@ -83,12 +80,19 @@ class TodoRepository(
         }
     }
 
+    /** 统一排序：未完成在前；有时间戳的按时间从近到远；无时间戳的按加入时间倒序。 */
+    private fun sortTodos(items: List<TodoItem>): List<TodoItem> = items.sortedWith(
+        compareBy<TodoItem> { it.isCompleted }
+            .thenBy { it.sortTs ?: Long.MAX_VALUE }
+            .thenByDescending { it.createdAt }
+    )
+
     fun addTodo(item: TodoItem) {
         scope.launch {
             mutex.withLock {
                 // 防重检查：如果已存在相同任务且未完成，可忽略或更新
-                val existing = _todos.value.find { 
-                    it.task == item.task && it.time == item.time && !it.isCompleted 
+                val existing = _todos.value.find {
+                    it.task == item.task && it.time == item.time && !it.isCompleted
                 }
                 if (existing != null) {
                     Log.d(TAG, "Duplicate todo detected, skipping: ${item.task}")
@@ -96,10 +100,7 @@ class TodoRepository(
                 }
 
                 val updated = listOf(item) + _todos.value
-                val sorted = updated.sortedWith(
-                    compareBy<TodoItem> { it.isCompleted }
-                        .thenByDescending { it.createdAt }
-                )
+                val sorted = sortTodos(updated)
                 _todos.value = sorted
                 saveToDisk(sorted)
                 Log.i(TAG, "Added todo: ${item.task}, id=${item.id}")
@@ -121,10 +122,7 @@ class TodoRepository(
                         item
                     }
                 }
-                val sorted = updated.sortedWith(
-                    compareBy<TodoItem> { it.isCompleted }
-                        .thenByDescending { it.createdAt }
-                )
+                val sorted = sortTodos(updated)
                 _todos.value = sorted
                 saveToDisk(sorted)
                 Log.i(TAG, "Toggled todo id=$id")
@@ -210,6 +208,7 @@ class TodoRepository(
                             time = formatEventTime(begin, allDay),
                             location = location,
                             sourceApp = "日历",
+                            sortTs = begin,
                         )
                     )
                 }
@@ -222,22 +221,35 @@ class TodoRepository(
         }
 
         mutex.withLock {
-            val existing = _todos.value
-            val existingIds = existing.map { it.id }.toHashSet()
-            val currentIds = events.map { it.id }.toHashSet()
-            val fresh = events.filter { it.id !in existingIds }
+            val mergedById = _todos.value.associateBy { it.id }.toMutableMap()
+            var added = 0
+            for (event in events) {
+                val prev = mergedById[event.id]
+                if (prev == null) {
+                    mergedById[event.id] = event
+                    added++
+                } else {
+                    // 日历是这些字段的事实来源：刷新内容/时间/地点/排序时间戳，
+                    // 保留用户的完成状态与加入时间
+                    val updated = prev.copy(
+                        task = event.task,
+                        time = event.time,
+                        location = event.location,
+                        sortTs = event.sortTs,
+                    )
+                    mergedById[event.id] = updated
+                }
+            }
             // 清理已不在日历窗口内的历史同步项（用户手动勾选完成的保留）
-            val kept = existing.filter {
+            val currentIds = events.map { it.id }.toHashSet()
+            val kept = mergedById.values.filter {
                 !it.id.startsWith("cal-") || it.isCompleted || it.id in currentIds
             }
-            val merged = (fresh + kept).sortedWith(
-                compareBy<TodoItem> { it.isCompleted }
-                    .thenByDescending { it.createdAt }
-            )
-            _todos.value = merged
-            saveToDisk(merged)
-            Log.i(TAG, "calendar sync: ${events.size} events, ${fresh.size} added")
-            CalendarSyncResult(added = fresh.size, totalEvents = events.size)
+            val sorted = sortTodos(kept)
+            _todos.value = sorted
+            saveToDisk(sorted)
+            Log.i(TAG, "calendar sync: ${events.size} events, $added added")
+            CalendarSyncResult(added = added, totalEvents = events.size)
         }
     }
 

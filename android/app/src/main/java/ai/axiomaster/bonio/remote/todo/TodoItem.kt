@@ -14,6 +14,7 @@ data class TodoItem(
     val person: String? = null,    // 相关人/机构 (例: 张总、招商银行)
     val sourceApp: String? = null, // 来源应用 (例: 微信、短信、钉钉)
     val rawText: String? = null,   // 原始通知内容
+    val sortTs: Long? = null,      // 排序时间戳（日历事件的开始时间；无则为 null，按加入时间排序）
     val createdAt: Long = System.currentTimeMillis(),
     val isCompleted: Boolean = false,
     val completedAt: Long? = null
@@ -27,6 +28,7 @@ data class TodoItem(
             put("person", person ?: JSONObject.NULL)
             put("sourceApp", sourceApp ?: JSONObject.NULL)
             put("rawText", rawText ?: JSONObject.NULL)
+            put("sortTs", sortTs ?: JSONObject.NULL)
             put("createdAt", createdAt)
             put("isCompleted", isCompleted)
             put("completedAt", completedAt ?: JSONObject.NULL)
@@ -43,6 +45,7 @@ data class TodoItem(
                 person = if (obj.isNull("person")) null else obj.optString("person").ifEmpty { null },
                 sourceApp = if (obj.isNull("sourceApp")) null else obj.optString("sourceApp").ifEmpty { null },
                 rawText = if (obj.isNull("rawText")) null else obj.optString("rawText").ifEmpty { null },
+                sortTs = if (obj.isNull("sortTs")) null else obj.optLong("sortTs").takeIf { it > 0 },
                 createdAt = obj.optLong("createdAt", System.currentTimeMillis()),
                 isCompleted = obj.optBoolean("isCompleted", false),
                 completedAt = if (obj.isNull("completedAt")) null else obj.optLong("completedAt")
