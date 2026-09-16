@@ -61,7 +61,13 @@ std::vector<types::Message> session_messages_to_history(
   std::vector<types::Message> history;
   for (const auto& m : msgs) {
     if (m.role == "user" || m.role == "assistant" || m.role == "system") {
-      history.push_back({m.role, m.content});
+      if (m.content_type == "image") {
+        // Never feed raw base64 back into the LLM context — image messages
+        // are for the client UI only (base64 here would explode the budget).
+        history.push_back({m.role, "[图片]"});
+      } else {
+        history.push_back({m.role, m.content});
+      }
     }
   }
   return history;

@@ -932,12 +932,28 @@ void run_wspp_server(int port, config::Config& config, const std::string& pairin
 
         auto save_user_message = [&]() {
           if (it->second.session_store) {
+            const int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count();
             session::Message user_msg;
             user_msg.role = "user";
             user_msg.content = message;
-            user_msg.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::system_clock::now().time_since_epoch()).count();
+            user_msg.timestamp = now_ms;
             it->second.session_store->add_message(session_key, user_msg);
+            // Persist image attachments as their own user messages so they
+            // survive history refreshes (chat.history returns them with
+            // content_type "image"; the agent history uses a placeholder).
+            for (const auto& att : attachments) {
+              if (!att.is_object()) continue;
+              const std::string b64 = att.value("content", "");
+              if (b64.empty()) continue;
+              session::Message img_msg;
+              img_msg.role = "user";
+              img_msg.content = b64;
+              img_msg.content_type = "image";
+              img_msg.mime_type = att.value("mimeType", "image/jpeg");
+              img_msg.timestamp = now_ms;
+              it->second.session_store->add_message(session_key, img_msg);
+            }
           }
         };
 
