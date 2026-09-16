@@ -53,6 +53,7 @@ fun PersonalizationTab(
     val currentSkin by viewModel.avatarSkin.collectAsState()
     val avatarScale by viewModel.avatarScale.collectAsState()
     val autoDockEdge by viewModel.autoDockEdge.collectAsState()
+    val callAutoRejectEnabled by viewModel.callAutoRejectEnabled.collectAsState()
     val serverConfig by viewModel.serverConfig.collectAsState()
     val skills by viewModel.skills.collectAsState()
     val skillsLoading by viewModel.skillsLoading.collectAsState()
@@ -282,6 +283,34 @@ fun PersonalizationTab(
                         BonioSwitch(
                             checked = autoDockEdge,
                             onCheckedChange = { viewModel.setAutoDockEdge(it) }
+                        )
+                    }
+
+                    HorizontalDivider(color = colors.border.copy(alpha = 0.6f))
+
+                    // 来电 10s 自动挂断
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+                            Text(
+                                text = "来电 10s 自动挂断",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = colors.textPrimary
+                            )
+                            Text(
+                                text = "开启后来电时语音提醒并倒计时10秒，超时未接听自动挂断",
+                                fontSize = 12.sp,
+                                color = colors.textSecondary,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
+                        BonioSwitch(
+                            checked = callAutoRejectEnabled,
+                            onCheckedChange = { viewModel.setCallAutoRejectEnabled(it) }
                         )
                     }
                 }

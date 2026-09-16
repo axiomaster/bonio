@@ -148,6 +148,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     avatarPrefs.edit().putBoolean("auto_dock_edge", enabled).apply()
   }
 
+  private val _callAutoRejectEnabled = MutableStateFlow(avatarPrefs.getBoolean("call_auto_reject_10s", false))
+  val callAutoRejectEnabled: StateFlow<Boolean> = _callAutoRejectEnabled
+
+  fun setCallAutoRejectEnabled(enabled: Boolean) {
+    _callAutoRejectEnabled.value = enabled
+    avatarPrefs.edit().putBoolean("call_auto_reject_10s", enabled).apply()
+  }
+
   val themeManager = ai.axiomaster.bonio.avatar.ThemeManager(app)
   val installedThemes: StateFlow<List<ai.axiomaster.bonio.remote.theme.ThemeInfo>> = themeManager.installedThemes
   val activeThemeId: StateFlow<String> = themeManager.activeThemeId

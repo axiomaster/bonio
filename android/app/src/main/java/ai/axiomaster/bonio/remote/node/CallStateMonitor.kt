@@ -81,6 +81,14 @@ class CallStateMonitor(
     private fun handleCallState(stateStr: String, number: String?) {
         when (stateStr) {
             TelephonyManager.EXTRA_STATE_RINGING -> {
+                val prefs = context.getSharedPreferences("bonio_avatar", Context.MODE_PRIVATE)
+                val autoRejectEnabled = prefs.getBoolean("call_auto_reject_10s", false)
+                if (!autoRejectEnabled) {
+                    Log.d(TAG, "Call auto-reject feature is disabled in settings, ignoring incoming call")
+                    lastState = stateStr
+                    return
+                }
+
                 if (number != null && number.isNotBlank()) {
                     ringingNumber = number
                     Log.d(TAG, "Got number from broadcast: $number")

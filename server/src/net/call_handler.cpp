@@ -104,6 +104,13 @@ void CallHandler::on_call_answered(const std::string& payload_json) {
   user_responded_ = true;
   tts_done_ = true;
   user_action_ = "answered";
+
+  std::vector<json> steps;
+  steps.push_back(avatar_cmd::step("cancelMovement", json::object(), 0));
+  steps.push_back(avatar_cmd::step("setState", {{"state", "idle"}}, 0));
+  steps.push_back(avatar_cmd::step("setColorFilter", {{"color", nullptr}}, 0));
+  steps.push_back(avatar_cmd::step("clearBubble", json::object(), 0));
+  avatar_cmd::send(event_callback_, avatar_cmd::sequence(steps));
 }
 
 void CallHandler::on_tts_done(const std::string& payload_json) {
@@ -160,20 +167,11 @@ void CallHandler::run_call_flow(const std::string& number, const std::string& co
   std::this_thread::sleep_for(std::chrono::milliseconds(800));
   if (!handling_) return;
 
-  // TTS announcement — avoid trigger keywords (接听/挂) to prevent STT echo
+  // TTS announcement: "主人，{display}给您来电话了，接听还是挂断？"
   std::string display = contact_name.empty() ? number : contact_name;
-  if (is_spam) {
-    send_tts("\xe4\xb8\xbb\xe4\xba\xba\xef\xbc\x8c" + display +
-             "\xe6\x89\x93\xe6\x9d\xa5\xe7\x94\xb5\xe8\xaf\x9d\xe4\xba\x86\xef\xbc\x8c"
-             "\xe7\x9c\x8b\xe7\x9d\x80\xe5\x83\x8f\xe9\xaa\x9a\xe6\x89\xb0\xe7\x94\xb5\xe8\xaf\x9d\xef\xbc\x8c"
-             "\xe8\xa6\x81\xe6\x88\x91\xe5\xb8\xae\xe4\xbd\xa0\xe5\xa4\x84\xe7\x90\x86\xe6\x8e\x89\xe5\x90\x97\xef\xbc\x9f");
-    // "主人，{display}打来电话了，看着像骚扰电话，要我帮你处理掉吗？"
-  } else {
-    send_tts("\xe4\xb8\xbb\xe4\xba\xba\xef\xbc\x8c" + display +
-             "\xe7\xbb\x99\xe4\xbd\xa0\xe6\x89\x93\xe7\x94\xb5\xe8\xaf\x9d\xe4\xba\x86\xef\xbc\x8c"
-             "\xe4\xbd\xa0\xe7\x9c\x8b\xe6\x80\x8e\xe4\xb9\x88\xe5\xa4\x84\xe7\x90\x86\xef\xbc\x9f");
-    // "主人，{display}给你打电话了，你看怎么处理？"
-  }
+  send_tts("\xe4\xb8\xbb\xe4\xba\xba\xef\xbc\x8c" + display +
+           "\xe7\xbb\x99\xe6\x82\xa8\xe6\x9d\xa5\xe7\x94\xb5\xe8\xaf\x9d\xe4\xba\x86\xef\xbc\x8c"
+           "\xe6\x8e\xa5\xe5\x90\xac\xe8\xbf\x98\xe6\x98\xaf\xe6\x8c\x82\xe6\x96\xad\xef\xbc\x9f");
 
   // Wait for client TTS playback to finish (with 8s timeout fallback)
   for (int wait = 0; wait < 80 && handling_ && !tts_done_; ++wait) {
@@ -202,6 +200,7 @@ void CallHandler::run_call_flow(const std::string& number, const std::string& co
 
   // Determine final action
   std::string final_action;
+  bool is_timeout = false;
   {
     std::lock_guard<std::mutex> lock(mutex_);
     if (user_action_ == "answer") {
@@ -210,13 +209,15 @@ void CallHandler::run_call_flow(const std::string& number, const std::string& co
       final_action = "reject";
     } else if (user_action_ == "ended" || user_action_ == "answered") {
       handling_ = false;
+      send_countdown(0);
       return;
     } else {
-      final_action = is_spam ? "reject" : "reject";
+      final_action = "reject";
+      is_timeout = true;
     }
   }
 
-  log::info("call_handler: executing action: " + final_action);
+  log::info("call_handler: executing action: " + final_action + (is_timeout ? " (timeout auto-reject)" : ""));
   send_countdown(0);
 
   // Tell client to execute the telephony action
@@ -224,6 +225,11 @@ void CallHandler::run_call_flow(const std::string& number, const std::string& co
     execute_answer();
   } else {
     execute_reject();
+    if (is_timeout) {
+      // "如果用户在倒计时结束后没有接听，自动挂断的；那就语音再播报一次：已挂断；"
+      std::this_thread::sleep_for(std::chrono::milliseconds(400));
+      send_tts("\xe5\xb7\xb2\xe6\x8c\x82\xe6\x96\xad"); // "已挂断"
+    }
   }
 
   handling_ = false;

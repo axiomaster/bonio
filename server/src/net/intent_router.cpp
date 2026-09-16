@@ -157,8 +157,8 @@ std::string IntentRouter::classify_call_command(const std::string& text, const s
 
   if (lower.empty()) return "";
 
-  // Echo guard
-  if (!last_tts.empty() && last_tts.find(lower) != std::string::npos) {
+  // Echo guard: ignore if the STT captured a long fragment of the TTS prompt
+  if (!last_tts.empty() && lower.length() > 10 && last_tts.find(lower) != std::string::npos) {
     log::info("intent_router: echo detected, ignoring: " + text);
     return "";
   }
