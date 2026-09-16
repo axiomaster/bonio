@@ -1,5 +1,9 @@
 package ai.axiomaster.bonio.ui.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -13,12 +17,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -41,9 +47,33 @@ fun TodoTab(
 ) {
     val strings = LocalAppStrings.current
     val colors = LocalAppColors.current
+    val context = LocalContext.current
     val todos by viewModel.todoRepository.todos.collectAsState()
     var filter by remember { mutableStateOf(TodoFilter.ALL) }
     var showAddDialog by remember { mutableStateOf(false) }
+    var syncing by remember { mutableStateOf(false) }
+    var syncTrigger by remember { mutableStateOf(0) }
+
+    val calendarPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) syncTrigger++
+        else android.widget.Toast.makeText(context, "未授予日历权限，无法同步待办", android.widget.Toast.LENGTH_SHORT).show()
+    }
+
+    LaunchedEffect(syncTrigger) {
+        if (syncTrigger == 0) return@LaunchedEffect
+        syncing = true
+        val result = viewModel.todoRepository.syncFromCalendar()
+        syncing = false
+        val message = when {
+            result.permissionDenied -> "未授予日历权限，无法同步"
+            result.totalEvents == 0 -> "日历暂无未来 7 天的日程"
+            result.added == 0 -> "日历日程已是最新（共 ${result.totalEvents} 项）"
+            else -> "已从日历同步 ${result.added} 项待办"
+        }
+        android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
+    }
 
     val pendingCount = todos.count { !it.isCompleted }
     val completedCount = todos.count { it.isCompleted }
@@ -91,12 +121,38 @@ fun TodoTab(
                 }
             }
 
-            IconButton(onClick = { showAddDialog = true }) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "新增待办",
-                    tint = colors.accent
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = {
+                        val granted = androidx.core.content.ContextCompat.checkSelfPermission(
+                            context, android.Manifest.permission.READ_CALENDAR
+                        ) == PackageManager.PERMISSION_GRANTED
+                        if (granted) syncTrigger++
+                        else calendarPermissionLauncher.launch(Manifest.permission.READ_CALENDAR)
+                    },
+                    enabled = !syncing
+                ) {
+                    if (syncing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = colors.accent
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "从日历同步待办",
+                            tint = colors.accent
+                        )
+                    }
+                }
+                IconButton(onClick = { showAddDialog = true }) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "新增待办",
+                        tint = colors.accent
+                    )
+                }
             }
         }
 
