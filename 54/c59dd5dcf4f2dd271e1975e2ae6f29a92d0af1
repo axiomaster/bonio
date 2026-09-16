@@ -1,0 +1,37 @@
+android/app/src/main/java/ai/axiomaster/bonio/MainViewModel.kt
+  h_de08bd40967a17 151-158
+android/app/src/main/java/ai/axiomaster/bonio/remote/node/CallStateMonitor.kt
+  h_de08bd40967a17 84-91
+android/app/src/main/java/ai/axiomaster/bonio/ui/screens/PersonalizationTab.kt
+  h_de08bd40967a17 56,288-315
+docs/design/prd/20260916-incoming-call-auto-reject-prd.md
+  h_de08bd40967a17 1-136
+server/src/net/call_handler.cpp
+  h_de08bd40967a17 107-113,170,172-174,203,212,215-216,220,228-232
+server/src/net/intent_router.cpp
+  h_de08bd40967a17 160-161
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.30.1",
+  "base_commit_sha": "54c59dd5dcf4f2dd271e1975e2ae6f29a92d0af1",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  },
+  "sessions": {
+    "s_65a1faaab12715": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c090aa30-2ffc-46e3-9a04-7b4dbf3679fe",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "lishiming <lishiming2@huawei.com>",
+      "total_additions": 0,
+      "total_deletions": 36,
+      "overridden_lines": 0
+    }
+  }
+}
