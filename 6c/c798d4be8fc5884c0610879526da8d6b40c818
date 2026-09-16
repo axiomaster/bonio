@@ -1,0 +1,18 @@
+android/app/src/main/jniLibs/arm64-v8a/libhiclaw.so
+  h_de08bd40967a17 2-3
+server/src/agent/agent.cpp
+  h_de08bd40967a17 226-248,806-807,810-820,916-929,932,934,946-948
+server/src/tools/memo_tool.cpp
+  h_de08bd40967a17 25,126-139,190,192,293,297-299,315,328
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.30.1",
+  "base_commit_sha": "6cc798d4be8fc5884c0610879526da8d6b40c818",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  }
+}
