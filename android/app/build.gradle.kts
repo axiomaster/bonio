@@ -18,13 +18,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    androidResources {
-        noCompress += listOf(".lottie")
-    }
-    @Suppress("DEPRECATION")
-    aaptOptions {
-        noCompress += listOf(".lottie", "lottie")
-    }
+
 
     // Extract native libs to disk so the bundled hiclaw engine binary
     // (jniLibs/arm64-v8a/libhiclaw.so) can be exec'd from nativeLibraryDir.
@@ -63,12 +57,9 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     
-    // Lottie for animations
-    implementation("com.airbnb.android:lottie:6.3.0")
-    implementation("com.airbnb.android:lottie-compose:6.3.0")
     // CardView for Text Bubble container
     implementation("androidx.cardview:cardview:1.0.0")
-    // AppCompat for Lottie's AppCompatImageView requirement
+    // AppCompat for PermissionRequester / ScreenCaptureRequester
     implementation("androidx.appcompat:appcompat:1.6.1")
     // Navigation Compose
     implementation(libs.androidx.navigation.compose)
@@ -78,7 +69,6 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.webkit)
-    implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.bouncycastle)
     implementation(libs.dnsjava)
     implementation(libs.androidx.exifinterface)

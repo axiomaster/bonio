@@ -4,10 +4,9 @@
     android:layout_width="80dp"
     android:layout_height="80dp">
 
-    <com.airbnb.lottie.LottieAnimationView
-        android:id="@+id/clone_lottie"
+    <ai.axiomaster.bonio.avatar.PixelAvatarView
+        android:id="@+id/clone_avatar"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        app:lottie_loop="true" />
+        android:layout_height="match_parent" />
 
 </FrameLayout>

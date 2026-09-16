@@ -42,8 +42,8 @@ import android.widget.LinearLayout
 import android.widget.RelativeLayout
 import androidx.cardview.widget.CardView
 import androidx.core.content.ContextCompat
-import com.airbnb.lottie.LottieAnimationView
-import com.airbnb.lottie.LottieDrawable
+import ai.axiomaster.bonio.avatar.PixelAvatarView
+
 import ai.axiomaster.bonio.remote.chat.OutgoingAttachment
 import ai.axiomaster.bonio.remote.cue.MagicCue
 import ai.axiomaster.bonio.input.ImeProxyManager
@@ -139,7 +139,7 @@ class FloatingWindowService : Service() {
 
     private var cloneView: View? = null
     private var cloneLayoutParams: WindowManager.LayoutParams? = null
-    private var cloneLottie: LottieAnimationView? = null
+    private var cloneAvatar: PixelAvatarView? = null
     private var isCloneAttached = false
     private var cloneReceiver: BroadcastReceiver? = null
 
@@ -1695,18 +1695,11 @@ class FloatingWindowService : Service() {
         if (isCloneAttached) return
 
         val view = LayoutInflater.from(this).inflate(R.layout.clone_agent_layout, null)
-        val lottie = view.findViewById<LottieAnimationView>(R.id.clone_lottie)
-        lottie.setFailureListener { e -> Log.w(TAG, "Clone Lottie failed", e) }
-
-        val asset = animationAsset ?: themeManager.resolveAssetPath(
-            AvatarState(activity = AgentState.Working)
-        )
-        try {
-            lottie.repeatCount = LottieDrawable.INFINITE
-            lottie.setAnimation(asset)
-            lottie.playAnimation()
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to set clone animation: $asset", e)
+        val avatar = view.findViewById<PixelAvatarView>(R.id.clone_avatar)
+        if (avatar != null) {
+            val currentSkin = pixelAvatarView.getSkin()
+            avatar.setSkin(currentSkin)
+            avatar.setVisualState(animationAsset ?: "working")
         }
 
         val layoutFlag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -1743,7 +1736,7 @@ class FloatingWindowService : Service() {
             isCloneAttached = true
             cloneView = view
             cloneLayoutParams = params
-            cloneLottie = lottie
+            cloneAvatar = avatar
 
             view.animate()
                 .alpha(1f)
@@ -1776,21 +1769,13 @@ class FloatingWindowService : Service() {
                 isCloneAttached = false
                 cloneView = null
                 cloneLayoutParams = null
-                cloneLottie?.cancelAnimation()
-                cloneLottie = null
+                cloneAvatar = null
             }
             .start()
     }
 
     fun updateCloneAnimation(animationAsset: String) {
-        val lottie = cloneLottie ?: return
-        try {
-            lottie.repeatCount = LottieDrawable.INFINITE
-            lottie.setAnimation(animationAsset)
-            lottie.playAnimation()
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to update clone animation: $animationAsset", e)
-        }
+        cloneAvatar?.setVisualState(animationAsset)
     }
 
     override fun onDestroy() {
@@ -1803,11 +1788,10 @@ class FloatingWindowService : Service() {
             } catch (_: Exception) {
             }
             isCloneAttached = false
-            cloneLottie?.cancelAnimation()
         }
         cloneView = null
         cloneLayoutParams = null
-        cloneLottie = null
+        cloneAvatar = null
         avatarController.onTransition = null
         actionEventWatcher?.stop()
         actionEventWatcher = null
