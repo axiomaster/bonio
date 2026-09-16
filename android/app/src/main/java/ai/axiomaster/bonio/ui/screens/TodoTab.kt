@@ -10,7 +10,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
@@ -26,11 +25,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ai.axiomaster.bonio.MainViewModel
+import ai.axiomaster.bonio.i18n.LocalAppStrings
 import ai.axiomaster.bonio.remote.todo.TodoItem
 import ai.axiomaster.bonio.ui.theme.LocalAppColors
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 enum class TodoFilter {
     ALL, PENDING, COMPLETED
@@ -38,11 +35,11 @@ enum class TodoFilter {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AllTodosView(
+fun TodoTab(
     viewModel: MainViewModel,
-    onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalAppStrings.current
     val colors = LocalAppColors.current
     val todos by viewModel.todoRepository.todos.collectAsState()
     var filter by remember { mutableStateOf(TodoFilter.ALL) }
@@ -68,21 +65,13 @@ fun AllTodosView(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "返回",
-                        tint = colors.textPrimary
-                    )
-                }
-                Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "所有待办",
+                    text = strings.tabTodo,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = colors.textPrimary

@@ -16,6 +16,7 @@ enum class AppLanguage(val code: String, val displayName: String) {
 data class AppStrings(
     // Bottom Nav Tabs
     val tabChat: String,
+    val tabTodo: String,
     val tabMemory: String,
     val tabPersonalization: String,
     val tabSettings: String,
@@ -111,6 +112,7 @@ data class AppStrings(
     companion object {
         val ZH = AppStrings(
             tabChat = "对话",
+            tabTodo = "待办",
             tabMemory = "记忆",
             tabPersonalization = "个性化",
             tabSettings = "设置",
@@ -202,6 +204,7 @@ data class AppStrings(
 
         val EN = AppStrings(
             tabChat = "Chat",
+            tabTodo = "Todo",
             tabMemory = "Memory",
             tabPersonalization = "Personalize",
             tabSettings = "Settings",

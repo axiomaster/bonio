@@ -39,7 +39,6 @@ import ai.axiomaster.bonio.MainViewModel
 import ai.axiomaster.bonio.i18n.AppStrings
 import ai.axiomaster.bonio.i18n.LocalAppStrings
 import ai.axiomaster.bonio.remote.memory.BonioMemo
-import ai.axiomaster.bonio.ui.components.PinnedTodoCard
 import ai.axiomaster.bonio.ui.theme.LocalAppColors
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -64,7 +63,6 @@ fun MemoryTab(
     var selectedTag by remember { mutableStateOf("") }
     var selectedMemory by remember { mutableStateOf<BonioMemo?>(null) }
     var pendingDelete by remember { mutableStateOf<BonioMemo?>(null) }
-    var showAllTodos by remember { mutableStateOf(false) }
 
     val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
@@ -142,12 +140,7 @@ fun MemoryTab(
         viewModel.memoryRepository.refresh()
     }
 
-    if (showAllTodos) {
-        AllTodosView(
-            viewModel = viewModel,
-            onBack = { showAllTodos = false }
-        )
-    } else if (selectedMemory != null) {
+    if (selectedMemory != null) {
         MemoryDetailView(
             memory = selectedMemory!!,
             strings = strings,
@@ -266,14 +259,6 @@ fun MemoryTab(
                     Text("导入", fontSize = 13.sp, color = colors.accent)
                 }
             }
-
-            // ── 📌 固定置顶卡片：备忘待办 ──
-            val todos by viewModel.todoRepository.todos.collectAsState()
-            PinnedTodoCard(
-                todos = todos,
-                onClick = { showAllTodos = true },
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-            )
 
             // ── Horizontal Tag Chips with Counters ──
             val tags = remember(memos) {

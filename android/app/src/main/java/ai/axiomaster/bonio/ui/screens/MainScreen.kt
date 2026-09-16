@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.ChatBubble
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.Icon
@@ -42,6 +43,7 @@ import ai.axiomaster.bonio.ui.theme.LocalAppColors
 
 sealed class Screen(val route: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     object Chat : Screen("chat", Icons.Default.ChatBubble)
+    object Todo : Screen("todo", Icons.Default.Checklist)
     object Memory : Screen("memory", Icons.Default.AutoStories)
     object Personalization : Screen("personalization", Icons.Default.Widgets)
     object Settings : Screen("settings", Icons.Default.Settings)
@@ -49,6 +51,7 @@ sealed class Screen(val route: String, val icon: androidx.compose.ui.graphics.ve
 
 val items = listOf(
     Screen.Chat,
+    Screen.Todo,
     Screen.Memory,
     Screen.Personalization,
     Screen.Settings
@@ -97,6 +100,7 @@ fun MainScreen(
                         val isSelected = selectedIndex == index
                         val title = when (screen) {
                             Screen.Chat -> strings.tabChat
+                            Screen.Todo -> strings.tabTodo
                             Screen.Memory -> strings.tabMemory
                             Screen.Personalization -> strings.tabPersonalization
                             Screen.Settings -> strings.tabSettings
@@ -145,6 +149,7 @@ fun MainScreen(
                     popExitTransition = { ExitTransition.None }
                 ) {
                     composable(Screen.Chat.route) { ChatTab(viewModel = viewModel) }
+                    composable(Screen.Todo.route) { TodoTab(viewModel = viewModel) }
                     composable(Screen.Memory.route) { MemoryTab(viewModel = viewModel) }
                     composable(Screen.Personalization.route) { PersonalizationTab(viewModel = viewModel) }
                     composable(Screen.Settings.route) { SettingsTab(viewModel = viewModel) }
