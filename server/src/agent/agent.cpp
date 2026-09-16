@@ -223,6 +223,29 @@ std::string cap_tool_output(const std::string& out) {
   return s;
 }
 
+// Most recent user-uploaded image in the assembled conversation (base64 body
+// of a data URL inside an image_url part). The LLM sees the image via vision
+// but cannot echo megabytes of base64 into tool arguments, so memo.save calls
+// are completed with this image as the cover.
+std::string extract_last_user_image_b64(const std::vector<std::string>& messages_json) {
+  for (auto it = messages_json.rbegin(); it != messages_json.rend(); ++it) {
+    json mj = json::parse(*it, nullptr, false);
+    if (mj.is_discarded() || !mj.is_object()) continue;
+    if (mj.value("role", "") != "user") continue;
+    if (!mj.contains("content") || !mj["content"].is_array()) continue;
+    for (auto p = mj["content"].rbegin(); p != mj["content"].rend(); ++p) {
+      if (!p->is_object() || p->value("type", "") != "image_url") continue;
+      const json& iu = p->value("image_url", json::object());
+      const std::string url = iu.value("url", "");
+      const std::string marker = ";base64,";
+      const size_t pos = url.find(marker);
+      if (pos == std::string::npos) continue;
+      return url.substr(pos + marker.size());
+    }
+  }
+  return "";
+}
+
 }  // namespace
 
 RunResult run(const config::Config& config,
@@ -780,8 +803,20 @@ RunResult run_streaming_with_history(
       req_body["messages"].push_back(json::parse(mj_str));
     }
     req_body["temperature"] = temp;
-    if (!tools_str.empty()) {
+    const bool final_round = (max_tool_rounds > 1 && round == max_tool_rounds - 1);
+    if (!final_round && !tools_str.empty()) {
       req_body["tools"] = json::parse(tools_str);
+    }
+    if (final_round) {
+      // Withhold tools and say so: otherwise the model keeps calling tools
+      // until the budget is exhausted (or leaks its internal DSML tool-call
+      // syntax as plain text when tools are silently unavailable).
+      req_body["messages"].push_back(json{
+        {"role", "system"},
+        {"content",
+         "This is your final round: do NOT call any more tools. Answer the "
+         "user directly now, using the information you already gathered. If "
+         "something could not be determined, say so briefly."}});
     }
     providers::encode_request_tool_names(req_body);
 
@@ -878,11 +913,25 @@ RunResult run_streaming_with_history(
 
     for (const auto& tc : tool_calls) {
       if (aborted && aborted->load()) break;
+      std::string args_json = tc.arguments;
+      if (tc.name == "memo.save") {
+        json args = json::parse(args_json, nullptr, false);
+        if (!args.is_discarded() && args.is_object() &&
+            args.value("coverImage", "").empty()) {
+          const std::string image = extract_last_user_image_b64(messages_json);
+          if (!image.empty()) {
+            args["coverImage"] = image;
+            args_json = args.dump();
+            log::info("memo.save: attached conversation image as cover (" +
+                      std::to_string(image.size()) + " b64 chars)");
+          }
+        }
+      }
       types::ToolResult tr;
       if (tools::is_remote_tool(tc.name) && remote_executor) {
-        tr = remote_executor(tc.id, tc.name, tc.arguments);
+        tr = remote_executor(tc.id, tc.name, args_json);
       } else {
-        tr = tools::run_tool(tc.name, tc.arguments);
+        tr = tools::run_tool(tc.name, args_json);
       }
       std::string out = cap_tool_output(tr.success ? tr.output : ("error: " + tr.error));
       messages_json.push_back(tool_message_json(tc.id, out));
@@ -894,7 +943,9 @@ RunResult run_streaming_with_history(
 
   RunResult r;
   r.ok = true;
-  r.content = full_content.empty() ? "(max tool rounds reached)" : full_content;
+  r.content = full_content.empty()
+      ? "抱歉，这个请求我暂时没能完成，请换个问法再试试。"
+      : full_content;
   return r;
 }
 

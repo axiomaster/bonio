@@ -22,6 +22,7 @@ namespace fs = std::filesystem;
 
 constexpr char kMetadataFile[] = "memo.json";
 constexpr char kCoverFile[] = "cover.jpg";
+constexpr char kCoverPngFile[] = "cover.png";
 
 std::mutex memo_mutex_;
 std::string memo_dir_cache_;
@@ -122,6 +123,20 @@ bool is_jpeg(const std::vector<uint8_t>& bytes) {
       bytes[bytes.size() - 2] == 0xff && bytes[bytes.size() - 1] == 0xd9;
 }
 
+bool is_png(const std::vector<uint8_t>& bytes) {
+  return bytes.size() >= 8 && bytes[0] == 0x89 && bytes[1] == 0x50 &&
+      bytes[2] == 0x4E && bytes[3] == 0x47 && bytes[4] == 0x0D &&
+      bytes[5] == 0x0A && bytes[6] == 0x1A && bytes[7] == 0x0A;
+}
+
+// Returns the on-disk cover filename for the given image bytes, or nullptr
+// if the format is not supported.
+const char* cover_file_for(const std::vector<uint8_t>& bytes) {
+  if (is_jpeg(bytes)) return kCoverFile;
+  if (is_png(bytes)) return kCoverPngFile;
+  return nullptr;
+}
+
 bool write_bytes(const fs::path& path, const std::vector<uint8_t>& bytes) {
   std::ofstream file(path, std::ios::binary | std::ios::trunc);
   if (!file) return false;
@@ -172,9 +187,9 @@ json memo_for_response(json memo, const fs::path& directory) {
   memo = normalized_memo(std::move(memo));
   memo["coverImage"] = "";
   const std::string cover_file = optional_string(memo, "coverFile");
-  if (cover_file == kCoverFile) {
+  if (cover_file == kCoverFile || cover_file == kCoverPngFile) {
     const std::optional<std::vector<uint8_t>> bytes = read_bytes(directory / cover_file);
-    if (bytes && is_jpeg(*bytes)) memo["coverImage"] = base64_encode(*bytes);
+    if (bytes && (is_jpeg(*bytes) || is_png(*bytes))) memo["coverImage"] = base64_encode(*bytes);
   }
   return memo;
 }
@@ -275,11 +290,13 @@ types::ToolResult memo_save(const std::string& args_json) {
   if (content.empty()) return types::ToolResult{false, "", "content is required"};
 
   std::optional<std::vector<uint8_t>> cover;
+  const char* cover_name = nullptr;
   const std::string cover_image = optional_string(params, "coverImage");
   if (!cover_image.empty()) {
     cover = base64_decode(cover_image);
-    if (!cover || !is_jpeg(*cover)) {
-      return types::ToolResult{false, "", "coverImage must be a base64 JPEG"};
+    cover_name = cover ? cover_file_for(*cover) : nullptr;
+    if (!cover_name) {
+      return types::ToolResult{false, "", "coverImage must be a base64 JPEG or PNG"};
     }
   }
 
@@ -295,7 +312,7 @@ types::ToolResult memo_save(const std::string& args_json) {
   memo["sourceApp"] = optional_string(params, "sourceApp");
   memo["pageTitle"] = optional_string(params, "pageTitle");
   memo["pageLink"] = optional_string(params, "pageLink");
-  memo["coverFile"] = cover ? kCoverFile : "";
+  memo["coverFile"] = cover ? cover_name : "";
   memo["tags"] = json::array();
   if (params.contains("tags") && params["tags"].is_array()) {
     for (const auto& tag : params["tags"]) {
@@ -308,7 +325,7 @@ types::ToolResult memo_save(const std::string& args_json) {
   fs::create_directories(directory, ec);
   if (ec) return types::ToolResult{false, "", "failed to create memo directory"};
   if (!write_json(directory / kMetadataFile, memo) ||
-      (cover && !write_bytes(directory / kCoverFile, *cover))) {
+      (cover && !write_bytes(directory / cover_name, *cover))) {
     fs::remove_all(directory, ec);
     return types::ToolResult{false, "", "failed to save memo"};
   }
