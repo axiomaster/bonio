@@ -1,0 +1,18 @@
+android/app/src/main/java/ai/axiomaster/bonio/remote/node/ContactsCalendarHandlers.kt
+  h_de08bd40967a17 316-322,324
+android/app/src/main/java/ai/axiomaster/bonio/remote/todo/TodoRepository.kt
+  h_de08bd40967a17 29,181-187,189,191-192,221
+android/app/src/main/java/ai/axiomaster/bonio/ui/screens/TodoTab.kt
+  h_de08bd40967a17 71
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.30.1",
+  "base_commit_sha": "4a18590cdd4a8d0e5226ee5acdd1f73e38fed308",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  }
+}
