@@ -256,19 +256,39 @@ class FloatingWindowService : Service() {
                 applyMagicCue()
             } else if (!actionableSuggestion.isNullOrEmpty()) {
                 sendActionableSuggestion()
+            } else if (!stateManager.currentTextBubble.value.isNullOrEmpty() &&
+                stateManager.bubbleCountdownLabel.value.isNullOrEmpty()
+            ) {
+                // Plain reply bubble: dismiss it and jump to the chat page.
+                avatarController.clearBubble()
+                bringAppToFront()
+                ai.axiomaster.bonio.util.NavigationBus.requestTab(
+                    ai.axiomaster.bonio.ui.screens.Screen.Chat.route
+                )
             }
         }
         bubbleContainer.setOnClickListener(onCapsuleClick)
         textBubble.setOnClickListener(onCapsuleClick)
         cueTitle.setOnClickListener(onCapsuleClick)
         bubbleContainer.setOnTouchListener { v, e ->
-            if (e.actionMasked == MotionEvent.ACTION_UP) {
-                val rect = android.graphics.Rect().also(v::getHitRect)
-                ai.axiomaster.bonio.util.AppLogger.i(
-                    TAG,
-                    "bubble touch UP raw=(${e.rawX.toInt()},${e.rawY.toInt()}) hitRect=$rect cues=${actionableCues.size}",
-                )
-                v.performClick()
+            when (e.actionMasked) {
+                MotionEvent.ACTION_UP -> {
+                    val rect = android.graphics.Rect().also(v::getHitRect)
+                    ai.axiomaster.bonio.util.AppLogger.i(
+                        TAG,
+                        "bubble touch UP raw=(${e.rawX.toInt()},${e.rawY.toInt()}) hitRect=$rect cues=${actionableCues.size}",
+                    )
+                    v.performClick()
+                }
+                MotionEvent.ACTION_OUTSIDE -> {
+                    // Taps anywhere outside the bubble: just dismiss the bubble,
+                    // no navigation.
+                    if (!stateManager.currentTextBubble.value.isNullOrEmpty() &&
+                        stateManager.bubbleCountdownLabel.value.isNullOrEmpty()
+                    ) {
+                        avatarController.clearBubble()
+                    }
+                }
             }
             false
         }
@@ -303,7 +323,10 @@ class FloatingWindowService : Service() {
             WindowManager.LayoutParams.WRAP_CONTENT,
             layoutFlag,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                // Receive ACTION_OUTSIDE when the user taps elsewhere on screen,
+                // so the message bubble can dismiss itself without navigating.
+                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START

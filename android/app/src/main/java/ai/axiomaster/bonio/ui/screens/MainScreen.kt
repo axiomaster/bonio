@@ -81,6 +81,24 @@ fun MainScreen(
             }
         }
 
+        // One-shot tab requests from overlay windows (avatar bubble taps).
+        val requestedTab by ai.axiomaster.bonio.util.NavigationBus.requestedTab.collectAsState()
+        LaunchedEffect(requestedTab) {
+            if (requestedTab != null) {
+                val target = items.firstOrNull { it.route == requestedTab }
+                if (target != null) {
+                    navController.navigate(target.route) {
+                        popUpTo(navController.graph.findStartDestination().id) {
+                            saveState = true
+                        }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
+                ai.axiomaster.bonio.util.NavigationBus.consume()
+            }
+        }
+
         Scaffold(
             modifier = modifier.fillMaxSize(),
             containerColor = colors.background,
