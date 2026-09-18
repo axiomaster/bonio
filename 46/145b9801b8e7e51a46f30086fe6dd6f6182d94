@@ -1,0 +1,16 @@
+docs/design/arch/20260918-screen-ocr-degrade-arch.md
+  h_de08bd40967a17 1-193
+docs/design/prd/20260918-screen-ocr-degrade-prd.md
+  h_de08bd40967a17 1-87
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.30.1",
+  "base_commit_sha": "46145b9801b8e7e51a46f30086fe6dd6f6182d94",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  }
+}
