@@ -780,30 +780,38 @@ class BonioAccessibilityService : AccessibilityService() {
    * Captures screen and returns scaled JPEG Base64 string.
    */
   suspend fun takeScreenshotBase64(maxEdge: Int = 1080, quality: Int = 80): String? {
-    val bitmap = takeScreenshotBitmap() ?: return null
+    val bitmap = takeScreenshotBitmap(maxEdge) ?: return null
     return try {
-      val width = bitmap.width
-      val height = bitmap.height
-      val longest = maxOf(width, height)
-      val scaledBitmap = if (longest > maxEdge) {
-        val scale = maxEdge.toFloat() / longest
-        val newW = (width * scale).toInt().coerceAtLeast(1)
-        val newH = (height * scale).toInt().coerceAtLeast(1)
-        Bitmap.createScaledBitmap(bitmap, newW, newH, true)
-      } else {
-        bitmap
-      }
+      compressForBase64(bitmap, quality)
+    } finally {
+      bitmap.recycle()
+    }
+  }
+
+  /** Bitmap direct output for local OCR — no base64 round-trip. */
+  suspend fun takeScreenshotBitmap(maxEdge: Int): Bitmap? {
+    val bitmap = takeScreenshotBitmap() ?: return null
+    val longest = maxOf(bitmap.width, bitmap.height)
+    if (longest <= maxEdge) return bitmap
+    val scale = maxEdge.toFloat() / longest
+    val scaled = Bitmap.createScaledBitmap(
+      bitmap,
+      (bitmap.width * scale).toInt().coerceAtLeast(1),
+      (bitmap.height * scale).toInt().coerceAtLeast(1),
+      true,
+    )
+    if (scaled !== bitmap) bitmap.recycle()
+    return scaled
+  }
+
+  private fun compressForBase64(bitmap: Bitmap, quality: Int): String? {
+    return try {
       val out = ByteArrayOutputStream()
-      scaledBitmap.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), out)
-      if (scaledBitmap != bitmap) {
-        scaledBitmap.recycle()
-      }
+      bitmap.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), out)
       Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
     } catch (e: Throwable) {
       Log.e(TAG, "Failed to compress screenshot: ${e.message}", e)
       null
-    } finally {
-      bitmap.recycle()
     }
   }
 
