@@ -1198,6 +1198,10 @@ class FloatingWindowService : Service() {
                 ai.axiomaster.bonio.util.AppLogger.i(TAG, "runMagicCue completed: isWechat=$isWechat cues=${cues?.size} remembered=$remembered hasScreenshot=${!screenshotBase64.isNullOrEmpty()}")
                 when {
                     !cues.isNullOrEmpty() -> showCues(cues!!)
+                    // WeChat cue errors must not be masked by "已记住" — surface
+                    // them so the user knows the analysis failed.
+                    isWechat && cues != null && cueError != null -> showCueFailure(cueError!!)
+                    isWechat && cues == null && cueError != null -> showCueFailure(cueError!!)
                     remembered || !isWechat -> {
                         cueEpoch += 1
                         val epoch = cueEpoch
@@ -1210,7 +1214,6 @@ class FloatingWindowService : Service() {
                             }
                         }, 2000)
                     }
-                    cues != null && cueError != null -> showCueFailure(cueError!!)
                     cues != null -> showCueFailure("当前页面没有什么可以帮你")
                     else -> showCueFailure(cueError ?: "屏幕分析失败，请稍后再试")
                 }
