@@ -220,7 +220,54 @@ class MagicCueController(
         ai.axiomaster.bonio.util.AppLogger.w(TAG, "contacts.search pre-check failed: ${e.message}")
       }
     }
+
+    // 备忘（长期记忆）预检：屏幕问题与本地备忘 bigram 模糊匹配，命中则把
+    // 备忘内容直接作为事实 —— 银行卡/账号这类只存于备忘的答案不依赖模型
+    // 主动调用工具。
+    memoFacts(tail)?.let { facts = appendFact(facts, it) }
     return facts
+  }
+
+  /** Screen-question ↔ memo fuzzy match via shared CJK bigrams. */
+  private suspend fun memoFacts(tail: String): String? {
+    return try {
+      val res = withTimeout(5_000) { session.request("memo.list", """{"limit":200}""") }
+      val arr = JSONObject(res).optJSONArray("memos") ?: return null
+      val qBigrams = cjkBigrams(tail)
+      if (qBigrams.isEmpty()) return null
+      data class Scored(val title: String, val content: String, val score: Int)
+      val scored = mutableListOf<Scored>()
+      for (i in 0 until arr.length()) {
+        val m = arr.optJSONObject(i) ?: continue
+        val title = m.optString("title").trim()
+        val content = m.optString("content").trim()
+        if (title.isEmpty() && content.isEmpty()) continue
+        val score = qBigrams.count { "$title $content".contains(it) }
+        if (score >= 3) scored.add(Scored(title, content, score))
+      }
+      scored.sortByDescending { it.score }
+      if (scored.isEmpty()) {
+        ai.axiomaster.bonio.util.AppLogger.i(TAG, "memoFacts: no memo matched (${arr.length()} scanned)")
+        null
+      } else {
+        ai.axiomaster.bonio.util.AppLogger.i(TAG, "memoFacts: matched ${scored.size} memo(s), top=${scored.first().title.take(30)}")
+        val sb = StringBuilder("【用户备忘（长期记忆）查询结果】\n")
+        for (s in scored.take(2)) {
+          sb.append("标题：").append(s.title).append('\n')
+          sb.append("内容：").append(s.content.take(300)).append('\n')
+        }
+        sb.toString()
+      }
+    } catch (e: Throwable) {
+      ai.axiomaster.bonio.util.AppLogger.w(TAG, "memo.list pre-check failed: ${e.message}")
+      null
+    }
+  }
+
+  private fun cjkBigrams(text: String): Set<String> {
+    val t = text.filter { it.code in 0x4E00..0x9FFF }
+    if (t.length < 2) return emptySet()
+    return (0 until t.length - 1).map { t.substring(it, it + 2) }.toSet()
   }
 
   private fun appendFact(current: String?, addition: String): String =
