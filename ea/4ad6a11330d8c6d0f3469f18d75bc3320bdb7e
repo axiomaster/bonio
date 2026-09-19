@@ -1,0 +1,14 @@
+android/app/src/main/java/ai/axiomaster/bonio/remote/cue/MagicCueController.kt
+  h_de08bd40967a17 236-239,241-243,251-253,258
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.30.1",
+  "base_commit_sha": "ea4ad6a11330d8c6d0f3469f18d75bc3320bdb7e",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  }
+}
