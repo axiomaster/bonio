@@ -33,7 +33,7 @@ export class ScreenHandlerImpl implements ScreenHandler {
   ) {
     this.context = context;
     this.screenManager = new ScreenRecordManager(context);
-    this.screenAwareness = new MsdpScreenAwarenessManager(isScreenAwarenessEnabled, onSmartEdgeResult);
+    this.screenAwareness = new MsdpScreenAwarenessManager(context, isScreenAwarenessEnabled, onSmartEdgeResult);
   }
 
   startScreenAwareness(): void {

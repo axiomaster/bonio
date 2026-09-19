@@ -3,6 +3,8 @@ import { BusinessError } from '@kit.BasicServicesKit';
 import { image } from '@kit.ImageKit';
 import { util } from '@kit.ArkTS';
 import { hilog } from '@kit.PerformanceAnalysisKit';
+import { fileIo } from '@kit.CoreFileKit';
+import { common } from '@kit.AbilityKit';
 
 const MAX_CONTEXT_TEXT_LENGTH = 12000;
 const MEMORY_COVER_MAX_EDGE = 480;
@@ -102,11 +104,17 @@ export class MsdpScreenAwarenessManager {
   private readonly onSmartEdgeResult: ((source: SmartEdgeResultSource, payloadJson: string,
     coverImageBase64?: string, originalImageBase64?: string, originalImageMimeType?: string) => void) | undefined;
 
+  public static instanceFilesDir: string | undefined = undefined;
+
   constructor(
+    context: common.Context | undefined,
     isEnabled: () => boolean,
     onSmartEdgeResult?: (source: SmartEdgeResultSource, payloadJson: string, coverImageBase64?: string,
       originalImageBase64?: string, originalImageMimeType?: string) => void,
   ) {
+    if (context?.filesDir) {
+      MsdpScreenAwarenessManager.instanceFilesDir = context.filesDir;
+    }
     this.isEnabled = isEnabled;
     this.onSmartEdgeResult = onSmartEdgeResult;
   }
@@ -160,11 +168,92 @@ export class MsdpScreenAwarenessManager {
     }
   }
 
+  private static readonly DUMP_DIR = '/data/local/tmp';
+
   /**
-   * Logs data returned by onscreen_awareness to hilog.
+   * Writes the complete received onscreen_awareness data into /data/local/tmp as a JSON file.
+   */
+  public static saveAwarenessJson(source: string, data: Object): void {
+    try {
+      let jsonStr = '';
+      try {
+        jsonStr = JSON.stringify(data, (key: string, value: Object | null | undefined): Object | null | undefined => {
+          if (key === 'image' && value && typeof value === 'object') {
+            return '[PixelMap]';
+          }
+          return value;
+        }, 2);
+      } catch (_) {
+        try {
+          jsonStr = JSON.stringify(data);
+        } catch (_) {
+          jsonStr = String(data);
+        }
+      }
+
+      // Write primary complete file /data/local/tmp/onscreen_awareness.json
+      const primaryPath = `${MsdpScreenAwarenessManager.DUMP_DIR}/onscreen_awareness.json`;
+      const latestPath = `${MsdpScreenAwarenessManager.DUMP_DIR}/onscreen_awareness_latest.json`;
+      const sourcePath = `${MsdpScreenAwarenessManager.DUMP_DIR}/onscreen_awareness_${source}.json`;
+      const okTmp = MsdpScreenAwarenessManager.writeFile(primaryPath, jsonStr);
+      MsdpScreenAwarenessManager.writeFile(latestPath, jsonStr);
+      MsdpScreenAwarenessManager.writeFile(sourcePath, jsonStr);
+
+      // Also write to app filesDir as guaranteed storage
+      const filesDir = MsdpScreenAwarenessManager.instanceFilesDir;
+      if (filesDir) {
+        const appPrimary = `${filesDir}/onscreen_awareness.json`;
+        const appLatest = `${filesDir}/onscreen_awareness_latest.json`;
+        const appSource = `${filesDir}/onscreen_awareness_${source}.json`;
+        MsdpScreenAwarenessManager.writeFile(appPrimary, jsonStr);
+        MsdpScreenAwarenessManager.writeFile(appLatest, jsonStr);
+        MsdpScreenAwarenessManager.writeFile(appSource, jsonStr);
+      }
+
+      hilog.info(
+        MsdpScreenAwarenessManager.DOMAIN,
+        MsdpScreenAwarenessManager.TAG,
+        '[onscreen_awareness] Saved complete JSON for %{public}s (%{public}d bytes, tmpSaved=%{public}s)',
+        source,
+        jsonStr.length,
+        okTmp ? 'true' : 'false',
+      );
+    } catch (err) {
+      hilog.error(
+        MsdpScreenAwarenessManager.DOMAIN,
+        MsdpScreenAwarenessManager.TAG,
+        '[onscreen_awareness] Failed to save JSON: %{public}s',
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }
+
+  private static writeFile(path: string, content: string): boolean {
+    try {
+      const file = fileIo.openSync(path, fileIo.OpenMode.CREATE | fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.TRUNC);
+      fileIo.writeSync(file.fd, content);
+      fileIo.closeSync(file.fd);
+      return true;
+    } catch (err) {
+      hilog.warn(
+        MsdpScreenAwarenessManager.DOMAIN,
+        MsdpScreenAwarenessManager.TAG,
+        '[onscreen_awareness] writeFile to %{public}s failed: %{public}s',
+        path,
+        err instanceof Error ? err.message : String(err),
+      );
+      return false;
+    }
+  }
+
+  /**
+   * Logs data returned by onscreen_awareness to hilog and writes to /data/local/tmp.
    * Handles large payloads safely by chunking them to avoid truncation.
    */
   public static logAwarenessData(source: string, data: Object): void {
+    // Write complete JSON file to /data/local/tmp
+    MsdpScreenAwarenessManager.saveAwarenessJson(source, data);
+
     let jsonStr = '';
     try {
       jsonStr = JSON.stringify(data, (key: string, value: Object | null | undefined): Object | null | undefined => {
