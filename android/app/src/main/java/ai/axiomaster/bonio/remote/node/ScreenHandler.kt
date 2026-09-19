@@ -77,8 +77,17 @@ class ScreenHandler(
       if (lines.isEmpty()) {
         // ── OCR 降级：无障碍树无文本（受限设置/受限窗口）──
         try {
-          val full = a11y.takeScreenshotBitmap()
-          if (full != null) {
+          val ocrStarted = android.os.SystemClock.elapsedRealtime()
+          // takeScreenshot 拒绝并发请求：magic cue 会并行发起独立截图，这里
+          // 首次失败（null）通常是对面请求在途，短暂等待后重试一次。
+          var full = a11y.takeScreenshotBitmap()
+          if (full == null) {
+            kotlinx.coroutines.delay(300)
+            full = a11y.takeScreenshotBitmap()
+          }
+          if (full == null) {
+            AppLogger.w("ScreenHandler", "ocr degrade: screenshot unavailable (twice)")
+          } else {
             val longest = maxOf(full.width, full.height)
             val scale = if (longest > OCR_MAX_EDGE) OCR_MAX_EDGE.toFloat() / longest else 1f
             val scaled = if (scale < 1f) {
@@ -94,6 +103,10 @@ class ScreenHandler(
             val ocrLines = screenOcr.recognize(scaled ?: full)
             if (scaled != null && scaled !== full) scaled.recycle()
             full.recycle()
+            AppLogger.i(
+              "ScreenHandler",
+              "ocr degrade: took ${android.os.SystemClock.elapsedRealtime() - ocrStarted}ms lines=${ocrLines.size}",
+            )
             if (ocrLines.isNotEmpty()) {
               // bbox 映射回全屏分辨率，与 a11y bounds 坐标系一致
               val inv = 1f / scale
