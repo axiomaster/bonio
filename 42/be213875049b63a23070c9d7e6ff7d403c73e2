@@ -1,0 +1,14 @@
+android/app/build.gradle.kts
+  h_de08bd40967a17 94-97
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.30.1",
+  "base_commit_sha": "42be213875049b63a23070c9d7e6ff7d403c73e2",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  }
+}
