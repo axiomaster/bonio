@@ -91,8 +91,10 @@ dependencies {
     implementation(libs.commonmark.ext.task.listitems)
 
     // On-device OCR fallback for screen.context (bundled Chinese model, no GMS needed)
-    // See docs/design/arch/20260918-screen-ocr-degrade-arch.md
-    implementation("com.google.mlkit:text-recognition-chinese:16.0.0")
+    // 16.0.1 ships 16KB-page-aligned native libs (16.0.0's libmlkit_google_ocr_pipeline.so
+    // is 4KB-aligned and trips Android 15+ installers). See
+    // docs/design/arch/20260918-screen-ocr-degrade-arch.md
+    implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
 
     testImplementation(libs.junit)
     testImplementation("org.json:json:20240303")
