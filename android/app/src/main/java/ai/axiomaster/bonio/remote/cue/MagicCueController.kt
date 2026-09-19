@@ -233,8 +233,14 @@ class MagicCueController(
     return try {
       val res = withTimeout(5_000) { session.request("memo.list", """{"limit":200}""") }
       val arr = JSONObject(res).optJSONArray("memos") ?: return null
-      val qBigrams = cjkBigrams(tail)
+      // 匹配范围聚焦"问题"（最后两行）：整屏文本会带入上一轮问答的实体
+      // 噪音，把真正相关的备忘挤出 top-N。
+      val question = tail.lines().map { it.trim() }.filter { it.isNotEmpty() }.takeLast(2).joinToString("\n")
+      val qBigrams = cjkBigrams(question)
       if (qBigrams.isEmpty()) return null
+      // 问题里的实体（"李创平的银行卡号"→李创平）直接命中的备忘强加权
+      val entities = Regex("([\\u4e00-\\u9fa5]{2,4})的(?:银行卡号|卡号|手机号码|手机号|电话号码|电话|号码|地址|身份证号|身份证)")
+        .findAll(question).map { it.groupValues[1] }.toList()
       data class Scored(val title: String, val content: String, val score: Int)
       val scored = mutableListOf<Scored>()
       for (i in 0 until arr.length()) {
@@ -242,12 +248,14 @@ class MagicCueController(
         val title = m.optString("title").trim()
         val content = m.optString("content").trim()
         if (title.isEmpty() && content.isEmpty()) continue
-        val score = qBigrams.count { "$title $content".contains(it) }
+        val hay = "$title $content"
+        var score = qBigrams.count { hay.contains(it) }
+        if (entities.any { hay.contains(it) }) score += 3
         if (score >= 3) scored.add(Scored(title, content, score))
       }
       scored.sortByDescending { it.score }
       if (scored.isEmpty()) {
-        ai.axiomaster.bonio.util.AppLogger.i(TAG, "memoFacts: no memo matched (${arr.length()} scanned)")
+        ai.axiomaster.bonio.util.AppLogger.i(TAG, "memoFacts: no memo matched (${arr.length()} scanned, q=${question.take(30)})")
         null
       } else {
         ai.axiomaster.bonio.util.AppLogger.i(TAG, "memoFacts: matched ${scored.size} memo(s), top=${scored.first().title.take(30)}")
