@@ -1146,17 +1146,12 @@ class FloatingWindowService : Service() {
 
         serviceScope.launch {
             try {
-                var screenshotBase64: String? = null
-                val ctxRes = kotlinx.coroutines.coroutineScope {
-                    val screenshotDef = async(Dispatchers.Default) {
-                        runtime.captureScreenshot(maxEdge = 1080, quality = 80)
-                    }
-                    val textDef = async(Dispatchers.Default) {
-                        runtime.captureScreenContext(6000)
-                    }
-                    screenshotBase64 = screenshotDef.await()
-                    textDef.await()
-                }
+                // Screenshot FIRST, then hand it to screen.context: the a11y
+                // takeScreenshot API has a minimum interval and rejects
+                // back-to-back calls, so the old parallel capture raced the
+                // context's own OCR screenshot (both could fail).
+                val screenshotBase64 = runtime.captureScreenshot(maxEdge = 1080, quality = 80)
+                val ctxRes = runtime.captureScreenContext(6000, screenshotBase64)
 
                 if (!ctxRes.ok || ctxRes.payloadJson == null) {
                     throw IllegalStateException(ctxRes.error?.message ?: "无法读取屏幕内容")

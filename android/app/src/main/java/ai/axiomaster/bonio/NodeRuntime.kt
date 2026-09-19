@@ -279,9 +279,22 @@ class NodeRuntime(context: Context) {
       },
     )
 
-  /** In-process screen context capture (accessibility tree text snapshot). */
-  suspend fun captureScreenContext(maxTextLength: Int = 6000): GatewaySession.InvokeResult =
-    invokeDispatcher.handleInvoke("screen.context", """{"maxTextLength":$maxTextLength}""")
+  /**
+   * In-process screen context capture (accessibility tree text snapshot).
+   * [screenshotBase64] — optional already-captured screenshot: when present,
+   * the OCR degrade path reuses it instead of taking another screenshot
+   * (a11y takeScreenshot has a rate limit and rejects back-to-back calls).
+   */
+  suspend fun captureScreenContext(
+    maxTextLength: Int = 6000,
+    screenshotBase64: String? = null,
+  ): GatewaySession.InvokeResult {
+    val params = org.json.JSONObject().apply {
+      put("maxTextLength", maxTextLength)
+      if (!screenshotBase64.isNullOrEmpty()) put("screenshotBase64", screenshotBase64)
+    }
+    return invokeDispatcher.handleInvoke("screen.context", params.toString())
+  }
 
   /**
    * Captures screen as JPEG Base64.

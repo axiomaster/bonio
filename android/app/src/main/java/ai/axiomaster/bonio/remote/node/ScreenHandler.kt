@@ -44,6 +44,12 @@ class ScreenHandler(
         code = "ACCESSIBILITY_NOT_ENABLED",
         message = "ACCESSIBILITY_NOT_ENABLED: accessibility service is not enabled",
       )
+    var providedScreenshotB64: String? = null
+    if (paramsJson != null) {
+      try {
+        providedScreenshotB64 = JSONObject(paramsJson).optString("screenshotBase64").ifEmpty { null }
+      } catch (_: Throwable) {}
+    }
     val dump = a11y.dumpActiveWindow(maxNodes = 250, maxTextLength = 240)
       ?: return GatewaySession.InvokeResult.error(
         code = "SCREEN_CONTEXT_FAILED",
@@ -78,38 +84,50 @@ class ScreenHandler(
         // ── OCR 降级：无障碍树无文本（受限设置/受限窗口）──
         try {
           val ocrStarted = android.os.SystemClock.elapsedRealtime()
-          // takeScreenshot 拒绝并发请求：magic cue 会并行发起独立截图，这里
-          // 首次失败（null）通常是对面请求在途，短暂等待后重试一次。
-          var full = a11y.takeScreenshotBitmap()
-          if (full == null) {
-            kotlinx.coroutines.delay(300)
-            full = a11y.takeScreenshotBitmap()
-          }
-          if (full == null) {
-            AppLogger.w("ScreenHandler", "ocr degrade: screenshot unavailable (twice)")
-          } else {
-            val longest = maxOf(full.width, full.height)
-            val scale = if (longest > OCR_MAX_EDGE) OCR_MAX_EDGE.toFloat() / longest else 1f
-            val scaled = if (scale < 1f) {
-              Bitmap.createScaledBitmap(
-                full,
-                (full.width * scale).toInt().coerceAtLeast(1),
-                (full.height * scale).toInt().coerceAtLeast(1),
-                true,
-              )
-            } else {
-              null
+          // Full-screen size for mapping OCR boxes back to a11y coordinates.
+          val screenW = a11y.resources.displayMetrics.widthPixels
+          val screenH = a11y.resources.displayMetrics.heightPixels
+          val screenLongest = maxOf(screenW, screenH)
+          val decodeProvided: () -> Bitmap? = {
+            providedScreenshotB64?.let { b64 ->
+              try {
+                val bytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT)
+                android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+              } catch (_: Throwable) {
+                null
+              }
             }
-            val ocrLines = screenOcr.recognize(scaled ?: full)
-            if (scaled != null && scaled !== full) scaled.recycle()
-            full.recycle()
+          }
+          var input = decodeProvided()
+          var sourceWasProvided = input != null
+          if (input == null) {
+            // Take our own screenshot. takeScreenshot has a minimum interval
+            // (a parallel capture may just have completed) — back off between
+            // attempts instead of failing fast.
+            val waits = longArrayOf(0, 400, 1_200)
+            for (wait in waits) {
+              if (wait > 0) kotlinx.coroutines.delay(wait)
+              input = a11y.takeScreenshotBitmap(maxEdge = OCR_MAX_EDGE)
+              if (input != null) break
+            }
+            sourceWasProvided = false
+          }
+          if (input == null) {
+            AppLogger.w("ScreenHandler", "ocr degrade: screenshot unavailable after retries")
+          } else {
+            val inputLongest = maxOf(input.width, input.height)
+            val inv = if (sourceWasProvided && screenLongest > 0 && inputLongest > 0) {
+              screenLongest.toFloat() / inputLongest
+            } else {
+              1f
+            }
+            val ocrLines = screenOcr.recognize(input)
+            if (!sourceWasProvided) input.recycle()
             AppLogger.i(
               "ScreenHandler",
-              "ocr degrade: took ${android.os.SystemClock.elapsedRealtime() - ocrStarted}ms lines=${ocrLines.size}",
+              "ocr degrade: took ${android.os.SystemClock.elapsedRealtime() - ocrStarted}ms lines=${ocrLines.size} provided=$sourceWasProvided",
             )
             if (ocrLines.isNotEmpty()) {
-              // bbox 映射回全屏分辨率，与 a11y bounds 坐标系一致
-              val inv = 1f / scale
               val ocrNodes = JSONArray()
               val ocrLineList = mutableListOf<Line>()
               for (l in ocrLines) {
