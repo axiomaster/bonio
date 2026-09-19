@@ -114,6 +114,9 @@ export class NodeRuntime {
       () => this.prefs.getScreenAwarenessEnabled(),
       (source: string, payloadJson: string, coverImageBase64?: string, originalImageBase64?: string,
         originalImageMimeType?: string) => {
+        hilog.info(NodeRuntime.DOMAIN, 'NodeRuntime',
+          '[onscreen_awareness] NodeRuntime received onSmartEdgeResult: source=%{public}s, payloadLength=%{public}d',
+          source, payloadJson.length);
         // Explicit trigger captures are enqueued after the handler returns so
         // the completion listener and screenshot cover share one input.
         if (source === 'trigger') return;

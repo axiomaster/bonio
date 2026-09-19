@@ -84,13 +84,13 @@ export class MsdpScreenAwarenessManager {
   private static readonly TAG = 'MsdpScreenAwareness';
   private readonly smartEdgeListener = (results: onScreen.OnscreenAwarenessInfo[]): void => {
     hilog.info(MsdpScreenAwarenessManager.DOMAIN, MsdpScreenAwarenessManager.TAG,
-      'smartEdgeListener EVENT RECEIVED! count=%{public}d', results ? results.length : -1);
+      '[onscreen_awareness] smartEdgeListener EVENT RECEIVED! count=%{public}d', results ? results.length : -1);
     this.lastSmartEdgeChangeAtMs = results.length > 0 ? Date.now() : this.lastSmartEdgeChangeAtMs;
     void this.reportSmartEdgeResult('subscribe', results);
   };
   private readonly readingListener = (status: onScreen.ReadingScreenPermissionStatus): void => {
     hilog.info(MsdpScreenAwarenessManager.DOMAIN, MsdpScreenAwarenessManager.TAG,
-      'readingScreenPermissionStatus: readingState=%{public}d', status.readingState);
+      '[onscreen_awareness] readingScreenPermissionStatus: readingState=%{public}d', status.readingState);
     this.readingState = status.readingState;
   };
   private smartEdgeSubscribed: boolean = false;
@@ -160,19 +160,69 @@ export class MsdpScreenAwarenessManager {
     }
   }
 
+  /**
+   * Logs data returned by onscreen_awareness to hilog.
+   * Handles large payloads safely by chunking them to avoid truncation.
+   */
+  public static logAwarenessData(source: string, data: Object): void {
+    let jsonStr = '';
+    try {
+      jsonStr = JSON.stringify(data, (key: string, value: Object | null | undefined): Object | null | undefined => {
+        if (key === 'image' && value && typeof value === 'object') {
+          return '[PixelMap]';
+        }
+        if ((key === 'coverImageBase64' || key === 'originalImageBase64') && typeof value === 'string' && value.length > 80) {
+          return `[Base64 image, length: ${value.length}]`;
+        }
+        return value;
+      }, 2);
+    } catch (_) {
+      try {
+        jsonStr = JSON.stringify(data);
+      } catch (_) {
+        jsonStr = String(data);
+      }
+    }
+
+    const CHUNK_SIZE = 1000;
+    if (jsonStr.length <= CHUNK_SIZE) {
+      hilog.info(MsdpScreenAwarenessManager.DOMAIN, MsdpScreenAwarenessManager.TAG,
+        '[onscreen_awareness] %{public}s: %{public}s', source, jsonStr);
+    } else {
+      const totalChunks = Math.ceil(jsonStr.length / CHUNK_SIZE);
+      hilog.info(MsdpScreenAwarenessManager.DOMAIN, MsdpScreenAwarenessManager.TAG,
+        '[onscreen_awareness] %{public}s (total %{public}d chars, %{public}d chunks):', source, jsonStr.length, totalChunks);
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, jsonStr.length);
+        hilog.info(MsdpScreenAwarenessManager.DOMAIN, MsdpScreenAwarenessManager.TAG,
+          '[onscreen_awareness] [%{public}d/%{public}d] %{public}s', i + 1, totalChunks, jsonStr.substring(start, end));
+      }
+    }
+  }
+
   public async captureContext(paramsJson: string | undefined): Promise<ScreenContextSnapshot> {
     this.assertEnabled();
     const maxTextLength = this.parseMaxTextLength(paramsJson);
     try {
+      hilog.info(MsdpScreenAwarenessManager.DOMAIN, MsdpScreenAwarenessManager.TAG,
+        '[onscreen_awareness] captureContext calling onScreen.getPageContent...');
       const page = await onScreen.getPageContent({
         contentUnderstand: true,
         pageLink: true,
         textOnly: true,
       });
+      MsdpScreenAwarenessManager.logAwarenessData('getPageContent returned data', page);
       const snapshot = this.toSnapshot(page, maxTextLength);
       this.lastSnapshot = snapshot;
       return snapshot;
     } catch (error) {
+      hilog.error(
+        MsdpScreenAwarenessManager.DOMAIN,
+        MsdpScreenAwarenessManager.TAG,
+        '[onscreen_awareness] getPageContent failed: %{public}s',
+        error instanceof Error ? error.message : String(error),
+      );
       throw this.toAwarenessError(error);
     }
   }
@@ -185,7 +235,12 @@ export class MsdpScreenAwarenessManager {
     this.assertEnabled();
     this.subscribeSmartEdge();
     try {
+      hilog.info(MsdpScreenAwarenessManager.DOMAIN, MsdpScreenAwarenessManager.TAG,
+        '[onscreen_awareness] triggerSmartEdge calling onScreen.trigger...');
       const result = await onScreen.trigger(SMART_EDGE_CAPABILITY);
+      hilog.info(MsdpScreenAwarenessManager.DOMAIN, MsdpScreenAwarenessManager.TAG,
+        '[onscreen_awareness] triggerSmartEdge received response resultCode=%{public}d, bundle=%{public}s, app=%{public}s',
+        result.resultCode, result.bundleName || '', result.appName || '');
       const report = await this.reportSmartEdgeResult('trigger', result);
       if (result.resultCode !== 0) {
         throw new MsdpScreenAwarenessError(
@@ -195,6 +250,12 @@ export class MsdpScreenAwarenessManager {
       }
       return this.toSmartEdgeSnapshot(result, report);
     } catch (error) {
+      hilog.error(
+        MsdpScreenAwarenessManager.DOMAIN,
+        MsdpScreenAwarenessManager.TAG,
+        '[onscreen_awareness] triggerSmartEdge failed: %{public}s',
+        error instanceof Error ? error.message : String(error),
+      );
       throw this.toAwarenessError(error);
     }
   }
@@ -203,7 +264,11 @@ export class MsdpScreenAwarenessManager {
   public async captureScreenshot(): Promise<SmartEdgeSnapshot> {
     this.assertEnabled();
     try {
+      hilog.info(MsdpScreenAwarenessManager.DOMAIN, MsdpScreenAwarenessManager.TAG,
+        '[onscreen_awareness] captureScreenshot calling onScreen.capture...');
       const results = await onScreen.capture(SCREENSHOT_CAPTURE_CAPABILITY);
+      hilog.info(MsdpScreenAwarenessManager.DOMAIN, MsdpScreenAwarenessManager.TAG,
+        '[onscreen_awareness] captureScreenshot received count=%{public}d', results.length);
       if (results.length === 0) {
         throw new MsdpScreenAwarenessError('SCREEN_CAPTURE_EMPTY_RESULT', 'MSDP Screenshot capture returned no result');
       }
@@ -217,6 +282,12 @@ export class MsdpScreenAwarenessManager {
       const report = await this.reportSmartEdgeResult('capture', results);
       return this.toSmartEdgeSnapshot(results[0], report);
     } catch (error) {
+      hilog.error(
+        MsdpScreenAwarenessManager.DOMAIN,
+        MsdpScreenAwarenessManager.TAG,
+        '[onscreen_awareness] captureScreenshot failed: %{public}s',
+        error instanceof Error ? error.message : String(error),
+      );
       throw this.toAwarenessError(error);
     }
   }
@@ -271,6 +342,7 @@ export class MsdpScreenAwarenessManager {
   private async reportSmartEdgeResult(source: SmartEdgeResultSource, result: Object): Promise<SmartEdgeReport> {
     const report: SmartEdgeReport = { payloadJson: '' };
     try {
+      MsdpScreenAwarenessManager.logAwarenessData(`${source} returned data`, result);
       report.payloadJson = JSON.stringify(result);
       const images = await this.extractMemoryImages(result);
       report.coverImageBase64 = images.coverImageBase64;
@@ -279,14 +351,19 @@ export class MsdpScreenAwarenessManager {
       hilog.info(
         MsdpScreenAwarenessManager.DOMAIN,
         MsdpScreenAwarenessManager.TAG,
-        '%{public}s result shape: %{public}s',
+        '[onscreen_awareness] %{public}s result shape: %{public}s',
         source,
         this.describeResultShape(result, report.payloadJson, report.coverImageBase64, report.originalImageBase64),
       );
       if (this.onSmartEdgeResult) this.onSmartEdgeResult(source, report.payloadJson, report.coverImageBase64,
         report.originalImageBase64, report.originalImageMimeType);
-    } catch (_) {
-      // Diagnostic rendering must never affect MSDP subscription or capture.
+    } catch (err) {
+      hilog.error(
+        MsdpScreenAwarenessManager.DOMAIN,
+        MsdpScreenAwarenessManager.TAG,
+        '[onscreen_awareness] reportSmartEdgeResult failed: %{public}s',
+        err instanceof Error ? `${err.name}: ${err.message}\n${err.stack || ''}` : String(err),
+      );
     }
     return report;
   }

@@ -4,6 +4,7 @@ import { common, abilityAccessCtrl } from '@kit.AbilityKit';
 import { ScreenRecordManager, RecordPayload } from '../ScreenRecordManager';
 import { fileIo } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
+import { hilog } from '@kit.PerformanceAnalysisKit';
 import {
   MsdpScreenAwarenessError,
   MsdpScreenAwarenessManager,
@@ -93,8 +94,14 @@ export class ScreenHandlerImpl implements ScreenHandler {
   async handleScreenContext(paramsJson: string | undefined): Promise<InvokeResult> {
     try {
       const context = await this.screenAwareness.captureContext(paramsJson);
+      hilog.info(0x3D00, 'ScreenHandler',
+        '[onscreen_awareness] handleScreenContext returned bundle=%{public}s, title=%{public}s',
+        context.bundleName, context.title || '');
       return { ok: true, payloadJson: JSON.stringify(context) };
     } catch (error) {
+      hilog.error(0x3D00, 'ScreenHandler',
+        '[onscreen_awareness] handleScreenContext error: %{public}s',
+        error instanceof Error ? error.message : String(error));
       return this.makeAwarenessError(error);
     }
   }
@@ -111,6 +118,9 @@ export class ScreenHandlerImpl implements ScreenHandler {
   async handleSmartEdgeTrigger(): Promise<InvokeResult> {
     try {
       const snapshot = await this.screenAwareness.triggerSmartEdge();
+      hilog.info(0x3D00, 'ScreenHandler',
+        '[onscreen_awareness] handleSmartEdgeTrigger returned bundle=%{public}s, app=%{public}s, title=%{public}s',
+        snapshot.bundleName || '', snapshot.appName || '', snapshot.title || '');
       return {
         ok: true,
         payloadJson: snapshot.payloadJson,
@@ -122,6 +132,9 @@ export class ScreenHandlerImpl implements ScreenHandler {
         title: snapshot.title,
       };
     } catch (error) {
+      hilog.error(0x3D00, 'ScreenHandler',
+        '[onscreen_awareness] handleSmartEdgeTrigger error: %{public}s',
+        error instanceof Error ? error.message : String(error));
       return this.makeAwarenessError(error);
     }
   }
@@ -129,8 +142,14 @@ export class ScreenHandlerImpl implements ScreenHandler {
   async handleScreenshotCapture(): Promise<InvokeResult> {
     try {
       const snapshot = await this.screenAwareness.captureScreenshot();
+      hilog.info(0x3D00, 'ScreenHandler',
+        '[onscreen_awareness] handleScreenshotCapture returned bundle=%{public}s, app=%{public}s',
+        snapshot.bundleName || '', snapshot.appName || '');
       return { ok: true, payloadJson: snapshot.payloadJson };
     } catch (error) {
+      hilog.error(0x3D00, 'ScreenHandler',
+        '[onscreen_awareness] handleScreenshotCapture error: %{public}s',
+        error instanceof Error ? error.message : String(error));
       return this.makeAwarenessError(error);
     }
   }
