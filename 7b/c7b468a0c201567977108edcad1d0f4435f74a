@@ -1,0 +1,16 @@
+harmonyos/entry/src/main/ets/node/handlers/ScreenHandlerImpl.ets
+  h_de08bd40967a17 36
+harmonyos/entry/src/main/ets/system/MsdpScreenAwarenessManager.ets
+  h_de08bd40967a17 6-7,107-108,110,115-117,171-172,174-250,254-256
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "5.30.1",
+  "base_commit_sha": "7bc7b468a0c201567977108edcad1d0f4435f74a",
+  "prompts": {},
+  "humans": {
+    "h_de08bd40967a17": {
+      "author": "lishiming <lishiming2@huawei.com>"
+    }
+  }
+}
