@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -122,6 +124,34 @@ fun PersonalizationTab(
     var memoEnabled by rememberSaveable { mutableStateOf(true) }
     var filesEnabled by rememberSaveable { mutableStateOf(true) }
 
+    // ── Skin import state ──
+    val customSkins by viewModel.customSkins.collectAsState()
+    val skinImportEvent by viewModel.skinImportEvent.collectAsState()
+    val downloadProgress by viewModel.skinDownloadProgress.collectAsState()
+    var showImportMenu by remember { mutableStateOf(false) }
+    var showUrlDialog by remember { mutableStateOf(false) }
+    var urlInput by remember { mutableStateOf("") }
+    var pendingDeleteSkin by remember { mutableStateOf<ai.axiomaster.bonio.avatar.SkinItem?>(null) }
+    var importErrorCode by remember { mutableStateOf<String?>(null) }
+
+    val zipPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) viewModel.importSkinFromUri(uri)
+    }
+
+    LaunchedEffect(skinImportEvent) {
+        when (val result = skinImportEvent) {
+            is ai.axiomaster.bonio.avatar.SkinImporter.ImportResult.Success -> {
+                android.widget.Toast.makeText(context, strings.skinImportSuccess, android.widget.Toast.LENGTH_SHORT).show()
+                viewModel.consumeSkinImportEvent()
+            }
+            is ai.axiomaster.bonio.avatar.SkinImporter.ImportResult.Failure -> {
+                importErrorCode = result.code
+                viewModel.consumeSkinImportEvent()
+            }
+            null -> {}
+        }
+    }
+
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -147,7 +177,7 @@ fun PersonalizationTab(
                             fontWeight = FontWeight.Medium,
                             color = colors.textPrimary
                         )
-                        val activeSkinItem = CustomSkinManager.getSkinById(currentSkin)
+                        val activeSkinItem = CustomSkinManager.getSkinById(currentSkin, context)
                         Text(
                             text = activeSkinItem.subtitle,
                             fontSize = 12.sp,
@@ -156,14 +186,14 @@ fun PersonalizationTab(
                         )
                     }
 
-                    // Horizontal Scroll Gallery
+                    // Horizontal Scroll Gallery: built-ins + imported skins + add card
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        CustomSkinManager.allSkins.forEach { skin ->
+                        (CustomSkinManager.builtinSkins + customSkins).forEach { skin ->
                             val isSelected = skin.id.equals(currentSkin, ignoreCase = true)
                             Surface(
                                 onClick = { viewModel.setAvatarSkin(skin.id) },
@@ -179,12 +209,38 @@ fun PersonalizationTab(
                                     modifier = Modifier.padding(12.dp),
                                     verticalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
-                                    Text(
-                                        text = skin.name.substringBefore(" "),
-                                        fontSize = 13.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (isSelected) colors.accent else colors.textPrimary
-                                    )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = skin.name.substringBefore(" "),
+                                            fontSize = 13.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isSelected) colors.accent else colors.textPrimary,
+                                            modifier = Modifier.weight(1f, fill = false)
+                                        )
+                                        if (!skin.isBuiltin) {
+                                            Text(
+                                                text = strings.skinCustomTag,
+                                                fontSize = 9.sp,
+                                                color = colors.accent,
+                                                modifier = Modifier
+                                                    .padding(start = 4.dp)
+                                                    .background(
+                                                        color = colors.accent.copy(alpha = 0.12f),
+                                                        shape = RoundedCornerShape(4.dp)
+                                                    )
+                                                    .padding(horizontal = 4.dp, vertical = 1.dp)
+                                            )
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = strings.skinDeleteAction,
+                                                tint = colors.textSecondary,
+                                                modifier = Modifier
+                                                    .padding(start = 2.dp)
+                                                    .size(14.dp)
+                                                    .clickable { pendingDeleteSkin = skin }
+                                            )
+                                        }
+                                    }
                                     Text(
                                         text = skin.subtitle,
                                         fontSize = 10.sp,
@@ -193,6 +249,33 @@ fun PersonalizationTab(
                                         overflow = TextOverflow.Ellipsis
                                     )
                                 }
+                            }
+                        }
+
+                        // ── 添加皮肤 entry ──
+                        Surface(
+                            onClick = { showImportMenu = true },
+                            modifier = Modifier.width(115.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            color = colors.surfaceVariant,
+                            border = BorderStroke(1.dp, colors.border)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = strings.skinAddAction,
+                                    tint = colors.accent,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Text(
+                                    text = strings.skinAddAction,
+                                    fontSize = 11.sp,
+                                    color = colors.textPrimary
+                                )
                             }
                         }
                     }
@@ -632,6 +715,108 @@ fun PersonalizationTab(
                 }
             }
         }
+    }
+
+    // ── Skin import / delete dialogs ──
+
+    if (showImportMenu) {
+        AlertDialog(
+            onDismissRequest = { showImportMenu = false },
+            title = { Text(strings.skinAddAction) },
+            text = { Text("支持 Bonio 皮肤包（zip）") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showImportMenu = false
+                    zipPicker.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream"))
+                }) { Text(strings.skinImportFromLocal) }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showImportMenu = false
+                    showUrlDialog = true
+                }) { Text(strings.skinImportFromUrl) }
+            }
+        )
+    }
+
+    if (showUrlDialog) {
+        val isDownloading = downloadProgress in 0..99
+        AlertDialog(
+            onDismissRequest = { if (!isDownloading) showUrlDialog = false },
+            title = { Text(strings.skinImportFromUrl) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = urlInput,
+                        onValueChange = { urlInput = it },
+                        placeholder = { Text(strings.skinImportUrlHint, fontSize = 13.sp) },
+                        singleLine = true,
+                        enabled = !isDownloading,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    if (isDownloading) {
+                        Text(strings.skinDownloading, fontSize = 12.sp, color = colors.textSecondary)
+                        LinearProgressIndicator(
+                            progress = { downloadProgress / 100f },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showUrlDialog = false
+                        viewModel.importSkinFromUrl(urlInput.trim())
+                    },
+                    enabled = !isDownloading && urlInput.trim().startsWith("http")
+                ) { Text(strings.skinImportDownload) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUrlDialog = false }, enabled = !isDownloading) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            }
+        )
+    }
+
+    pendingDeleteSkin?.let { skin ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteSkin = null },
+            title = { Text(strings.skinDeleteAction) },
+            text = { Text(strings.skinDeleteConfirm) },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteCustomSkin(skin.id)
+                    pendingDeleteSkin = null
+                }) { Text(strings.skinDeleteAction, color = Color(0xFFD93025)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteSkin = null }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            }
+        )
+    }
+
+    importErrorCode?.let { code ->
+        AlertDialog(
+            onDismissRequest = { importErrorCode = null },
+            title = { Text(strings.skinImportFailedTitle) },
+            text = {
+                Text(
+                    strings.skinErrorMessages[code] ?: code,
+                    fontSize = 14.sp,
+                    color = colors.textPrimary
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { importErrorCode = null }) {
+                    Text("OK")
+                }
+            }
+        )
     }
 }
 

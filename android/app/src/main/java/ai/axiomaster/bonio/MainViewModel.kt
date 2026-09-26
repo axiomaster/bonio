@@ -2,10 +2,13 @@ package ai.axiomaster.bonio
 
 import android.app.Application
 import android.content.Intent
+import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import ai.axiomaster.bonio.ai.AgentManager
 import ai.axiomaster.bonio.ai.AgentState
+import ai.axiomaster.bonio.avatar.CustomSkinManager
+import ai.axiomaster.bonio.avatar.SkinImporter
 import ai.axiomaster.bonio.remote.gateway.GatewayEndpoint
 import ai.axiomaster.bonio.remote.chat.OutgoingAttachment
 import ai.axiomaster.bonio.remote.chat.SpeechToTextManager
@@ -134,6 +137,53 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     avatarPrefs.edit().putString("avatar_skin", normalized).apply()
   }
 
+  // ── Custom skins (import / delete, see docs/design/arch/skin-import-arch-20260926.md) ──
+
+  val customSkins: StateFlow<List<ai.axiomaster.bonio.avatar.SkinItem>> = CustomSkinManager.customSkins
+
+  /** One-shot import outcome for the UI; consumed via [consumeSkinImportEvent]. */
+  private val _skinImportEvent = MutableStateFlow<SkinImporter.ImportResult?>(null)
+  val skinImportEvent: StateFlow<SkinImporter.ImportResult?> = _skinImportEvent
+
+  /** 0..100 while a URL download runs, -1 when idle. */
+  private val _skinDownloadProgress = MutableStateFlow(-1)
+  val skinDownloadProgress: StateFlow<Int> = _skinDownloadProgress
+
+  fun refreshCustomSkins() = CustomSkinManager.refresh(getApplication())
+
+  fun importSkinFromUri(uri: Uri) {
+    viewModelScope.launch {
+      val result = SkinImporter.installFromUri(getApplication(), uri)
+      _skinImportEvent.value = result
+      if (result is SkinImporter.ImportResult.Success) setAvatarSkin(result.skin.id)
+    }
+  }
+
+  fun importSkinFromUrl(url: String) {
+    viewModelScope.launch {
+      val result = SkinImporter.installFromUrl(getApplication(), url) { pct ->
+        _skinDownloadProgress.value = pct
+      }
+      _skinDownloadProgress.value = -1
+      _skinImportEvent.value = result
+      if (result is SkinImporter.ImportResult.Success) setAvatarSkin(result.skin.id)
+    }
+  }
+
+  fun consumeSkinImportEvent() {
+    _skinImportEvent.value = null
+  }
+
+  fun deleteCustomSkin(id: String) {
+    viewModelScope.launch {
+      val removed = SkinImporter.uninstall(getApplication(), id)
+      if (removed) {
+        if (_avatarSkin.value.equals(id, ignoreCase = true)) setAvatarSkin("cat")
+        CustomSkinManager.refresh(getApplication())
+      }
+    }
+  }
+
   private val _avatarScale = MutableStateFlow(avatarPrefs.getFloat("avatar_scale", 1.0f))
   val avatarScale: StateFlow<Float> = _avatarScale
 
@@ -167,6 +217,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
   val partialSttText: StateFlow<String?> = _partialSttText
 
   init {
+      CustomSkinManager.refresh(app)
       runtime.chat.onAssistantSpoke = { text: String ->
           if (_isSpeakerEnabled.value) {
               AgentManager.stateManager.transitionTo(AgentState.Speaking)

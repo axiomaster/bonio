@@ -17,15 +17,17 @@ import kotlin.math.min
 class KunAnimationSpec(val row: Int, val frameDurations: IntArray)
 
 object KunAnimations {
-    val idle = KunAnimationSpec(0, intArrayOf(280, 110, 110, 140, 140, 320))
-    val runRight = KunAnimationSpec(1, intArrayOf(120, 120, 120, 120, 120, 120, 120, 220))
-    val runLeft = KunAnimationSpec(2, intArrayOf(120, 120, 120, 120, 120, 120, 120, 220))
-    val wave = KunAnimationSpec(3, intArrayOf(140, 140, 140, 280))
-    val jump = KunAnimationSpec(4, intArrayOf(140, 140, 140, 140, 280))
-    val failed = KunAnimationSpec(5, intArrayOf(140, 140, 140, 140, 140, 140, 140, 240))
-    val waiting = KunAnimationSpec(6, intArrayOf(150, 150, 150, 150, 150, 260))
-    val working = KunAnimationSpec(7, intArrayOf(120, 120, 120, 120, 120, 220))
-    val thinking = KunAnimationSpec(8, intArrayOf(150, 150, 150, 150, 150, 280))
+    private fun spec(state: String) =
+        SkinManifest.defaultAnim(state).let { KunAnimationSpec(it.row, it.frames) }
+    val idle = spec("idle")
+    val runRight = spec("run_right")
+    val runLeft = spec("run_left")
+    val wave = spec("wave")
+    val jump = spec("jump")
+    val failed = spec("failed")
+    val waiting = spec("waiting")
+    val working = spec("working")
+    val thinking = spec("thinking")
 }
 
 class PixelAvatarView @JvmOverloads constructor(
@@ -36,10 +38,9 @@ class PixelAvatarView @JvmOverloads constructor(
 
     companion object {
         private const val TAG = "PixelAvatarView"
-        private const val SPRITE_COLS = 8
-        private const val SPRITE_ROWS = 9
-        private const val FRAME_WIDTH = 192
-        private const val FRAME_HEIGHT = 208
+
+        /** Per-row opaque-pixel bounds cache capacity — grid rows are capped by SkinManifest.MAX_GRID. */
+        private const val MAX_ROWS = SkinManifest.MAX_GRID
 
         private val bitmapCache = ConcurrentHashMap<String, Bitmap>()
     }
@@ -56,6 +57,10 @@ class PixelAvatarView @JvmOverloads constructor(
     private var currentFrame: Int = 0
     private var celebrateWithJump: Boolean = false
 
+    /** Grid + animation table of the active skin; defaults until a custom manifest says otherwise. */
+    private var currentGrid: SkinGrid = SkinGrid.DEFAULT
+    private var currentSpecs: Map<String, KunAnimationSpec> = emptyMap()
+
     /**
      * Per-row opaque-pixel bounds (union over all frames of the row), in
      * spritesheet pixel coordinates. Sprites carry large transparent margins
@@ -63,7 +68,7 @@ class PixelAvatarView @JvmOverloads constructor(
      * close to the visible cat and guarantees edge-docked peeks show real
      * pixels on both sides.
      */
-    private val rowBounds = arrayOfNulls<Rect>(SPRITE_ROWS)
+    private val rowBounds = arrayOfNulls<Rect>(MAX_ROWS)
 
     private val handler = Handler(Looper.getMainLooper())
     private var isRunning = false
@@ -124,58 +129,109 @@ class PixelAvatarView @JvmOverloads constructor(
         }
     }
 
+    /** Map a normalized visual state to its logical animation key. */
+    private fun logicalAnimKey(state: String): String = when (state) {
+        "working" -> "working"
+        "thinking" -> "thinking"
+        "waiting" -> "waiting"
+        "failed" -> "failed"
+        "completed" -> if (celebrateWithJump) "jump" else "wave"
+        "wave" -> "wave"
+        "dragLeft" -> "run_left"
+        "dragRight" -> "run_right"
+        else -> "idle"
+    }
+
     private fun getAnimationSpec(): KunAnimationSpec {
-        return when (visualState) {
-            "working" -> KunAnimations.working
-            "thinking" -> KunAnimations.thinking
-            "waiting" -> KunAnimations.waiting
-            "failed" -> KunAnimations.failed
-            "completed" -> if (celebrateWithJump) KunAnimations.jump else KunAnimations.wave
-            "wave" -> KunAnimations.wave
-            "dragLeft" -> KunAnimations.runLeft
-            "dragRight" -> KunAnimations.runRight
-            else -> KunAnimations.idle
+        val key = logicalAnimKey(visualState)
+        return currentSpecs[key]
+            ?: KunAnimations.run { when (key) {
+                "working" -> working
+                "thinking" -> thinking
+                "waiting" -> waiting
+                "failed" -> failed
+                "jump" -> jump
+                "wave" -> wave
+                "run_left" -> runLeft
+                "run_right" -> runRight
+                else -> idle
+            } }
+    }
+
+    private fun specsFor(item: SkinItem): Map<String, KunAnimationSpec> {
+        val manifest = item.manifest ?: return emptyMap()
+        val specs = mutableMapOf<String, KunAnimationSpec>()
+        for (state in SkinManifest.STATES) {
+            val anim = manifest.resolvedAnim(state)
+            specs[state] = KunAnimationSpec(anim.row, anim.frames)
         }
+        return specs
     }
 
     private fun loadSkin(skinId: String) {
-        val skinItem = CustomSkinManager.getSkinById(skinId)
-        val fileName = "avatars/${skinItem.rawfileName}"
-        val cached = bitmapCache[fileName]
-        if (cached != null && !cached.isRecycled) {
-            currentBitmap = cached
-            return
+        val skinItem = CustomSkinManager.getSkinById(skinId, context)
+
+        val cacheKey: String
+        val bitmap: Bitmap?
+        if (skinItem.sheetFile != null) {
+            val file = java.io.File(skinItem.sheetFile)
+            // mtime in the key invalidates the cache after an overwrite-import.
+            cacheKey = "file:${skinItem.sheetFile}:${file.lastModified()}"
+            val cached = bitmapCache[cacheKey]
+            if (cached != null && !cached.isRecycled) {
+                applySkinBitmap(skinItem, cached)
+                return
+            }
+            val opts = BitmapFactory.Options().apply { inScaled = false }
+            bitmap = BitmapFactory.decodeFile(skinItem.sheetFile, opts)
+        } else {
+            cacheKey = "asset:avatars/${skinItem.rawfileName}"
+            val cached = bitmapCache[cacheKey]
+            if (cached != null && !cached.isRecycled) {
+                applySkinBitmap(skinItem, cached)
+                return
+            }
+            bitmap = try {
+                context.assets.open("avatars/${skinItem.rawfileName}").use { stream ->
+                    val opts = BitmapFactory.Options().apply {
+                        inScaled = false // Load raw pixel data without DPI scaling
+                    }
+                    BitmapFactory.decodeStream(stream, null, opts)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to load spritesheet for skin: $skinId from ${skinItem.rawfileName}", e)
+                null
+            }
         }
 
-        try {
-            context.assets.open(fileName).use { stream ->
-                val opts = BitmapFactory.Options().apply {
-                    inScaled = false // Load raw pixel data without DPI scaling
-                }
-                val bmp = BitmapFactory.decodeStream(stream, null, opts)
-                if (bmp != null) {
-                    bitmapCache[fileName] = bmp
-                    currentBitmap = bmp
-                    java.util.Arrays.fill(rowBounds, null)
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to load spritesheet for skin: $skinId from $fileName", e)
+        if (bitmap != null) {
+            bitmapCache[cacheKey] = bitmap
+            applySkinBitmap(skinItem, bitmap)
         }
+    }
+
+    private fun applySkinBitmap(item: SkinItem, bmp: Bitmap) {
+        currentBitmap = bmp
+        currentGrid = item.manifest?.grid ?: SkinGrid.DEFAULT
+        currentSpecs = specsFor(item)
+        currentFrame = 0
+        java.util.Arrays.fill(rowBounds, null)
     }
 
     /** Union of opaque pixels across all frames of [row]; computed once, cached. */
     private fun rowContentBounds(bmp: Bitmap, row: Int): Rect? {
         val cached = rowBounds.getOrNull(row)
         if (cached != null) return cached
-        val top = row * FRAME_HEIGHT
+        val fw = currentGrid.frameWidth
+        val fh = currentGrid.frameHeight
+        val top = row * fh
         val bounds = Rect(-1, -1, -1, -1)
-        val pixels = IntArray(FRAME_WIDTH * FRAME_HEIGHT)
-        for (col in 0 until SPRITE_COLS) {
-            bmp.getPixels(pixels, 0, FRAME_WIDTH, col * FRAME_WIDTH, top, FRAME_WIDTH, FRAME_HEIGHT)
-            for (py in 0 until FRAME_HEIGHT) {
-                val base = py * FRAME_WIDTH
-                for (px in 0 until FRAME_WIDTH) {
+        val pixels = IntArray(fw * fh)
+        for (col in 0 until currentGrid.cols) {
+            bmp.getPixels(pixels, 0, fw, col * fw, top, fw, fh)
+            for (py in 0 until fh) {
+                val base = py * fw
+                for (px in 0 until fw) {
                     if ((pixels[base + px] ushr 24) != 0) {
                         if (bounds.left < 0 || px < bounds.left) bounds.left = px
                         if (bounds.right < 0 || px > bounds.right) bounds.right = px
@@ -186,7 +242,7 @@ class PixelAvatarView @JvmOverloads constructor(
             }
         }
         val result = if (bounds.left < 0) null else bounds
-        rowBounds[row] = result
+        if (row in rowBounds.indices) rowBounds[row] = result
         return result
     }
 
@@ -215,8 +271,9 @@ class PixelAvatarView @JvmOverloads constructor(
         val bmp = currentBitmap ?: return
 
         val spec = getAnimationSpec()
-        val row = spec.row.coerceIn(0, SPRITE_ROWS - 1)
-        val col = currentFrame.coerceIn(0, SPRITE_COLS - 1)
+        val row = spec.row.coerceIn(0, currentGrid.rows - 1)
+        val col = currentFrame.coerceIn(0, (spec.frameDurations.size - 1).coerceAtLeast(0))
+            .coerceAtMost(currentGrid.cols - 1)
 
         val viewW = width
         val viewH = height
@@ -226,12 +283,13 @@ class PixelAvatarView @JvmOverloads constructor(
         // margins are skipped so the character fills the view and the head
         // status pill sits right above the visible head.
         val content = rowContentBounds(bmp, row)
-        val srcTop = row * FRAME_HEIGHT
+        val srcTop = row * currentGrid.frameHeight
         val srcRect = if (content != null) {
-            Rect(col * FRAME_WIDTH + content.left, srcTop + content.top,
-                 col * FRAME_WIDTH + content.right + 1, srcTop + content.bottom + 1)
+            Rect(col * currentGrid.frameWidth + content.left, srcTop + content.top,
+                 col * currentGrid.frameWidth + content.right + 1, srcTop + content.bottom + 1)
         } else {
-            Rect(col * FRAME_WIDTH, srcTop, col * FRAME_WIDTH + FRAME_WIDTH, srcTop + FRAME_HEIGHT)
+            Rect(col * currentGrid.frameWidth, srcTop,
+                 col * currentGrid.frameWidth + currentGrid.frameWidth, srcTop + currentGrid.frameHeight)
         }
 
         val srcW = srcRect.width()
