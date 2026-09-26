@@ -39,6 +39,9 @@ server/bin/
 release/
 hapsigner
 
+# Generated skin packs (tools/make-skin-pack.py output)
+dist/
+
 # Node (dsh plugins)
 dsh-plugins/*/node_modules/
 
