@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.*
@@ -348,7 +349,44 @@ fun SettingsTab(
             }
         }
 
-        // ── 6. About & Device Information Section ──
+        // ── 6. Server Connection ──
+        item { SectionHeader(title = strings.serverConnectionSection) }
+        item {
+            Surface(
+                onClick = { ai.axiomaster.bonio.util.NavigationBus.requestTab("server") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                color = colors.cardBackground,
+                border = BorderStroke(1.dp, colors.border)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            strings.serverConnectionSection,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = colors.textPrimary
+                        )
+                        Text(
+                            if (isConnected) strings.statusConnected else strings.statusOffline,
+                            fontSize = 12.sp,
+                            color = if (isConnected) Color(0xFF2ECC71) else colors.textSecondary,
+                            modifier = Modifier.padding(top = 3.dp)
+                        )
+                    }
+                    Icon(
+                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = strings.serverConnectionSection,
+                        tint = colors.textSecondary
+                    )
+                }
+            }
+        }
+
+        // ── 7. About & Device Information Section ──
         item { SectionHeader(title = strings.aboutSection) }
         item {
             Surface(

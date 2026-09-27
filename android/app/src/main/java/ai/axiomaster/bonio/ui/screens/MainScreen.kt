@@ -47,6 +47,9 @@ sealed class Screen(val route: String, val icon: androidx.compose.ui.graphics.ve
     object Memory : Screen("memory", Icons.Default.AutoStories)
     object Personalization : Screen("personalization", Icons.Default.Widgets)
     object Settings : Screen("settings", Icons.Default.Settings)
+
+    /** Server connection settings — reached from Settings, deliberately not a bottom tab. */
+    object Server : Screen("server", Icons.Default.Settings)
 }
 
 val items = listOf(
@@ -81,11 +84,12 @@ fun MainScreen(
             }
         }
 
-        // One-shot tab requests from overlay windows (avatar bubble taps).
+        // One-shot navigation requests from overlay windows and Settings.
         val requestedTab by ai.axiomaster.bonio.util.NavigationBus.requestedTab.collectAsState()
         LaunchedEffect(requestedTab) {
-            if (requestedTab != null) {
-                val target = items.firstOrNull { it.route == requestedTab }
+            val requested = requestedTab
+            if (requested != null) {
+                val target = items.firstOrNull { it.route == requested }
                 if (target != null) {
                     navController.navigate(target.route) {
                         popUpTo(navController.graph.findStartDestination().id) {
@@ -94,16 +98,24 @@ fun MainScreen(
                         launchSingleTop = true
                         restoreState = true
                     }
+                } else {
+                    // Non-tab destination (e.g. Screen.Server): push on top of
+                    // the current screen so system back returns to it.
+                    navController.navigate(requested) {
+                        launchSingleTop = true
+                    }
                 }
                 ai.axiomaster.bonio.util.NavigationBus.consume()
             }
         }
 
+        val isTabRoute = items.any { it.route == currentDestination?.route }
+
         Scaffold(
             modifier = modifier.fillMaxSize(),
             containerColor = colors.background,
             topBar = {
-                TabRow(
+                if (isTabRoute) TabRow(
                     selectedTabIndex = selectedIndex,
                     modifier = Modifier
                         .windowInsetsPadding(WindowInsets.statusBars)
@@ -122,6 +134,7 @@ fun MainScreen(
                             Screen.Memory -> strings.tabMemory
                             Screen.Personalization -> strings.tabPersonalization
                             Screen.Settings -> strings.tabSettings
+                            Screen.Server -> strings.serverConnectionSection
                         }
                         Tab(
                             selected = isSelected,
@@ -171,6 +184,7 @@ fun MainScreen(
                     composable(Screen.Memory.route) { MemoryTab(viewModel = viewModel) }
                     composable(Screen.Personalization.route) { PersonalizationTab(viewModel = viewModel) }
                     composable(Screen.Settings.route) { SettingsTab(viewModel = viewModel) }
+                    composable(Screen.Server.route) { ServerTab(viewModel = viewModel) }
                 }
             }
         }
