@@ -27,7 +27,6 @@ import ai.axiomaster.bonio.i18n.LocalAppStrings
 import ai.axiomaster.bonio.local.LocalEngineController
 import ai.axiomaster.bonio.remote.gateway.GatewayEndpoint
 import ai.axiomaster.bonio.ui.theme.LocalAppColors
-import ai.axiomaster.bonio.util.NavigationBus
 
 /**
  * Server connection settings — reachable from Settings (not a bottom tab).
@@ -37,6 +36,7 @@ import ai.axiomaster.bonio.util.NavigationBus
 @Composable
 fun ServerTab(
   viewModel: MainViewModel,
+  onBack: () -> Unit = {},
   modifier: Modifier = Modifier
 ) {
   val strings = LocalAppStrings.current
@@ -70,7 +70,7 @@ fun ServerTab(
         contentDescription = strings.actionBack,
         tint = colors.textPrimary,
         modifier = Modifier
-          .clickable { NavigationBus.requestTab("settings") }
+          .clickable { onBack() }
           .padding(10.dp)
           .size(22.dp)
       )

@@ -184,7 +184,9 @@ fun MainScreen(
                     composable(Screen.Memory.route) { MemoryTab(viewModel = viewModel) }
                     composable(Screen.Personalization.route) { PersonalizationTab(viewModel = viewModel) }
                     composable(Screen.Settings.route) { SettingsTab(viewModel = viewModel) }
-                    composable(Screen.Server.route) { ServerTab(viewModel = viewModel) }
+                    composable(Screen.Server.route) {
+                        ServerTab(viewModel = viewModel, onBack = { navController.popBackStack() })
+                    }
                 }
             }
         }
