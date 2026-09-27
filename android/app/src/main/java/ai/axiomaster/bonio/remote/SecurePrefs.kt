@@ -266,6 +266,22 @@ class SecurePrefs(context: Context) {
   }
 
   private fun createSecurePrefs(context: Context, name: String): SharedPreferences {
+    try {
+      return encryptedPrefs(context, name)
+    } catch (e: Exception) {
+      // The Keystore-wrapped keyset is bound to the app's original install;
+      // restoring prefs across reinstalls/devices (signature change, backup
+      // move, UID change) makes decryption fail with AEADBadTagException and
+      // would crash-loop the app on every start. Self-heal: drop the stale
+      // file (secret values are lost — they cannot be recovered anyway) and
+      // rebuild fresh.
+      android.util.Log.e("SecurePrefs", "encrypted prefs unreadable, recreating ($name)", e)
+      context.deleteSharedPreferences(name)
+      return encryptedPrefs(context, name)
+    }
+  }
+
+  private fun encryptedPrefs(context: Context, name: String): SharedPreferences {
     return EncryptedSharedPreferences.create(
       context,
       name,
