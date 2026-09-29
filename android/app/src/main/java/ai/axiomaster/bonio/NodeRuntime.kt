@@ -431,7 +431,11 @@ class NodeRuntime(context: Context) {
   }
 
   fun setForeground(v: Boolean) { _isForeground.value = v }
-  fun connect(endpoint: GatewayEndpoint, tokenOverride: String? = null) {
+  fun connect(
+    endpoint: GatewayEndpoint,
+    tokenOverride: String? = null,
+    tokenProvider: (() -> String?)? = null,
+  ) {
     DeviceNotificationListenerService.setNodeEventSink { event, payload ->
       scope.launch {
         operatorSession.sendNodeEvent(event, payload)
@@ -450,10 +454,12 @@ class NodeRuntime(context: Context) {
       return
     }
     connectedEndpoint = endpoint
-    val token = tokenOverride ?: prefs.loadGatewayToken()
+    // With a dynamic provider the token is resolved on each attempt, so don't
+    // pre-seed it from the manual-gateway token (which targets a different server).
+    val token = tokenOverride ?: if (tokenProvider == null) prefs.loadGatewayToken() else null
     val pwd = prefs.loadGatewayPassword()
-    operatorSession.connect(endpoint, token, pwd, connectionManager.buildOperatorConnectOptions(), tls)
-    nodeSession.connect(endpoint, token, pwd, connectionManager.buildNodeConnectOptions(), tls)
+    operatorSession.connect(endpoint, token, pwd, connectionManager.buildOperatorConnectOptions(), tls, tokenProvider)
+    nodeSession.connect(endpoint, token, pwd, connectionManager.buildNodeConnectOptions(), tls, tokenProvider)
     startDeviceStatusReporting()
     chargingTriggeredSync.start()
   }
@@ -470,7 +476,7 @@ class NodeRuntime(context: Context) {
 
   /** Connect to the embedded local hiclaw engine on 127.0.0.1. */
   fun connectLocal() {
-    connect(localEndpoint(), prefs.loadLocalToken())
+    connect(localEndpoint(), tokenProvider = { prefs.loadLocalToken() })
   }
 
   fun disconnect() {

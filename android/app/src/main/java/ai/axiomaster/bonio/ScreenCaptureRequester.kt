@@ -30,6 +30,16 @@ class ScreenCaptureRequester(private val activity: ComponentActivity) {
 
   fun getPreAuthorizedResult(): CaptureResult? = preAuthorizedResult
 
+  /**
+   * Whether this requester's ActivityResultLauncher can currently be used.
+   * When the host activity is stopped/destroyed the launcher is unregistered and
+   * launch() throws, so callers should fall back to [ScreenCaptureConsentActivity].
+   */
+  fun isAvailable(): Boolean =
+    !activity.isFinishing &&
+      !activity.isDestroyed &&
+      activity.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
+
   private val launcher: ActivityResultLauncher<Intent> =
     activity.registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
       val p = pending

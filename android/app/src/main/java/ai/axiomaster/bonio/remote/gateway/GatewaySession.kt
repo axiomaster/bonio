@@ -105,6 +105,13 @@ class GatewaySession(
     val password: String?,
     val options: GatewayConnectOptions,
     val tls: GatewayTlsParams?,
+    /**
+     * Optional dynamic token source, re-evaluated on every connection attempt.
+     * Needed for the embedded local engine, whose pairing code is generated
+     * asynchronously at first launch: a one-shot snapshot would stay empty and
+     * the session would retry forever with bad credentials.
+     */
+    val tokenProvider: (() -> String?)? = null,
   )
 
   private var desired: DesiredConnection? = null
@@ -117,8 +124,9 @@ class GatewaySession(
     password: String?,
     options: GatewayConnectOptions,
     tls: GatewayTlsParams? = null,
+    tokenProvider: (() -> String?)? = null,
   ) {
-    desired = DesiredConnection(endpoint, token, password, options, tls)
+    desired = DesiredConnection(endpoint, token, password, options, tls, tokenProvider)
     if (job == null) {
       job = scope.launch(Dispatchers.IO) { runLoop() }
     }
@@ -630,7 +638,8 @@ class GatewaySession(
   }
 
   private suspend fun connectOnce(target: DesiredConnection) = withContext(Dispatchers.IO) {
-    val conn = Connection(target.endpoint, target.token, target.password, target.options, target.tls)
+    val resolvedToken = target.tokenProvider?.invoke() ?: target.token
+    val conn = Connection(target.endpoint, resolvedToken, target.password, target.options, target.tls)
     currentConnection = conn
     try {
       conn.connect()

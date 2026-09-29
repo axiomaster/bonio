@@ -7,13 +7,17 @@ import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.media.Image
 import android.media.ImageReader
+import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.util.Base64
+import ai.axiomaster.bonio.NodeForegroundService
+import ai.axiomaster.bonio.ScreenCaptureConsentActivity
 import ai.axiomaster.bonio.ScreenCaptureRequester
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 class ScreenCaptureManager(private val context: Context) {
   data class Payload(val payloadJson: String)
@@ -31,28 +35,37 @@ class ScreenCaptureManager(private val context: Context) {
 
   suspend fun capture(paramsJson: String?): Payload =
     withContext(Dispatchers.Default) {
-      val requester =
-        screenCaptureRequester
-          ?: throw IllegalStateException(
-            "SCREEN_PERMISSION_REQUIRED: grant Screen Recording permission",
-          )
-
       val params = parseJsonParamsObject(paramsJson)
       val quality = parseJsonInt(params, "quality")?.coerceIn(1, 100) ?: 80
       val maxWidth = parseJsonInt(params, "maxWidth")?.takeIf { it > 0 }
 
       val capture =
-        latestCaptureResult ?: requester.requestCapture(skipRationale = true)
+        latestCaptureResult ?: obtainConsent()
           ?: throw IllegalStateException(
             "SCREEN_PERMISSION_REQUIRED: grant Screen Recording permission",
           )
       latestCaptureResult = null
+
+      // Android 14+ refuses MediaProjection unless a foreground service of type
+      // mediaProjection is already running. Consent must be held first, so flip
+      // the type on now and give the service a moment to apply it.
+      runCatching { NodeForegroundService.updateMediaProjection(context, true) }
+      delay(300)
 
       val mgr =
         context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
       val projection =
         mgr.getMediaProjection(capture.resultCode, capture.data)
           ?: throw IllegalStateException("UNAVAILABLE: screen capture unavailable")
+
+      // Android 14+ requires a MediaProjection.Callback to be registered before
+      // createVirtualDisplay, otherwise the system rejects the capture with
+      // "Must register a callback before starting capture".
+      val projectionCallback = object : MediaProjection.Callback() {}
+      projection.registerCallback(
+        projectionCallback,
+        android.os.Handler(android.os.Looper.getMainLooper()),
+      )
 
       val metrics = context.resources.displayMetrics
       val width = metrics.widthPixels
@@ -120,8 +133,37 @@ class ScreenCaptureManager(private val context: Context) {
           projection.stop()
         } catch (_: Throwable) {
         }
+        try {
+          projection.unregisterCallback(projectionCallback)
+        } catch (_: Throwable) {
+        }
+        // Drop the mediaProjection foreground-service type now that no
+        // projection is active (Android 14 rejects a type without a projection).
+        runCatching { NodeForegroundService.updateMediaProjection(context, false) }
       }
     }
+
+  /**
+   * Ask for MediaProjection consent. Prefers the main activity's registered
+   * launcher; when that activity is not alive (the floating avatar can trigger
+   * capture while the app is backgrounded) it falls back to a dedicated
+   * transparent consent activity so the request is not lost.
+   */
+  private suspend fun obtainConsent(): ScreenCaptureRequester.CaptureResult? {
+    val requester = screenCaptureRequester
+    if (requester != null && requester.isAvailable()) {
+      // A live launcher returning null means the user declined or let it time
+      // out — do not re-prompt through the fallback path.
+      return runCatching { requester.requestCapture(skipRationale = true) }.getOrNull()
+    }
+    return try {
+      withTimeoutOrNull(CONSENT_TIMEOUT_MS) {
+        ScreenCaptureConsentActivity.request(context).await()
+      }
+    } catch (_: Throwable) {
+      null
+    }
+  }
 
   private fun imageToBitmap(image: Image): Bitmap {
     val planes = image.planes
@@ -142,5 +184,9 @@ class ScreenCaptureManager(private val context: Context) {
       bitmap.recycle()
       cropped
     }
+  }
+
+  companion object {
+    private const val CONSENT_TIMEOUT_MS = 30_000L
   }
 }

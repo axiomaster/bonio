@@ -50,7 +50,24 @@ class LocalEngineController(context: Context, private val prefs: SecurePrefs) {
     if (_state.value == State.Running || _state.value == State.Starting) return
     stopping = false
     restartCount = 0
+    // Guarantee the pairing code exists before any client attempts to connect.
+    // Otherwise client connect races engine bootstrap: on a fresh install the app
+    // reads the token before ensureConfig() has generated it, sends no auth, and
+    // the gateway rejects the connection in a loop until the app is restarted.
+    ensureLocalToken()
     scope.launch { startInternal() }
+  }
+
+  /**
+   * Returns the persisted local pairing token, generating and saving one if absent.
+   * Call before [ensureStarted] (or rely on it) so the client and the engine agree
+   * on the same code from the very first connection attempt.
+   */
+  fun ensureLocalToken(): String {
+    prefs.loadLocalToken()?.let { return it }
+    val token = newPairingCode()
+    prefs.saveLocalToken(token)
+    return token
   }
 
   fun stop() {

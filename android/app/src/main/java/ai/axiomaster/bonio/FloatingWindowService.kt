@@ -1122,27 +1122,21 @@ class FloatingWindowService : Service() {
             return
         }
 
-        val a11y = ai.axiomaster.bonio.remote.node.BonioAccessibilityService.instance
-        if (a11y == null) {
-            avatarController.setActivity(AgentState.Confused)
-            setHeadStatus("未开启无障碍服务 点我前往系统设置", 6000)
-            pendingAccessibilityPrompt = true
-            mainHandler.postDelayed({
-                if (pendingAccessibilityPrompt) {
-                    pendingAccessibilityPrompt = false
-                    avatarController.clearBubble()
-                    avatarController.setActivity(AgentState.Idle)
-                }
-            }, 6000)
-            return
-        }
+        // Accessibility gives the richest analysis, but its absence must not
+        // dead-end the gesture: still screenshot, try OCR, and fall back to
+        // saving the screenshot as a memory (无障碍分析 >> OCR 分析 >> 截图记忆).
+        val a11yMissing = ai.axiomaster.bonio.remote.node.BonioAccessibilityService.instance == null
+        pendingAccessibilityPrompt = a11yMissing
 
         magicCuePending = true
         actionableCues = emptyList()
         cueEpoch += 1
         avatarController.clearBubble()
         avatarController.setActivity(AgentState.Thinking)
-        setHeadStatus("正在分析屏幕…", 60_000)
+        setHeadStatus(
+            if (a11yMissing) "正在截图识别（开启无障碍可分析屏幕）…" else "正在分析屏幕…",
+            60_000,
+        )
 
         serviceScope.launch {
             try {
@@ -1153,24 +1147,34 @@ class FloatingWindowService : Service() {
                 val screenshotBase64 = runtime.captureScreenshot(maxEdge = 1080, quality = 80)
                 val ctxRes = runtime.captureScreenContext(6000, screenshotBase64)
 
-                if (!ctxRes.ok || ctxRes.payloadJson == null) {
-                    throw IllegalStateException(ctxRes.error?.message ?: "无法读取屏幕内容")
-                }
-                val obj = withContext(Dispatchers.Default) { org.json.JSONObject(ctxRes.payloadJson) }
-                val screen = ai.axiomaster.bonio.remote.cue.MagicCueController.ScreenContext(
-                    packageName = obj.optString("package"),
-                    title = obj.optString("title"),
-                    content = obj.optString("content"),
-                    rawJson = ctxRes.payloadJson,
+                // screen.context degrades to OCR when accessibility is off, and
+                // may still come back empty; that is not fatal — the screenshot
+                // itself becomes the memory (截图兜底).
+                var screen = ai.axiomaster.bonio.remote.cue.MagicCueController.ScreenContext(
+                    packageName = "",
+                    title = "",
+                    content = "",
+                    rawJson = "",
                 )
+                var hasText = false
+                if (ctxRes.ok && ctxRes.payloadJson != null) {
+                    val obj = withContext(Dispatchers.Default) { org.json.JSONObject(ctxRes.payloadJson) }
+                    screen = ai.axiomaster.bonio.remote.cue.MagicCueController.ScreenContext(
+                        packageName = obj.optString("package"),
+                        title = obj.optString("title"),
+                        content = obj.optString("content"),
+                        rawJson = ctxRes.payloadJson,
+                    )
+                    hasText = screen.content.isNotBlank()
+                }
 
                 val isWechat = screen.packageName == WECHAT_PACKAGE
                 var cues: List<ai.axiomaster.bonio.remote.cue.MagicCue>? = null
                 var cueError: String? = null
                 var remembered = false
                 kotlinx.coroutines.coroutineScope {
-                    // Only run LLM magic cue analysis for WeChat; all other apps just screenshot+save
-                    if (isWechat) {
+                    // Only run LLM magic cue analysis for WeChat pages with readable text.
+                    if (isWechat && hasText) {
                         launch {
                             when (val r = withContext(Dispatchers.Default) { runtime.magicCue.runCue(screen, screenshotBase64) }) {
                                 is ai.axiomaster.bonio.remote.cue.MagicCueController.CueResult.Success -> cues = r.cues
@@ -1180,35 +1184,57 @@ class FloatingWindowService : Service() {
                     }
                     launch {
                         remembered = withContext(Dispatchers.Default) {
-                            runtime.companionMemory.capture(
-                                screen = screen,
-                                explicit = true,
-                                coverImage = screenshotBase64,
-                                originalImage = screenshotBase64,
-                            )
+                            if (hasText) {
+                                runtime.companionMemory.capture(
+                                    screen = screen,
+                                    explicit = true,
+                                    coverImage = screenshotBase64,
+                                    originalImage = screenshotBase64,
+                                )
+                            } else {
+                                false
+                            }
+                        }
+                        // 截图兜底：分析不可用（无无障碍/无文本/LLM 失败）时也把截图存下来。
+                        if (!remembered && !screenshotBase64.isNullOrEmpty()) {
+                            remembered = withContext(Dispatchers.Default) {
+                                saveScreenshotMemory(runtime, screen, screenshotBase64)
+                            }
                         }
                     }
                 }
                 magicCuePending = false
-                ai.axiomaster.bonio.util.AppLogger.i(TAG, "runMagicCue completed: isWechat=$isWechat cues=${cues?.size} remembered=$remembered hasScreenshot=${!screenshotBase64.isNullOrEmpty()}")
+                ai.axiomaster.bonio.util.AppLogger.i(TAG, "runMagicCue completed: a11yMissing=$a11yMissing isWechat=$isWechat hasText=$hasText cues=${cues?.size} remembered=$remembered hasScreenshot=${!screenshotBase64.isNullOrEmpty()}")
+                val a11yStillMissing = ai.axiomaster.bonio.remote.node.BonioAccessibilityService.instance == null
                 when {
-                    !cues.isNullOrEmpty() -> showCues(cues!!)
+                    !cues.isNullOrEmpty() -> {
+                        showCues(cues!!)
+                        if (a11yStillMissing) remindAccessibility()
+                    }
                     // WeChat cue errors must not be masked by "已记住" — surface
                     // them so the user knows the analysis failed.
-                    isWechat && cues != null && cueError != null -> showCueFailure(cueError!!)
-                    isWechat && cues == null && cueError != null -> showCueFailure(cueError!!)
-                    remembered || !isWechat -> {
-                        cueEpoch += 1
-                        val epoch = cueEpoch
-                        avatarController.setActivity(AgentState.Happy)
-                        setHeadStatus("已记住 ✅", 2000)
-                        mainHandler.postDelayed({
-                            if (cueEpoch == epoch) {
-                                avatarController.clearBubble()
-                                avatarController.setActivity(AgentState.Idle)
-                            }
-                        }, 2000)
+                    isWechat && cueError != null -> {
+                        showCueFailure(cueError!!)
+                        if (a11yStillMissing) remindAccessibility()
                     }
+                    remembered -> {
+                        avatarController.setActivity(AgentState.Happy)
+                        if (a11yStillMissing) {
+                            // Screenshot fallback succeeded — nudge toward full analysis.
+                            remindAccessibility("已截图记住 · 点我开启无障碍可分析屏幕")
+                        } else {
+                            cueEpoch += 1
+                            val epoch = cueEpoch
+                            setHeadStatus("已记住 ✅", 2000)
+                            mainHandler.postDelayed({
+                                if (cueEpoch == epoch) {
+                                    avatarController.clearBubble()
+                                    avatarController.setActivity(AgentState.Idle)
+                                }
+                            }, 2000)
+                        }
+                    }
+                    a11yStillMissing -> remindAccessibility("未能读取屏幕内容 · 点我开启无障碍")
                     cues != null -> showCueFailure("当前页面没有什么可以帮你")
                     else -> showCueFailure(cueError ?: "屏幕分析失败，请稍后再试")
                 }
@@ -1217,6 +1243,59 @@ class FloatingWindowService : Service() {
                 Log.e(TAG, "Magic cue failed", e)
                 showCueFailure(e.message ?: "屏幕分析失败，请稍后再试")
             }
+        }
+    }
+
+    /** Persist a raw screenshot as a memo — the last-resort "截图记忆" fallback. */
+    private suspend fun saveScreenshotMemory(
+        runtime: ai.axiomaster.bonio.NodeRuntime,
+        screen: ai.axiomaster.bonio.remote.cue.MagicCueController.ScreenContext,
+        screenshotBase64: String,
+    ): Boolean {
+        return try {
+            runtime.memoryService.save(
+                ai.axiomaster.bonio.remote.memory.MemoryService.SaveParams(
+                    title = screen.title.ifBlank { "屏幕截图" },
+                    content = screen.content,
+                    source = "screenshot_fallback",
+                    sourceApp = screen.packageName.ifEmpty { null },
+                    pageTitle = screen.title.ifEmpty { null },
+                    coverImage = screenshotBase64,
+                    originalImage = screenshotBase64,
+                    originalImageMimeType = "image/jpeg",
+                ),
+            ).isSuccess
+        } catch (e: Throwable) {
+            ai.axiomaster.bonio.util.AppLogger.w(TAG, "screenshot memory save failed: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * Remind the user that accessibility (the best analysis path) is off without
+     * blocking the current result. While the hint is live a single tap opens the
+     * system accessibility settings; with no [statusText] it is a transient toast.
+     */
+    private fun remindAccessibility(statusText: String? = null) {
+        if (ai.axiomaster.bonio.remote.node.BonioAccessibilityService.instance != null) return
+        pendingAccessibilityPrompt = true
+        if (statusText != null) {
+            setHeadStatus(statusText, 6000)
+            val epoch = ++cueEpoch
+            mainHandler.postDelayed({
+                if (pendingAccessibilityPrompt && cueEpoch == epoch) {
+                    pendingAccessibilityPrompt = false
+                    avatarController.clearBubble()
+                    avatarController.setActivity(AgentState.Idle)
+                }
+            }, 6000)
+        } else {
+            android.widget.Toast.makeText(
+                applicationContext,
+                "开启「Bonio 无障碍服务」可分析屏幕内容",
+                android.widget.Toast.LENGTH_LONG,
+            ).show()
+            mainHandler.postDelayed({ pendingAccessibilityPrompt = false }, 6000)
         }
     }
 

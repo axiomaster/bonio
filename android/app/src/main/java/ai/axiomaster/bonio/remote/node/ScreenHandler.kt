@@ -39,27 +39,35 @@ class ScreenHandler(
     }
     maxTextLength = maxTextLength.coerceIn(1, 12000)
 
-    val a11y = BonioAccessibilityService.instance
-      ?: return GatewaySession.InvokeResult.error(
-        code = "ACCESSIBILITY_NOT_ENABLED",
-        message = "ACCESSIBILITY_NOT_ENABLED: accessibility service is not enabled",
-      )
     var providedScreenshotB64: String? = null
     if (paramsJson != null) {
       try {
         providedScreenshotB64 = JSONObject(paramsJson).optString("screenshotBase64").ifEmpty { null }
       } catch (_: Throwable) {}
     }
-    val dump = a11y.dumpActiveWindow(maxNodes = 250, maxTextLength = 240)
-      ?: return GatewaySession.InvokeResult.error(
+
+    val a11y = BonioAccessibilityService.instance
+    // Without accessibility we can still read the screen when the caller hands
+    // us a screenshot (avatar double-tap flow) by degrading straight to OCR.
+    if (a11y == null && providedScreenshotB64 == null) {
+      return GatewaySession.InvokeResult.error(
+        code = "ACCESSIBILITY_NOT_ENABLED",
+        message = "ACCESSIBILITY_NOT_ENABLED: accessibility service is not enabled",
+      )
+    }
+
+    val dump = a11y?.dumpActiveWindow(maxNodes = 250, maxTextLength = 240)
+    if (a11y != null && dump == null) {
+      return GatewaySession.InvokeResult.error(
         code = "SCREEN_CONTEXT_FAILED",
         message = "SCREEN_CONTEXT_FAILED: no accessible window content",
       )
+    }
 
     return try {
-      val obj = JSONObject(dump)
+      val obj = if (dump != null) JSONObject(dump) else JSONObject()
       var nodes = obj.optJSONArray("nodes") ?: JSONArray()
-      var source = "accessibility"
+      var source = if (a11y != null) "accessibility" else "none"
 
       fun linesFromNodes(arr: JSONArray): List<Line> = buildList {
         for (i in 0 until arr.length()) {
@@ -81,13 +89,14 @@ class ScreenHandler(
 
       var lines = linesFromNodes(nodes)
       if (lines.isEmpty()) {
-        // ── OCR 降级：无障碍树无文本（受限设置/受限窗口）──
+        // ── OCR 降级：无障碍树无文本（未启用/受限设置/受限窗口）──
         try {
           val ocrStarted = android.os.SystemClock.elapsedRealtime()
           // Full-screen size for mapping OCR boxes back to a11y coordinates.
-          val screenW = a11y.resources.displayMetrics.widthPixels
-          val screenH = a11y.resources.displayMetrics.heightPixels
-          val screenLongest = maxOf(screenW, screenH)
+          val screenLongest = a11y?.let {
+            val dm = it.resources.displayMetrics
+            maxOf(dm.widthPixels, dm.heightPixels)
+          } ?: 0
           val decodeProvided: () -> Bitmap? = {
             providedScreenshotB64?.let { b64 ->
               try {
@@ -100,7 +109,7 @@ class ScreenHandler(
           }
           var input = decodeProvided()
           var sourceWasProvided = input != null
-          if (input == null) {
+          if (input == null && a11y != null) {
             // Take our own screenshot. takeScreenshot has a minimum interval
             // (a parallel capture may just have completed) — back off between
             // attempts instead of failing fast.
@@ -148,6 +157,15 @@ class ScreenHandler(
         } catch (e: Throwable) {
           AppLogger.w("ScreenHandler", "ocr degrade failed: ${e.message}")
         }
+      }
+
+      if (a11y == null && lines.isEmpty()) {
+        // No tree and OCR read nothing: report it so the caller can fall back to
+        // saving the raw screenshot instead of pretending analysis succeeded.
+        return GatewaySession.InvokeResult.error(
+          code = "ACCESSIBILITY_NOT_ENABLED",
+          message = "ACCESSIBILITY_NOT_ENABLED: no readable screen content without accessibility",
+        )
       }
 
       val content = StringBuilder()
