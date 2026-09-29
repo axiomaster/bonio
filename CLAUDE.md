@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+Related instruction files: `AGENTS.md` (condensed agent guidance — keep consistent with this file).
+
 ## Mandatory Rules
 
 1. **Always compile after every code change** — run the appropriate build command to verify the code compiles successfully before proceeding.
@@ -9,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Design Document Workflow
 
-Feature development follows a three-stage document pipeline:
+Feature development follows a three-stage document pipeline under `docs/design/`:
 
 | Stage | Input | Output | Naming |
 |-------|-------|--------|--------|
@@ -19,16 +21,24 @@ Feature development follows a three-stage document pipeline:
 
 - Raw PRDs in `rr/` are user-authored; do not modify without user confirmation.
 - Refined PRDs and architecture docs are produced by the team and must reference the source raw PRD.
+- Key architecture docs: `arch/20260826-dsh-refactor-arch.md` (DSH backend), `arch/android-port-arch-20260911.md` (Android embedded engine).
 
 ## Project Overview
 
-Bonio (HiClaw) is an AI agent gateway system with four components:
-- **server/** — C++ WebSocket gateway server (HiClaw) that connects to LLM providers and routes tool calls
-- **android/** — Kotlin/Jetpack Compose companion app for device control (camera, location, SMS)
-- **harmonyos/** — ArkTS/HarmonyOS port of the Android app; its agent backend is the on-device DSH daemon + `dsh-plugins/bonio-bridge` (WebSocket at `127.0.0.1:10724`), not hiclaw
-- **desktop/** — Flutter desktop client for Windows/macOS (chat, config, session management)
+Bonio (HiClaw) is an AI agent companion system: one backend, four clients, one protocol.
 
-Clients maintain **dual WebSocket sessions**: `operatorSession` (user commands: chat, config) and `nodeSession` (server-initiated tool calls: camera, location, etc.).
+- **server/** — C++17 WebSocket gateway (hiclaw): LLM provider adapters, agent loop, tool routing, memory, cron, WeChat bridge
+- **android/** — Kotlin/Jetpack Compose app, package **`ai.axiomaster.bonio`** (compileSdk 36, minSdk 31, Java 17)
+- **harmonyos/** — ArkTS port; its agent backend is the on-device **DSH daemon + `dsh-plugins/bonio-bridge`** (WebSocket at `127.0.0.1:10724`), not hiclaw
+- **desktop/** — Flutter client for Windows/macOS
+
+All clients speak **WebSocket protocol v3** and maintain **dual sessions**: `operatorSession` (user commands: chat, config) and `nodeSession` (server-initiated tool calls: camera, location, SMS, screen). Mobile-only capabilities respond `UNSUPPORTED_COMMAND` on the desktop node session.
+
+The app↔backend coupling is **protocol-only** — apps only do RPC, never link backend code. The same hiclaw gateway binary is embedded per platform:
+
+- **Android**: bundled as `android/app/src/main/jniLibs/arm64-v8a/libhiclaw.so` (arm64 only), exec'd from `nativeLibraryDir` by [`local/LocalEngineController.kt`](android/app/src/main/java/ai/axiomaster/bonio/local/LocalEngineController.kt) — a loopback gateway on `127.0.0.1` supervised as a child process.
+- **Desktop**: bundled next to the app and spawned by [`desktop/lib/services/hiclaw_process.dart`](desktop/lib/services/hiclaw_process.dart).
+- **HarmonyOS**: hiclaw is replaced entirely by the DSH backend (see **DSH Backend** below).
 
 ## Build Commands
 
@@ -56,7 +66,15 @@ cd server && scripts/build-ohos-arm64.sh
 # Output: server/build/ohos-arm64/hiclaw
 ```
 
-Third-party deps are vendored in `server/third_party/` (CLI11, spdlog, nlohmann_json, libhv, mbedtls, websocketpp, asio, linenoise-ng). Must be cloned before building — see CMakeLists.txt error messages for clone URLs.
+Each build also copies the binary to `server/bin/`. Third-party deps are vendored in `server/third_party/` (CLI11, spdlog, nlohmann_json, libhv, mbedtls, websocketpp, asio, linenoise-ng). Must be cloned before building — see CMakeLists.txt error messages for clone URLs.
+
+**Embedding the engine into the Android APK** (after a successful android-arm64 build):
+
+```bash
+cp server/build/android-arm64-v8a/hiclaw android/app/src/main/jniLibs/arm64-v8a/libhiclaw.so
+```
+
+The `lib*.so` name is required for APK packaging; `useLegacyPackaging = true` in `app/build.gradle.kts` extracts it to `nativeLibraryDir` (Android 10+ W^X only allows exec from there). Bundled native libs must be **16KB-page-aligned** — Android 15+ installers reject 4KB-aligned ones.
 
 ### Unified Build Scripts (root `scripts/`)
 
@@ -64,7 +82,7 @@ One-click build, bundle, and launch scripts at the project root:
 
 ```bash
 # Windows — build server + desktop, bundle hiclaw, and launch
-scripts\build-and-run.bat
+scripts\build-and-run.bat [--ninja]   # --ninja uses Ninja instead of the VS generator
 
 # macOS / Linux
 scripts/build-and-run.sh
@@ -73,41 +91,28 @@ scripts/build-and-run.sh
 #   --skip-server   Skip hiclaw compilation
 #   --skip-desktop  Skip Flutter compilation
 #   --clean         Clean build directories first
-```
 
-Individual steps:
-
-```bash
-# Build hiclaw only → server/bin/hiclaw(.exe)
-scripts\build-server.bat          # Windows
-scripts/build-server.sh           # macOS / Linux
-
-# Build Flutter desktop + bundle hiclaw (requires server built first)
-scripts\build-desktop.bat --run   # Windows, --run to launch after build
-scripts/build-desktop.sh --run    # macOS / Linux
-
-# Platform-specific server builds (called by build-server scripts):
-cd server && scripts\build-win-amd64.bat       # → build/win-amd64/ + bin/
-cd server && scripts/build-linux-amd64.sh       # → build/linux-amd64/ + bin/
-cd server && scripts/build-macos-arm64.sh       # → build/macos-arm64/ + bin/
-cd server && scripts/build-android-arm64-v8a.sh  # → build/android-arm64-v8a/ + bin/
-cd server && scripts/build-ohos-arm64.sh        # → build/ohos-arm64/ + bin/
+scripts\build-server.bat / scripts/build-server.sh    # hiclaw only → server/bin/
+scripts\build-desktop.bat --run / scripts/build-desktop.sh --run   # Flutter desktop + bundle hiclaw
 ```
 
 ### Running Tests
 
 ```bash
-# Android
+# Android (unit tests in android/app/src/test/, e.g. UserProfileExtractionTest, NotificationTodoExtractorTest)
 cd android && ./gradlew test
+cd android && ./gradlew test --tests "ai.axiomaster.bonio.UserProfileExtractionTest"   # single class
 
 # Desktop (Flutter)
 cd desktop && flutter test
+cd desktop && flutter test test/services/foo_test.dart              # single file
+cd desktop && flutter test --plain-name "some test name"            # single test
 
 # HarmonyOS
 cd harmonyos && hvigorw test
 ```
 
-Server has no test suite.
+Server has no test suite — verification is compiling and running it.
 
 ### Android App
 
@@ -115,7 +120,8 @@ Server has no test suite.
 cd android && ./gradlew assembleDebug
 ```
 
-Package: `ai.axiomaster.boji`, compileSdk 36, minSdk 31, Java 17, Jetpack Compose.
+- Chat STT uses the **platform `SpeechRecognizer`** only ([`remote/chat/SpeechToTextManager.kt`](android/app/src/main/java/ai/axiomaster/bonio/remote/chat/SpeechToTextManager.kt)) — the offline Sherpa-ONNX engine was cut from the v1 build (APK 345MB → 114MB).
+- The avatar uses **sprite sheets** (`avatar/PixelAvatarView.kt`), not Lottie — Lottie deps/assets were stripped from Android (desktop still uses `lottie`).
 
 ### HarmonyOS App
 
@@ -126,48 +132,38 @@ export DEVECO_SDK_HOME=/Applications/DevEco-Studio.app/Contents/sdk
 cd harmonyos && hvigorw --mode module -p product=default assembleHap
 ```
 
-Builds are **unsigned** (no `signingConfigs` committed). After any HAP task: full `hvigorw clean assembleHap` → sign with `tools/hapsigner` using the `system_core` profile in `harmonyos/root_float_signing/` → `hdc install -r` onto a connected device (report the blocker if no device).
-
-See `harmonyos/CLAUDE.md` for the full build/sign/install workflow and ets architecture.
+Builds are **unsigned** (no `signingConfigs` committed). After any HAP task: full `hvigorw clean assembleHap` → sign with **hapsigner** using the `system_core` profile in `harmonyos/root_float_signing/` → `hdc install -r` onto a connected device (report the blocker if no device).
 
 ### Desktop App (Flutter)
 
 ```bash
-cd desktop && flutter pub get && flutter run -d windows
-# or for macOS:
-cd desktop && flutter pub get && flutter run -d macos
-# Build release:
-cd desktop && flutter build windows
-cd desktop && flutter build macos
-# Bundle hiclaw into build output (after server build):
-cd desktop && powershell -File scripts\bundle-hiclaw.ps1     # Windows
-cd desktop && ./scripts/bundle-hiclaw.sh <app_bundle_path>   # macOS
+cd desktop && flutter pub get && flutter run -d macos   # or -d windows
+cd desktop && flutter build macos                        # release build
+./scripts/bundle-hiclaw.sh <app_bundle_path>             # bundle hiclaw (server built first)
+# Windows: powershell -File scripts\bundle-hiclaw.ps1
 ```
 
 Requires Flutter SDK >=3.2.0. Cross-platform (Windows + macOS) via single Flutter codebase.
 
-**Desktop TTS (avatar commands)**
+**Desktop quirks**
 
-- Avatar `tts` / `stopTts` use [`desktop/lib/services/desktop_tts.dart`](desktop/lib/services/desktop_tts.dart): **no** `flutter_tts` native plugin (avoids Windows CMake/NuGet). Speech is implemented with **PowerShell + System.Speech** on Windows, **`say`** on macOS, and **`spd-say` / `espeak-ng` / `espeak`** on Linux when available in `PATH`.
-- Assistant reply **speech** (when enabled in Settings) uses the same `DesktopTts` after each completed chat turn (`ChatController` → `onAssistantReplyForTts`), so OpenClaw does not need to emit `avatar.command` for basic read-aloud.
-- The pet is shown in a **second OS window** via [`desktop_multi_window`](desktop/pubspec.yaml) + [`window_manager`](desktop/pubspec.yaml) (see [`desktop/lib/main.dart`](desktop/lib/main.dart), [`desktop/lib/avatar_window_app.dart`](desktop/lib/avatar_window_app.dart)), so it stays visible when the main Bonio window is minimized. State is pushed from [`AvatarController`](desktop/lib/services/avatar_controller.dart) with `invokeMethod('sync', …)`; drag deltas go back through `avatarPan` on the main window controller.
-
-**Desktop STT (voice input)**
-
-- Uses **Sherpa-ONNX streaming paraformer** (bilingual zh-en), same engine as Android's `SherpaOnnxSpeechManager`. Architecture mirrors Android's `SpeechToTextManager` → `SherpaOnnxSpeechManager` with unified `SpeechToTextListener` callback interface (partial, final, error, ready, end).
-- Audio capture via [`record`](desktop/pubspec.yaml) package (PCM16, 16 kHz, mono) → `sherpa_onnx` FFI `OnlineRecognizer` with endpoint detection.
-- Model files (`encoder.int8.onnx`, `decoder.int8.onnx`, `tokens.txt`) must be placed next to the executable. Download with `powershell -ExecutionPolicy Bypass -File tool/download_model.ps1`.
+- `desktop_multi_window` is a **vendored local package** (`desktop/packages/desktop_multi_window`, path dep in pubspec) — not from pub.dev. Together with `window_manager` it hosts the pet in a **second OS window** ([`avatar_window_app.dart`](desktop/lib/avatar_window_app.dart)) so it stays visible when the main window is minimized. State is pushed from `AvatarController` (`invokeMethod('sync', …)`); drag deltas return via `avatarPan`.
+- **TTS** ([`desktop/lib/services/desktop_tts.dart`](desktop/lib/services/desktop_tts.dart)): deliberately **no `flutter_tts` plugin** (avoids Windows CMake/NuGet) — uses PowerShell + System.Speech (Windows), `say` (macOS), `spd-say`/`espeak-ng`/`espeak` (Linux). Assistant replies are spoken by `ChatController` → `onAssistantReplyForTts` after each turn, not via `avatar.command`.
+- **STT** (`sherpa_speech_manager.dart` + `platform/microphone.dart`): Sherpa-ONNX streaming paraformer via FFI. Model files (`encoder.int8.onnx`, `decoder.int8.onnx`, `tokens.txt`) must sit next to the executable — download from `desktop/` with `powershell -ExecutionPolicy Bypass -File tool/download_model.ps1`. Paddle OCR models: `tool/download_ocr_models.ps1`.
 
 ## Server CLI Reference
 
 | Command | Description |
 |---------|-------------|
-| `hiclaw run "prompt"` | Single-turn chat |
-| `hiclaw gateway [--port 18789]` | Start WebSocket gateway |
-| `hiclaw serve [port]` | HTTP service (POST `{"prompt":"..."}`) |
+| `hiclaw agent run "<prompt>"` | Single-turn chat |
 | `hiclaw agent` | Interactive REPL mode |
+| `hiclaw gateway [--port N] [--new-pairing]` | WebSocket gateway (default port from config `gateway.port`) |
+| `hiclaw gateway serve [port]` | HTTP service (POST `{"prompt":"..."}`) |
+| `hiclaw cron list\|add\|run` | Scheduled jobs (`add "<expr>" "<prompt>"`) |
 | `hiclaw config` | Interactive configuration |
-| `hiclaw model list` | List configured models |
+| `hiclaw model list\|status` | Model management |
+| `hiclaw skill list\|install\|remove\|enable\|disable` | Skill packages |
+| `hiclaw wechat setup` | Print WeChat setup instructions |
 | `hiclaw --version` | Print version |
 
 Global options: `--config-dir <path>` (default `~/.bonio`), `--log-level`.
@@ -187,21 +183,23 @@ Global options: `--config-dir <path>` (default `~/.bonio`), `--log-level`.
 
 ```
 server/
-├── src/main.cpp                   # CLI entry point (subcommands: run, config, serve, etc.)
+├── src/main.cpp                   # CLI entry point
+├── src/cli/cli.cpp                # Subcommand parsing (CLI11)
 ├── src/agent/agent.cpp            # Agent loop (LLM call → tool call → result → repeat)
 ├── src/config/config.cpp          # Config loading/saving (hiclaw.json)
-├── src/cron/                      # Cron scheduler (5-field expr parser + persistent store)
+├── src/cron/                      # 5-field cron parser + persistent store + scheduler + cron_tool
 ├── src/memory/file_memory.cpp     # Agent memory: store, recall, forget (file-based)
 ├── src/net/
 │   ├── gateway.cpp                # WebSocket gateway - all RPC methods + event broadcast
 │   ├── async_agent.cpp            # Per-session agent manager (LLM streaming)
+│   ├── context_classifier.cpp     # Classifies UI structure into plugin-declared tags (local Ollama)
 │   ├── http_client.cpp            # HTTP client for LLM provider APIs
 │   ├── tool_router.cpp            # Routes tool calls to node sessions
 │   ├── intent_router.cpp          # Classifies voice STT results (chat/screenshot/summarize/call)
 │   ├── call_handler.cpp           # Incoming call flow: TTS, countdown, answer/reject, spam detect
-│   ├── idle_manager.cpp           # Pet avatar random wandering when device is idle
 │   ├── health_monitor.cpp         # Screen-time awareness: late-night usage nags
 │   ├── notification_handler.cpp   # Filters important notifications for avatar reactions
+│   ├── serve.cpp                  # HTTP server mode
 │   ├── wechat_adapter.cpp         # WeChat channel bridge (WeCom + ilink → agent pipeline)
 │   ├── wecom_ws_client.cpp        # WeCom intelligent-bot WebSocket long-connection client
 │   └── ilink_http_client.cpp      # HTTP client for WeChat ilink bot API (personal WeChat)
@@ -218,59 +216,92 @@ server/
 
 Key design: `gateway.cpp` uses websocketpp. The gateway manages connected client sessions and broadcasts events (agent deltas, chat updates, avatar commands) to relevant clients. `WeChatAdapter` feeds external WeChat messages into the same agent pipeline as gateway chat messages.
 
+All subsystems receive an `EventCallback` to push events to connected clients:
+
+- **IntentRouter** — Classifies voice STT final results server-side. Intents: `Chat`, `ScreenCapture`, `Summarize`, `CallAnswer`, `CallReject`. Keyword matching; also `classify_call_command()` for during-call voice classification.
+- **CallHandler** — Incoming call flow: TTS announcement with caller info, countdown timer, spam detection, `call.action` events (answer/reject). Coordinates TTS/STT start/stop with the client.
+- **HealthMonitor** — Screen-time wellness: late-night (23:00-6:00) nags via avatar TTS after 2h continuous use, 15-min cooldown. (Android also implements client-side idle wandering + health nags in `avatar/IdleBehaviorScheduler.kt` / `HealthNagScheduler.kt`.)
+- **NotificationHandler** — Evaluates `notifications.changed` events, filters important ones (messaging apps, calls), triggers avatar reactions.
+- **ContextClassifier** — Classifies a UI structure into content-type tags using a local Ollama model. Tags are not hardcoded; the caller passes available tags aggregated from installed plugin declarations.
+
 ### Android App
 
 ```
-android/app/src/main/java/ai/axiomaster/boji/
-├── MainViewModel.kt          # MVVM ViewModel, holds serverConfig StateFlow
-├── NodeRuntime.kt            # Core runtime: manages operatorSession + nodeSession
-├── remote/gateway/           # GatewaySession (WebSocket RPC), DeviceIdentityStore (Ed25519)
-├── remote/node/              # InvokeDispatcher routes server commands to handlers
-├── remote/chat/              # ChatController, VoskSpeechManager, SystemTtsManager
-├── remote/config/            # ConfigRepository, ServerConfig data classes
-├── ui/screens/               # Compose UI: ServerTab, ChatTab, ModelConfigScreen
+android/app/src/main/java/ai/axiomaster/bonio/
+├── MainViewModel.kt / NodeRuntime.kt   # MVVM + dual-session runtime (operator + node)
+├── local/LocalEngineController.kt      # Spawns/supervises the embedded libhiclaw.so gateway
+├── avatar/                             # Floating pet: PixelAvatarView (sprite sheets), state machine,
+│                                       #   CloneManager, CustomSkinManager, idle/health schedulers
+├── input/                              # BonioProxyImeService + ImeProxyManager (proxy IME for magic cue)
+├── remote/
+│   ├── gateway/                        # GatewaySession (WebSocket RPC), DeviceIdentityStore (Ed25519)
+│   ├── node/                           # InvokeDispatcher + handlers (camera, location, SMS, screen,
+│   │                                   #   contacts/calendar, telephony, notifications, accessibility)
+│   ├── chat/                           # ChatController, SpeechToTextManager (platform), SystemTtsManager
+│   ├── cue/                            # MagicCueController — answers on-screen questions (tool-backed;
+│   │                                   #   OCR degrade path via ML Kit → remote/ocr/ScreenOcrRecognizer)
+│   ├── memory/                         # Hierarchical memory L0–L3, UserProfile extraction, charging sync
+│   ├── skills/                         # ClawHubClient (skill marketplace), SkillRepository
+│   ├── config/                         # ConfigRepository, ServerConfig data classes
+│   └── protocol/ theme/ todo/          # Protocol constants (OpenClaw-compatible), theme, todo extraction
+├── ui/screens/                         # MainScreen tabs: Chat / Todo / Memory / Personalization / Settings
+│                                       #   (+ ServerTab, ModelConfigScreen, ScreenTab, MarketplaceTab)
+└── i18n/ util/
 ```
+
+Magic-cue references: `docs/design/arch/magic-cue-arch-20260905.md`, `arch/20260913-android-magic-cue-ime-proxy-arch.md`, `arch/20260918-screen-ocr-degrade-arch.md`.
 
 ### Desktop App (Flutter)
 
 ```
 desktop/lib/
-├── main.dart                     # App entry point, theme config
-├── models/
-│   ├── gateway_models.dart       # GatewayEndpoint, GatewayConnectOptions, GatewayClientInfo
-│   ├── server_config.dart        # ServerConfig, ModelConfig, ProviderInfo, GatewayConfig
-│   ├── chat_models.dart          # ChatMessage, ChatMessageContent, ChatPendingToolCall, etc.
-│   └── device_identity.dart      # DeviceIdentity data model
+├── main.dart / avatar_window_app.dart  # Main window + second OS window hosting the pet
+├── models/                             # gateway_models, server_config, chat_models, device_identity
 ├── services/
-│   ├── gateway_session.dart      # WebSocket session (protocol v3, reconnection, RPC)
-│   ├── device_identity_store.dart # Ed25519 key generation, signing, persistence
-│   ├── device_auth_store.dart    # Device token persistence (SharedPreferences)
-│   ├── config_repository.dart    # config.get / config.set via gateway
-│   ├── chat_controller.dart      # Chat state, streaming, history, sessions
-│   └── node_runtime.dart         # Dual session orchestration (operator + node)
-├── providers/
-│   └── app_state.dart            # App-level state (Provider pattern)
-└── ui/
-    ├── screens/
-    │   ├── main_screen.dart      # NavigationRail layout (Chat, Server, Settings)
-    │   ├── chat_tab.dart         # Chat messages with markdown rendering
-    │   ├── server_tab.dart       # Gateway connection + model config cards
-    │   ├── model_config_screen.dart # Add/edit/remove model configurations
-    │   └── settings_tab.dart     # About, keyboard shortcuts, capabilities
-    └── widgets/
-        └── chat_composer.dart    # Message input with thinking level selector
+│   ├── gateway_session.dart            # WebSocket session (protocol v3, reconnection, RPC)
+│   ├── chat_controller.dart / node_runtime.dart   # Chat state/streaming; dual-session orchestration
+│   ├── hiclaw_process.dart             # Spawns the bundled hiclaw engine
+│   ├── note_service.dart / note_export_service.dart  # Memory notes; Obsidian/ZIP export
+│   ├── skill_repository.dart / clawhub_client.dart   # Skills + ClawHub marketplace
+│   ├── avatar_controller.dart / avatar_command_executor.dart  # Pet state sync + avatar.command execution
+│   ├── desktop_tts.dart / sherpa_speech_manager.dart  # TTS / STT (see Desktop quirks above)
+│   └── device_identity_store.dart / device_auth_store.dart / config_repository.dart / tray_service.dart
+├── platform/                           # win32_* / macos_* behind shared interfaces
+│   ├── cdp/                            # Chrome DevTools Protocol browser agent
+│   └── ocr/                            # Paddle OCR bridge (native)
+├── plugins/                            # PluginManager / PluginHost / PluginBridge; builtin_plugins.dart
+├── providers/app_state.dart            # App-level state (Provider pattern)
+├── l10n/                               # app_strings.dart
+└── ui/screens/                         # chat_tab, memory_tab, marketplace_tab, plugin_tab, ai_lens_screen,
+                                        #   reading_companion_screen, search_similar_screen, server_tab,
+                                        #   settings_tab, model_config_screen, ocr_result_window
 ```
 
-Desktop shares the same gateway protocol and dual-session architecture as Android/HarmonyOS. Mobile-only capabilities (camera, location, SMS, etc.) respond with `UNSUPPORTED_COMMAND` on the node session.
+### HarmonyOS App
 
-### WeChat Integration
+ArkTS under `harmonyos/entry/src/main/ets/`: `gateway/` (GatewaySession), `node/` (handlers + chat), `voice/`, `intent/`, `pages/` (incl. float window), `system/` (device services), `tools/`, `models/`, `protocol/`, `common/`. Talks to the DSH backend below; float-window avatar mirrors Android's.
 
-Server bridges WeChat into the agent pipeline via `WeChatAdapter`, which orchestrates two channel clients:
+### DSH Backend (HarmonyOS)
 
-- **WeCom** (`WecomWsClient`) — Enterprise WeChat intelligent-bot protocol over `wss://openws.work.weixin.qq.com`. Receives messages via WebSocket long-connection, replies via `aibot_respond_msg` (stream format). Requires `bot_id` + `bot_secret` in config.
-- **ilink** (`IlinkHttpClient`) — Personal WeChat bot API via HTTP long-polling. Receives messages with `get_updates()`, sends replies chunked to 3800 chars with retry on `ret=-2`. Requires `token` + `base_url` in config.
+DSH (DeepSeek Harness) runs **on the phone** and replaces hiclaw as the agent backend:
 
-Messages from either channel flow through the same `AsyncAgentManager` → `Agent` loop → tool calls → response pipeline as gateway chat messages. Reply context (callback_req_id for WeCom, user_id for ilink) is tracked per session. Message deduplication by msg_id prevents double-processing.
+```
+avatar ⇄ bonio-app ⇄ (hiclaw protocol, ws://127.0.0.1:10724) ⇄ dsh process / bonio-bridge ⇄ DeepSeek LLM
+```
+
+- **`dsh-plugins/bonio-bridge`** — a cordis (DSH) plugin exposing the hiclaw-compatible gateway protocol at `127.0.0.1:10724` (token auth, dual sessions), so bonio-app connects with zero business-code changes. Implements dsh tools: `bonio_node_invoke` (device capabilities → node session), `memo_save`/`memo_list`, `cron_add`/`cron_list`/`cron_remove`/`cron_runs`, `device_info`.
+- **`dsh-plugins/bonio-wechat`** — WeChat bridge plugin for DSH.
+- **Daemon**: `tools/dsh-daemon.sh` keeps `dsh --profile bonio --port 13082` alive on-device (`/data/local/bin/`), pushed by the deploy scripts.
+- **Deploy**: `tools/deploy-bonio-bridge-ohos.sh`, `tools/deploy-bonio-wechat-ohos.sh`, `tools/deploy-dsh-skills-ohos.sh`, `tools/deploy-node-ohos.sh`. On-device skills: `skills/ohos-cli-tool`, `skills/phone-use-harmonyos` (SKILL.md copies in `tools/skills-device/`).
+
+### WeChat Integration (server)
+
+Server bridges WeChat into the agent pipeline via `WeChatAdapter`, orchestrating two channel clients:
+
+- **WeCom** (`WecomWsClient`) — Enterprise WeChat intelligent-bot protocol over `wss://openws.work.weixin.qq.com`. Receives via WebSocket long-connection, replies via `aibot_respond_msg` (stream format). Requires `bot_id` + `bot_secret`.
+- **ilink** (`IlinkHttpClient`) — Personal WeChat bot API via HTTP long-polling (`get_updates()`), replies chunked to 3800 chars with retry on `ret=-2`. Requires `token` + `base_url`.
+
+Messages from either channel flow through the same `AsyncAgentManager` → `Agent` loop → tool calls → response pipeline as gateway chat messages. Reply context (callback_req_id for WeCom, user_id for ilink) is tracked per session; msg_id dedup prevents double-processing.
 
 ### Avatar Command System
 
@@ -290,38 +321,27 @@ Server sends `avatar.command` events to control the pet avatar on clients. Comma
 | `performAction(type)` | Trigger one-shot animation |
 | `sequence(steps[])` | Chain multiple commands with optional delays |
 
-### Server Subsystems
-
-All subsystems receive an `EventCallback` to push events to connected clients:
-
-- **IntentRouter** — Classifies voice STT final results server-side. Intents: `Chat` (send as chat message), `ScreenCapture`, `Summarize`, `CallAnswer`, `CallReject`. Uses keyword matching. Also provides `classify_call_command()` for during-call voice classification.
-- **CallHandler** — Manages incoming phone call flow: sends TTS announcement with caller info, runs countdown timer, performs spam detection (number lookup + contact name heuristics), and sends `call.action` events (answer/reject). Coordinates TTS/STT start/stop with the client.
-- **IdleManager** — Random pet avatar wandering when device is idle. Triggers `moveTo` commands at random intervals (8-20s) within a radius when the device screen is on and the avatar is in idle state.
-- **HealthMonitor** — Screen-time wellness. Accumulates screen-on time and during late-night hours (23:00-6:00), sends gentle then escalating nags via avatar TTS after 2 hours of continuous use, with 15-minute cooldown between nags.
-- **NotificationHandler** — Evaluates `notifications.changed` events. Filters important notifications (from messaging apps, calls, etc.) and triggers avatar reactions via `avatar.command`.
-
-### Cron System
-
-5-field cron expression parser (`minute hour day-of-month month day-of-week`) in [`cron/schedule.hpp`](server/include/hiclaw/cron/schedule.hpp). Supports `*`, `N`, `N-M`, and `*/M` (step) syntax. `cron::store` persists scheduled tasks in a JSON file under the config directory. Used for periodic tasks configured in `hiclaw.json`.
-
 ### Memory System
 
-File-based agent memory in [`memory/memory.hpp`](server/include/hiclaw/memory/memory.hpp). Supports `store(key, content, category)`, `recall(query, limit)`, and `forget(key)`. Categories: `core` (always loaded), `daily`, `conversation`, or custom. Stores JSON files under `<config_dir>/memory/`. The agent uses memory to persist user preferences and facts across sessions.
+- **Server**: file-based agent memory in [`memory/memory.hpp`](server/include/hiclaw/memory/memory.hpp) — `store(key, content, category)`, `recall(query, limit)`, `forget(key)`; categories `core` (always loaded), `daily`, `conversation`, custom; JSON files under `<config_dir>/memory/`. `memo_tool.cpp` exposes `memo_save`/`memo_list` (stored under `~/.bonio/memos` via bonio-bridge).
+- **Android**: hierarchical memory **L0–L3** in `remote/memory/` (`UserProfileExtractor`, `ChargingTriggeredSync` extracts profiles while charging) with chat prompt injection. PRD: `docs/design/prd/20260916-hierarchical-memory-l0-l3-prd.md`.
 
 ## Gateway Protocol
 
-WebSocket protocol version 3. Frame types: `req` (request), `res` (response), `event`.
+WebSocket protocol version 3. Frame types: `req` `{type,id,method,params}`, `res` `{type,id,ok,payload,error}`, `event` `{type,event,payload}`.
+
+**Auth**: server compares `params.auth.token`/`params.auth.password` against `gateway.pairing_code` from config; an empty `pairing_code` means open access. Clients also send an Ed25519 device signature, which the server currently does **not** verify.
 
 ### Key RPC Methods
 
 | Method | Direction | Description |
 |--------|-----------|-------------|
-| `connect` | client→server | Auth handshake (Ed25519 signature) |
-| `config.get` | client→server | Returns `{default_model, models[], gateway{}, providers[]}` |
-| `config.set` | client→server | Updates config, saves to hiclaw.json |
-| `chat.send` | client→server | Send message, returns runId (async streaming) |
+| `connect` | client→server | Handshake (role=operator/node, pairing-code auth, hello payload) |
+| `config.get` / `config.set` | client→server | Read config / update + save hiclaw.json |
+| `chat.send` | client→server | Send message (+attachments), returns runId (async streaming) |
 | `chat.abort` | client→server | Cancel running request |
 | `sessions.list/delete/reset/patch` | client→server | Session management |
+| `voicewake.get/set` | client→server | Voice wake toggle |
 | `node.invoke.result` | client→server | Return tool call result |
 
 ### Key Events (server→client)
@@ -332,6 +352,8 @@ WebSocket protocol version 3. Frame types: `req` (request), `res` (response), `e
 | `node.invoke.request` | Server asks client to execute a tool |
 | `agent` | LLM streaming delta (assistant text / tool calls) |
 | `chat` | Chat state updates (final, etc.) |
+| `avatar.command` | Pet avatar control (see table above) |
+| `notifications.changed` | Device notification stream |
 | `tick` | Heartbeat every 30s |
 
 ### Tool Call Flow
@@ -343,12 +365,12 @@ WebSocket protocol version 3. Frame types: `req` (request), `res` (response), `e
 
 ## Configuration
 
-Server config lives in `hiclaw.json` (workspace root, default: `~/.bonio/hiclaw.json`). Uses **snake_case** field names throughout:
+Server config lives in `hiclaw.json` (workspace root copy in this repo; default dir `~/.bonio`). Uses **snake_case** field names throughout:
 
 ```json
 {
   "default_model": "glm-4.7",
-  "gateway": {"enabled": true, "host": "0.0.0.0", "port": 10724},
+  "gateway": {"enabled": true, "host": "0.0.0.0", "port": 10724, "pairing_code": "..."},
   "models": [{"id": "glm-4.7", "provider": "glm", "api_key": "..."}]
 }
 ```
@@ -359,19 +381,22 @@ Server config lives in `hiclaw.json` (workspace root, default: `~/.bonio/hiclaw.
 
 - **snake_case in protocol/API**: All gateway methods and hiclaw.json fields use snake_case (e.g., `default_model`, `api_key_env`, `base_url`)
 - **Dual session architecture**: Android, HarmonyOS, and Desktop all maintain separate operator and node WebSocket connections
-- **Handler interface pattern**: Feature handlers implement interfaces from `InvokeDispatcher` for testability
+- **Protocol-only coupling**: clients never link backend code; any backend speaking gateway v3 (hiclaw, bonio-bridge/DSH) is a drop-in replacement
+- **Handler interface pattern**: Feature handlers implement interfaces from `InvokeDispatcher` (Android) for testability
 - **Provider adapters**: New LLM providers implement the provider interface in `server/src/providers/`
-- **Reference implementations**: `reference/` contains original code used during porting — do not modify
-- **Desktop platform abstraction**: Platform-specific code lives in `desktop/lib/platform/` with `win32_*.dart` / `macos_*.dart` implementations behind shared interfaces (e.g., `screen_capture.dart`, `microphone.dart`, `gui_agent.dart`). CDP (Chrome DevTools Protocol) agent is in `desktop/lib/platform/cdp/`.
-- **Plugin system**: Desktop supports dynamic plugins via `desktop/lib/plugins/` (`PluginManager`, `PluginHost`, `PluginBridge`). Built-in plugins defined in `builtin_plugins.dart`.
+- **Desktop platform abstraction**: Platform-specific code lives in `desktop/lib/platform/` with `win32_*.dart` / `macos_*.dart` implementations behind shared interfaces (e.g., `screen_capture.dart`, `microphone.dart`, `gui_agent.dart`)
+- **16KB page alignment**: bundled native libs (jniLibs, ML Kit OCR ≥16.0.1) must be 16KB-aligned for Android 15+ installers
 
 ## Additional Directories
 
-- **`docs/design/`** — PRD documents and implementation plans for features (记一记, 阅读搭子, plugin system, avatar, voice input, etc.)
-- **`skills/`** — Device skills: `phone-use-agent` (C++ native CLI for mobile screen automation, references Open-AutoGLM), plus `ohos-cli-tool` and `phone-use-harmonyos` deployed to the on-device DSH
-- **`dsh-plugins/`** — On-device DSH plugins (`bonio-bridge` speaks the hiclaw gateway protocol to the app, `bonio-wechat` bridges WeChat), deployed via `tools/deploy-*-ohos.sh`
-- **`reference/`** — OpenClaw (Node.js) and ZeroClaw (Rust) reference implementations, used during porting — read-only
-- **`assets/`** — Shared Lottie animations for the avatar cat (various states: idle, happy, confused, etc.)
+- **`docs/design/`** — `rr/` raw PRDs, `prd/` refined PRDs, `arch/` architecture docs (DSH refactor, Android port, magic cue, OCR degrade, memory, avatar, …)
+- **`docs/blog/`** — bilingual tech blog series; **`docs/superpowers/`** — plans/specs notes
+- **`skills/`** — Device skills: `phone-use-agent` (C++ CLI for mobile screen automation), `ohos-cli-tool`, `phone-use-harmonyos` (deployed to the on-device DSH)
+- **`dsh-plugins/`** — On-device DSH plugins: `bonio-bridge` (hiclaw-compatible gateway), `bonio-wechat` (WeChat bridge)
+- **`tools/`** — Deploy scripts (`deploy-*-ohos.sh`), `dsh-daemon.sh`, `bonio-proxy-ime` (C++ proxy IME), `skills-device/` (SKILL.md copies), `hapsigner` binaries if present
+- **`assets/`** — Shared animation/OCR/reading assets (Lottie for desktop avatar)
+- **`dsh-kun-like-pet/`** — Vendored third-party DSH desktop-pet plugin (reference only; separate upstream project)
+- **`tasks/`** — Working PRD notes
 
 ## Linting & Formatting
 
@@ -382,5 +407,6 @@ Server config lives in `hiclaw.json` (workspace root, default: `~/.bonio/hiclaw.
 
 ## Git Notes
 
-- **Git LFS** is used for `.so` and `.onnx` binary files (see `.gitattributes`)
-- Sherpa-ONNX model files must be downloaded separately: `powershell -ExecutionPolicy Bypass -File desktop/tool/download_model.ps1`
+- **Git LFS** tracks `.so` and `.onnx` files (see `.gitattributes`)
+- `.bat` / `.cmd` / `.ps1` files **must use CRLF** (enforced via `.gitattributes`)
+- Sherpa-ONNX model files must be downloaded separately (see Desktop quirks above)
