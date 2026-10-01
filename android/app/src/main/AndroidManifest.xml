@@ -88,7 +88,11 @@
         <service
             android:name=".NodeForegroundService"
             android:exported="false"
-            android:foregroundServiceType="dataSync|microphone|mediaProjection" />
+            android:foregroundServiceType="specialUse|dataSync|microphone|mediaProjection">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps the agent gateway connection alive for long-running remote control sessions" />
+        </service>
 
         <service
             android:name=".remote.node.DeviceNotificationListenerService"

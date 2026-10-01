@@ -86,6 +86,13 @@ class NodeForegroundService : Service() {
     return START_STICKY
   }
 
+  override fun onTimeout(startId: Int) {
+    // Safety net: Android 15+ throws ForegroundServiceDidNotStopInTimeException if a
+    // quota-limited FGS type (e.g. dataSync) outlives its onTimeout(). The base type is
+    // specialUse (no quota), so this should never fire — stop promptly if it does.
+    stopSelf()
+  }
+
   override fun onDestroy() {
     notificationJob?.cancel()
     scope.cancel()
@@ -158,7 +165,14 @@ class NodeForegroundService : Service() {
 
     lastRequiresMic = requiresMic
     lastRequiresMediaProjection = requiresMediaProjection
-    var types = ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+    // dataSync is quota-limited to 6h/24h on Android 15+ and crashes on timeout; specialUse
+    // has no quota and fits a long-lived connection service (same choice as FloatingWindowService).
+    var types =
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+      } else {
+        ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+      }
     if (requiresMic) {
       types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
     }
