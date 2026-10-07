@@ -2,7 +2,6 @@ package ai.axiomaster.bonio.avatar
 
 import ai.axiomaster.bonio.ai.AgentManager
 import ai.axiomaster.bonio.ai.AgentState
-import ai.axiomaster.bonio.remote.chat.SystemTtsManager
 import android.media.RingtoneManager
 import android.content.Context
 import android.util.Log
@@ -22,14 +21,14 @@ import kotlinx.serialization.json.long
 /**
  * Unified executor for server-driven `avatar.command` events.
  * The server sends structured commands; this class dispatches to
- * AvatarController / AgentStateManager / TTS without any business logic.
+ * AvatarController / AgentStateManager without any business logic.
+ * (TTS actions were removed with the voice interaction feature —
+ * server-sent `tts`/`stopTts` are ignored.)
  */
 class AvatarCommandExecutor(
     private val context: Context,
     private val scope: CoroutineScope,
 ) {
-    var ttsManager: SystemTtsManager? = null
-
     private val json = Json { ignoreUnknownKeys = true }
 
     fun execute(payloadJson: String?) {
@@ -51,8 +50,6 @@ class AvatarCommandExecutor(
                 "moveTo" -> executeMoveTo(params)
                 "setBubble" -> executeSetBubble(params)
                 "clearBubble" -> executeClearBubble()
-                "tts" -> executeTts(params)
-                "stopTts" -> executeStopTts()
                 "playSound" -> executePlaySound(params)
                 "setColorFilter" -> executeSetColorFilter(params)
                 "setPosition" -> executeSetPosition(params)
@@ -125,15 +122,6 @@ class AvatarCommandExecutor(
         AgentManager.stateManager.clearBubble()
     }
 
-    private fun executeTts(params: JsonObject?) {
-        val text = params?.get("text")?.jsonPrimitive?.content ?: return
-        ttsManager?.speak(text)
-    }
-
-    private fun executeStopTts() {
-        ttsManager?.stop()
-    }
-
     private fun executePlaySound(params: JsonObject?) {
         val type = params?.get("type")?.jsonPrimitive?.content ?: "notification"
         try {
@@ -185,8 +173,6 @@ class AvatarCommandExecutor(
                     "moveTo" -> executeMoveTo(stepParams)
                     "setBubble" -> executeSetBubble(stepParams)
                     "clearBubble" -> executeClearBubble()
-                    "tts" -> executeTts(stepParams)
-                    "stopTts" -> executeStopTts()
                     "playSound" -> executePlaySound(stepParams)
                     "setColorFilter" -> executeSetColorFilter(stepParams)
                     "setPosition" -> executeSetPosition(stepParams)

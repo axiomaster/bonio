@@ -5,13 +5,11 @@ import android.content.Intent
 import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
-import ai.axiomaster.bonio.ai.AgentManager
 import ai.axiomaster.bonio.ai.AgentState
 import ai.axiomaster.bonio.avatar.CustomSkinManager
 import ai.axiomaster.bonio.avatar.SkinImporter
 import ai.axiomaster.bonio.remote.gateway.GatewayEndpoint
 import ai.axiomaster.bonio.remote.chat.OutgoingAttachment
-import ai.axiomaster.bonio.remote.chat.SpeechToTextManager
 import ai.axiomaster.bonio.remote.node.CanvasController
 import ai.axiomaster.bonio.remote.node.ScreenCaptureManager
 import ai.axiomaster.bonio.remote.node.ScreenRecordManager
@@ -84,10 +82,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
   private val _serverConfig = kotlinx.coroutines.flow.MutableStateFlow<ai.axiomaster.bonio.remote.config.ServerConfig?>(null)
   val serverConfig: StateFlow<ai.axiomaster.bonio.remote.config.ServerConfig?> = _serverConfig
-
-  private val ttsManager = ai.axiomaster.bonio.remote.chat.SystemTtsManager(app)
-  private val _isSpeakerEnabled = MutableStateFlow(true)
-  val isSpeakerEnabled: StateFlow<Boolean> = _isSpeakerEnabled
 
   private val appPrefs = app.getSharedPreferences("bonio_app_settings", android.content.Context.MODE_PRIVATE)
   private val _appLanguage = MutableStateFlow(
@@ -212,29 +206,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
   val installedThemes: StateFlow<List<ai.axiomaster.bonio.remote.theme.ThemeInfo>> = themeManager.installedThemes
   val activeThemeId: StateFlow<String> = themeManager.activeThemeId
 
-  private val sttManager = SpeechToTextManager(app)
-  private val _partialSttText = MutableStateFlow<String?>(null)
-  val partialSttText: StateFlow<String?> = _partialSttText
-
   init {
       CustomSkinManager.refresh(app)
-      runtime.chat.onAssistantSpoke = { text: String ->
-          if (_isSpeakerEnabled.value) {
-              AgentManager.stateManager.transitionTo(AgentState.Speaking)
-              AgentManager.stateManager.setBubble(text)
-              ttsManager.speak(text)
-          }
-      }
-
-      ttsManager.onSpeakingDone = {
-          viewModelScope.launch(Dispatchers.Main) {
-              if (AgentManager.stateManager.currentState.value == AgentState.Speaking) {
-                  AgentManager.stateManager.transitionTo(AgentState.Idle)
-              }
-          }
-      }
-
-      sttManager.warmUp()
 
       viewModelScope.launch {
           isConnected.collect { connected ->
@@ -245,57 +218,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
       }
   }
 
-  fun startVoiceInput() {
-      _partialSttText.value = null
-      sttManager.startListening(object : SpeechToTextManager.Listener {
-          override fun onPartialResult(text: String) {
-              _partialSttText.value = text
-          }
-
-          override fun onFinalResult(text: String) {
-              _partialSttText.value = null
-              AgentManager.stateManager.transitionTo(AgentState.Thinking)
-              sendChat(message = text, thinking = chatThinkingLevel.value, attachments = emptyList())
-          }
-
-          override fun onError(errorCode: Int) {
-              Log.w("MainViewModel", "STT error $errorCode")
-              _partialSttText.value = null
-              AgentManager.stateManager.transitionTo(AgentState.Idle)
-          }
-
-          override fun onReadyForSpeech() {
-              AgentManager.stateManager.transitionTo(AgentState.Listening)
-          }
-
-          override fun onEndOfSpeech() {}
-      })
-  }
-
-  fun stopVoiceInput() {
-      sttManager.stopListening()
-  }
-
-  fun cancelVoiceInput() {
-      sttManager.cancelListening()
-      _partialSttText.value = null
-      AgentManager.stateManager.transitionTo(AgentState.Idle)
-  }
-
-  fun setSpeakerEnabled(enabled: Boolean) {
-      _isSpeakerEnabled.value = enabled
-      if (!enabled) {
-          ttsManager.stop()
-          if (AgentManager.stateManager.currentState.value == AgentState.Speaking) {
-              AgentManager.stateManager.transitionTo(AgentState.Idle)
-          }
-      }
-  }
-
   override fun onCleared() {
       super.onCleared()
-      sttManager.destroy()
-      ttsManager.release()
   }
 
   fun setForeground(value: Boolean) {

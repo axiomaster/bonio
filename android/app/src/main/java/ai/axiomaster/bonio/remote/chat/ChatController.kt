@@ -49,8 +49,9 @@ class ChatController(
   private val _streamingAssistantText = MutableStateFlow<String?>(null)
   val streamingAssistantText: StateFlow<String?> = _streamingAssistantText.asStateFlow()
 
-  var onAssistantReply: ((String) -> Unit)? = null
-  var onAssistantSpoke: ((String) -> Unit)? = null
+  // NOTE: voice hooks (onAssistantReply/onAssistantSpoke) were removed with the
+  // voice interaction feature — assistant replies are no longer spoken or
+  // mirrored into the avatar bubble from here.
   var onMemoChanged: (() -> Unit)? = null
   var userProfileProvider: (() -> String)? = null
 
@@ -429,16 +430,6 @@ class ChatController(
               val newAssistantCount = history.messages.count { it.role == "assistant" }
               val prevCount = assistantCountBeforeSend
               Log.d("ChatController", "handleChatEvent: assistant count before=$prevCount after=$newAssistantCount")
-              if (prevCount >= 0 && newAssistantCount > prevCount) {
-                val finalAssistantMessage = history.messages.lastOrNull { it.role == "assistant" }
-                val textToSpeak = finalAssistantMessage?.content?.find { it.type == "text" }?.text
-                if (!textToSpeak.isNullOrBlank()) {
-                  onAssistantReply?.invoke(textToSpeak)
-                  onAssistantSpoke?.invoke(textToSpeak)
-                }
-              } else {
-                Log.d("ChatController", "handleChatEvent: No new assistant message, skipping TTS")
-              }
               assistantCountBeforeSend = -1
             } else {
               // Server history is empty or old, append local streaming result as backup
@@ -451,8 +442,6 @@ class ChatController(
                   timestampMs = System.currentTimeMillis()
                 )
                 _messages.value = current + assistantMsg
-                onAssistantReply?.invoke(streamingText)
-                onAssistantSpoke?.invoke(streamingText)
               } else {
                 Log.d("ChatController", "handleChatEvent: No streaming text to save and history empty")
               }

@@ -87,9 +87,6 @@ fun SettingsTab(
     // Connection states
     val isConnected by viewModel.isConnected.collectAsState()
 
-    // Voice & Audio
-    val isSpeakerEnabled by viewModel.isSpeakerEnabled.collectAsState()
-
     // Floating window state
     val showAvatarOverlay by viewModel.showAvatarOverlay.collectAsState()
 
@@ -110,13 +107,6 @@ fun SettingsTab(
         } else {
             viewModel.setLocationMode(LocationMode.Off)
         }
-    }
-
-    var micPermissionGranted by remember {
-        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
-    }
-    val audioPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        micPermissionGranted = granted
     }
 
     val screenRecordEnabled by viewModel.screenRecordEnabled.collectAsState()
@@ -143,7 +133,6 @@ fun SettingsTab(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 isAccessibilityGranted = isAccessibilityEnabled(context)
-                micPermissionGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -224,24 +213,6 @@ fun SettingsTab(
             }
         }
 
-        // ── 3. Voice & Audio Section ──
-        item { SectionHeader(title = strings.voiceSettingsSection) }
-        item {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                color = colors.cardBackground,
-                border = BorderStroke(1.dp, colors.border)
-            ) {
-                ToggleRow(
-                    title = strings.ttsSettingTitle,
-                    subtitle = strings.ttsSettingDesc,
-                    isOn = isSpeakerEnabled,
-                    onToggle = { viewModel.setSpeakerEnabled(it) }
-                )
-            }
-        }
-
         // ── 4. Floating Window Section ──
         item { SectionHeader(title = if (currentLanguage == AppLanguage.ZH) "悬浮窗口" else "Floating Window") }
         item {
@@ -289,16 +260,6 @@ fun SettingsTab(
                             } else {
                                 viewModel.setLocationMode(LocationMode.Off)
                             }
-                        }
-                    )
-                    HorizontalDivider(color = colors.divider, thickness = 0.5.dp)
-                    ToggleRow(
-                        title = strings.permMicTitle,
-                        subtitle = strings.permMicDesc,
-                        isOn = micPermissionGranted,
-                        onToggle = { enable ->
-                            if (enable) audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                            else micPermissionGranted = false
                         }
                     )
                     HorizontalDivider(color = colors.divider, thickness = 0.5.dp)

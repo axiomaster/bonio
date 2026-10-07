@@ -8,7 +8,6 @@ import ai.axiomaster.bonio.avatar.CloneManager
 import ai.axiomaster.bonio.avatar.MotionState
 import ai.axiomaster.bonio.avatar.ThemeManager
 import ai.axiomaster.bonio.avatar.ActionEventWatcher
-import ai.axiomaster.bonio.remote.chat.SpeechToTextManager
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
@@ -17,7 +16,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.pm.PackageManager
 import android.graphics.PorterDuff
 import android.graphics.PixelFormat
 import android.os.Build
@@ -41,7 +39,6 @@ import android.widget.TextView
 import android.widget.LinearLayout
 import android.widget.RelativeLayout
 import androidx.cardview.widget.CardView
-import androidx.core.content.ContextCompat
 import ai.axiomaster.bonio.avatar.PixelAvatarView
 
 import ai.axiomaster.bonio.remote.chat.OutgoingAttachment
@@ -75,6 +72,7 @@ class FloatingWindowService : Service() {
     private lateinit var bubbleContainer: CardView
     private lateinit var cueTitle: TextView
     private lateinit var textBubble: TextView
+    private lateinit var cueRowsContainer: LinearLayout
 
     // Fixed avatar window offsets (anchor avatar at x=30dp, y=36dp within 160x140dp window)
     private var avatarWindowWidth = 0
@@ -99,13 +97,8 @@ class FloatingWindowService : Service() {
     private lateinit var themeManager: ThemeManager
     private var actionEventWatcher: ActionEventWatcher? = null
 
-    private var sttManager: SpeechToTextManager? = null
-    private var callTtsManager: ai.axiomaster.bonio.remote.chat.SystemTtsManager? = null
-    private var isVoiceActive = false
-    private var voiceSessionId = 0
-    private var screenSuggestionPending = false
-    private var actionableSuggestion: String? = null
     private var magicCuePending = false
+    private var rememberPending = false
     private var actionableCues: List<ai.axiomaster.bonio.remote.cue.MagicCue> = emptyList()
     private var cueEpoch = 0
     private var headStatusUntil = 0L
@@ -175,47 +168,15 @@ class FloatingWindowService : Service() {
                 .build()
 
             if (Build.VERSION.SDK_INT >= 34) {
-                val hasMic = ContextCompat.checkSelfPermission(
-                    this, android.Manifest.permission.RECORD_AUDIO
-                ) == PackageManager.PERMISSION_GRANTED
-                val serviceType = if (hasMic) {
-                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or
-                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
-                } else {
-                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-                }
-                startForeground(101, notification, serviceType)
+                startForeground(101, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
             } else {
                 startForeground(101, notification)
             }
         }
 
-        sttManager = SpeechToTextManager(applicationContext)
-        sttManager?.warmUp()
-
-        callTtsManager = ai.axiomaster.bonio.remote.chat.SystemTtsManager(applicationContext)
         val runtime = (application as BonioApp).runtime
-        runtime.callEventHandler.ttsManager = callTtsManager
-        runtime.callEventHandler.sttManager = sttManager
         runtime.callStateMonitor.start()
-        runtime.avatarCommandExecutor.ttsManager = callTtsManager
         runtime.floatingWindowIntentHandler = { payload -> handleIntentExecute(payload) }
-        runtime.chat.onAssistantReply = { text ->
-            if (screenSuggestionPending) {
-                screenSuggestionPending = false
-                actionableSuggestion = text.trim()
-                mainHandler.post {
-                    avatarController.setActivity(AgentState.Speaking)
-                    avatarController.setBubble(text, SUGGESTION_BG_COLOR, android.graphics.Color.WHITE)
-                    mainHandler.postDelayed({
-                        if (stateManager.currentState.value == AgentState.Speaking) {
-                            avatarController.clearBubble()
-                            avatarController.setActivity(AgentState.Idle)
-                        }
-                    }, SUGGESTION_DISPLAY_MS)
-                }
-            }
-        }
 
         val avatarPrefs = getSharedPreferences("bonio_avatar", Context.MODE_PRIVATE)
         currentAvatarScale = avatarPrefs.getFloat("avatar_scale", 1.0f)
@@ -247,6 +208,7 @@ class FloatingWindowService : Service() {
         bubbleContainer = capsuleView.findViewById(R.id.capsule_root)
         cueTitle = capsuleView.findViewById(R.id.cue_title)
         textBubble = capsuleView.findViewById(R.id.text_bubble)
+        cueRowsContainer = capsuleView.findViewById(R.id.cue_rows_container)
 
         val onCapsuleClick = View.OnClickListener {
             ai.axiomaster.bonio.util.AppLogger.i(TAG, "capsule clicked: pendingPrompt=$pendingAccessibilityPrompt cues=${actionableCues.size}")
@@ -254,8 +216,6 @@ class FloatingWindowService : Service() {
                 openAccessibilitySettings()
             } else if (actionableCues.isNotEmpty()) {
                 applyMagicCue()
-            } else if (!actionableSuggestion.isNullOrEmpty()) {
-                sendActionableSuggestion()
             } else if (!stateManager.currentTextBubble.value.isNullOrEmpty() &&
                 stateManager.bubbleCountdownLabel.value.isNullOrEmpty()
             ) {
@@ -495,7 +455,7 @@ class FloatingWindowService : Service() {
                                          state.activity == AgentState.Sleeping ||
                                          state.activity == AgentState.Bored
                     val isStationary = state.motion == MotionState.Stationary
-                    val notBusy = !screenSuggestionPending && !magicCuePending && !isVoiceActive && !isCapsuleAttached && (now >= headStatusUntil)
+                    val notBusy = !rememberPending && !magicCuePending && !isCapsuleAttached && (now >= headStatusUntil)
                     if (isIdleActivity && isStationary && notBusy) {
                         if (now - lastInteractionTime >= AUTO_DOCK_IDLE_TIMEOUT_MS) {
                             dockToNearestEdge(animated = true)
@@ -517,6 +477,9 @@ class FloatingWindowService : Service() {
                         hideBubbleAnimated()
                     }
                 } else {
+                    // Generic bubble (streaming reply, call prompt, "已记住"…):
+                    // retire any cue rows and restore the plain text surface.
+                    resetCueRows()
                     cueTitle.visibility = View.GONE
                     textBubble.text = text
                     showBubbleAnimated()
@@ -906,8 +869,8 @@ class FloatingWindowService : Service() {
             private val longPressRunnable = Runnable {
                 if (!isDragging) {
                     longPressTriggered = true
-                    Log.d(TAG, "Long press detected -> analyzing current screen")
-                    analyzeCurrentScreen()
+                    Log.d(TAG, "Long press detected -> remembering current screen")
+                    rememberScreen()
                 }
             }
 
@@ -948,7 +911,6 @@ class FloatingWindowService : Service() {
                                 hideBubbleAnimated()
                             }
                             if (longPressTriggered) {
-                                cancelVoiceInputFromFloating()
                                 longPressTriggered = false
                             }
                         }
@@ -1043,77 +1005,140 @@ class FloatingWindowService : Service() {
         pixelAvatarView.setOnTouchListener(touchListener)
     }
 
-    private fun analyzeCurrentScreen() {
-        if (screenSuggestionPending) return
+    // ── Long-press: screenshot → local archive + agent memory → "已记住" ──
+
+    private fun rememberScreen() {
+        if (rememberPending || magicCuePending) return
+        val runtime = (application as BonioApp).runtime
+        if (!runtime.isConnected.value) {
+            avatarController.setActivity(AgentState.Confused)
+            setHeadStatus("后端未连接")
+            mainHandler.postDelayed({ avatarController.clearBubble(); avatarController.setActivity(AgentState.Idle) }, 2000)
+            return
+        }
+
+        rememberPending = true
+        cueEpoch += 1
+        val epoch = cueEpoch
         avatarController.clearBubble()
-        actionableSuggestion = null
+        resetCueRows()
+        hideBubbleAnimated()
         avatarController.setActivity(AgentState.Thinking)
-        setHeadStatus("正在理解当前屏幕…", 15_000)
+        avatarController.performAction("take_photo")
+        setHeadStatus("正在记住屏幕…", 60_000)
+
         serviceScope.launch {
             try {
-                val uiTree = withContext(Dispatchers.Default) {
-                    ai.axiomaster.bonio.remote.node.BonioAccessibilityService.instance?.dumpActiveWindow()
+                val screenshotBase64 = runtime.captureScreenshot(maxEdge = 1080, quality = 80)
+                    ?: throw IllegalStateException("截图失败，请稍后再试")
+
+                // Local archive is best-effort: never blocks or fails the memory save.
+                val localFile = withContext(Dispatchers.IO) { saveScreenshotLocally(screenshotBase64) }
+                if (localFile == null) {
+                    ai.axiomaster.bonio.util.AppLogger.w(TAG, "screenshot local save failed (continuing)")
                 }
-                if (uiTree == null) {
-                    throw IllegalStateException("请先在系统设置中启用 Bonio 无障碍服务")
+
+                val (screen, hasText) = parseScreenContext(runtime, screenshotBase64)
+
+                var remembered = if (hasText) {
+                    withContext(Dispatchers.Default) {
+                        runtime.companionMemory.capture(
+                            screen = screen,
+                            explicit = true,
+                            coverImage = screenshotBase64,
+                            originalImage = screenshotBase64,
+                        )
+                    }
+                } else {
+                    false
                 }
-                val suggestion = withContext(Dispatchers.Default) {
-                    ai.axiomaster.bonio.remote.node.ScreenSuggestionRules.match(uiTree)
+                // 截图兜底：分析不可用（无无障碍/无文本/LLM 失败）时也把截图存下来。
+                if (!remembered) {
+                    remembered = withContext(Dispatchers.Default) {
+                        saveScreenshotMemory(runtime, screen, screenshotBase64)
+                    }
                 }
-                if (suggestion == null) {
-                    avatarController.setActivity(AgentState.Confused)
-                    setHeadStatus("暂时没有匹配的建议")
-                    delay(2500)
-                    avatarController.clearBubble()
-                    avatarController.setActivity(AgentState.Idle)
-                    return@launch
+                if (!remembered) throw IllegalStateException("没能记住屏幕，请稍后再试")
+
+                ai.axiomaster.bonio.util.AppLogger.i(
+                    TAG,
+                    "rememberScreen completed: hasText=$hasText local=${localFile?.name}",
+                )
+                if (cueEpoch != epoch) return@launch  // superseded by a newer gesture
+                rememberPending = false
+                avatarController.setBubble("已记住", SUGGESTION_BG_COLOR, android.graphics.Color.WHITE)
+                setHeadStatus("已记住", 2000)
+                avatarController.showTemporaryState(AgentState.Happy)
+                mainHandler.postDelayed({
+                    if (cueEpoch == epoch) {
+                        avatarController.clearBubble()
+                    }
+                }, 2000)
+                if (ai.axiomaster.bonio.remote.node.BonioAccessibilityService.instance == null) {
+                    remindAccessibility()
                 }
-                actionableSuggestion = suggestion
-                avatarController.setActivity(AgentState.Speaking)
-                avatarController.setBubble(suggestion, SUGGESTION_BG_COLOR, android.graphics.Color.WHITE)
-                delay(SUGGESTION_DISPLAY_MS)
-                if (actionableSuggestion == suggestion) {
-                    actionableSuggestion = null
-                    avatarController.clearBubble()
-                    avatarController.setActivity(AgentState.Idle)
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Screen context analysis failed", e)
-                avatarController.setActivity(AgentState.Confused)
-                setHeadStatus(e.message ?: "屏幕分析失败", 2500)
-                delay(2500)
-                avatarController.clearBubble()
-                avatarController.setActivity(AgentState.Idle)
+            } catch (e: Throwable) {
+                rememberPending = false
+                ai.axiomaster.bonio.util.AppLogger.w(TAG, "rememberScreen failed: ${e.message}")
+                showCueFailure(e.message ?: "没能记住屏幕，请稍后再试")
             }
         }
     }
 
-    private fun sendActionableSuggestion() {
-        val suggestion = actionableSuggestion?.takeIf { it.isNotBlank() } ?: return
-        actionableSuggestion = null
-        avatarController.setActivity(AgentState.Working)
-        setHeadStatus("正在发送…", 15_000)
-        serviceScope.launch {
-            val accessibility = ai.axiomaster.bonio.remote.node.BonioAccessibilityService.instance
-            val filled = accessibility?.fillActiveReplyField(suggestion) == true
-            if (filled) {
-                avatarController.setActivity(AgentState.Happy)
-                setHeadStatus("已写入回复框")
+    /** Archive the raw screenshot under filesDir/screenshots/. Returns null on failure. */
+    private fun saveScreenshotLocally(base64: String): java.io.File? {
+        return runCatching {
+            val decoded = android.util.Base64.decode(base64, android.util.Base64.DEFAULT)
+            val bitmap = android.graphics.BitmapFactory.decodeByteArray(decoded, 0, decoded.size)
+            if (bitmap == null) {
+                null
             } else {
-                actionableSuggestion = suggestion
-                avatarController.setActivity(AgentState.Confused)
-                setHeadStatus("未找到回复框，点此重试")
+                val dir = java.io.File(filesDir, "screenshots").apply { mkdirs() }
+                val name = java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.US).format(java.util.Date())
+                val file = java.io.File(dir, "$name.jpg")
+                file.outputStream().use { out ->
+                    bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, out)
+                }
+                file
             }
-            delay(1800)
-            avatarController.clearBubble()
-            avatarController.setActivity(AgentState.Idle)
+        }.getOrNull()
+    }
+
+    /**
+     * Screen text for memory/cue flows: screen.context prefers the accessibility
+     * tree and degrades to OCR with the caller-provided screenshot. Returns the
+     * parsed context and whether it yielded readable text.
+     */
+    private suspend fun parseScreenContext(
+        runtime: ai.axiomaster.bonio.NodeRuntime,
+        screenshotBase64: String?,
+    ): Pair<ai.axiomaster.bonio.remote.cue.MagicCueController.ScreenContext, Boolean> {
+        val ctxRes = runtime.captureScreenContext(6000, screenshotBase64)
+        if (!ctxRes.ok || ctxRes.payloadJson == null) {
+            return Pair(
+                ai.axiomaster.bonio.remote.cue.MagicCueController.ScreenContext(
+                    packageName = "",
+                    title = "",
+                    content = "",
+                    rawJson = "",
+                ),
+                false,
+            )
         }
+        val obj = withContext(Dispatchers.Default) { org.json.JSONObject(ctxRes.payloadJson) }
+        val screen = ai.axiomaster.bonio.remote.cue.MagicCueController.ScreenContext(
+            packageName = obj.optString("package"),
+            title = obj.optString("title"),
+            content = obj.optString("content"),
+            rawJson = ctxRes.payloadJson,
+        )
+        return Pair(screen, screen.content.isNotBlank())
     }
 
     // ── Magic Cue (double-tap): screen text → LLM suggestions → capsule ──
 
     private fun runMagicCue() {
-        if (magicCuePending) return
+        if (magicCuePending || rememberPending) return
         val runtime = (application as BonioApp).runtime
         if (!runtime.isConnected.value) {
             avatarController.setActivity(AgentState.Confused)
@@ -1145,98 +1170,34 @@ class FloatingWindowService : Service() {
                 // back-to-back calls, so the old parallel capture raced the
                 // context's own OCR screenshot (both could fail).
                 val screenshotBase64 = runtime.captureScreenshot(maxEdge = 1080, quality = 80)
-                val ctxRes = runtime.captureScreenContext(6000, screenshotBase64)
-
-                // screen.context degrades to OCR when accessibility is off, and
-                // may still come back empty; that is not fatal — the screenshot
-                // itself becomes the memory (截图兜底).
-                var screen = ai.axiomaster.bonio.remote.cue.MagicCueController.ScreenContext(
-                    packageName = "",
-                    title = "",
-                    content = "",
-                    rawJson = "",
-                )
-                var hasText = false
-                if (ctxRes.ok && ctxRes.payloadJson != null) {
-                    val obj = withContext(Dispatchers.Default) { org.json.JSONObject(ctxRes.payloadJson) }
-                    screen = ai.axiomaster.bonio.remote.cue.MagicCueController.ScreenContext(
-                        packageName = obj.optString("package"),
-                        title = obj.optString("title"),
-                        content = obj.optString("content"),
-                        rawJson = ctxRes.payloadJson,
-                    )
-                    hasText = screen.content.isNotBlank()
-                }
+                val (screen, hasText) = parseScreenContext(runtime, screenshotBase64)
 
                 val isWechat = screen.packageName == WECHAT_PACKAGE
                 var cues: List<ai.axiomaster.bonio.remote.cue.MagicCue>? = null
                 var cueError: String? = null
-                var remembered = false
-                kotlinx.coroutines.coroutineScope {
-                    // Only run LLM magic cue analysis for WeChat pages with readable text.
-                    if (isWechat && hasText) {
-                        launch {
-                            when (val r = withContext(Dispatchers.Default) { runtime.magicCue.runCue(screen, screenshotBase64) }) {
-                                is ai.axiomaster.bonio.remote.cue.MagicCueController.CueResult.Success -> cues = r.cues
-                                is ai.axiomaster.bonio.remote.cue.MagicCueController.CueResult.Error -> cueError = r.message
-                            }
-                        }
-                    }
-                    launch {
-                        remembered = withContext(Dispatchers.Default) {
-                            if (hasText) {
-                                runtime.companionMemory.capture(
-                                    screen = screen,
-                                    explicit = true,
-                                    coverImage = screenshotBase64,
-                                    originalImage = screenshotBase64,
-                                )
-                            } else {
-                                false
-                            }
-                        }
-                        // 截图兜底：分析不可用（无无障碍/无文本/LLM 失败）时也把截图存下来。
-                        if (!remembered && !screenshotBase64.isNullOrEmpty()) {
-                            remembered = withContext(Dispatchers.Default) {
-                                saveScreenshotMemory(runtime, screen, screenshotBase64)
-                            }
-                        }
+                // Only run LLM magic cue analysis for WeChat pages with readable text.
+                if (isWechat && hasText && !screenshotBase64.isNullOrEmpty()) {
+                    when (val r = withContext(Dispatchers.Default) { runtime.magicCue.runCue(screen, screenshotBase64) }) {
+                        is ai.axiomaster.bonio.remote.cue.MagicCueController.CueResult.Success -> cues = r.cues
+                        is ai.axiomaster.bonio.remote.cue.MagicCueController.CueResult.Error -> cueError = r.message
                     }
                 }
                 magicCuePending = false
-                ai.axiomaster.bonio.util.AppLogger.i(TAG, "runMagicCue completed: a11yMissing=$a11yMissing isWechat=$isWechat hasText=$hasText cues=${cues?.size} remembered=$remembered hasScreenshot=${!screenshotBase64.isNullOrEmpty()}")
+                ai.axiomaster.bonio.util.AppLogger.i(TAG, "runMagicCue completed: a11yMissing=$a11yMissing isWechat=$isWechat hasText=$hasText cues=${cues?.size} hasScreenshot=${!screenshotBase64.isNullOrEmpty()}")
                 val a11yStillMissing = ai.axiomaster.bonio.remote.node.BonioAccessibilityService.instance == null
                 when {
                     !cues.isNullOrEmpty() -> {
                         showCues(cues!!)
                         if (a11yStillMissing) remindAccessibility()
                     }
-                    // WeChat cue errors must not be masked by "已记住" — surface
+                    // WeChat cue errors must not be masked — surface
                     // them so the user knows the analysis failed.
                     isWechat && cueError != null -> {
                         showCueFailure(cueError!!)
                         if (a11yStillMissing) remindAccessibility()
                     }
-                    remembered -> {
-                        avatarController.setActivity(AgentState.Happy)
-                        if (a11yStillMissing) {
-                            // Screenshot fallback succeeded — nudge toward full analysis.
-                            remindAccessibility("已截图记住 · 点我开启无障碍可分析屏幕")
-                        } else {
-                            cueEpoch += 1
-                            val epoch = cueEpoch
-                            setHeadStatus("已记住 ✅", 2000)
-                            mainHandler.postDelayed({
-                                if (cueEpoch == epoch) {
-                                    avatarController.clearBubble()
-                                    avatarController.setActivity(AgentState.Idle)
-                                }
-                            }, 2000)
-                        }
-                    }
-                    a11yStillMissing -> remindAccessibility("未能读取屏幕内容 · 点我开启无障碍")
-                    cues != null -> showCueFailure("当前页面没有什么可以帮你")
-                    else -> showCueFailure(cueError ?: "屏幕分析失败，请稍后再试")
+                    a11yStillMissing -> remindAccessibility("暂无建议 · 开启无障碍后可分析屏幕")
+                    else -> showCueFailure("暂无建议")
                 }
             } catch (e: Throwable) {
                 magicCuePending = false
@@ -1303,15 +1264,16 @@ class FloatingWindowService : Service() {
         actionableCues = cues
         cueEpoch += 1
         val epoch = cueEpoch
-        val first = cues.first()
 
-        if (first.title.isNotEmpty() && first.title != first.content) {
-            cueTitle.text = first.title
-            cueTitle.visibility = View.VISIBLE
-        } else {
-            cueTitle.visibility = View.GONE
+        // Multi-cue mode: one tappable row per suggestion. The plain text_bubble
+        // stays reserved for generic bubbles (streaming replies, prompts…).
+        textBubble.visibility = View.GONE
+        cueTitle.visibility = View.GONE
+        cueRowsContainer.removeAllViews()
+        cueRowsContainer.visibility = View.VISIBLE
+        cues.forEach { cue ->
+            cueRowsContainer.addView(buildCueRow(cue))
         }
-        textBubble.text = first.content
 
         avatarController.setActivity(AgentState.Speaking)
         val headPrompt = if (cues.size > 1) {
@@ -1325,10 +1287,65 @@ class FloatingWindowService : Service() {
         mainHandler.postDelayed({
             if (cueEpoch == epoch) {
                 actionableCues = emptyList()
+                resetCueRows()
                 hideBubbleAnimated()
                 avatarController.setActivity(AgentState.Idle)
             }
         }, SUGGESTION_DISPLAY_MS)
+    }
+
+    /** One tappable suggestion row (optional title above bold content). */
+    private fun buildCueRow(cue: ai.axiomaster.bonio.remote.cue.MagicCue): View {
+        val density = resources.displayMetrics.density
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = (8 * density).toInt() }
+            val outValue = android.util.TypedValue()
+            theme.resolveAttribute(android.R.attr.selectableItemBackground, outValue, true)
+            setBackgroundResource(outValue.resourceId)
+            isClickable = true
+            isFocusable = true
+            setPadding(0, (4 * density).toInt(), 0, (4 * density).toInt())
+        }
+        if (cue.title.isNotEmpty() && cue.title != cue.content) {
+            row.addView(TextView(this).apply {
+                text = cue.title
+                setTextColor(0xFF888888.toInt())
+                textSize = 11f
+                maxWidth = (260 * density).toInt()
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            })
+        }
+        row.addView(TextView(this).apply {
+            text = cue.content
+            setTextColor(0xFF1A1A1A.toInt())
+            textSize = 14f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            maxWidth = (260 * density).toInt()
+            maxLines = 3
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        })
+        row.setOnClickListener {
+            if (actionableCues.contains(cue)) {
+                applyMagicCue(cue)
+            }
+        }
+        return row
+    }
+
+    /** Restore the capsule to its generic single-text mode (cues gone). */
+    private fun resetCueRows() {
+        if (::cueRowsContainer.isInitialized) {
+            cueRowsContainer.removeAllViews()
+            cueRowsContainer.visibility = View.GONE
+        }
+        if (::textBubble.isInitialized) {
+            textBubble.visibility = View.VISIBLE
+        }
     }
 
     private fun showCueFailure(message: String) {
@@ -1341,6 +1358,7 @@ class FloatingWindowService : Service() {
         val cue = customCue ?: actionableCues.firstOrNull() ?: return
         cueEpoch += 1
         actionableCues = emptyList()
+        resetCueRows()
         hideBubbleAnimated()
         avatarController.setActivity(AgentState.Working)
         setHeadStatus("正在发送…", 15_000)
@@ -1437,206 +1455,11 @@ class FloatingWindowService : Service() {
         }
     }
 
-    private fun startVoiceInputFromFloating() {
-        val currentState = stateManager.currentState.value
-        if (currentState == AgentState.Bored || currentState == AgentState.Sleeping) {
-            avatarController.setActivity(AgentState.Idle)
-        } else if (currentState != AgentState.Idle) {
-            Log.d(TAG, "Cannot start voice input, agent state is $currentState")
-            return
-        }
-
-        val hasMic = ContextCompat.checkSelfPermission(
-            this, android.Manifest.permission.RECORD_AUDIO
-        ) == PackageManager.PERMISSION_GRANTED
-        if (!hasMic) {
-            Log.w(TAG, "RECORD_AUDIO permission not granted, bringing app to front")
-            bringAppToFront()
-            return
-        }
-
-        Log.d(TAG, "Starting voice input from floating window")
-        val mySession = ++voiceSessionId
-        isVoiceActive = true
-        avatarController.setActivity(AgentState.Listening)
-
-        sttManager?.startListening(object : SpeechToTextManager.Listener {
-            override fun onPartialResult(text: String) {
-                if (voiceSessionId != mySession) return
-                avatarController.setBubble(text)
-            }
-
-            override fun onFinalResult(text: String) {
-                if (voiceSessionId != mySession) {
-                    Log.d(TAG, "STT onFinalResult ignored (session $mySession stale, current $voiceSessionId)")
-                    return
-                }
-                Log.d(TAG, "STT final result from floating: $text")
-                isVoiceActive = false
-                avatarController.clearBubble()
-                avatarController.setActivity(AgentState.Thinking)
-
-                val runtime = (application as BonioApp).runtime
-                sendSttResultToServer(text, runtime)
-            }
-
-            override fun onError(errorCode: Int) {
-                if (voiceSessionId != mySession) return
-                Log.w(TAG, "STT error from floating: $errorCode")
-                isVoiceActive = false
-                avatarController.clearBubble()
-                avatarController.setActivity(AgentState.Idle)
-            }
-
-            override fun onReadyForSpeech() {
-                if (voiceSessionId != mySession) return
-                Log.d(TAG, "STT ready for speech from floating")
-            }
-
-            override fun onEndOfSpeech() {
-                if (voiceSessionId != mySession) return
-                Log.d(TAG, "STT end of speech from floating")
-                if (isVoiceActive) {
-                    isVoiceActive = false
-                    avatarController.clearBubble()
-                    avatarController.setActivity(AgentState.Idle)
-                }
-            }
-        })
-    }
-
-    private fun stopVoiceInputFromFloating() {
-        if (isVoiceActive) {
-            Log.d(TAG, "Stopping voice input from floating window")
-            val mySession = voiceSessionId
-            sttManager?.stopListening()
-            mainHandler.postDelayed({
-                if (isVoiceActive && voiceSessionId == mySession) {
-                    Log.w(TAG, "STT stop safety timeout — forcing state reset")
-                    isVoiceActive = false
-                    avatarController.clearBubble()
-                    avatarController.setActivity(AgentState.Idle)
-                }
-            }, 1500L)
-        }
-    }
-
-    private fun cancelVoiceInputFromFloating() {
-        if (isVoiceActive) {
-            Log.d(TAG, "Cancelling voice input from floating window")
-            voiceSessionId++
-            sttManager?.cancelListening()
-            isVoiceActive = false
-            avatarController.setActivity(AgentState.Idle)
-        }
-    }
-
-    private fun handleAgentClick() {
-        val currentState = stateManager.currentState.value
-        when (currentState) {
-            AgentState.Speaking, AgentState.Working -> {
-                Log.d(TAG, "Tap during $currentState -> interrupting, entering Listening")
-                callTtsManager?.stop()
-                val runtime = (application as BonioApp).runtime
-                runtime.chat.stopStreaming()
-                forceStartVoiceInput()
-            }
-            AgentState.Listening -> {
-                Log.d(TAG, "Tap during Listening -> stopping voice input")
-                stopVoiceInputFromFloating()
-            }
-            AgentState.Thinking -> {
-                bringAppToFront()
-            }
-            else -> {
-                bringAppToFront()
-            }
-        }
-    }
-
-    private fun forceStartVoiceInput() {
-        val hasMic = ContextCompat.checkSelfPermission(
-            this, android.Manifest.permission.RECORD_AUDIO
-        ) == PackageManager.PERMISSION_GRANTED
-        if (!hasMic) {
-            Log.w(TAG, "RECORD_AUDIO permission not granted, bringing app to front")
-            bringAppToFront()
-            return
-        }
-
-        Log.d(TAG, "Force starting voice input (interrupting current state)")
-        if (isVoiceActive) {
-            sttManager?.cancelListening()
-        }
-        val mySession = ++voiceSessionId
-        isVoiceActive = true
-        avatarController.setActivity(AgentState.Listening)
-
-        sttManager?.startListening(object : SpeechToTextManager.Listener {
-            override fun onPartialResult(text: String) {
-                if (voiceSessionId != mySession) return
-                avatarController.setBubble(text)
-            }
-
-            override fun onFinalResult(text: String) {
-                if (voiceSessionId != mySession) {
-                    Log.d(TAG, "STT onFinalResult ignored (session $mySession stale)")
-                    return
-                }
-                Log.d(TAG, "STT final result (interrupt): $text")
-                isVoiceActive = false
-                avatarController.clearBubble()
-                avatarController.setActivity(AgentState.Thinking)
-
-                val runtime = (application as BonioApp).runtime
-                sendSttResultToServer(text, runtime)
-            }
-
-            override fun onError(errorCode: Int) {
-                if (voiceSessionId != mySession) return
-                Log.w(TAG, "STT error (interrupt): $errorCode")
-                isVoiceActive = false
-                avatarController.clearBubble()
-                avatarController.setActivity(AgentState.Idle)
-            }
-
-            override fun onReadyForSpeech() {}
-
-            override fun onEndOfSpeech() {
-                if (voiceSessionId != mySession) return
-                if (isVoiceActive) {
-                    isVoiceActive = false
-                    avatarController.clearBubble()
-                    avatarController.setActivity(AgentState.Idle)
-                }
-            }
-        })
-    }
-
     private fun bringAppToFront() {
         val intent = Intent(this, MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         }
         startActivity(intent)
-    }
-
-    private fun sendSttResultToServer(text: String, runtime: NodeRuntime) {
-        serviceScope.launch {
-            try {
-                val payload = kotlinx.serialization.json.buildJsonObject {
-                    put("text", kotlinx.serialization.json.JsonPrimitive(text))
-                    put("context", kotlinx.serialization.json.JsonPrimitive("floating"))
-                }
-                runtime.sendEventToServer("stt.final_result", payload.toString())
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to send stt.final_result to server, falling back to chat", e)
-                runtime.chat.sendMessage(
-                    message = text,
-                    thinkingLevel = runtime.chat.thinkingLevel.value,
-                    attachments = emptyList()
-                )
-            }
-        }
     }
 
     fun handleIntentExecute(payloadJson: String?) {
@@ -1895,21 +1718,9 @@ class FloatingWindowService : Service() {
         avatarController.onTransition = null
         actionEventWatcher?.stop()
         actionEventWatcher = null
-        if (isVoiceActive) {
-            sttManager?.cancelListening()
-            isVoiceActive = false
-        }
-        sttManager?.destroy()
-        sttManager = null
-        callTtsManager?.release()
-        callTtsManager = null
         val runtime = (application as BonioApp).runtime
         runtime.callStateMonitor.stop()
-        runtime.callEventHandler.ttsManager = null
-        runtime.callEventHandler.sttManager = null
-        runtime.avatarCommandExecutor.ttsManager = null
         runtime.floatingWindowIntentHandler = null
-        runtime.chat.onAssistantReply = null
         dockAnimator?.cancel()
         dockAnimator = null
         serviceScope.cancel()

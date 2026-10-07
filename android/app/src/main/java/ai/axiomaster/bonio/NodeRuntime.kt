@@ -17,7 +17,6 @@ import ai.axiomaster.bonio.remote.gateway.GatewaySession
 import ai.axiomaster.bonio.remote.gateway.probeGatewayTlsFingerprint
 import ai.axiomaster.bonio.remote.node.*
 import ai.axiomaster.bonio.remote.LocationMode
-import ai.axiomaster.bonio.remote.VoiceWakeMode
 import ai.axiomaster.bonio.remote.SecurePrefs
 import android.os.PowerManager
 import kotlinx.coroutines.CoroutineScope
@@ -95,12 +94,10 @@ class NodeRuntime(context: Context) {
     prefs = prefs,
     cameraEnabled = { cameraEnabled.value },
     locationMode = { locationMode.value },
-    voiceWakeMode = { VoiceWakeMode.Off },
     motionActivityAvailable = { false },
     motionPedometerAvailable = { false },
     smsAvailable = { smsAvailable() },
     telephonyAvailable = { hasTelephony() },
-    hasRecordAudioPermission = { hasRecordAudioPermission() },
     manualTls = { manualTls.value },
   )
 
@@ -552,8 +549,6 @@ class NodeRuntime(context: Context) {
       it.telephonyHandler = telephonyHandler
     }
   }
-
-  private fun hasRecordAudioPermission(): Boolean = ContextCompat.checkSelfPermission(appContext, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 
   private fun hasTelephony(): Boolean = appContext.packageManager.hasSystemFeature(PackageManager.FEATURE_TELEPHONY)
 

@@ -70,29 +70,9 @@ fun ChatTab(
     val scope = rememberCoroutineScope()
 
     val attachments = remember { mutableStateListOf<PendingImageAttachment>() }
-    val isSpeakerEnabled by viewModel.isSpeakerEnabled.collectAsState()
-    val partialSttText by viewModel.partialSttText.collectAsState()
 
     val sessionLabel = remember(sessionKey) {
         labelForSessionKey(sessionKey)
-    }
-
-    val micPermissionLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) {
-                viewModel.startVoiceInput()
-            }
-        }
-
-    val startVoiceWithPermission = {
-        val hasMic = androidx.core.content.ContextCompat.checkSelfPermission(
-            context, android.Manifest.permission.RECORD_AUDIO
-        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-        if (hasMic) {
-            viewModel.startVoiceInput()
-        } else {
-            micPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
-        }
     }
 
     val pickImages =
@@ -203,25 +183,6 @@ fun ChatTab(
                         }
                     }
                 }
-
-                Spacer(modifier = Modifier.width(6.dp))
-
-                // Speaker toggle button
-                Surface(
-                    onClick = { viewModel.setSpeakerEnabled(!isSpeakerEnabled) },
-                    shape = RoundedCornerShape(14.dp),
-                    color = if (isSpeakerEnabled) (if (colors.isDark) Color(0xFF1E2D4A) else Color(0xFFE3F2FD)) else colors.surfaceVariant,
-                    modifier = Modifier.size(width = 36.dp, height = 28.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = if (isSpeakerEnabled) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
-                            contentDescription = "Speaker Toggle",
-                            modifier = Modifier.size(16.dp),
-                            tint = if (isSpeakerEnabled) colors.accent else colors.textTertiary
-                        )
-                    }
-                }
             }
 
             if (!errorText.isNullOrBlank()) {
@@ -263,8 +224,6 @@ fun ChatTab(
                         thinkingLevel = thinkingLevel,
                         pendingRunCount = pendingRunCount,
                         attachments = attachments,
-                        isSpeakerEnabled = isSpeakerEnabled,
-                        partialSttText = partialSttText,
                         onPickImages = { pickImages.launch("image/*") },
                         onRemoveAttachment = { id -> attachments.removeAll { it.id == id } },
                         onSetThinkingLevel = { level -> viewModel.setChatThinkingLevel(level) },
@@ -286,9 +245,6 @@ fun ChatTab(
                             viewModel.sendChat(message = text, thinking = thinkingLevel, attachments = outgoing)
                             attachments.clear()
                         },
-                        onStartVoice = { startVoiceWithPermission() },
-                        onStopVoice = { viewModel.stopVoiceInput() },
-                        onCancelVoice = { viewModel.cancelVoiceInput() },
                     )
                 }
             }

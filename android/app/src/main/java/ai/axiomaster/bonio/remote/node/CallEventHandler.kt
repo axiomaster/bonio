@@ -2,13 +2,9 @@ package ai.axiomaster.bonio.remote.node
 
 import android.util.Log
 import ai.axiomaster.bonio.ai.AgentManager
-import ai.axiomaster.bonio.ai.AgentState
 import ai.axiomaster.bonio.remote.chat.ChatController
-import ai.axiomaster.bonio.remote.chat.SpeechToTextManager
-import ai.axiomaster.bonio.remote.chat.SystemTtsManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -20,14 +16,8 @@ class CallEventHandler(
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
-    var ttsManager: SystemTtsManager? = null
-    var sttManager: SpeechToTextManager? = null
     var chatController: ChatController? = null
     var telephonyHandler: TelephonyHandler? = null
-
-    private var isCallSttActive = false
-    private var callSttSessionId = 0
-    private var lastTtsText: String = ""
 
     fun handleEvent(event: String, payloadJson: String?): Boolean {
         return when (event) {
@@ -36,11 +26,11 @@ class CallEventHandler(
                 true
             }
             "call.stt.start" -> {
-                handleSttStart(payloadJson)
+                Log.i(TAG, "call.stt.start ignored (voice input removed)")
                 true
             }
             "call.stt.stop" -> {
-                handleSttStop()
+                Log.i(TAG, "call.stt.stop ignored (voice input removed)")
                 true
             }
             "call.action" -> {
@@ -67,92 +57,19 @@ class CallEventHandler(
         try {
             val obj = json.parseToJsonElement(payloadJson) as? JsonObject ?: return
             val text = obj["text"]?.jsonPrimitive?.content ?: return
-            Log.i(TAG, "Call TTS: $text")
+            Log.i(TAG, "Call TTS (speech output removed, bubble only): $text")
 
-            lastTtsText = text
-            AgentManager.avatarController.setActivity(AgentState.Speaking)
             AgentManager.stateManager.setBubble(text)
 
-            val tts = ttsManager
-            if (tts != null) {
-                tts.onSpeakingDone = {
-                    Log.i(TAG, "Call TTS playback finished, notifying server")
-                    scope.launch {
-                        sendEvent("call.tts.done", "{}")
-                    }
-                }
-                tts.speak(text)
-            } else {
-                scope.launch {
-                    delay(2000)
-                    sendEvent("call.tts.done", "{}")
-                }
+            // Voice is removed: acknowledge immediately so the server's call
+            // flow (which waits for call.tts.done) keeps progressing.
+            scope.launch {
+                sendEvent("call.tts.done", "{}")
             }
 
             addChatMessage(text)
         } catch (e: Exception) {
             Log.w(TAG, "Failed to parse call.tts: ${e.message}")
-        }
-    }
-
-    private fun handleSttStart(payloadJson: String?) {
-        val stt = sttManager ?: run {
-            Log.w(TAG, "No STT manager available for call.stt.start")
-            return
-        }
-
-        if (isCallSttActive) {
-            Log.d(TAG, "Call STT already active, ignoring start")
-            return
-        }
-
-        isCallSttActive = true
-        val mySession = ++callSttSessionId
-        Log.i(TAG, "Call STT started (session $mySession)")
-
-        AgentManager.avatarController.setActivity(AgentState.Listening)
-
-        stt.startListening(object : SpeechToTextManager.Listener {
-            override fun onPartialResult(text: String) {
-                if (callSttSessionId != mySession) return
-                AgentManager.stateManager.setBubble("🎤 $text")
-            }
-
-            override fun onFinalResult(text: String) {
-                if (callSttSessionId != mySession) return
-                Log.i(TAG, "Call STT final result: $text")
-                isCallSttActive = false
-                AgentManager.stateManager.clearBubble()
-
-                addChatMessage("\u7528\u6237\u8bed\u97f3: $text", role = "user")
-
-                scope.launch {
-                    sendEvent("stt.final_result",
-                        """{"text":"$text","context":"call","lastTts":"$lastTtsText"}""")
-                }
-            }
-
-            override fun onError(errorCode: Int) {
-                if (callSttSessionId != mySession) return
-                Log.w(TAG, "Call STT error: $errorCode")
-                isCallSttActive = false
-            }
-
-            override fun onReadyForSpeech() {}
-
-            override fun onEndOfSpeech() {
-                if (callSttSessionId != mySession) return
-                isCallSttActive = false
-            }
-        })
-    }
-
-    private fun handleSttStop() {
-        if (isCallSttActive) {
-            isCallSttActive = false
-            ++callSttSessionId
-            sttManager?.cancelListening()
-            Log.i(TAG, "Call STT stopped")
         }
     }
 

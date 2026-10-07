@@ -2,7 +2,6 @@ package ai.axiomaster.bonio.remote.node
 
 import ai.axiomaster.bonio.remote.LocationMode
 import ai.axiomaster.bonio.remote.SecurePrefs
-import ai.axiomaster.bonio.remote.VoiceWakeMode
 import ai.axiomaster.bonio.remote.gateway.GatewayClientInfo
 import ai.axiomaster.bonio.remote.gateway.GatewayConnectOptions
 import ai.axiomaster.bonio.remote.gateway.GatewayEndpoint
@@ -13,12 +12,10 @@ class ConnectionManager(
   private val prefs: SecurePrefs,
   private val cameraEnabled: () -> Boolean,
   private val locationMode: () -> LocationMode,
-  private val voiceWakeMode: () -> VoiceWakeMode,
   private val motionActivityAvailable: () -> Boolean,
   private val motionPedometerAvailable: () -> Boolean,
   private val smsAvailable: () -> Boolean,
   private val telephonyAvailable: () -> Boolean,
-  private val hasRecordAudioPermission: () -> Boolean,
   private val manualTls: () -> Boolean,
 ) {
   companion object {
@@ -69,7 +66,6 @@ class ConnectionManager(
       cameraEnabled = cameraEnabled(),
       locationEnabled = locationMode() != LocationMode.Off,
       smsAvailable = smsAvailable(),
-      voiceWakeEnabled = voiceWakeMode() != VoiceWakeMode.Off && hasRecordAudioPermission(),
       motionActivityAvailable = motionActivityAvailable(),
       motionPedometerAvailable = motionPedometerAvailable(),
       telephonyAvailable = telephonyAvailable(),

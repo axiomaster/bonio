@@ -5,7 +5,6 @@ enum class OpenClawCapability(val rawValue: String) {
   Camera("camera"),
   Screen("screen"),
   Sms("sms"),
-  VoiceWake("voiceWake"),
   Location("location"),
   Device("device"),
   Notifications("notifications"),

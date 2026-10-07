@@ -9,23 +9,16 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonPrimitive
 import java.util.UUID
 
 class SecurePrefs(context: Context) {
   companion object {
-    val defaultWakeWords: List<String> = listOf("bonio", "claude")
     private const val displayNameKey = "node.displayName"
-    private const val voiceWakeModeKey = "voiceWake.mode"
     private const val plainPrefsName = "bonio.node"
     private const val securePrefsName = "bonio.node.secure"
   }
 
   private val appContext = context.applicationContext
-  private val json = Json { ignoreUnknownKeys = true }
   private val plainPrefs: SharedPreferences =
     appContext.getSharedPreferences(plainPrefsName, Context.MODE_PRIVATE)
 
@@ -100,18 +93,6 @@ class SecurePrefs(context: Context) {
   private val _canvasDebugStatusEnabled =
     MutableStateFlow(plainPrefs.getBoolean("canvas.debugStatusEnabled", false))
   val canvasDebugStatusEnabled: StateFlow<Boolean> = _canvasDebugStatusEnabled
-
-  private val _wakeWords = MutableStateFlow(loadWakeWords())
-  val wakeWords: StateFlow<List<String>> = _wakeWords
-
-  private val _voiceWakeMode = MutableStateFlow(loadVoiceWakeMode())
-  val voiceWakeMode: StateFlow<VoiceWakeMode> = _voiceWakeMode
-
-  private val _talkEnabled = MutableStateFlow(plainPrefs.getBoolean("talk.enabled", false))
-  val talkEnabled: StateFlow<Boolean> = _talkEnabled
-
-  private val _speakerEnabled = MutableStateFlow(plainPrefs.getBoolean("voice.speakerEnabled", true))
-  val speakerEnabled: StateFlow<Boolean> = _speakerEnabled
 
   fun setLastDiscoveredStableId(value: String) {
     val trimmed = value.trim()
@@ -308,60 +289,5 @@ class SecurePrefs(context: Context) {
 
     plainPrefs.edit { putString(displayNameKey, resolved) }
     return resolved
-  }
-
-  fun setWakeWords(words: List<String>) {
-    val sanitized = WakeWords.sanitize(words, defaultWakeWords)
-    val encoded =
-      JsonArray(sanitized.map { JsonPrimitive(it) }).toString()
-    plainPrefs.edit { putString("voiceWake.triggerWords", encoded) }
-    _wakeWords.value = sanitized
-  }
-
-  fun setVoiceWakeMode(mode: VoiceWakeMode) {
-    plainPrefs.edit { putString(voiceWakeModeKey, mode.rawValue) }
-    _voiceWakeMode.value = mode
-  }
-
-  fun setTalkEnabled(value: Boolean) {
-    plainPrefs.edit { putBoolean("talk.enabled", value) }
-    _talkEnabled.value = value
-  }
-
-  fun setSpeakerEnabled(value: Boolean) {
-    plainPrefs.edit { putBoolean("voice.speakerEnabled", value) }
-    _speakerEnabled.value = value
-  }
-
-  private fun loadVoiceWakeMode(): VoiceWakeMode {
-    val raw = plainPrefs.getString(voiceWakeModeKey, null)
-    val resolved = VoiceWakeMode.fromRawValue(raw)
-
-    // Default ON (foreground) when unset.
-    if (raw.isNullOrBlank()) {
-      plainPrefs.edit { putString(voiceWakeModeKey, resolved.rawValue) }
-    }
-
-    return resolved
-  }
-
-  private fun loadWakeWords(): List<String> {
-    val raw = plainPrefs.getString("voiceWake.triggerWords", null)?.trim()
-    if (raw.isNullOrEmpty()) return defaultWakeWords
-    return try {
-      val element = json.parseToJsonElement(raw)
-      val array = element as? JsonArray ?: return defaultWakeWords
-      val decoded =
-        array.mapNotNull { item ->
-          when (item) {
-            is JsonNull -> null
-            is JsonPrimitive -> item.content.trim().takeIf { it.isNotEmpty() }
-            else -> null
-          }
-        }
-      WakeWords.sanitize(decoded, defaultWakeWords)
-    } catch (_: Throwable) {
-      defaultWakeWords
-    }
   }
 }
