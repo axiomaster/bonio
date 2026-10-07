@@ -371,6 +371,29 @@ fun SettingsTab(
                         value = appVersion
                     )
                     Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                context.startActivity(
+                                    android.content.Intent(context, ai.axiomaster.bonio.PrivacyPolicyActivity::class.java)
+                                )
+                            },
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (currentLanguage == AppLanguage.ZH) "隐私政策" else "Privacy Policy",
+                            fontSize = 13.sp,
+                            color = colors.textSecondary
+                        )
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = colors.textTertiary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
