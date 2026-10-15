@@ -1017,6 +1017,13 @@ class FloatingWindowService : Service() {
             return
         }
 
+        // Gesture captures are accessibility-only: the MediaProjection consent
+        // dialog would yank the user out of the screen they want to remember.
+        if (ai.axiomaster.bonio.remote.node.BonioAccessibilityService.instance == null) {
+            remindAccessibility("开启无障碍后才能记住屏幕 · 点我设置")
+            return
+        }
+
         rememberPending = true
         cueEpoch += 1
         val epoch = cueEpoch
@@ -1029,8 +1036,11 @@ class FloatingWindowService : Service() {
 
         serviceScope.launch {
             try {
-                val screenshotBase64 = runtime.captureScreenshot(maxEdge = 1080, quality = 80)
-                    ?: throw IllegalStateException("截图失败，请稍后再试")
+                val screenshotBase64 = runtime.captureScreenshot(
+                    maxEdge = 1080,
+                    quality = 80,
+                    allowMediaProjectionFallback = false,
+                ) ?: throw IllegalStateException("截图失败，请稍后再试")
 
                 // Local archive is best-effort: never blocks or fails the memory save.
                 val localFile = withContext(Dispatchers.IO) { saveScreenshotLocally(screenshotBase64) }
@@ -1147,21 +1157,22 @@ class FloatingWindowService : Service() {
             return
         }
 
-        // Accessibility gives the richest analysis, but its absence must not
-        // dead-end the gesture: still screenshot, try OCR, and fall back to
-        // saving the screenshot as a memory (无障碍分析 >> OCR 分析 >> 截图记忆).
+        // Accessibility gives the richest analysis. Gesture captures are
+        // accessibility-only — the MediaProjection consent dialog would yank
+        // the user out of the app being analyzed — so nudge instead of falling
+        // back to it.
         val a11yMissing = ai.axiomaster.bonio.remote.node.BonioAccessibilityService.instance == null
-        pendingAccessibilityPrompt = a11yMissing
+        if (a11yMissing) {
+            remindAccessibility("暂无建议 · 开启无障碍后可分析屏幕")
+            return
+        }
 
         magicCuePending = true
         actionableCues = emptyList()
         cueEpoch += 1
         avatarController.clearBubble()
         avatarController.setActivity(AgentState.Thinking)
-        setHeadStatus(
-            if (a11yMissing) "正在截图识别（开启无障碍可分析屏幕）…" else "正在分析屏幕…",
-            60_000,
-        )
+        setHeadStatus("正在分析屏幕…", 60_000)
 
         serviceScope.launch {
             try {
@@ -1169,7 +1180,11 @@ class FloatingWindowService : Service() {
                 // takeScreenshot API has a minimum interval and rejects
                 // back-to-back calls, so the old parallel capture raced the
                 // context's own OCR screenshot (both could fail).
-                val screenshotBase64 = runtime.captureScreenshot(maxEdge = 1080, quality = 80)
+                val screenshotBase64 = runtime.captureScreenshot(
+                    maxEdge = 1080,
+                    quality = 80,
+                    allowMediaProjectionFallback = false,
+                )
                 val (screen, hasText) = parseScreenContext(runtime, screenshotBase64)
 
                 val isWechat = screen.packageName == WECHAT_PACKAGE

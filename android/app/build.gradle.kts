@@ -59,6 +59,7 @@ dependencies {
     
     // CardView for Text Bubble container
     implementation("androidx.cardview:cardview:1.0.0")
+    implementation("com.airbnb.android:lottie-compose:6.4.1")  // VoiceTab (WIP) uses Lottie animations
     // AppCompat for PermissionRequester / ScreenCaptureRequester
     implementation("androidx.appcompat:appcompat:1.6.1")
     // Navigation Compose

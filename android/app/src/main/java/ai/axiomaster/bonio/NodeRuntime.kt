@@ -297,8 +297,16 @@ class NodeRuntime(context: Context) {
    * Captures screen as JPEG Base64.
    * Prefers BonioAccessibilityService (silent, no MediaProjection prompt).
    * Falls back to ScreenCaptureManager if MediaProjection is authorized.
+   *
+   * Set [allowMediaProjectionFallback] = false for floating-avatar gestures:
+   * the MediaProjection consent dialog yanks the user out of the app being
+   * analyzed, and the resulting capture misses the original screen anyway.
    */
-  suspend fun captureScreenshot(maxEdge: Int = 1080, quality: Int = 80): String? {
+  suspend fun captureScreenshot(
+    maxEdge: Int = 1080,
+    quality: Int = 80,
+    allowMediaProjectionFallback: Boolean = true,
+  ): String? {
     // 1. Accessibility Service silent screenshot
     val a11y = BonioAccessibilityService.instance
     if (a11y != null) {
@@ -311,6 +319,11 @@ class NodeRuntime(context: Context) {
       } catch (e: Throwable) {
         ai.axiomaster.bonio.util.AppLogger.w("NodeRuntime", "AccessibilityService takeScreenshot failed: ${e.message}")
       }
+    }
+
+    if (!allowMediaProjectionFallback) {
+      ai.axiomaster.bonio.util.AppLogger.i("NodeRuntime", "MediaProjection fallback disabled; screenshot unavailable")
+      return null
     }
 
     // 2. Fallback to ScreenCaptureManager (MediaProjection)
